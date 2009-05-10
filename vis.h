@@ -8,7 +8,7 @@ typedef char u8;
 // forward declaration
 struct SimState;
 
-#define VIS_BLOCK_SIZE 3
+#define VIS_BLOCK_SIZE 4
 
 void SDLDrawPixel(SDL_Surface *screen, int x, int y, u8 r, u8 g, u8 b);
 Uint32 SDLGetPixel(SDL_Surface *surface, int x, int y);

@@ -231,14 +231,17 @@ void SimInit(struct SimState *state)
 		state->lat[5][i] = state->lat[6][i] = state->lat[7][i] = state->lat[8][i] = 1.0/36.0;
 	}
 
+	// bottom
 	for (i = 0; i < LAT_W; i++) {
 		state->map[i] = GEO_WALL;
 	}
 
+	// left / right
 	for (i = 0; i < LAT_H; i++) {
-		state->map[i*LAT_H] = state->map[LAT_W-1 + i*LAT_H] = GEO_WALL;
+		state->map[i*LAT_W] = state->map[LAT_W-1 + i*LAT_W] = GEO_WALL;
 	}
 
+	// top
 	for (i = 0; i < LAT_W; i++) {
 		state->map[(LAT_H-1)*LAT_W + i] = GEO_INFLOW;
 	}
@@ -271,7 +274,7 @@ void SimCleanup(struct SimState *state)
 
 	free(state->map);
 	cudaFree(state->dmap);
-	for (i = 0; i < 0; i++) {
+	for (i = 0; i < 8; i++) {
 		free(state->lat[i]);
 	}
 
@@ -302,8 +305,6 @@ void SimCleanup(struct SimState *state)
 
 int main(int argc, char **argv)
 {
-	int i;
-
 	dim3 grid;
 	grid.x = LAT_W/BLOCK_SIZE;
 	grid.y = LAT_H;
@@ -316,10 +317,12 @@ int main(int argc, char **argv)
 	int iter = 0;
 
 	SDL_Event event;
-	int keypress = 0;
-	int h = 0;
+	bool quit = false;
+	bool mouse = false;
+	bool update_map = false;
+	int last_x, last_y;
 
-	while (!keypress) {
+	while (!quit) {
 
 		if (iter % 100 == 0) {
 			LBMCollideAndPropagate<<<grid, BLOCK_SIZE, BLOCK_SIZE*6*sizeof(float)>>>(state.dmap, state.d1, state.d2, state.drho, state.dvx, state.dvy);
@@ -338,14 +341,46 @@ int main(int argc, char **argv)
 		}
 
 	    while (SDL_PollEvent(&event)) {
-			switch(event.type) {
+			switch (event.type) {
 			case SDL_QUIT:
-				keypress = 1;
+				quit = true;
 				break;
 			case SDL_KEYDOWN:
-				keypress = 1;
+				quit = true;
 				break;
+			case SDL_MOUSEBUTTONUP:
+				if (event.button.button == SDL_BUTTON_LEFT) {
+					mouse = false;
+					last_x = event.button.x / VIS_BLOCK_SIZE;
+					last_y = event.button.y / VIS_BLOCK_SIZE;
+					state.map[(LAT_H-last_y-1) * LAT_W + last_x] = GEO_WALL;
+					update_map = true;
+				}
+				break;
+
+			case SDL_MOUSEBUTTONDOWN:
+				if (event.button.button == SDL_BUTTON_LEFT) {
+					mouse = true;
+					last_x = event.button.x / VIS_BLOCK_SIZE;
+					last_y = event.button.y / VIS_BLOCK_SIZE;
+					state.map[(LAT_H-last_y-1) * LAT_W + last_x] = GEO_WALL;
+					update_map = true;
+				}
+				break;
+
+			case SDL_MOUSEMOTION:
+				if (mouse) {
+					last_x = event.motion.x / VIS_BLOCK_SIZE;
+					last_y = event.motion.y / VIS_BLOCK_SIZE;
+					state.map[(LAT_H-last_y-1) * LAT_W + last_x] = GEO_WALL;
+					update_map = true;
+				}
 			}
+		}
+
+		if (update_map) {
+			cudaMemcpy(state.dmap, state.map, size_i, cudaMemcpyHostToDevice);
+			update_map = false;
 		}
 
 		iter++;

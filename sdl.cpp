@@ -200,7 +200,11 @@ void visualize(struct SimState *state)
 	for (y = 0; y < LAT_H; y++) {
 		for (x = 0; x < LAT_W; x++) {
 			float amnt = sqrtf(state->vx[i]*state->vx[i] + state->vy[i]*state->vy[i]) / 0.1f * 255.0f;
-			SDLDrawBlockPixel(vis.bbuf, x, LAT_H-y, (int)amnt, (int)amnt, 0);
+			if (state->map[i] == GEO_WALL) {
+				SDLDrawBlockPixel(vis.bbuf, x, LAT_H-y-1, 0, 0, 255);
+			} else {
+				SDLDrawBlockPixel(vis.bbuf, x, LAT_H-y-1, (int)amnt, (int)amnt, 0);
+			}
 			i++;
 		}
 	}
