@@ -2,22 +2,15 @@
 #include <cstdlib>
 #include <cmath>
 
-#define GEO_FLUID 0
-#define GEO_WALL 1
-#define GEO_INFLOW 2
+#include "sim.h"
+#include "vis.h"
 
-#define LAT_H 128
-#define LAT_W 128
-
-#define BLOCK_SIZE 64
+const int size_i = LAT_W*LAT_H*sizeof(int);
+const int size_f = LAT_W*LAT_H*sizeof(float);
 
 const float visc = 0.01f;				// viscosity
 __constant__ float tau;					// relaxation time
 __constant__ int latH = LAT_H;			// lattice height
-
-struct Dist {
-	float *fC, *fE, *fW, *fS, *fN, *fSE, *fSW, *fNE, *fNW;
-};
 
 // TODO:
 // - try having dummy nodes as the edges of the lattice to avoid divergent threads
@@ -189,7 +182,7 @@ void output(int snum, float *vx, float *vy, float *rho)
 	fclose(fp);
 }
 
-int main(int argc, char **argv)
+void SimInit(struct SimState *state)
 {
 	int i;
 
@@ -197,142 +190,168 @@ int main(int argc, char **argv)
 	float tmp = (6.0f*visc + 1.0f)/2.0f;
 	cudaMemcpyToSymbol(tau, &tmp, sizeof(float));
 
-	int size_i = LAT_W*LAT_H*sizeof(int);
-	int size_f = LAT_W*LAT_H*sizeof(float);
+	state->map = (int*)calloc(LAT_W*LAT_H, sizeof(int));
+	cudaMalloc((void**)&state->dmap, size_i);
 
-	int *map, *dmap;
-	map = (int*)calloc(LAT_W*LAT_H, sizeof(int));
-	cudaMalloc((void**)&dmap, size_i);
+	cudaMalloc((void**)&state->dvx, size_f);
+	cudaMalloc((void**)&state->dvy, size_f);
+	cudaMalloc((void**)&state->drho, size_f);
 
-	// macroscopic quantities on the video card
-	float *dvx, *dvy, *drho;
-	cudaMalloc((void**)&dvx, size_f);
-	cudaMalloc((void**)&dvy, size_f);
-	cudaMalloc((void**)&drho, size_f);
+	state->vx = (float*)malloc(size_f);
+	state->vy = (float*)malloc(size_f);
+	state->rho = (float*)malloc(size_f);
 
-	// macroscopic quantities in RAM
-	float *vx, *vy, *rho;
-	vx = (float*)malloc(size_f);
-	vy = (float*)malloc(size_f);
-	rho = (float*)malloc(size_f);
+	cudaMalloc((void**)&state->d1.fC, size_f);
+	cudaMalloc((void**)&state->d1.fE, size_f);
+	cudaMalloc((void**)&state->d1.fW, size_f);
+	cudaMalloc((void**)&state->d1.fN, size_f);
+	cudaMalloc((void**)&state->d1.fS, size_f);
+	cudaMalloc((void**)&state->d1.fNE, size_f);
+	cudaMalloc((void**)&state->d1.fSE, size_f);
+	cudaMalloc((void**)&state->d1.fNW, size_f);
+	cudaMalloc((void**)&state->d1.fSW, size_f);
 
-	float *lat[9];
-	Dist d1, d2;
-
-	cudaMalloc((void**)&d1.fC, size_f);
-	cudaMalloc((void**)&d1.fE, size_f);
-	cudaMalloc((void**)&d1.fW, size_f);
-	cudaMalloc((void**)&d1.fN, size_f);
-	cudaMalloc((void**)&d1.fS, size_f);
-	cudaMalloc((void**)&d1.fNE, size_f);
-	cudaMalloc((void**)&d1.fSE, size_f);
-	cudaMalloc((void**)&d1.fNW, size_f);
-	cudaMalloc((void**)&d1.fSW, size_f);
-
-	cudaMalloc((void**)&d2.fC, size_f);
-	cudaMalloc((void**)&d2.fE, size_f);
-	cudaMalloc((void**)&d2.fW, size_f);
-	cudaMalloc((void**)&d2.fN, size_f);
-	cudaMalloc((void**)&d2.fS, size_f);
-	cudaMalloc((void**)&d2.fNE, size_f);
-	cudaMalloc((void**)&d2.fSE, size_f);
-	cudaMalloc((void**)&d2.fNW, size_f);
-	cudaMalloc((void**)&d2.fSW, size_f);
+	cudaMalloc((void**)&state->d2.fC, size_f);
+	cudaMalloc((void**)&state->d2.fE, size_f);
+	cudaMalloc((void**)&state->d2.fW, size_f);
+	cudaMalloc((void**)&state->d2.fN, size_f);
+	cudaMalloc((void**)&state->d2.fS, size_f);
+	cudaMalloc((void**)&state->d2.fNE, size_f);
+	cudaMalloc((void**)&state->d2.fSE, size_f);
+	cudaMalloc((void**)&state->d2.fNW, size_f);
+	cudaMalloc((void**)&state->d2.fSW, size_f);
 
 	for (i = 0; i < 9; i++) {
-		lat[i] = (float*)malloc(size_f);
+		state->lat[i] = (float*)malloc(size_f);
 	}
 
 	for (i = 0; i < LAT_W*LAT_H; i++) {
-		lat[0][i] = 4.0/9.0;
-		lat[1][i] = lat[2][i] = lat[3][i] = lat[4][i] = 1.0/9.0;
-		lat[5][i] = lat[6][i] = lat[7][i] = lat[8][i] = 1.0/36.0;
+		state->lat[0][i] = 4.0/9.0;
+		state->lat[1][i] = state->lat[2][i] = state->lat[3][i] = state->lat[4][i] = 1.0/9.0;
+		state->lat[5][i] = state->lat[6][i] = state->lat[7][i] = state->lat[8][i] = 1.0/36.0;
 	}
 
 	for (i = 0; i < LAT_W; i++) {
-		map[i] = GEO_WALL;
+		state->map[i] = GEO_WALL;
 	}
 
 	for (i = 0; i < LAT_H; i++) {
-		map[i*LAT_H] = map[LAT_W-1 + i*LAT_H] = GEO_WALL;
+		state->map[i*LAT_H] = state->map[LAT_W-1 + i*LAT_H] = GEO_WALL;
 	}
 
 	for (i = 0; i < LAT_W; i++) {
-		map[(LAT_H-1)*LAT_W + i] = GEO_INFLOW;
+		state->map[(LAT_H-1)*LAT_W + i] = GEO_INFLOW;
 	}
 
-	cudaMemcpy(dmap, map, size_i, cudaMemcpyHostToDevice);
-	cudaMemcpy(d1.fC, lat[0], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d1.fN, lat[1], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d1.fS, lat[2], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d1.fE, lat[3], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d1.fW, lat[4], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d1.fNE, lat[5], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d1.fNW, lat[6], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d1.fSE, lat[7], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d1.fSW, lat[8], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->dmap, state->map, size_i, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d1.fC, state->lat[0], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d1.fN, state->lat[1], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d1.fS, state->lat[2], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d1.fE, state->lat[3], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d1.fW, state->lat[4], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d1.fNE, state->lat[5], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d1.fNW, state->lat[6], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d1.fSE, state->lat[7], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d1.fSW, state->lat[8], size_f, cudaMemcpyHostToDevice);
 
-	cudaMemcpy(d2.fC, lat[0], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d2.fN, lat[1], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d2.fS, lat[2], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d2.fE, lat[3], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d2.fW, lat[4], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d2.fNE, lat[5], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d2.fNW, lat[6], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d2.fSE, lat[7], size_f, cudaMemcpyHostToDevice);
-	cudaMemcpy(d2.fSW, lat[8], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d2.fC, state->lat[0], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d2.fN, state->lat[1], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d2.fS, state->lat[2], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d2.fE, state->lat[3], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d2.fW, state->lat[4], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d2.fNE, state->lat[5], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d2.fNW, state->lat[6], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d2.fSE, state->lat[7], size_f, cudaMemcpyHostToDevice);
+	cudaMemcpy(state->d2.fSW, state->lat[8], size_f, cudaMemcpyHostToDevice);
+}
+
+void SimCleanup(struct SimState *state)
+{
+	int i;
+
+	free(state->map);
+	cudaFree(state->dmap);
+	for (i = 0; i < 0; i++) {
+		free(state->lat[i]);
+	}
+
+	cudaFree(state->dvx);
+	cudaFree(state->dvy);
+	cudaFree(state->drho);
+
+	cudaFree(state->d1.fC);
+	cudaFree(state->d1.fE);
+	cudaFree(state->d1.fW);
+	cudaFree(state->d1.fS);
+	cudaFree(state->d1.fN);
+	cudaFree(state->d1.fNE);
+	cudaFree(state->d1.fNW);
+	cudaFree(state->d1.fSE);
+	cudaFree(state->d1.fSW);
+
+	cudaFree(state->d2.fC);
+	cudaFree(state->d2.fE);
+	cudaFree(state->d2.fW);
+	cudaFree(state->d2.fS);
+	cudaFree(state->d2.fN);
+	cudaFree(state->d2.fNE);
+	cudaFree(state->d2.fNW);
+	cudaFree(state->d2.fSE);
+	cudaFree(state->d2.fSW);
+}
+
+int main(int argc, char **argv)
+{
+	int i;
+
 	dim3 grid;
-
 	grid.x = LAT_W/BLOCK_SIZE;
 	grid.y = LAT_H;
 
-	for (int iter = 0; iter < 10000; iter++) {
+	struct SimState state;
+
+	SimInit(&state);
+	SDLInit();
+
+	int iter = 0;
+
+	SDL_Event event;
+	int keypress = 0;
+	int h = 0;
+
+	while (!keypress) {
 
 		if (iter % 100 == 0) {
-			LBMCollideAndPropagate<<<grid, BLOCK_SIZE, BLOCK_SIZE*6*sizeof(float)>>>(dmap, d1, d2, drho, dvx, dvy);
-			cudaMemcpy(vx, dvx, size_f, cudaMemcpyDeviceToHost);
-			cudaMemcpy(vy, dvy, size_f, cudaMemcpyDeviceToHost);
-			cudaMemcpy(rho, drho, size_f, cudaMemcpyDeviceToHost);
-			output(iter, vx, vy, rho);
+			LBMCollideAndPropagate<<<grid, BLOCK_SIZE, BLOCK_SIZE*6*sizeof(float)>>>(state.dmap, state.d1, state.d2, state.drho, state.dvx, state.dvy);
+			cudaMemcpy(state.vx, state.dvx, size_f, cudaMemcpyDeviceToHost);
+			cudaMemcpy(state.vy, state.dvy, size_f, cudaMemcpyDeviceToHost);
+			cudaMemcpy(state.rho, state.drho, size_f, cudaMemcpyDeviceToHost);
+//			output(iter, state.vx, state.vy, state.rho);
+			visualize(&state);
 		} else {
 			// A-B access pattern with swapped distributions d1, d2
 			if (iter % 2 == 0) {
-				LBMCollideAndPropagate<<<grid, BLOCK_SIZE, BLOCK_SIZE*6*sizeof(float)>>>(dmap, d1, d2, drho, dvx, dvy);
+				LBMCollideAndPropagate<<<grid, BLOCK_SIZE, BLOCK_SIZE*6*sizeof(float)>>>(state.dmap, state.d1, state.d2, state.drho, state.dvx, state.dvy);
 			} else {
-				LBMCollideAndPropagate<<<grid, BLOCK_SIZE, BLOCK_SIZE*6*sizeof(float)>>>(dmap, d2, d1, drho, dvx, dvy);
+				LBMCollideAndPropagate<<<grid, BLOCK_SIZE, BLOCK_SIZE*6*sizeof(float)>>>(state.dmap, state.d2, state.d1, state.drho, state.dvx, state.dvy);
 			}
 		}
+
+	    while (SDL_PollEvent(&event)) {
+			switch(event.type) {
+			case SDL_QUIT:
+				keypress = 1;
+				break;
+			case SDL_KEYDOWN:
+				keypress = 1;
+				break;
+			}
+		}
+
+		iter++;
 	}
 
-	free(map);
-	cudaFree(dmap);
-	for (i = 0; i < 0; i++) {
-		free(lat[i]);
-	}
-
-	cudaFree(dvx);
-	cudaFree(dvy);
-	cudaFree(drho);
-
-	cudaFree(d1.fC);
-	cudaFree(d1.fE);
-	cudaFree(d1.fW);
-	cudaFree(d1.fS);
-	cudaFree(d1.fN);
-	cudaFree(d1.fNE);
-	cudaFree(d1.fNW);
-	cudaFree(d1.fSE);
-	cudaFree(d1.fSW);
-
-	cudaFree(d2.fC);
-	cudaFree(d2.fE);
-	cudaFree(d2.fW);
-	cudaFree(d2.fS);
-	cudaFree(d2.fN);
-	cudaFree(d2.fNE);
-	cudaFree(d2.fNW);
-	cudaFree(d2.fSE);
-	cudaFree(d2.fSW);
-
+	SDL_Quit();
+	SimCleanup(&state);
 	return 0;
 }
