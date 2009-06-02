@@ -8,35 +8,35 @@
 #define M_WALL 1
 #define M_SETU 2
 
-const int mx = 100;
-const int my = 100;
+const int mx = 128;
+const int my = 128;
 
-const double visc = 0.005;
-double tau;
+const float visc = 0.01f;
+float tau;
 
-double ***outbuf;
-double ***ltc;
+float ***outbuf;
+float ***ltc;
 char **map;
 
 void allocate()
 {
 	int x, y;
 
-	ltc = (double***)calloc(mx, sizeof(double **));
-	outbuf = (double***)calloc(mx, sizeof(double **));
+	ltc = (float***)calloc(mx, sizeof(float **));
+	outbuf = (float***)calloc(mx, sizeof(float **));
 	map = (char**)calloc(mx, sizeof(char*));
 
 	for (x = 0; x < mx; x++) {
-		ltc[x] = (double**)calloc(my, sizeof(double *));
+		ltc[x] = (float**)calloc(my, sizeof(float *));
 		map[x] = (char*)calloc(my, sizeof(char));
-		outbuf[x] = (double**)calloc(my, sizeof(double *));
+		outbuf[x] = (float**)calloc(my, sizeof(float *));
 
 		for (y = 0; y < my; y++) {
-			ltc[x][y] = (double*)calloc(9, sizeof(double));
+			ltc[x][y] = (float*)calloc(9, sizeof(float));
 		}
 	}
 
-	outbuf[0][0] = (double*)calloc(mx*my*3, sizeof(double));
+	outbuf[0][0] = (float*)calloc(mx*my*3, sizeof(float));
 
 	for (x = 0; x < mx; x++) {
 		for (y = 0; y < my; y++) {
@@ -51,15 +51,15 @@ void init()
 
 	for (x = 0; x < mx; x++) {
 		for (y = 0; y < my; y++) {
-			ltc[x][y][0] = 4.0/9.0;
+			ltc[x][y][0] = 4.0f/9.0f;
 			ltc[x][y][1] =
 			ltc[x][y][2] =
 			ltc[x][y][3] =
-			ltc[x][y][4] = 1.0/9.0;
+			ltc[x][y][4] = 1.0f/9.0f;
 			ltc[x][y][5] =
 			ltc[x][y][6] =
 			ltc[x][y][7] =
-			ltc[x][y][8] = 1.0/36.0;
+			ltc[x][y][8] = 1.0f/36.0f;
 		}
 	}
 
@@ -137,7 +137,7 @@ void propagate()
 	}
 }
 
-void get_macro(int x, int y, double &rho, double &vx, double &vy)
+void get_macro(int x, int y, float &rho, float &vx, float &vy)
 {
 	int i;
 	rho = 0.0;
@@ -150,8 +150,8 @@ void get_macro(int x, int y, double &rho, double &vx, double &vy)
 		vx = (ltc[x][y][2] + ltc[x][y][5] + ltc[x][y][6] - ltc[x][y][8] - ltc[x][y][4] - ltc[x][y][7])/rho;
 		vy = (ltc[x][y][1] + ltc[x][y][5] + ltc[x][y][8] - ltc[x][y][7] - ltc[x][y][3] - ltc[x][y][6])/rho;
 	} else {
-		vx = 0.1;
-		vy = 0.0;
+		vx = 0.1f;
+		vy = 0.0f;
 	}
 }
 
@@ -171,21 +171,21 @@ void relaxate()
 		for (y = 0; y < my; y++) {
 
 			if (map[x][y] != M_WALL) {
-				double vx, vy, rho;
+				float vx, vy, rho;
 				get_macro(x, y, rho, vx, vy);
 
-				double Cusq = -1.5 * (vx*vx + vy*vy);
-				double feq[9];
+				float Cusq = -1.5f * (vx*vx + vy*vy);
+				float feq[9];
 
-				feq[0] = rho * (1.0 + Cusq) * 4.0/9.0;
-				feq[1] = rho * (1.0 + Cusq + 3.0*vy + 4.5*vy*vy) / 9.0;
-				feq[2] = rho * (1.0 + Cusq + 3.0*vx + 4.5*vx*vx) / 9.0;
-				feq[3] = rho * (1.0 + Cusq - 3.0*vy + 4.5*vy*vy) / 9.0;
-				feq[4] = rho * (1.0 + Cusq - 3.0*vx + 4.5*vx*vx) / 9.0;
-				feq[5] = rho * (1.0 + Cusq + 3.0*(vx+vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0;
-				feq[6] = rho * (1.0 + Cusq + 3.0*(vx-vy) + 4.5*(vx-vy)*(vx-vy)) / 36.0;
-				feq[7] = rho * (1.0 + Cusq + 3.0*(-vx-vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0;
-				feq[8] = rho * (1.0 + Cusq + 3.0*(-vx+vy) + 4.5*(-vx+vy)*(-vx+vy)) / 36.0;
+				feq[0] = rho * (1.0f + Cusq) * 4.0f/9.0f;
+				feq[1] = rho * (1.0f + Cusq + 3.0f*vy + 4.5f*vy*vy) / 9.0f;
+				feq[2] = rho * (1.0f + Cusq + 3.0f*vx + 4.5f*vx*vx) / 9.0f;
+				feq[3] = rho * (1.0f + Cusq - 3.0f*vy + 4.5f*vy*vy) / 9.0f;
+				feq[4] = rho * (1.0f + Cusq - 3.0f*vx + 4.5f*vx*vx) / 9.0f;
+				feq[5] = rho * (1.0f + Cusq + 3.0f*(vx+vy) + 4.5f*(vx+vy)*(vx+vy)) / 36.0f;
+				feq[6] = rho * (1.0f + Cusq + 3.0f*(vx-vy) + 4.5f*(vx-vy)*(vx-vy)) / 36.0f;
+				feq[7] = rho * (1.0f + Cusq + 3.0f*(-vx-vy) + 4.5f*(vx+vy)*(vx+vy)) / 36.0f;
+				feq[8] = rho * (1.0f + Cusq + 3.0f*(-vx+vy) + 4.5f*(-vx+vy)*(-vx+vy)) / 36.0f;
 
 				if (map[x][y] == M_FLUID) {
 					for (i = 0; i < 9; i++) {
@@ -197,7 +197,7 @@ void relaxate()
 					}
 				}
 			} else {
-				double tmp;
+				float tmp;
 				tmp = ltc[x][y][2];
 				ltc[x][y][2] = ltc[x][y][4];
 				ltc[x][y][4] = tmp;
@@ -218,7 +218,8 @@ void relaxate()
 	}
 }
 
-void output(int snum, hid_t file, hid_t dataspace, hid_t datatype)
+void output(int snum)
+	//, hid_t file, hid_t dataspace, hid_t datatype)
 {
 	int x, y;
 	char name[128];
@@ -230,13 +231,13 @@ void output(int snum, hid_t file, hid_t dataspace, hid_t datatype)
 	sprintf(name, "t%d", snum);
 	for (x = 0; x < mx; x++) {
 		for (y = 0; y < my; y++) {
-			double vx, vy, rho;
+			float vx, vy, rho;
 			get_macro(x, y, rho, vx, vy);
 
-			outbuf[x][y][0] = rho;
+/*			outbuf[x][y][0] = rho;
 			outbuf[x][y][1] = vx;
 			outbuf[x][y][2] = vy;
-
+*/
 //			printf("%x\n", &outbuf[x][y][0]);
 
 //			fprintf(fp, "%d %d %f %f %f | %f %f %f %f %f %f %f %f %f\n", x, y, rho, vx, vy,
@@ -246,9 +247,9 @@ void output(int snum, hid_t file, hid_t dataspace, hid_t datatype)
 		}
 		fprintf(fp, "\n");
 	}
-	hid_t dataset = H5Dcreate(file, name, datatype, dataspace, H5P_DEFAULT);
-    H5Dwrite(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &outbuf[0][0][0]);
-	H5Dclose(dataset);
+//	hid_t dataset = H5Dcreate(file, name, datatype, dataspace, H5P_DEFAULT);
+//    H5Dwrite(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &outbuf[0][0][0]);
+//	H5Dclose(dataset);
 
 	fclose(fp);
 }
@@ -259,8 +260,8 @@ int main(int argc, char **argv)
 	int st = 0;
 	int Re;
 
-	tau = (6.0*visc + 1.0)/2.0;
-	Re=(int)((mx-1)*0.1/((2.0*tau-1.0)/6.0)+0.5);
+	tau = (6.0f*visc + 1.0f)/2.0f;
+	Re=(int)((mx-1)*0.1f/((2.0f*tau-1.0f)/6.0f)+0.5f);
 
 	printf("visc = %f\n", visc);
 	printf("tau = %f\n", tau);
@@ -269,24 +270,24 @@ int main(int argc, char **argv)
 	allocate();
 	init();
 
-    hsize_t dimsf[] = {mx, my, 3};
-	hid_t file = H5Fcreate("out.dat", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-	hid_t dataspace = H5Screate_simple(3, dimsf, NULL);
-	hid_t datatype = H5Tcopy(H5T_NATIVE_DOUBLE);
+//	hsize_t dimsf[] = {mx, my, 3};
+//	hid_t file = H5Fcreate("out.dat", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+//	hid_t dataspace = H5Screate_simple(3, dimsf, NULL);
+//	hid_t datatype = H5Tcopy(H5T_NATIVE_DOUBLE);
 //	H5Tset_order(datatype, H5T_ORDER_LE);
 
-	for (st = 1; st < 30000; st++) {
+	for (st = 1; st < 10000; st++) {
 		relaxate();
 		propagate();
-		if (st % 10 == 0) {
-			output(st, file, dataspace, datatype);
+		if (st % 100 == 0) {
+			output(st);	//, file, dataspace, datatype);
 			printf("%05d\n", st);
 		}
 	}
 
-	H5Sclose(dataspace);
-	H5Tclose(datatype);
-	H5Fclose(file);
+//	H5Sclose(dataspace);
+//	H5Tclose(datatype);
+//	H5Fclose(file);
 
 	return 0;
 }
