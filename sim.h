@@ -26,4 +26,9 @@ struct SimState {
 	Dist d1, d2;
 };
 
+void SimInit(struct SimState *state);
+void SimCleanup(struct SimState *state);
+void SimUpdate(int iter, struct SimState state);
+void SimUpdateMap(struct SimState state);
+
 #endif  /* __SIM_H_ */

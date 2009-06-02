@@ -4,151 +4,153 @@
 
 #include <hdf5.h>
 
+#include "sim.h"
+
 #define M_FLUID 0
 #define M_WALL 1
 #define M_SETU 2
 
-const int mx = 128;
-const int my = 128;
+const int size_i = LAT_W*LAT_H*sizeof(int);
+const int size_f = LAT_W*LAT_H*sizeof(float);
 
 const float visc = 0.01f;
 float tau;
 
-float ***outbuf;
-float ***ltc;
-char **map;
+#define idx(x,y) ((y)*LAT_W+(x))
 
-void allocate()
+void allocate(struct SimState *state)
 {
-	int x, y;
+	int x, y, i;
 
-	ltc = (float***)calloc(mx, sizeof(float **));
-	outbuf = (float***)calloc(mx, sizeof(float **));
+	state->map = (int*)calloc(LAT_W*LAT_H, sizeof(int));
+	state->vx = (float*)malloc(size_f);
+	state->vy = (float*)malloc(size_f);
+	state->rho = (float*)malloc(size_f);
+
+	for (i = 0; i < 9; i++) {
+		state->lat[i] = (float*)malloc(size_f);
+	}
+
+/*	ltc = (float***)calloc(mx, sizeof(float **));
 	map = (char**)calloc(mx, sizeof(char*));
 
 	for (x = 0; x < mx; x++) {
 		ltc[x] = (float**)calloc(my, sizeof(float *));
 		map[x] = (char*)calloc(my, sizeof(char));
-		outbuf[x] = (float**)calloc(my, sizeof(float *));
 
 		for (y = 0; y < my; y++) {
 			ltc[x][y] = (float*)calloc(9, sizeof(float));
 		}
-	}
-
-	outbuf[0][0] = (float*)calloc(mx*my*3, sizeof(float));
-
-	for (x = 0; x < mx; x++) {
-		for (y = 0; y < my; y++) {
-			outbuf[x][y] = outbuf[0][0] + (x*my + y)*3;
-		}
-	}
+	}*/
 }
 
-void init()
+void init(struct SimState *state)
 {
-	int x, y;
+	int x, y, i;
 
-	for (x = 0; x < mx; x++) {
-		for (y = 0; y < my; y++) {
-			ltc[x][y][0] = 4.0f/9.0f;
-			ltc[x][y][1] =
-			ltc[x][y][2] =
-			ltc[x][y][3] =
-			ltc[x][y][4] = 1.0f/9.0f;
-			ltc[x][y][5] =
-			ltc[x][y][6] =
-			ltc[x][y][7] =
-			ltc[x][y][8] = 1.0f/36.0f;
+	for (x = 0; x < LAT_W; x++) {
+		for (y = 0; y < LAT_H; y++) {
+			i = idx(x,y);
+			state->lat[0][i] = 4.0f/9.0f;
+			state->lat[1][i] =
+			state->lat[2][i] =
+			state->lat[3][i] =
+			state->lat[4][i] = 1.0f/9.0f;
+			state->lat[5][i] =
+			state->lat[6][i] =
+			state->lat[7][i] =
+			state->lat[8][i] = 1.0f/36.0f;
 		}
 	}
 
-	for (x = 0; x < mx; x++) {
-		map[x][0] = M_WALL;
+	for (x = 0; x < LAT_W; x++) {
+		state->map[idx(x,0)] = M_WALL;
 	}
 
-	for (y = 0; y < my; y++) {
-		map[0][y] = map[mx-1][y] = M_WALL;
+	for (y = 0; y < LAT_H; y++) {
+		state->map[idx(0,y)] = state->map[idx(LAT_W-1,y)] = M_WALL;
 	}
 
-	for (x = 0; x < mx; x++) {
-		map[x][my-1] = M_SETU;
+	for (x = 0; x < LAT_W; x++) {
+		state->map[idx(x,LAT_H-1)] = M_SETU;
 	}
 }
 
-void propagate()
+void propagate(struct SimState state)
 {
 	int x, y;
 
 	// west
-	for (x = 0; x < mx-1; x++) {
-		for (y = 0; y < my; y++) {
-			ltc[x][y][4] = ltc[x+1][y][4];
+	for (x = 0; x < LAT_W-1; x++) {
+		for (y = 0; y < LAT_H; y++) {
+			state.lat[4][idx(x,y)] = state.lat[4][idx(x+1,y)];
 		}
 	}
 
 	// north-west
-	for (x = 0; x < mx-1; x++) {
-		for (y = my-1; y > 0; y--) {
-			ltc[x][y][8] = ltc[x+1][y-1][8];
+	for (x = 0; x < LAT_W-1; x++) {
+		for (y = LAT_H-1; y > 0; y--) {
+			state.lat[8][idx(x,y)] = state.lat[8][idx(x+1,y-1)];
 		}
 	}
 
 	// north-east
-	for (x = mx-1; x > 0; x--) {
-		for (y = my-1; y > 0; y--) {
-			ltc[x][y][5] = ltc[x-1][y-1][5];
+	for (x = LAT_W-1; x > 0; x--) {
+		for (y = LAT_H-1; y > 0; y--) {
+			state.lat[5][idx(x,y)] = state.lat[5][idx(x-1,y-1)];
 		}
 	}
 
 	// north
-	for (x = 0; x < mx; x++) {
-		for (y = my-1; y > 0; y--) {
-			ltc[x][y][1] = ltc[x][y-1][1];
+	for (x = 0; x < LAT_W; x++) {
+		for (y = LAT_H-1; y > 0; y--) {
+			state.lat[1][idx(x,y)] = state.lat[1][idx(x,y-1)];
 		}
 	}
 
 	// south
-	for (x = 0; x < mx; x++) {
-		for (y = 0; y < my-1; y++) {
-			ltc[x][y][3] = ltc[x][y+1][3];
+	for (x = 0; x < LAT_W; x++) {
+		for (y = 0; y < LAT_H-1; y++) {
+			state.lat[3][idx(x,y)] = state.lat[3][idx(x,y+1)];
 		}
 	}
 
 	// south-west
-	for (x = 0; x < mx-1; x++) {
-		for (y = 0; y < my-1; y++) {
-			ltc[x][y][7] = ltc[x+1][y+1][7];
+	for (x = 0; x < LAT_W-1; x++) {
+		for (y = 0; y < LAT_H-1; y++) {
+			state.lat[7][idx(x,y)] = state.lat[7][idx(x+1,y+1)];
 		}
 	}
 
 	// south-east
-	for (x = mx-1; x > 0; x--) {
-		for (y = 0; y < my-1; y++) {
-			ltc[x][y][6] = ltc[x-1][y+1][6];
+	for (x = LAT_W-1; x > 0; x--) {
+		for (y = 0; y < LAT_H-1; y++) {
+			state.lat[6][idx(x,y)] = state.lat[6][idx(x-1,y+1)];
 		}
 	}
 
 	// east
-	for (x = mx-1; x > 0; x--) {
-		for (y = 0; y < my; y++) {
-			ltc[x][y][2] = ltc[x-1][y][2];
+	for (x = LAT_W-1; x > 0; x--) {
+		for (y = 0; y < LAT_H; y++) {
+			state.lat[2][idx(x,y)] = state.lat[2][idx(x-1,y)];
 		}
 	}
 }
 
-void get_macro(int x, int y, float &rho, float &vx, float &vy)
+void get_macro(struct SimState state, int x, int y, float &rho, float &vx, float &vy)
 {
 	int i;
 	rho = 0.0;
 
+	int gi = idx(x,y);
+
 	for (i = 0; i < 9; i++) {
-		rho += ltc[x][y][i];
+		rho += state.lat[i][gi];
 	}
 
-	if (map[x][y] == M_FLUID || map[x][y] == M_WALL) {
-		vx = (ltc[x][y][2] + ltc[x][y][5] + ltc[x][y][6] - ltc[x][y][8] - ltc[x][y][4] - ltc[x][y][7])/rho;
-		vy = (ltc[x][y][1] + ltc[x][y][5] + ltc[x][y][8] - ltc[x][y][7] - ltc[x][y][3] - ltc[x][y][6])/rho;
+	if (state.map[gi] == M_FLUID || state.map[gi] == M_WALL) {
+		vx = (state.lat[2][gi] + state.lat[5][gi] + state.lat[6][gi] - state.lat[8][gi] - state.lat[4][gi] - state.lat[7][gi])/rho;
+		vy = (state.lat[1][gi] + state.lat[5][gi] + state.lat[8][gi] - state.lat[7][gi] - state.lat[3][gi] - state.lat[6][gi])/rho;
 	} else {
 		vx = 0.1f;
 		vy = 0.0f;
@@ -163,16 +165,22 @@ void get_macro(int x, int y, float &rho, float &vx, float &vy)
 // |  7  3  6
 //  ->
 
-void relaxate()
+void relaxate(struct SimState state)
 {
-	int x, y, i;
+	int x, y, i, gi;
 
-	for (x = 0; x < mx; x++) {
-		for (y = 0; y < my; y++) {
+	for (x = 0; x < LAT_W; x++) {
+		for (y = 0; y < LAT_H; y++) {
 
-			if (map[x][y] != M_WALL) {
+			gi = idx(x, y);
+
+			if (state.map[idx(x,y)] != M_WALL) {
 				float vx, vy, rho;
-				get_macro(x, y, rho, vx, vy);
+				get_macro(state, x, y, rho, vx, vy);
+
+				state.vx[gi] = vx;
+				state.vy[gi] = vy;
+				state.rho[gi] = rho;
 
 				float Cusq = -1.5f * (vx*vx + vy*vy);
 				float feq[9];
@@ -187,107 +195,65 @@ void relaxate()
 				feq[7] = rho * (1.0f + Cusq + 3.0f*(-vx-vy) + 4.5f*(vx+vy)*(vx+vy)) / 36.0f;
 				feq[8] = rho * (1.0f + Cusq + 3.0f*(-vx+vy) + 4.5f*(-vx+vy)*(-vx+vy)) / 36.0f;
 
-				if (map[x][y] == M_FLUID) {
+				if (state.map[idx(x,y)] == M_FLUID) {
 					for (i = 0; i < 9; i++) {
-						ltc[x][y][i] += (feq[i] - ltc[x][y][i]) / tau;
+						state.lat[i][idx(x,y)] += (feq[i] - state.lat[i][idx(x,y)]) / tau;
 					}
 				} else {
 					for (i = 0; i < 9; i++) {
-						ltc[x][y][i] = feq[i];
+						state.lat[i][idx(x,y)] = feq[i];
 					}
 				}
 			} else {
 				float tmp;
-				tmp = ltc[x][y][2];
-				ltc[x][y][2] = ltc[x][y][4];
-				ltc[x][y][4] = tmp;
+				tmp = state.lat[2][idx(x,y)];
+				state.lat[2][idx(x,y)] = state.lat[4][idx(x,y)];
+				state.lat[4][idx(x,y)] = tmp;
 
-				tmp = ltc[x][y][1];
-				ltc[x][y][1] = ltc[x][y][3];
-				ltc[x][y][3] = tmp;
+				tmp = state.lat[1][idx(x,y)];
+				state.lat[1][idx(x,y)] = state.lat[3][idx(x,y)];
+				state.lat[3][idx(x,y)] = tmp;
 
-				tmp = ltc[x][y][8];
-				ltc[x][y][8] = ltc[x][y][6];
-				ltc[x][y][6] = tmp;
+				tmp = state.lat[8][idx(x,y)];
+				state.lat[8][idx(x,y)] = state.lat[6][idx(x,y)];
+				state.lat[6][idx(x,y)] = tmp;
 
-				tmp = ltc[x][y][7];
-				ltc[x][y][7] = ltc[x][y][5];
-				ltc[x][y][5] = tmp;
+				tmp = state.lat[7][idx(x,y)];
+				state.lat[7][idx(x,y)] = state.lat[5][idx(x,y)];
+				state.lat[6][idx(x,y)] = tmp;
 			}
 		}
 	}
 }
 
-void output(int snum)
-	//, hid_t file, hid_t dataspace, hid_t datatype)
+void SimInit(struct SimState *state)
 {
-	int x, y;
-	char name[128];
-	FILE *fp;
-
-	sprintf(name, "out%05d.dat", snum);
-	fp = fopen(name, "w");
-
-	sprintf(name, "t%d", snum);
-	for (x = 0; x < mx; x++) {
-		for (y = 0; y < my; y++) {
-			float vx, vy, rho;
-			get_macro(x, y, rho, vx, vy);
-
-/*			outbuf[x][y][0] = rho;
-			outbuf[x][y][1] = vx;
-			outbuf[x][y][2] = vy;
-*/
-//			printf("%x\n", &outbuf[x][y][0]);
-
-//			fprintf(fp, "%d %d %f %f %f | %f %f %f %f %f %f %f %f %f\n", x, y, rho, vx, vy,
-//					ltc[x][y][0], ltc[x][y][2], ltc[x][y][3], ltc[x][y][4], ltc[x][y][1],
-//					ltc[x][y][6], ltc[x][y][7], ltc[x][y][8], ltc[x][y][5]);
-			fprintf(fp, "%d %d %f %f %f\n", x, y, rho, vx, vy);
-		}
-		fprintf(fp, "\n");
-	}
-//	hid_t dataset = H5Dcreate(file, name, datatype, dataspace, H5P_DEFAULT);
-//    H5Dwrite(dataset, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, &outbuf[0][0][0]);
-//	H5Dclose(dataset);
-
-	fclose(fp);
-}
-
-
-int main(int argc, char **argv)
-{
-	int st = 0;
-	int Re;
-
 	tau = (6.0f*visc + 1.0f)/2.0f;
-	Re=(int)((mx-1)*0.1f/((2.0f*tau-1.0f)/6.0f)+0.5f);
+
+	int Re;
+	Re=(int)((LAT_W-1)*0.1f/((2.0f*tau-1.0f)/6.0f)+0.5f);
 
 	printf("visc = %f\n", visc);
 	printf("tau = %f\n", tau);
 	printf("Re = %d\n", Re);
 
-	allocate();
-	init();
-
-//	hsize_t dimsf[] = {mx, my, 3};
-//	hid_t file = H5Fcreate("out.dat", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-//	hid_t dataspace = H5Screate_simple(3, dimsf, NULL);
-//	hid_t datatype = H5Tcopy(H5T_NATIVE_DOUBLE);
-//	H5Tset_order(datatype, H5T_ORDER_LE);
-
-	for (st = 1; st < 10000; st++) {
-		relaxate();
-		propagate();
-		if (st % 100 == 0) {
-			output(st);	//, file, dataspace, datatype);
-			printf("%05d\n", st);
-		}
-	}
-
-//	H5Sclose(dataspace);
-//	H5Tclose(datatype);
-//	H5Fclose(file);
-
-	return 0;
+	allocate(state);
+	init(state);
 }
+
+void SimCleanup(struct SimState *state)
+{
+	return;
+}
+
+void SimUpdate(int iter, struct SimState state)
+{
+	relaxate(state);
+	propagate(state);
+}
+
+void SimUpdateMap(struct SimState state)
+{
+	return;
+}
+
