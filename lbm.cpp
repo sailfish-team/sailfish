@@ -2,8 +2,6 @@
 #include <cstdlib>
 #include <cmath>
 
-#include <hdf5.h>
-
 #include "sim.h"
 
 #define M_FLUID 0
