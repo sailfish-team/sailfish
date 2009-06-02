@@ -3,6 +3,9 @@ CXX=icc
 
 all: lbm_cuda lbm
 
+clean:
+	rm -f lbm_cuda lbm *.o
+
 %.o: %.c vis.h sim.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
