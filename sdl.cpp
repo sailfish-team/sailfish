@@ -11,7 +11,10 @@ struct Vis {
 	int bytesPerPix, blockh, blockw;
 	SDL_Surface *screen, *bbuf;
 	SDL_Rect rbuf;
+	TTF_Font *font;
 } vis;
+
+static SDL_Color text_color = { 255, 0, 0 };
 
 void SDLDrawPixel(SDL_Surface *screen, int x, int y, u8 r, u8 g, u8 b)
 {
@@ -194,9 +197,27 @@ void SDLDrawBlockPixel(SDL_Surface *screen, int x, int y, u8 r, u8 g, u8 b)
 	SDL_UpdateRect(screen, x, y, VIS_BLOCK_SIZE, VIS_BLOCK_SIZE);
 }
 
-void visualize(struct SimState *state)
+void render_text(SDL_Surface *dst, char *text, int x, int y)
+{
+	SDL_Surface *tmp;
+	SDL_Rect dstrect;
+
+	tmp = TTF_RenderText_Solid(vis.font, text, text_color);
+	if (tmp != NULL) {
+		dstrect.x = x;
+		dstrect.y = y;
+		dstrect.w = tmp->w;
+		dstrect.h = tmp->h;
+		SDL_BlitSurface(tmp, NULL, dst, &dstrect);
+		SDL_FreeSurface(tmp);
+	}
+}
+
+void visualize(struct SimState *state, float lups)
 {
 	int x, y, i = 0;
+	char buf[128];
+
 	for (y = 0; y < LAT_H; y++) {
 		for (x = 0; x < LAT_W; x++) {
 			float amnt = sqrtf(state->vx[i]*state->vx[i] + state->vy[i]*state->vy[i]) / 0.1f * 255.0f;
@@ -208,6 +229,8 @@ void visualize(struct SimState *state)
 			i++;
 		}
 	}
+	sprintf(buf, "%.1f MLUPS", lups * 10e-6);
+	render_text(vis.bbuf, buf, 0, VIS_BLOCK_SIZE * LAT_H - 16);
 
 	SDL_BlitSurface(vis.bbuf, NULL, vis.screen, &vis.rbuf);
 	SDL_UpdateRect(vis.screen, 0, 0, 0, 0);
@@ -218,6 +241,16 @@ void SDLInit(void)
 	if (SDL_Init(SDL_INIT_VIDEO) < 0)
 		exit(1);
 
+	if (TTF_Init() < 0)
+		exit(2);
+
+	vis.font = TTF_OpenFont("lucida.ttf", 12);
+	if (vis.font == NULL) {
+		fprintf(stderr, "Couldn't load %d pt font from %s: %s\n", 12, "lucida.ttf", SDL_GetError());
+		exit(3);
+	}
+
+	TTF_SetFontStyle(vis.font, TTF_STYLE_NORMAL);
 	vis.xres = LAT_W*VIS_BLOCK_SIZE;
 	vis.yres = LAT_H*VIS_BLOCK_SIZE;
 	vis.depth = 32;

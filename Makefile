@@ -3,9 +3,9 @@ CXX=icc
 
 all: lbm_cuda lbm
 
-lbm: lbm.cpp sim.cpp sdl.cpp
-	$(CXX) $(CXXFLAGS) lbm.cpp sdl.cpp sim.cpp -o lbm -lm -lhdf5 -lSDL
+lbm: lbm.cpp sim.o sdl.o
+	$(CXX) $(CXXFLAGS) lbm.cpp sdl.o sim.o -o lbm -lm -lhdf5 -lSDL -lrt -lSDL_ttf
 
-lbm_cuda: lbm.cu sdl.cpp sim.cpp vis.h sim.h
-	nvcc lbm.cu sdl.cpp sim.cpp --use_fast_math -o lbm_cuda -lSDL
+lbm_cuda: lbm.cu sdl.o sim.o vis.h sim.h
+	nvcc lbm.cu sdl.cpp sim.cpp --use_fast_math -o lbm_cuda -lSDL -lrt -lSDL_ttf
 

@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <ctime>
 
 #include "sim.h"
 #include "vis.h"
@@ -41,11 +42,18 @@ int main(int argc, char **argv)
 	bool update_map = false;
 	int last_x, last_y;
 
+	struct timespec t1, t2;
+	clock_gettime(CLOCK_REALTIME, &t1);
+
 	while (!quit) {
 		SimUpdate(iter, state);
+		clock_gettime(CLOCK_REALTIME, &t2);
 
 		if (iter % 100 == 0) {
-			visualize(&state);
+			long timediff = (t2.tv_sec - t1.tv_sec) * 1000000000 + (t2.tv_nsec - t1.tv_nsec);
+
+			visualize(&state, LAT_H * LAT_W * 100 * 1000000000.0f / timediff);
+			clock_gettime(CLOCK_REALTIME, &t1);
 		}
 
 	    while (SDL_PollEvent(&event)) {

@@ -2,6 +2,7 @@
 #define __VIS_H_ 1
 
 #include <SDL/SDL.h>
+#include <SDL/SDL_ttf.h>
 
 typedef char u8;
 
@@ -14,7 +15,7 @@ void SDLDrawPixel(SDL_Surface *screen, int x, int y, u8 r, u8 g, u8 b);
 Uint32 SDLGetPixel(SDL_Surface *surface, int x, int y);
 void SDLPutPixel(SDL_Surface *surface, int x, int y, Uint32 pixel);
 void SDLDrawBlockPixel(SDL_Surface *screen, int x, int y, u8 r, u8 g, u8 b);
-void visualize(struct SimState *state);
+void visualize(struct SimState *state, float lups);
 void SDLInit(void);
 
 #endif  /* __VIS_H_ */
