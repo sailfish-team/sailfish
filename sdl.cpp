@@ -229,7 +229,7 @@ void visualize(struct SimState *state, float lups)
 			i++;
 		}
 	}
-	sprintf(buf, "%.1f MLUPS", lups * 10e-6);
+	sprintf(buf, "%.1f MLUPS", lups * 1e-6);
 	render_text(vis.bbuf, buf, 0, VIS_BLOCK_SIZE * LAT_H - 16);
 
 	SDL_BlitSurface(vis.bbuf, NULL, vis.screen, &vis.rbuf);
