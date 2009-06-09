@@ -1,11 +1,7 @@
-// the following constants need to be dynamically
-// determined: LAT_H, LAT_W, BLOCK_SIZE
+// the following additional constants need to be defined:
+// LAT_H, LAT_W, BLOCK_SIZE, GEO_FLUID, GEO_WALL, GEO_INFLOW
 
 __constant__ float tau;			// relaxation time
-
-#define GEO_FLUID 0
-#define GEO_WALL 1
-#define GEO_INFLOW 2
 
 struct Dist {
 	float *fC, *fE, *fW, *fS, *fN, *fSE, *fSW, *fNE, *fNW;
@@ -15,11 +11,6 @@ struct Dist {
 // - try having dummy nodes as the edges of the lattice to avoid divergent threads
 
 __global__ void LBMCollideAndPropagate(int *map, Dist cd, Dist od, float *orho, float *ovx, float *ovy)
-
-//__global__ void LBMCollideAndPropagate(int *map,
-//float *cd___fC, float *cd___fE, float *cd___fW, float *cd___fS, float *cd___fN, float *cd___fSE, float *cd___fSW,  float*cd___fNE,  float*cd___fNW,
-//float *od___fC, float *od___fE, float *od___fW, float *od___fS, float *od___fN, float *od___fSE, float *od___fSW, float *od___fNE, float *od___fNW,
-//float *orho, float *ovx, float *ovy)
 {
 	int tix = threadIdx.x;
 	int ti = tix + blockIdx.x * blockDim.x;
