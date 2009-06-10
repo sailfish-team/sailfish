@@ -30,7 +30,7 @@ class LBMSim(object):
 									self.options.lat_w, self.options.lat_h)
 
 	def _init_code(self):
-		fp = open('lbm_py.cu')
+		fp = open('lbm.cu')
 		src = fp.read()
 		fp.close()
 		src = '#define BLOCK_SIZE %d\n#define LAT_H %d\n#define LAT_W %d\n' % (self.block_size, self.options.lat_h, self.options.lat_w) + src
