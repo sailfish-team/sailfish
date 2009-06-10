@@ -2,6 +2,9 @@ import time
 import pygame
 import numpy
 import sim
+import sys
+
+vismode = 0
 
 def init(options):
 	global font, screen
@@ -17,8 +20,17 @@ def visualize(screen, map, vx, vy, rho):
 	height, width = vx.shape
 	srf = pygame.Surface((width, height))
 
-	drw = numpy.sqrt(vx*vx + vy*vy) / 0.1 * 255
-	drw = drw.astype(numpy.int32)
+	if vismode == 0:
+		drw = numpy.sqrt(vx*vx + vy*vy) / 0.1 * 255
+	elif vismode == 1:
+		drw = numpy.abs(vx) / 0.1 * 255
+	elif vismode == 2:
+		drw = numpy.abs(vy) / 0.1 * 255
+	elif vismode == 3:
+		t = numpy.abs(rho - 1.00)
+		drw = t / numpy.max(t) * 255
+
+	drw = drw.astype(numpy.uint8)
 
 	a = pygame.surfarray.pixels3d(srf)
 	b = numpy.rot90(map == sim.GEO_WALL, 3)
@@ -26,7 +38,7 @@ def visualize(screen, map, vx, vy, rho):
 	a[b] = (0,0,255)
 	b = numpy.logical_not(b)
 
-	drw = numpy.rot90(drw, 3).reshape((height, width, 1)) * numpy.int32([1,1,0])
+	drw = numpy.rot90(drw, 3).reshape((height, width, 1)) * numpy.uint8([1,1,0])
 	a[b] = drw[b]
 
 	del a
@@ -43,7 +55,7 @@ def main(options, update_map, sim_step, map, vx, vy, rho):
 	drawing = False
 	draw_type = 1
 
-	global font, screen
+	global font, screen, vismode
 
 	while 1:
 		for event in pygame.event.get():
@@ -68,6 +80,17 @@ def main(options, update_map, sim_step, map, vx, vy, rho):
 					x, y = get_loc(event, screen, options)
 					map[y][x] = draw_type == 1 and sim.GEO_WALL or sim.GEO_FLUID
 					update_map()
+			elif event.type == pygame.KEYUP:
+				if event.key == pygame.K_0:
+					vismode = 0
+				elif event.key == pygame.K_1:
+					vismode = 1
+				elif event.key == pygame.K_2:
+					vismode = 2
+				elif event.key == pygame.K_3:
+					vismode = 3
+				elif event.key == pygame.K_q:
+					sys.exit()
 
 		sim_step(i)
 
