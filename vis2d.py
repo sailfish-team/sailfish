@@ -90,19 +90,19 @@ class Fluid2DVis(object):
 				elif event.key == pygame.K_q:
 					sys.exit()
 
-	def main(self, update_map, sim_step, geo_map, vx, vy, rho):
+	def main(self, lbm_sim):
 		i = 0
 		t_prev = time.time()
 		while 1:
-			self._process_events(update_map, geo_map)
-			sim_step(i)
+			self._process_events(lbm_sim.update_map, lbm_sim.geo_map)
+			lbm_sim.sim_step(i)
 
 			if i % 100 == 0:
 				t_now = time.time()
 				mlups = 100.0 * self.lat_w * self.lat_h * 1e-6 / (t_now - t_prev)
 				t_prev = t_now
 
-				self._visualize(geo_map, vx, vy, rho)
+				self._visualize(lbm_sim.geo_map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho)
 				perf = self._font.render('%.2f MLUPS' % mlups, True, (0, 255, 0))
 				self._screen.blit(perf, (12, 12))
 				pygame.display.flip()
