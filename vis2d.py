@@ -4,108 +4,111 @@ import numpy
 import sim
 import sys
 
-vismode = 0
+pygame.init()
+pygame.surfarray.use_arraytype('numpy')
 
-def init(options):
-	global font, screen
+class Fluid2DVis(object):
 
-	# Clear the screen.
-	pygame.init()
-	pygame.surfarray.use_arraytype('numpy')
-	font = pygame.font.SysFont('Liberation Mono', 14)
-	screen = pygame.display.set_mode((options.scr_w, options.scr_h), pygame.RESIZABLE)
-	screen.fill((0,0,0))
+	def __init__(self, width, height, lat_w, lat_h):
+		self._vismode = 0
+		self._font = pygame.font.SysFont('Liberation Mono', 14)
+		self._screen = pygame.display.set_mode((width, height),
+				pygame.RESIZABLE)
+		self.lat_w = lat_w
+		self.lat_h = lat_h
 
-def visualize(screen, map, vx, vy, rho):
-	height, width = vx.shape
-	srf = pygame.Surface((width, height))
+		self._drawing = False
+		self._draw_type = 1
 
-	if vismode == 0:
-		drw = numpy.sqrt(vx*vx + vy*vy) / 0.1 * 255
-	elif vismode == 1:
-		drw = numpy.abs(vx) / 0.1 * 255
-	elif vismode == 2:
-		drw = numpy.abs(vy) / 0.1 * 255
-	elif vismode == 3:
-		t = numpy.abs(rho - 1.00)
-		drw = t / numpy.max(t) * 255
+	def _visualize(self, geo_map, vx, vy, rho):
+		height, width = vx.shape
+		srf = pygame.Surface((width, height))
 
-	drw = drw.astype(numpy.uint8)
+		if self._vismode == 0:
+			drw = numpy.sqrt(vx*vx + vy*vy) / 0.1 * 255
+		elif self._vismode == 1:
+			drw = numpy.abs(vx) / 0.1 * 255
+		elif self._vismode == 2:
+			drw = numpy.abs(vy) / 0.1 * 255
+		elif self._vismode == 3:
+			t = numpy.abs(rho - 1.00)
+			drw	= t / numpy.max(t) * 255
 
-	a = pygame.surfarray.pixels3d(srf)
-	b = numpy.rot90(map == sim.GEO_WALL, 3)
+		# Rotate the field to the correct position.
+		drw = numpy.rot90(drw.astype(numpy.uint8), 3)
+		a = pygame.surfarray.pixels3d(srf)
 
-	a[b] = (0,0,255)
-	b = numpy.logical_not(b)
+		# Draw the walls.
+		b = numpy.rot90(geo_map == sim.GEO_WALL, 3)
+		a[b] = (0, 0, 255)
 
-	drw = numpy.rot90(drw, 3).reshape((height, width, 1)) * numpy.uint8([1,1,0])
-	a[b] = drw[b]
+		# Draw the data field for all sites which are not marked as a wall.
+		b = numpy.logical_not(b)
+		drw = drw.reshape((height, width, 1)) * numpy.uint8([1, 1, 0])
+		a[b] = drw[b]
 
-	del a
-	pygame.transform.scale(srf, screen.get_size(), screen)
+		# Unlock the surface and put the picture on screen.
+		del a
+		pygame.transform.scale(srf, self._screen.get_size(), self._screen)
 
-def get_loc(event, screen, options):
-	x = event.pos[0] * options.lat_w / screen.get_width()
-	y = options.lat_h-1 - (event.pos[1] * options.lat_h / screen.get_height())
-	return min(max(x, 0), options.lat_w-1), min(max(y, 0), options.lat_h-1)
+	def _get_loc(self, event):
+		x = event.pos[0] * self.lat_w / self._screen.get_width()
+		y = self.lat_h-1 - (event.pos[1] * self.lat_h / self._screen.get_height())
+		return min(max(x, 0), self.lat_w-1), min(max(y, 0), self.lat_h-1)
 
-def main(options, update_map, sim_step, map, vx, vy, rho):
-	i = 0
-	t_prev = time.time()
-	drawing = False
-	draw_type = 1
+	def _draw_wall(self, update_map, geo_map, event):
+		x, y = self._get_loc(event)
+		geo_map[y][x] = self._draw_type == 1 and sim.GEO_WALL or sim.GEO_FLUID
+		update_map()
 
-	global font, screen, vismode
-
-	while 1:
+	def _process_events(self, update_map, geo_map):
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				sys.exit()
 			elif event.type == pygame.VIDEORESIZE:
-				screen = pygame.display.set_mode(event.size, pygame.RESIZABLE)
+				self._screen = pygame.display.set_mode(event.size, pygame.RESIZABLE)
 			elif event.type == pygame.MOUSEBUTTONUP:
-				x, y = get_loc(event, screen, options)
-				draw_type = event.button
-				map[y][x] = draw_type == 1 and sim.GEO_WALL or sim.GEO_FLUID
-				drawing = False
-				update_map()
+				self._draw_type = event.button
+				self._draw_wall(update_map, geo_map, event)
+				self._drawing = False
 			elif event.type == pygame.MOUSEBUTTONDOWN:
-				x, y = get_loc(event, screen, options)
-				draw_type = event.button
-				map[y][x] = draw_type == 1 and sim.GEO_WALL or sim.GEO_FLUID
-				drawing = True
-				update_map()
+				self._draw_type = event.button
+				self._draw_wall(update_map, geo_map, event)
+				self._drawing = True
 			elif event.type == pygame.MOUSEMOTION:
-				if drawing:
-					x, y = get_loc(event, screen, options)
-					map[y][x] = draw_type == 1 and sim.GEO_WALL or sim.GEO_FLUID
-					update_map()
+				if self._drawing:
+					self._draw_wall(update_map, geo_map, event)
 			elif event.type == pygame.KEYUP:
 				if event.key == pygame.K_0:
-					vismode = 0
+					self._vismode = 0
 				elif event.key == pygame.K_1:
-					vismode = 1
+					self._vismode = 1
 				elif event.key == pygame.K_2:
-					vismode = 2
+					self._vismode = 2
 				elif event.key == pygame.K_3:
-					vismode = 3
+					self._vismode = 3
 				elif event.key == pygame.K_q:
 					sys.exit()
 
-		sim_step(i)
+	def main(self, update_map, sim_step, geo_map, vx, vy, rho):
+		i = 0
+		t_prev = time.time()
+		while 1:
+			self._process_events(update_map, geo_map)
+			sim_step(i)
 
-		if i % 100 == 0:
-			t_now = time.time()
-			mlups = 100.0 * options.lat_w * options.lat_h * 1e-6 / (t_now - t_prev)
-			t_prev = t_now
+			if i % 100 == 0:
+				t_now = time.time()
+				mlups = 100.0 * self.lat_w * self.lat_h * 1e-6 / (t_now - t_prev)
+				t_prev = t_now
 
-			visualize(screen, map, vx, vy, rho)
-			perf = font.render('%.2f MLUPS' % mlups, True, (0,255,0))
-			screen.blit(perf, (12, 12))
-			pygame.display.flip()
+				self._visualize(geo_map, vx, vy, rho)
+				perf = self._font.render('%.2f MLUPS' % mlups, True, (0, 255, 0))
+				self._screen.blit(perf, (12, 12))
+				pygame.display.flip()
 
-			t_prev = time.time()
-			print t_prev - t_now
+				t_prev = time.time()
+				print t_prev - t_now
 
-		i += 1
+			i += 1
 

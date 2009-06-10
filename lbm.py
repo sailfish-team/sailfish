@@ -23,7 +23,7 @@ parser.add_option('--scr_h', dest='scr_h', help='screen height', type='int', act
 options, args = parser.parse_args()
 block_size = 64
 
-vis2d.init(options)
+vis = vis2d.Fluid2DVis(options.scr_w, options.scr_h, options.lat_w, options.lat_h)
 
 f = open('lbm_py.cu')
 src = f.read()
@@ -104,5 +104,5 @@ def sim_step(i):
 	else:
 		lbm_cnp.prepared_call((options.lat_w/block_size, options.lat_h), *args2)
 
-vis2d.main(options, update_map, sim_step, map, vx, vy, rho)
+vis.main(update_map, sim_step, map, vx, vy, rho)
 
