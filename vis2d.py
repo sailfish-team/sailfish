@@ -44,7 +44,7 @@ class Fluid2DVis(object):
 
 		# Draw the data field for all sites which are not marked as a wall.
 		b = numpy.logical_not(b)
-		drw = drw.reshape((height, width, 1)) * numpy.uint8([1, 1, 0])
+		drw = drw.reshape((width, height, 1)) * numpy.uint8([1, 1, 0])
 		a[b] = drw[b]
 
 		# Unlock the surface and put the picture on screen.
@@ -97,9 +97,9 @@ class Fluid2DVis(object):
 			self._process_events(lbm_sim.update_map, lbm_sim.geo_map)
 			lbm_sim.sim_step(i)
 
-			if i % 100 == 0:
+			if i % lbm_sim.options.every == 0:
 				t_now = time.time()
-				mlups = 100.0 * self.lat_w * self.lat_h * 1e-6 / (t_now - t_prev)
+				mlups = float(lbm_sim.options.every) * self.lat_w * self.lat_h * 1e-6 / (t_now - t_prev)
 				t_prev = t_now
 
 				self._visualize(lbm_sim.geo_map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho)

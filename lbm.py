@@ -22,6 +22,7 @@ class LBMSim(object):
 		parser.add_option('--visc', dest='visc', help='viscosity', type='float', action='store', default=0.01)
 		parser.add_option('--scr_w', dest='scr_w', help='screen width', type='int', action='store', default=512)
 		parser.add_option('--scr_h', dest='scr_h', help='screen height', type='int', action='store', default=512)
+		parser.add_option('--every', dest='every', help='update the visualization every N steps', metavar='N', type='int', action='store', default=100)
 
 		self.options, self.args = parser.parse_args()
 		self.block_size = 64
@@ -99,7 +100,7 @@ class LBMSim(object):
 
 	def sim_step(self, i):
 		if i % 2 == 0:
-			if i % 100 == 0:
+			if i % self.options.every == 0:
 				self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *self.args1v)
 				cuda.memcpy_dtoh(self.vx, self.gpu_vx)
 				cuda.memcpy_dtoh(self.vy, self.gpu_vy)
