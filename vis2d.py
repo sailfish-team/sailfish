@@ -51,6 +51,20 @@ class Fluid2DVis(object):
 		del a
 		pygame.transform.scale(srf, self._screen.get_size(), self._screen)
 
+		max_v = 0.1
+		scale = max(height, width)/10 / max_v * 2
+
+		sw, sh = self._screen.get_size()
+		for i in range(1, 11):
+			for j in range(1, 11):
+				ox = sw*i/11
+				oy = sh - sh*j/11
+
+				pygame.draw.line(self._screen, (255, 0, 0),
+								 (ox, oy),
+								 (ox + vx[height*j/11][width*i/11] * scale,
+								  oy - vy[height*j/11][width*i/11] * scale))
+
 	def _get_loc(self, event):
 		x = event.pos[0] * self.lat_w / self._screen.get_width()
 		y = self.lat_h-1 - (event.pos[1] * self.lat_h / self._screen.get_height())
