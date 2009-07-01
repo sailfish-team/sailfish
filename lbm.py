@@ -37,7 +37,7 @@ class LBMSim(object):
 		src = '#define BLOCK_SIZE %d\n#define LAT_H %d\n#define LAT_W %d\n' % (self.block_size, self.options.lat_h, self.options.lat_w) + src
 		src = '#define GEO_FLUID %d\n#define GEO_WALL %d\n#define GEO_INFLOW %d\n' % (GEO_FLUID, GEO_WALL, GEO_INFLOW) + src
 
-		self.mod = cuda.SourceModule(src, options=['--use_fast_math'])
+		self.mod = cuda.SourceModule(src, options=['--use_fast_math', '-Xptxas', '-v'])
 		self.lbm_cnp = self.mod.get_function('LBMCollideAndPropagate')
 
 		# Set the 'tau' parameter.
