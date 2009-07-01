@@ -49,6 +49,10 @@ class LBMSim(object):
 		# Initialize the map.
 		self.geo_map = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.int32)
 		self.gpu_geo_map = cuda.mem_alloc(self.geo_map.size * self.geo_map.dtype.itemsize)
+		self.reset_geo()
+
+	def reset_geo(self):
+		self.geo_map = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.int32)
 		# bottom/top
 		for i in range(0, self.options.lat_w):
 			self.geo_map[0][i] = numpy.int32(GEO_WALL)
@@ -56,7 +60,7 @@ class LBMSim(object):
 		# left/right
 		for i in range(0, self.options.lat_h):
 			self.geo_map[i][0] = self.geo_map[i][self.options.lat_w-1] = numpy.int32(GEO_WALL)
-		cuda.memcpy_htod(self.gpu_geo_map, self.geo_map)
+		self.update_map()
 
 	def _init_lbm(self):
 		self.vx = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.float32)

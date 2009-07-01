@@ -73,12 +73,12 @@ class Fluid2DVis(object):
 		y = self.lat_h-1 - (event.pos[1] * self.lat_h / self._screen.get_height())
 		return min(max(x, 0), self.lat_w-1), min(max(y, 0), self.lat_h-1)
 
-	def _draw_wall(self, update_map, geo_map, event):
+	def _draw_wall(self, lbm_sim, event):
 		x, y = self._get_loc(event)
-		geo_map[y][x] = self._draw_type == 1 and sim.GEO_WALL or sim.GEO_FLUID
-		update_map()
+		lbm_sim.geo_map[y][x] = self._draw_type == 1 and sim.GEO_WALL or sim.GEO_FLUID
+		lbm_sim.update_map()
 
-	def _process_events(self, update_map, geo_map):
+	def _process_events(self, lbm_sim):
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				sys.exit()
@@ -86,15 +86,15 @@ class Fluid2DVis(object):
 				self._screen = pygame.display.set_mode(event.size, pygame.RESIZABLE)
 			elif event.type == pygame.MOUSEBUTTONUP:
 				self._draw_type = event.button
-				self._draw_wall(update_map, geo_map, event)
+				self._draw_wall(lbm_sim, event)
 				self._drawing = False
 			elif event.type == pygame.MOUSEBUTTONDOWN:
 				self._draw_type = event.button
-				self._draw_wall(update_map, geo_map, event)
+				self._draw_wall(lbm_sim, event)
 				self._drawing = True
 			elif event.type == pygame.MOUSEMOTION:
 				if self._drawing:
-					self._draw_wall(update_map, geo_map, event)
+					self._draw_wall(lbm_sim, event)
 			elif event.type == pygame.KEYUP:
 				if event.key == pygame.K_0:
 					self._vismode = 0
@@ -108,12 +108,14 @@ class Fluid2DVis(object):
 					self._velocity = not self._velocity
 				elif event.key == pygame.K_q:
 					sys.exit()
+				elif event.key == pygame.K_r:
+					lbm_sim.reset_geo()
 
 	def main(self, lbm_sim):
 		i = 0
 		t_prev = time.time()
 		while 1:
-			self._process_events(lbm_sim.update_map, lbm_sim.geo_map)
+			self._process_events(lbm_sim)
 			lbm_sim.sim_step(i)
 
 			if i % lbm_sim.options.every == 0:
