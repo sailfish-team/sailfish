@@ -3,22 +3,25 @@
 
 __constant__ float tau;			// relaxation time
 
-struct Dist {
+struct DistP {
 	float *fC, *fE, *fW, *fS, *fN, *fSE, *fSW, *fNE, *fNW;
+};
+
+struct Dist {
+	float fC, fE, fW, fS, fN, fSE, fSW, fNE, fNW;
 };
 
 // TODO:
 // - try having dummy nodes as the edges of the lattice to avoid divergent threads
 
-__global__ void LBMCollideAndPropagate(int *map, Dist cd, Dist od, float *orho, float *ovx, float *ovy)
+__global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho, float *ovx, float *ovy)
 {
 	int tix = threadIdx.x;
 	int ti = tix + blockIdx.x * blockDim.x;
 	int gi = ti + LAT_W*blockIdx.y;
 
 	// equilibrium distributions
-	float feq_C, feq_N, feq_S, feq_E, feq_W, feq_NE, feq_NW, feq_SE, feq_SW;
-	float fi_N, fi_S, fi_E, fi_W, fi_C, fi_NE, fi_NW, fi_SE, fi_SW;
+	Dist feq, fi;
 	float rho;
 	float2 v;
 
@@ -31,24 +34,24 @@ __global__ void LBMCollideAndPropagate(int *map, Dist cd, Dist od, float *orho, 
 	__shared__ float fo_NW[BLOCK_SIZE];
 
 	// cache the distribution in local variables
-	fi_C = cd.fC[gi];
-	fi_E = cd.fE[gi];
-	fi_W = cd.fW[gi];
-	fi_S = cd.fS[gi];
-	fi_N = cd.fN[gi];
-	fi_NE = cd.fNE[gi];
-	fi_NW = cd.fNW[gi];
-	fi_SE = cd.fSE[gi];
-	fi_SW = cd.fSW[gi];
+	fi.fC = cd.fC[gi];
+	fi.fE = cd.fE[gi];
+	fi.fW = cd.fW[gi];
+	fi.fS = cd.fS[gi];
+	fi.fN = cd.fN[gi];
+	fi.fNE = cd.fNE[gi];
+	fi.fNW = cd.fNW[gi];
+	fi.fSE = cd.fSE[gi];
+	fi.fSW = cd.fSW[gi];
 
 	// macroscopic quantities for the current cell
-	rho = fi_C + fi_E + fi_W + fi_S + fi_N + fi_NE + fi_NW + fi_SE + fi_SW;
+	rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
 	if (map[gi] == GEO_INFLOW) {
 		v.x = 0.1f;
 		v.y = 0.0f;
 	} else {
-		v.x = (fi_E + fi_SE + fi_NE - fi_W - fi_SW - fi_NW) / rho;
-		v.y = (fi_N + fi_NW + fi_NE - fi_S - fi_SW - fi_SE) / rho;
+		v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / rho;
+		v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / rho;
 	}
 
 	if (orho != NULL) {
@@ -60,83 +63,83 @@ __global__ void LBMCollideAndPropagate(int *map, Dist cd, Dist od, float *orho, 
 	// relaxation
 	float Cusq = -1.5f * (v.x*v.x + v.y*v.y);
 
-	feq_C = rho * (1.0f + Cusq) * 4.0f/9.0f;
-	feq_N = rho * (1.0f + Cusq + 3.0f*v.y + 4.5f*v.y*v.y) / 9.0f;
-	feq_E = rho * (1.0f + Cusq + 3.0f*v.x + 4.5f*v.x*v.x) / 9.0f;
-	feq_S = rho * (1.0f + Cusq - 3.0f*v.y + 4.5f*v.y*v.y) / 9.0f;
-	feq_W = rho * (1.0f + Cusq - 3.0f*v.x + 4.5f*v.x*v.x) / 9.0f;
-	feq_NE = rho * (1.0f + Cusq + 3.0f*(v.x+v.y) + 4.5f*(v.x+v.y)*(v.x+v.y)) / 36.0f;
-	feq_SE = rho * (1.0f + Cusq + 3.0f*(v.x-v.y) + 4.5f*(v.x-v.y)*(v.x-v.y)) / 36.0f;
-	feq_SW = rho * (1.0f + Cusq + 3.0f*(-v.x-v.y) + 4.5f*(v.x+v.y)*(v.x+v.y)) / 36.0f;
-	feq_NW = rho * (1.0f + Cusq + 3.0f*(-v.x+v.y) + 4.5f*(-v.x+v.y)*(-v.x+v.y)) / 36.0f;
+	feq.fC = rho * (1.0f + Cusq) * 4.0f/9.0f;
+	feq.fN = rho * (1.0f + Cusq + 3.0f*v.y + 4.5f*v.y*v.y) / 9.0f;
+	feq.fE = rho * (1.0f + Cusq + 3.0f*v.x + 4.5f*v.x*v.x) / 9.0f;
+	feq.fS = rho * (1.0f + Cusq - 3.0f*v.y + 4.5f*v.y*v.y) / 9.0f;
+	feq.fW = rho * (1.0f + Cusq - 3.0f*v.x + 4.5f*v.x*v.x) / 9.0f;
+	feq.fNE = rho * (1.0f + Cusq + 3.0f*(v.x+v.y) + 4.5f*(v.x+v.y)*(v.x+v.y)) / 36.0f;
+	feq.fSE = rho * (1.0f + Cusq + 3.0f*(v.x-v.y) + 4.5f*(v.x-v.y)*(v.x-v.y)) / 36.0f;
+	feq.fSW = rho * (1.0f + Cusq + 3.0f*(-v.x-v.y) + 4.5f*(v.x+v.y)*(v.x+v.y)) / 36.0f;
+	feq.fNW = rho * (1.0f + Cusq + 3.0f*(-v.x+v.y) + 4.5f*(-v.x+v.y)*(-v.x+v.y)) / 36.0f;
 
 	if (map[gi] == GEO_FLUID) {
-		fi_C += (feq_C - fi_C) / tau;
-		fi_E += (feq_E - fi_E) / tau;
-		fi_W += (feq_W - fi_W) / tau;
-		fi_S += (feq_S - fi_S) / tau;
-		fi_N += (feq_N - fi_N) / tau;
-		fi_SE += (feq_SE - fi_SE) / tau;
-		fi_NE += (feq_NE - fi_NE) / tau;
-		fi_SW += (feq_SW - fi_SW) / tau;
-		fi_NW += (feq_NW - fi_NW) / tau;
+		fi.fC += (feq.fC - fi.fC) / tau;
+		fi.fE += (feq.fE - fi.fE) / tau;
+		fi.fW += (feq.fW - fi.fW) / tau;
+		fi.fS += (feq.fS - fi.fS) / tau;
+		fi.fN += (feq.fN - fi.fN) / tau;
+		fi.fSE += (feq.fSE - fi.fSE) / tau;
+		fi.fNE += (feq.fNE - fi.fNE) / tau;
+		fi.fSW += (feq.fSW - fi.fSW) / tau;
+		fi.fNW += (feq.fNW - fi.fNW) / tau;
 	} else if (map[gi] == GEO_INFLOW) {
-		fi_C  = feq_C;
-		fi_E  = feq_E;
-		fi_W  = feq_W;
-		fi_S  = feq_S;
-		fi_N  = feq_N;
-		fi_SE = feq_SE;
-		fi_NE = feq_NE;
-		fi_SW = feq_SW;
-		fi_NW = feq_NW;
+		fi.fC  = feq.fC;
+		fi.fE  = feq.fE;
+		fi.fW  = feq.fW;
+		fi.fS  = feq.fS;
+		fi.fN  = feq.fN;
+		fi.fSE = feq.fSE;
+		fi.fNE = feq.fNE;
+		fi.fSW = feq.fSW;
+		fi.fNW = feq.fNW;
 	} else if (map[gi] == GEO_WALL) {
 		float t;
-		t = fi_E;
-		fi_E = fi_W;
-		fi_W = t;
+		t = fi.fE;
+		fi.fE = fi.fW;
+		fi.fW = t;
 
-		t = fi_NW;
-		fi_NW = fi_SE;
-		fi_SE = t;
+		t = fi.fNW;
+		fi.fNW = fi.fSE;
+		fi.fSE = t;
 
-		t = fi_NE;
-		fi_NE = fi_SW;
-		fi_SW = t;
+		t = fi.fNE;
+		fi.fNE = fi.fSW;
+		fi.fSW = t;
 
-		t = fi_N;
-		fi_N = fi_S;
-		fi_S = t;
+		t = fi.fN;
+		fi.fN = fi.fS;
+		fi.fS = t;
 	}
 
-	od.fC[gi] = fi_C;
+	od.fC[gi] = fi.fC;
 
 	// N + S propagation (global memory)
-	if (blockIdx.y > 0)			od.fS[gi-LAT_W] = fi_S;
-	if (blockIdx.y < LAT_H-1)	od.fN[gi+LAT_W] = fi_N;
+	if (blockIdx.y > 0)			od.fS[gi-LAT_W] = fi.fS;
+	if (blockIdx.y < LAT_H-1)	od.fN[gi+LAT_W] = fi.fN;
 
 	// E propagation in shared memory
 	if (tix < blockDim.x-1) {
-		fo_E[tix+1] = fi_E;
-		fo_NE[tix+1] = fi_NE;
-		fo_SE[tix+1] = fi_SE;
+		fo_E[tix+1] = fi.fE;
+		fo_NE[tix+1] = fi.fNE;
+		fo_SE[tix+1] = fi.fSE;
 	// E propagation in global memory (at block boundary)
 	} else if (ti < LAT_W) {
-		od.fE[gi+1] = fi_E;
-		if (blockIdx.y > 0)			od.fSE[gi-LAT_W+1] = fi_SE;
-		if (blockIdx.y < LAT_H-1)	od.fNE[gi+LAT_W+1] = fi_NE;
+		od.fE[gi+1] = fi.fE;
+		if (blockIdx.y > 0)			od.fSE[gi-LAT_W+1] = fi.fSE;
+		if (blockIdx.y < LAT_H-1)	od.fNE[gi+LAT_W+1] = fi.fNE;
 	}
 
 	// W propagation in shared memory
 	if (tix > 0) {
-		fo_W[tix-1] = fi_W;
-		fo_NW[tix-1] = fi_NW;
-		fo_SW[tix-1] = fi_SW;
+		fo_W[tix-1] = fi.fW;
+		fo_NW[tix-1] = fi.fNW;
+		fo_SW[tix-1] = fi.fSW;
 	// W propagation in global memory (at block boundary)
 	} else if (ti > 0) {
-		od.fW[gi-1] = fi_W;
-		if (blockIdx.y > 0)			od.fSW[gi-LAT_W-1] = fi_SW;
-		if (blockIdx.y < LAT_H-1)	od.fNW[gi+LAT_W-1] = fi_NW;
+		od.fW[gi-1] = fi.fW;
+		if (blockIdx.y > 0)			od.fSW[gi-LAT_W-1] = fi.fSW;
+		if (blockIdx.y < LAT_H-1)	od.fNW[gi+LAT_W-1] = fi.fNW;
 	}
 
 	__syncthreads();
