@@ -112,8 +112,10 @@ class Fluid2DVis(object):
 					lbm_sim.reset_geo()
 
 	def main(self, lbm_sim):
-		i = 0
+		i = 1
 		t_prev = time.time()
+		avg_mlups = 0.0
+
 		while 1:
 			self._process_events(lbm_sim)
 			lbm_sim.sim_step(i)
@@ -124,8 +126,13 @@ class Fluid2DVis(object):
 				t_prev = t_now
 
 				self._visualize(lbm_sim.geo_map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho)
-				perf = self._font.render('%.2f MLUPS' % mlups, True, (0, 255, 0))
+				perf = self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0))
+				perf2 = self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0))
+				disp_iter = i / lbm_sim.options.every
+				avg_mlups = (disp_iter*avg_mlups + mlups) / (disp_iter+1)
+
 				self._screen.blit(perf, (12, 12))
+				self._screen.blit(perf2, (12, 24))
 				pygame.display.flip()
 
 				t_prev = time.time()
