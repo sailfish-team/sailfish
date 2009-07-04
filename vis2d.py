@@ -17,11 +17,12 @@ class Fluid2DVis(object):
 		self.lat_w = lat_w
 		self.lat_h = lat_h
 
+		self._tracers = True
 		self._velocity = True
 		self._drawing = False
 		self._draw_type = 1
 
-	def _visualize(self, geo_map, vx, vy, rho):
+	def _visualize(self, geo_map, vx, vy, rho, tx, ty):
 		height, width = vx.shape
 		srf = pygame.Surface((width, height))
 
@@ -52,21 +53,29 @@ class Fluid2DVis(object):
 		del a
 		pygame.transform.scale(srf, self._screen.get_size(), self._screen)
 
+		sw, sh = self._screen.get_size()
+
 		# Draw the velocity field
 		if self._velocity:
 			max_v = 0.1
-			scale = max(height, width)/10 / max_v * 2
+			vfsp = 21
+			scale = max(sh, sw)/(vfsp-1) / max_v
 
-			sw, sh = self._screen.get_size()
-			for i in range(1, 11):
-				for j in range(1, 11):
-					ox = sw*i/11
-					oy = sh - sh*j/11
+
+			for i in range(1, vfsp):
+				for j in range(1, vfsp):
+					ox = sw*i/vfsp
+					oy = sh - sh*j/vfsp
 
 					pygame.draw.line(self._screen, (255, 0, 0),
 									 (ox, oy),
-									 (ox + vx[height*j/11][width*i/11] * scale,
-									  oy - vy[height*j/11][width*i/11] * scale))
+									 (ox + vx[height*j/vfsp][width*i/vfsp] * scale,
+									  oy - vy[height*j/vfsp][width*i/vfsp] * scale))
+
+		# Draw the tracer particles
+		if self._tracers:
+			for x, y in zip(tx, ty):
+				pygame.draw.circle(self._screen, (0, 255, 0), (x * sw / width, sh - y * sh / height), 2)
 
 	def _get_loc(self, event):
 		x = event.pos[0] * self.lat_w / self._screen.get_width()
@@ -106,6 +115,8 @@ class Fluid2DVis(object):
 					self._vismode = 3
 				elif event.key == pygame.K_v:
 					self._velocity = not self._velocity
+				elif event.key == pygame.K_t:
+					self._tracers = not self._tracers
 				elif event.key == pygame.K_q:
 					sys.exit()
 				elif event.key == pygame.K_r:
@@ -118,14 +129,14 @@ class Fluid2DVis(object):
 
 		while 1:
 			self._process_events(lbm_sim)
-			lbm_sim.sim_step(i)
+			lbm_sim.sim_step(i, self._tracers)
 
 			if i % lbm_sim.options.every == 0:
 				t_now = time.time()
 				mlups = float(lbm_sim.options.every) * self.lat_w * self.lat_h * 1e-6 / (t_now - t_prev)
 				t_prev = t_now
 
-				self._visualize(lbm_sim.geo_map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho)
+				self._visualize(lbm_sim.geo_map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y)
 				perf = self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0))
 				perf2 = self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0))
 				disp_iter = i / lbm_sim.options.every

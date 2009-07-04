@@ -23,6 +23,7 @@ class LBMSim(object):
 		parser.add_option('--scr_w', dest='scr_w', help='screen width', type='int', action='store', default=512)
 		parser.add_option('--scr_h', dest='scr_h', help='screen height', type='int', action='store', default=512)
 		parser.add_option('--every', dest='every', help='update the visualization every N steps', metavar='N', type='int', action='store', default=100)
+		parser.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
 
 		self.options, self.args = parser.parse_args()
 		self.block_size = 64
@@ -39,6 +40,7 @@ class LBMSim(object):
 
 		self.mod = cuda.SourceModule(src, options=['--use_fast_math', '-Xptxas', '-v'])
 		self.lbm_cnp = self.mod.get_function('LBMCollideAndPropagate')
+		self.lbm_tracer = self.mod.get_function('LBMUpdateTracerParticles')
 
 		# Set the 'tau' parameter.
 		self.tau = numpy.float32((6.0 * self.options.visc + 1.0)/2.0)
@@ -70,8 +72,18 @@ class LBMSim(object):
 		self.gpu_vy = cuda.mem_alloc(self.vy.size * self.vy.dtype.itemsize)
 		self.gpu_rho = cuda.mem_alloc(self.rho.size * self.rho.dtype.itemsize)
 
+		self.tracer_x = numpy.random.random_sample(self.options.tracers).astype(numpy.float32) * self.options.lat_w
+		self.tracer_y = numpy.random.random_sample(self.options.tracers).astype(numpy.float32) * self.options.lat_h
+		self.gpu_tracer_x = cuda.mem_alloc(self.tracer_x.size * self.tracer_x.dtype.itemsize)
+		self.gpu_tracer_y = cuda.mem_alloc(self.tracer_y.size * self.tracer_y.dtype.itemsize)
+
+		cuda.memcpy_htod(self.gpu_tracer_x, self.tracer_x)
+		cuda.memcpy_htod(self.gpu_tracer_y, self.tracer_y)
+
 		cuda.memcpy_htod(self.gpu_vx, self.vx)
 		cuda.memcpy_htod(self.gpu_vy, self.vy)
+		cuda.memcpy_htod(self.gpu_rho, self.rho)
+		cuda.memcpy_htod(self.gpu_rho, self.rho)
 		cuda.memcpy_htod(self.gpu_rho, self.rho)
 
 		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), numpy.float32)
@@ -94,7 +106,10 @@ class LBMSim(object):
 			cuda.memcpy_htod(gdist, self.dist[i])
 
 		self.lbm_cnp.prepare('P' * (4+2*9), block=(self.block_size,1,1), shared=(self.block_size*6*numpy.dtype(numpy.float32()).itemsize))
+		self.lbm_tracer.prepare('P' * (12), block=(self.options.tracers,1,1))
 
+		self.args_tracer2 = self.gpu_dist1 + [self.gpu_geo_map, self.gpu_tracer_x, self.gpu_tracer_y]
+		self.args_tracer1 = self.gpu_dist2 + [self.gpu_geo_map, self.gpu_tracer_x, self.gpu_tracer_y]
 		self.args1v = [self.gpu_geo_map] + self.gpu_dist1 + self.gpu_dist2 + [self.gpu_rho, self.gpu_vx, self.gpu_vy]
 		self.args1 = [self.gpu_geo_map] + self.gpu_dist1 + self.gpu_dist2 + [0,0,0]
 		self.args2 = [self.gpu_geo_map] + self.gpu_dist2 + self.gpu_dist1 + [0,0,0]
@@ -102,17 +117,27 @@ class LBMSim(object):
 	def update_map(self):
 		cuda.memcpy_htod(self.gpu_geo_map, self.geo_map)
 
-	def sim_step(self, i):
+	def sim_step(self, i, tracers=True):
 		if i % 2 == 0:
 			if i % self.options.every == 0:
 				self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *self.args1v)
+				if tracers:
+					self.lbm_tracer.prepared_call((1,1), *self.args_tracer1)
+					cuda.memcpy_dtoh(self.tracer_x, self.gpu_tracer_x)
+					cuda.memcpy_dtoh(self.tracer_y, self.gpu_tracer_y)
+
 				cuda.memcpy_dtoh(self.vx, self.gpu_vx)
 				cuda.memcpy_dtoh(self.vy, self.gpu_vy)
 				cuda.memcpy_dtoh(self.rho, self.gpu_rho)
 			else:
 				self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *self.args1)
+				if tracers:
+					self.lbm_tracer.prepared_call((1,1), *self.args_tracer1)
 		else:
 			self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *self.args2)
+			if tracers:
+				self.lbm_tracer.prepared_call((1,1), *self.args_tracer2)
+
 
 	def run(self):
 		self._init_code()

@@ -1,6 +1,8 @@
 // the following additional constants need to be defined:
 // LAT_H, LAT_W, BLOCK_SIZE, GEO_FLUID, GEO_WALL, GEO_INFLOW
 
+#define DT 1.0f
+
 __constant__ float tau;			// relaxation time
 
 struct DistP {
@@ -10,6 +12,80 @@ struct DistP {
 struct Dist {
 	float fC, fE, fW, fS, fN, fSE, fSW, fNE, fNW;
 };
+
+__device__ void inline getDist(Dist &dout, DistP din, int idx)
+{
+	dout.fC = din.fC[idx];
+	dout.fE = din.fE[idx];
+	dout.fW = din.fW[idx];
+	dout.fS = din.fS[idx];
+	dout.fN = din.fN[idx];
+	dout.fNE = din.fNE[idx];
+	dout.fNW = din.fNW[idx];
+	dout.fSE = din.fSE[idx];
+	dout.fSW = din.fSW[idx];
+}
+
+__device__ void inline getMacro(Dist fi, int *map, int idx, float &rho, float2 &v)
+{
+	rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
+	if (map[idx] == GEO_INFLOW) {
+		v.x = 0.1f;
+		v.y = 0.0f;
+	} else {
+		v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / rho;
+		v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / rho;
+	}
+}
+
+__global__ void LBMUpdateTracerParticles(DistP cd, int *map, float *x, float *y)
+{
+	float rho;
+	float2 pv;
+
+	int gi = threadIdx.x + blockDim.x * blockIdx.x;
+	float cx = x[gi];
+	float cy = y[gi];
+
+	int ix = (int)(cx);
+	int iy = (int)(cy);
+
+	if (iy < 0)
+		iy = 0;
+
+	if (ix < 0)
+		ix = 0;
+
+	if (ix > LAT_W-1)
+		ix = LAT_W-1;
+
+	if (iy > LAT_H-1)
+		iy = LAT_H-1;
+
+	int dix = ix + LAT_W*iy;
+
+	Dist fc;
+	getDist(fc, cd, dix);
+	getMacro(fc, map, dix, rho, pv);
+
+	cx = cx + pv.x * DT;
+	cy = cy + pv.y * DT;
+
+	if (cx > LAT_W)
+		cx = 0.0f;
+
+	if (cy > LAT_H)
+		cy = 0.0f;
+
+	if (cx < 0.0f)
+		cx = (float)LAT_W;
+
+	if (cy < 0.0f)
+		cy = (float)LAT_H;
+
+	x[gi] = cx;
+	y[gi] = cy;
+}
 
 // TODO:
 // - try having dummy nodes as the edges of the lattice to avoid divergent threads
@@ -34,25 +110,10 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 	__shared__ float fo_NW[BLOCK_SIZE];
 
 	// cache the distribution in local variables
-	fi.fC = cd.fC[gi];
-	fi.fE = cd.fE[gi];
-	fi.fW = cd.fW[gi];
-	fi.fS = cd.fS[gi];
-	fi.fN = cd.fN[gi];
-	fi.fNE = cd.fNE[gi];
-	fi.fNW = cd.fNW[gi];
-	fi.fSE = cd.fSE[gi];
-	fi.fSW = cd.fSW[gi];
+	getDist(fi, cd, gi);
 
 	// macroscopic quantities for the current cell
-	rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
-	if (map[gi] == GEO_INFLOW) {
-		v.x = 0.1f;
-		v.y = 0.0f;
-	} else {
-		v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / rho;
-		v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / rho;
-	}
+	getMacro(fi, map, gi, rho, v);
 
 	if (orho != NULL) {
 		orho[gi] = rho;
