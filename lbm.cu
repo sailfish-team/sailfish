@@ -13,6 +13,9 @@ struct Dist {
 	float fC, fE, fW, fS, fN, fSE, fSW, fNE, fNW;
 };
 
+//
+// Copy the idx-th distributin from din into dout.
+//
 __device__ void inline getDist(Dist &dout, DistP din, int idx)
 {
 	dout.fC = din.fC[idx];
@@ -26,10 +29,14 @@ __device__ void inline getDist(Dist &dout, DistP din, int idx)
 	dout.fSW = din.fSW[idx];
 }
 
-__device__ void inline getMacro(Dist fi, int *map, int idx, float &rho, float2 &v)
+//
+// Get macroscopic density rho and velocity v given a distribution fi, and
+// a the node class node_type.
+//
+__device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 {
 	rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
-	if (map[idx] == GEO_INFLOW) {
+	if (node_type == GEO_INFLOW) {
 		v.x = 0.1f;
 		v.y = 0.0f;
 	} else {
@@ -38,6 +45,11 @@ __device__ void inline getMacro(Dist fi, int *map, int idx, float &rho, float2 &
 	}
 }
 
+//
+// A kernel to update the position of tracer particles.
+//
+// Each thread updates the position of a single particle using Euler's algorithm.
+//
 __global__ void LBMUpdateTracerParticles(DistP cd, int *map, float *x, float *y)
 {
 	float rho;
@@ -50,6 +62,7 @@ __global__ void LBMUpdateTracerParticles(DistP cd, int *map, float *x, float *y)
 	int ix = (int)(cx);
 	int iy = (int)(cy);
 
+	// Sanity checks.
 	if (iy < 0)
 		iy = 0;
 
@@ -66,11 +79,12 @@ __global__ void LBMUpdateTracerParticles(DistP cd, int *map, float *x, float *y)
 
 	Dist fc;
 	getDist(fc, cd, dix);
-	getMacro(fc, map, dix, rho, pv);
+	getMacro(fc, map[dix], rho, pv);
 
 	cx = cx + pv.x * DT;
 	cy = cy + pv.y * DT;
 
+	// Periodic boundary conditions.
 	if (cx > LAT_W)
 		cx = 0.0f;
 
@@ -87,42 +101,15 @@ __global__ void LBMUpdateTracerParticles(DistP cd, int *map, float *x, float *y)
 	y[gi] = cy;
 }
 
-// TODO:
-// - try having dummy nodes as the edges of the lattice to avoid divergent threads
-
-__global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho, float *ovx, float *ovy)
+//
+// Performs the relaxation step in the BGK model given the density rho,
+// the velocity v and the distribution fi.
+//
+__device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int *map, int gi)
 {
-	int tix = threadIdx.x;
-	int ti = tix + blockIdx.x * blockDim.x;
-	int gi = ti + LAT_W*blockIdx.y;
-
-	// equilibrium distributions
-	Dist feq, fi;
-	float rho;
-	float2 v;
-
-	// shared variables for in-block propagation
-	__shared__ float fo_E[BLOCK_SIZE];
-	__shared__ float fo_W[BLOCK_SIZE];
-	__shared__ float fo_SE[BLOCK_SIZE];
-	__shared__ float fo_SW[BLOCK_SIZE];
-	__shared__ float fo_NE[BLOCK_SIZE];
-	__shared__ float fo_NW[BLOCK_SIZE];
-
-	// cache the distribution in local variables
-	getDist(fi, cd, gi);
-
-	// macroscopic quantities for the current cell
-	getMacro(fi, map, gi, rho, v);
-
-	if (orho != NULL) {
-		orho[gi] = rho;
-		ovx[gi] = v.x;
-		ovy[gi] = v.y;
-	}
-
 	// relaxation
 	float Cusq = -1.5f * (v.x*v.x + v.y*v.y);
+	Dist feq;
 
 	feq.fC = rho * (1.0f + Cusq) * 4.0f/9.0f;
 	feq.fN = rho * (1.0f + Cusq + 3.0f*v.y + 4.5f*v.y*v.y) / 9.0f;
@@ -172,7 +159,44 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 		fi.fN = fi.fS;
 		fi.fS = t;
 	}
+}
 
+// TODO:
+// - try having dummy nodes as the edges of the lattice to avoid divergent threads
+
+__global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho, float *ovx, float *ovy)
+{
+	int tix = threadIdx.x;
+	int ti = tix + blockIdx.x * blockDim.x;
+	int gi = ti + LAT_W*blockIdx.y;
+
+	// shared variables for in-block propagation
+	__shared__ float fo_E[BLOCK_SIZE];
+	__shared__ float fo_W[BLOCK_SIZE];
+	__shared__ float fo_SE[BLOCK_SIZE];
+	__shared__ float fo_SW[BLOCK_SIZE];
+	__shared__ float fo_NE[BLOCK_SIZE];
+	__shared__ float fo_NW[BLOCK_SIZE];
+
+	// cache the distribution in local variables
+	Dist fi;
+	getDist(fi, cd, gi);
+
+	// macroscopic quantities for the current cell
+	float rho;
+	float2 v;
+	getMacro(fi, map[gi], rho, v);
+
+	// only save the macroscopic quantities if requested to do so
+	if (orho != NULL) {
+		orho[gi] = rho;
+		ovx[gi] = v.x;
+		ovy[gi] = v.y;
+	}
+
+	BGK_relaxate(rho, v, fi, map, gi);
+
+	// update the 0-th direction distribution
 	od.fC[gi] = fi.fC;
 
 	// N + S propagation (global memory)

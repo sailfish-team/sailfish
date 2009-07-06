@@ -54,6 +54,7 @@ class LBMSim(object):
 		self.reset_geo()
 
 	def reset_geo(self):
+		"""Initialize the simulation for the lid-driven cavity geometry."""
 		self.geo_map = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.int32)
 		# bottom/top
 		for i in range(0, self.options.lat_w):
