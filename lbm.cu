@@ -1,9 +1,13 @@
 // the following additional constants need to be defined:
 // LAT_H, LAT_W, BLOCK_SIZE, GEO_FLUID, GEO_WALL, GEO_INFLOW
 
+#define RELAX_bgk	BGK_relaxate(rho, v, fi, map[gi]);
+#define RELAX_mrt	MS_relaxate(fi, map[gi]);
+
 #define DT 1.0f
 
 __constant__ float tau;			// relaxation time
+__constant__ float visc;		// viscosity
 
 struct DistP {
 	float *fC, *fE, *fW, *fS, *fN, *fSE, *fSW, *fNE, *fNW;
@@ -11,6 +15,11 @@ struct DistP {
 
 struct Dist {
 	float fC, fE, fW, fS, fN, fSE, fSW, fNE, fNW;
+};
+
+// Distribution in momentum space.
+struct DistM {
+	float rho, en, ens, mx, ex, my, ey, sd, sod;
 };
 
 //
@@ -102,10 +111,94 @@ __global__ void LBMUpdateTracerParticles(DistP cd, int *map, float *x, float *y)
 }
 
 //
+// Relaxation in moment space.
+//
+__device__ void inline MS_relaxate(Dist &fi, int node_type)
+{
+	DistM fm, feq;
+
+	fm.rho = 1.0f*fi.fC + 1.0f*fi.fE + 1.0f*fi.fN + 1.0f*fi.fW + 1.0f*fi.fS + 1.0f*fi.fNE + 1.0f*fi.fNW + 1.0f*fi.fSW + 1.0f*fi.fSE;
+	fm.en = -4.0f*fi.fC - 1.0f*fi.fE - 1.0f*fi.fN - 1.0f*fi.fW - 1.0f*fi.fS + 2.0f*fi.fNE + 2.0f*fi.fNW + 2.0f*fi.fSW + 2.0f*fi.fSE;
+	fm.ens = 4.0f*fi.fC - 2.0f*fi.fE - 2.0f*fi.fN - 2.0f*fi.fW - 2.0f*fi.fS + 1.0f*fi.fNE + 1.0f*fi.fNW + 1.0f*fi.fSW + 1.0f*fi.fSE;
+	fm.mx =  0.0f*fi.fC + 1.0f*fi.fE + 0.0f*fi.fN - 1.0f*fi.fW + 0.0f*fi.fS + 1.0f*fi.fNE - 1.0f*fi.fNW - 1.0f*fi.fSW + 1.0f*fi.fSE;
+	fm.ex =  0.0f*fi.fC - 2.0f*fi.fE + 0.0f*fi.fN + 2.0f*fi.fW + 0.0f*fi.fS + 1.0f*fi.fNE - 1.0f*fi.fNW - 1.0f*fi.fSW + 1.0f*fi.fSE;
+	fm.my =  0.0f*fi.fC + 0.0f*fi.fE + 1.0f*fi.fN + 0.0f*fi.fW - 1.0f*fi.fS + 1.0f*fi.fNE + 1.0f*fi.fNW - 1.0f*fi.fSW - 1.0f*fi.fSE;
+	fm.ey =  0.0f*fi.fC + 0.0f*fi.fE - 2.0f*fi.fN + 0.0f*fi.fW + 2.0f*fi.fS + 1.0f*fi.fNE + 1.0f*fi.fNW - 1.0f*fi.fSW - 1.0f*fi.fSE;
+	fm.sd =  0.0f*fi.fC + 1.0f*fi.fE - 1.0f*fi.fN + 1.0f*fi.fW - 1.0f*fi.fS + 0.0f*fi.fNE + 0.0f*fi.fNW + 0.0f*fi.fSW - 0.0f*fi.fSE;
+	fm.sod = 0.0f*fi.fC + 0.0f*fi.fE + 0.0f*fi.fN + 0.0f*fi.fW + 0.0f*fi.fS + 1.0f*fi.fNE - 1.0f*fi.fNW + 1.0f*fi.fSW - 1.0f*fi.fSE;
+
+	if (node_type == GEO_INFLOW) {
+		fm.mx = 0.1f;
+		fm.my = 0.0f;
+	}
+
+	float h = fm.mx*fm.mx + fm.my*fm.my;
+	feq.en  = -2.0f*fm.rho + 3.0f*h;
+	feq.ens = fm.rho - 3.0f*h;
+	feq.ex  = -fm.mx;
+	feq.ey  = -fm.my;
+	feq.sd  = (fm.mx*fm.mx - fm.my*fm.my);
+	feq.sod = (fm.mx*fm.my);
+
+	float tau7 = 4.0f / (12.0f*visc + 2.0f);
+	float tau4 = 3.0f*(2.0f - tau7) / (3.0f - tau7);
+	float tau8 = 1.0f/((2.0f/tau7 - 1.0f)*0.5f + 0.5f);
+
+	if (node_type == GEO_FLUID) {
+		fm.en  -= 1.63f * (fm.en - feq.en);
+		fm.ens -= 1.14f * (fm.ens - feq.ens);
+		fm.ex  -= tau4 * (fm.ex - feq.ex);
+		fm.ey  -= 1.92f * (fm.ey - feq.ey);
+		fm.sd  -= tau7 * (fm.sd - feq.sd);
+		fm.sod -= tau8 * (fm.sod - feq.sod);
+	} else if (node_type == GEO_INFLOW) {
+		fm.en  = feq.en;
+		fm.ens = feq.ens;
+		fm.ex  = feq.ex;
+		fm.ey  = feq.ey;
+		fm.sd  = feq.sd;
+		fm.sod = feq.sod;
+	} else if (node_type == GEO_WALL) {
+		float t;
+		t = fi.fE;
+		fi.fE = fi.fW;
+		fi.fW = t;
+
+		t = fi.fNW;
+		fi.fNW = fi.fSE;
+		fi.fSE = t;
+
+		t = fi.fNE;
+		fi.fNE = fi.fSW;
+		fi.fSW = t;
+
+		t = fi.fN;
+		fi.fN = fi.fS;
+		fi.fS = t;
+	}
+
+	if (node_type != GEO_WALL) {
+		fi.fC  = (1.0f/9.0f)*fm.rho - (1.0f/9.0f)*fm.en + (1.0f/9.0f)*fm.ens;
+		fi.fE  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.mx - (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
+		fi.fN  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.my - (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
+		fi.fW  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.mx + (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
+		fi.fS  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.my + (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
+		fi.fNE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+				 +(1.0f/6.0f)*fm.mx + (1.0f/12.0f)*fm.ex + (1.0f/6.0f)*fm.my + (1.0f/12.0f)*fm.ey + 0.25f*fm.sod;
+		fi.fNW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+				 -(1.0f/6.0f)*fm.mx - (1.0f/12.0f)*fm.ex + (1.0f/6.0f)*fm.my + (1.0f/12.0f)*fm.ey - 0.25f*fm.sod;
+		fi.fSW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+				 -(1.0f/6.0f)*fm.mx - (1.0f/12.0f)*fm.ex - (1.0f/6.0f)*fm.my - (1.0f/12.0f)*fm.ey + 0.25f*fm.sod;
+		fi.fSE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+				 +(1.0f/6.0f)*fm.mx + (1.0f/12.0f)*fm.ex - (1.0f/6.0f)*fm.my - (1.0f/12.0f)*fm.ey - 0.25f*fm.sod;
+	}
+}
+
+//
 // Performs the relaxation step in the BGK model given the density rho,
 // the velocity v and the distribution fi.
 //
-__device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int *map, int gi)
+__device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type)
 {
 	// relaxation
 	float Cusq = -1.5f * (v.x*v.x + v.y*v.y);
@@ -121,7 +214,7 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int *map, int
 	feq.fSW = rho * (1.0f + Cusq + 3.0f*(-v.x-v.y) + 4.5f*(v.x+v.y)*(v.x+v.y)) / 36.0f;
 	feq.fNW = rho * (1.0f + Cusq + 3.0f*(-v.x+v.y) + 4.5f*(-v.x+v.y)*(-v.x+v.y)) / 36.0f;
 
-	if (map[gi] == GEO_FLUID) {
+	if (node_type == GEO_FLUID) {
 		fi.fC += (feq.fC - fi.fC) / tau;
 		fi.fE += (feq.fE - fi.fE) / tau;
 		fi.fW += (feq.fW - fi.fW) / tau;
@@ -131,7 +224,7 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int *map, int
 		fi.fNE += (feq.fNE - fi.fNE) / tau;
 		fi.fSW += (feq.fSW - fi.fSW) / tau;
 		fi.fNW += (feq.fNW - fi.fNW) / tau;
-	} else if (map[gi] == GEO_INFLOW) {
+	} else if (node_type == GEO_INFLOW) {
 		fi.fC  = feq.fC;
 		fi.fE  = feq.fE;
 		fi.fW  = feq.fW;
@@ -141,7 +234,7 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int *map, int
 		fi.fNE = feq.fNE;
 		fi.fSW = feq.fSW;
 		fi.fNW = feq.fNW;
-	} else if (map[gi] == GEO_WALL) {
+	} else if (node_type == GEO_WALL) {
 		float t;
 		t = fi.fE;
 		fi.fE = fi.fW;
@@ -194,7 +287,7 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 		ovy[gi] = v.y;
 	}
 
-	BGK_relaxate(rho, v, fi, map, gi);
+	RELAXATE;
 
 	// update the 0-th direction distribution
 	od.fC[gi] = fi.fC;

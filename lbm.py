@@ -24,6 +24,7 @@ class LBMSim(object):
 		parser.add_option('--scr_h', dest='scr_h', help='screen height', type='int', action='store', default=512)
 		parser.add_option('--every', dest='every', help='update the visualization every N steps', metavar='N', type='int', action='store', default=100)
 		parser.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
+		parser.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
 
 		self.options, self.args = parser.parse_args()
 		self.block_size = 64
@@ -37,6 +38,7 @@ class LBMSim(object):
 		fp.close()
 		src = '#define BLOCK_SIZE %d\n#define LAT_H %d\n#define LAT_W %d\n' % (self.block_size, self.options.lat_h, self.options.lat_w) + src
 		src = '#define GEO_FLUID %d\n#define GEO_WALL %d\n#define GEO_INFLOW %d\n' % (GEO_FLUID, GEO_WALL, GEO_INFLOW) + src
+		src = '#define RELAXATE RELAX_%s\n' % (self.options.model) + src
 
 		self.mod = cuda.SourceModule(src, options=['--use_fast_math', '-Xptxas', '-v'])
 		self.lbm_cnp = self.mod.get_function('LBMCollideAndPropagate')
@@ -46,6 +48,9 @@ class LBMSim(object):
 		self.tau = numpy.float32((6.0 * self.options.visc + 1.0)/2.0)
 		self.gpu_tau = self.mod.get_global('tau')[0]
 		cuda.memcpy_htod(self.gpu_tau, self.tau)
+
+		self.gpu_visc = self.mod.get_global('visc')[0]
+		cuda.memcpy_htod(self.gpu_visc, numpy.float32(self.options.visc))
 
 	def _init_geo(self):
 		# Initialize the map.
