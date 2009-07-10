@@ -7,6 +7,32 @@ import sys
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
 
+def hsv_to_rgb(a):
+	t = a[:,:,0]*6.0
+	i = t.astype(numpy.uint8)
+	f = t - numpy.floor(t)
+
+	v = a[:,:,2]
+
+	o = numpy.ones_like(a[:,:,0])
+	p = v * (o - a[:,:,1])
+	q = v * (o - a[:,:,1]*f)
+	t = v * (o - a[:,:,1]*(o - f))
+
+	i = numpy.mod(i, 6)
+	sh = i.shape
+	i = i.reshape(sh[0], sh[1], 1) * numpy.uint8([1,1,1])
+
+	choices = [numpy.dstack((v, t, p)),
+			   numpy.dstack((q, v, p)),
+			   numpy.dstack((p, v, t)),
+			   numpy.dstack((p, q, v)),
+			   numpy.dstack((t, p, v)),
+			   numpy.dstack((v, p, q))]
+
+	return numpy.choose(i, choices)
+
+
 class Fluid2DVis(object):
 
 	def __init__(self, width, height, lat_w, lat_h):
@@ -27,17 +53,17 @@ class Fluid2DVis(object):
 		srf = pygame.Surface((width, height))
 
 		if self._vismode == 0:
-			drw = numpy.sqrt(vx*vx + vy*vy) / 0.1 * 255
+			drw = numpy.sqrt(vx*vx + vy*vy) / 0.1
 		elif self._vismode == 1:
-			drw = numpy.abs(vx) / 0.1 * 255
+			drw = numpy.abs(vx) / 0.1
 		elif self._vismode == 2:
-			drw = numpy.abs(vy) / 0.1 * 255
+			drw = numpy.abs(vy) / 0.1
 		elif self._vismode == 3:
 			t = numpy.abs(rho - 1.00)
-			drw	= t / numpy.max(t) * 255
+			drw	= t / numpy.max(t)
 
 		# Rotate the field to the correct position.
-		drw = numpy.rot90(drw.astype(numpy.uint8), 3)
+		drw = numpy.rot90(drw.astype(numpy.float32), 3)
 		a = pygame.surfarray.pixels3d(srf)
 
 		# Draw the walls.
@@ -46,7 +72,16 @@ class Fluid2DVis(object):
 
 		# Draw the data field for all sites which are not marked as a wall.
 		b = numpy.logical_not(b)
-		drw = drw.reshape((width, height, 1)) * numpy.uint8([1, 1, 0])
+
+		drw = (drw.reshape((width, height, 1)) * 255.0).astype(numpy.uint8) * numpy.uint8([1,1,0])
+
+		# HSV example
+#		drw = drw.reshape((width, height, 1)) * numpy.float32([1.0, 1.0, 1.0])
+#		drw[:,:,2] = 1.0
+#		drw[:,:,1] = 1.0
+#		drw = hsv_to_rgb(drw) * 255.0
+#		drw = drw.astype(numpy.uint8)
+
 		a[b] = drw[b]
 
 		# Unlock the surface and put the picture on screen.
