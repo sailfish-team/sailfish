@@ -32,6 +32,20 @@ def hsv_to_rgb(a):
 
 	return numpy.choose(i, choices)
 
+def _vis_hsv(drw, width, height):
+		drw = drw.reshape((width, height, 1)) * numpy.float32([1.0, 1.0, 1.0])
+		drw[:,:,2] = 1.0
+		drw[:,:,1] = 1.0
+		drw = hsv_to_rgb(drw) * 255.0
+		return drw.astype(numpy.uint8)
+
+def _vis_std(drw, width, height):
+		return (drw.reshape((width, height, 1)) * 255.0).astype(numpy.uint8) * numpy.uint8([1,1,0])
+
+_vis_map = {
+	'std': _vis_std,
+	'hsv': _vis_hsv,
+	}
 
 class Fluid2DVis(object):
 
@@ -48,7 +62,7 @@ class Fluid2DVis(object):
 		self._drawing = False
 		self._draw_type = 1
 
-	def _visualize(self, geo_map, vx, vy, rho, tx, ty):
+	def _visualize(self, geo_map, vx, vy, rho, tx, ty, vismode):
 		height, width = vx.shape
 		srf = pygame.Surface((width, height))
 
@@ -72,16 +86,7 @@ class Fluid2DVis(object):
 
 		# Draw the data field for all sites which are not marked as a wall.
 		b = numpy.logical_not(b)
-
-		drw = (drw.reshape((width, height, 1)) * 255.0).astype(numpy.uint8) * numpy.uint8([1,1,0])
-
-		# HSV example
-#		drw = drw.reshape((width, height, 1)) * numpy.float32([1.0, 1.0, 1.0])
-#		drw[:,:,2] = 1.0
-#		drw[:,:,1] = 1.0
-#		drw = hsv_to_rgb(drw) * 255.0
-#		drw = drw.astype(numpy.uint8)
-
+		drw = _vis_map[vismode](drw, width, height)
 		a[b] = drw[b]
 
 		# Unlock the surface and put the picture on screen.
@@ -171,7 +176,7 @@ class Fluid2DVis(object):
 				mlups = float(lbm_sim.options.every) * self.lat_w * self.lat_h * 1e-6 / (t_now - t_prev)
 				t_prev = t_now
 
-				self._visualize(lbm_sim.geo_map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y)
+				self._visualize(lbm_sim.geo_map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y, lbm_sim.options.vismode)
 				perf = self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0))
 				perf2 = self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0))
 				disp_iter = i / lbm_sim.options.every
