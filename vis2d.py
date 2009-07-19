@@ -1,8 +1,9 @@
-import time
-import pygame
+import math
 import numpy
+import pygame
 import sim
 import sys
+import time
 
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
@@ -33,17 +34,27 @@ def hsv_to_rgb(a):
 	return numpy.choose(i, choices)
 
 def _vis_hsv(drw, width, height):
-		drw = drw.reshape((width, height, 1)) * numpy.float32([1.0, 1.0, 1.0])
-		drw[:,:,2] = 1.0
-		drw[:,:,1] = 1.0
-		drw = hsv_to_rgb(drw) * 255.0
-		return drw.astype(numpy.uint8)
+	drw = drw.reshape((width, height, 1)) * numpy.float32([1.0, 1.0, 1.0])
+	drw[:,:,2] = 1.0
+	drw[:,:,1] = 1.0
+	drw = hsv_to_rgb(drw) * 255.0
+	return drw.astype(numpy.uint8)
 
 def _vis_std(drw, width, height):
-		return (drw.reshape((width, height, 1)) * 255.0).astype(numpy.uint8) * numpy.uint8([1,1,0])
+	return (drw.reshape((width, height, 1)) * 255.0).astype(numpy.uint8) * numpy.uint8([1,1,0])
 
-_vis_map = {
+def _vis_rgb1(drw, width, height):
+	"""This is the default color palette from gnuplot."""
+	r = numpy.sqrt(drw)
+	g = numpy.power(drw, 3)
+	b = numpy.sin(drw * math.pi)
+
+	return (numpy.dstack([r,g,b]) * 250.0).astype(numpy.uint8)
+
+
+vis_map = {
 	'std': _vis_std,
+	'rgb1': _vis_rgb1,
 	'hsv': _vis_hsv,
 	}
 
@@ -86,7 +97,7 @@ class Fluid2DVis(object):
 
 		# Draw the data field for all sites which are not marked as a wall.
 		b = numpy.logical_not(b)
-		drw = _vis_map[vismode](drw, width, height)
+		drw = vis_map[vismode](drw, width, height)
 		a[b] = drw[b]
 
 		# Unlock the surface and put the picture on screen.
