@@ -16,9 +16,10 @@ from optparse import OptionParser, OptionValueError
 class LBMGeo(object):
 	"""Abstract class for the LBM geometry."""
 
-	def __init__(self, lat_w, lat_h):
+	def __init__(self, lat_w, lat_h, model):
 		self.lat_w = lat_w
 		self.lat_h = lat_h
+		self.model = model
 		self.map = numpy.zeros((lat_h, lat_w), numpy.int32)
 		self.gpu_map = cuda.mem_alloc(self.map.size * self.map.dtype.itemsize)
 		self.reset()
@@ -29,6 +30,19 @@ class LBMGeo(object):
 	def reset(self): abstract
 
 	def init_dist(self, dist): abstract
+
+	def velocity_to_dist(self, vx, vy, dist, x, y):
+		"""Set the distributions at node (x,y) so that the fluid there has a specific velocity (vx,vy)."""
+		cusq = -1.5 * (vx*vx + vy*vy)
+		dist[0][y][x] = numpy.float32((1.0 + cusq) * 4.0/9.0)
+		dist[4][y][x] = numpy.float32((1.0 + cusq + 3.0*vy + 4.5*vy*vy) / 9.0)
+		dist[1][y][x] = numpy.float32((1.0 + cusq + 3.0*vx + 4.5*vx*vx) / 9.0)
+		dist[3][y][x] = numpy.float32((1.0 + cusq - 3.0*vy + 4.5*vy*vy) / 9.0)
+		dist[2][y][x] = numpy.float32((1.0 + cusq - 3.0*vx + 4.5*vx*vx) / 9.0)
+		dist[7][y][x] = numpy.float32((1.0 + cusq + 3.0*(vx+vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0)
+		dist[5][y][x] = numpy.float32((1.0 + cusq + 3.0*(vx-vy) + 4.5*(vx-vy)*(vx-vy)) / 36.0)
+		dist[6][y][x] = numpy.float32((1.0 + cusq + 3.0*(-vx-vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0)
+		dist[8][y][x] = numpy.float32((1.0 + cusq + 3.0*(-vx+vy) + 4.5*(-vx+vy)*(-vx+vy)) / 36.0)
 
 
 class LBMSim(object):
@@ -98,7 +112,7 @@ class LBMSim(object):
 		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), numpy.float32)
 
 		# Simulation geometry.
-		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h)
+		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h, self.options.model)
 		self.geo.init_dist(self.dist)
 
 		# Particle distributions in device memory, A-B access pattern.
