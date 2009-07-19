@@ -31,32 +31,9 @@ class LBMGeo(object):
 	def init_dist(self, dist): abstract
 
 
-class LBMGeoLDC(LBMGeo):
-	"""Lid-driven cavity geometry."""
-
-	def reset(self):
-		"""Initialize the simulation for the lid-driven cavity geometry."""
-		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
-		# bottom/top
-		for i in range(0, self.lat_w):
-			self.map[0][i] = numpy.int32(GEO_WALL)
-			self.map[self.lat_h-1][i] = numpy.int32(GEO_INFLOW)
-		# left/right
-		for i in range(0, self.lat_h):
-			self.map[i][0] = self.map[i][self.lat_w-1] = numpy.int32(GEO_WALL)
-		self.update_map()
-
-	def init_dist(self, dist):
-		for x in range(0, self.lat_w):
-			for y in range(0, self.lat_h):
-				dist[0][y][x] = numpy.float32(4.0/9.0)
-				dist[1][y][x] = dist[2][y][x] = dist[3][y][x] = dist[4][y][x] = numpy.float32(1.0/9.0)
-				dist[5][y][x] = dist[6][y][x] = dist[7][y][x] = dist[8][y][x] = numpy.float32(1.0/36.0)
-
-
 class LBMSim(object):
 
-	def __init__(self):
+	def __init__(self, geo_class):
 		parser = OptionParser()
 		parser.add_option('--lat_w', dest='lat_w', help='lattice width', type='int', action='store', default=128)
 		parser.add_option('--lat_h', dest='lat_h', help='lattice height', type='int', action='store', default=128)
@@ -68,6 +45,7 @@ class LBMSim(object):
 		parser.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
 		parser.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=['std', 'hsv'], action='store', default='std')
 
+		self.geo_class = geo_class
 		self.options, self.args = parser.parse_args()
 		self.block_size = 64
 
@@ -120,7 +98,7 @@ class LBMSim(object):
 		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), numpy.float32)
 
 		# Simulation geometry.
-		self.geo = LBMGeoLDC(self.options.lat_w, self.options.lat_h)
+		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h)
 		self.geo.init_dist(self.dist)
 
 		# Particle distributions in device memory, A-B access pattern.
@@ -176,5 +154,4 @@ class LBMSim(object):
 		self._init_lbm()
 		self.vis.main(self)
 
-lbm = LBMSim()
-lbm.run()
+
