@@ -197,7 +197,8 @@ class Fluid2DVis(object):
 				pygame.display.flip()
 
 				t_prev = time.time()
-				print t_prev - t_now
+#				print t_prev - t_now
+				print mlups
 
 			i += 1
 
