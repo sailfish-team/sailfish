@@ -1,5 +1,9 @@
-// the following additional constants need to be defined:
+// The following additional constants need to be defined:
 // LAT_H, LAT_W, BLOCK_SIZE, GEO_FLUID, GEO_WALL, GEO_INFLOW
+
+// If INFLOW_PROP is set, new distributions will be propagated into
+// GEO_INFLOW nodes and thus the velocity of these nodes will have to
+// be explicitly overridden at relaxation time.
 
 #define RELAX_bgk	BGK_relaxate(rho, v, fi, map[gi]);
 #define RELAX_mrt	MS_relaxate(fi, map[gi]);
@@ -297,15 +301,15 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 	// update the 0-th direction distribution
 	od.fC[gi] = fi.fC;
 
-	// N + S propagation (global memory)
-	if (blockIdx.y > 0)			od.fS[gi-LAT_W] = fi.fS;
-	if (blockIdx.y < LAT_H-1)	od.fN[gi+LAT_W] = fi.fN;
-
 #ifdef INFLOW_PROP
 	#define set_odist(idx, dir, val, mtype) od.dir[idx] = val;
 #else
 	#define set_odist(idx, dir, val, mtype) if (mtype != GEO_INFLOW) { od.dir[idx] = val; }
 #endif
+
+	// N + S propagation (global memory)
+	if (blockIdx.y > 0)			set_odist(gi-LAT_W, fS, fi.fS, map[gi-LAT_W]);
+	if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fN, fi.fN, map[gi+LAT_W]);
 
 	// E propagation in shared memory
 	if (tix < blockDim.x-1) {
