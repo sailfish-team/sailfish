@@ -101,7 +101,6 @@ class Fluid2DVis(object):
 			vfsp = 21
 			scale = max(sh, sw)/(vfsp-1) / max_v
 
-
 			for i in range(1, vfsp):
 				for j in range(1, vfsp):
 					ox = sw*i/vfsp
@@ -124,8 +123,8 @@ class Fluid2DVis(object):
 
 	def _draw_wall(self, lbm_sim, event):
 		x, y = self._get_loc(event)
-		lbm_sim.geo_map[y][x] = self._draw_type == 1 and sim.GEO_WALL or sim.GEO_FLUID
-		lbm_sim.update_map()
+		lbm_sim.geo.map[y][x] = self._draw_type == 1 and sim.GEO_WALL or sim.GEO_FLUID
+		lbm_sim.geo.update_map()
 
 	def _process_events(self, lbm_sim):
 		for event in pygame.event.get():
@@ -160,7 +159,7 @@ class Fluid2DVis(object):
 				elif event.key == pygame.K_q:
 					sys.exit()
 				elif event.key == pygame.K_r:
-					lbm_sim.reset_geo()
+					lbm_sim.geo.reset()
 
 	def main(self, lbm_sim):
 		i = 1
@@ -176,7 +175,7 @@ class Fluid2DVis(object):
 				mlups = float(lbm_sim.options.every) * self.lat_w * self.lat_h * 1e-6 / (t_now - t_prev)
 				t_prev = t_now
 
-				self._visualize(lbm_sim.geo_map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y, lbm_sim.options.vismode)
+				self._visualize(lbm_sim.geo.map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y, lbm_sim.options.vismode)
 				perf = self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0))
 				perf2 = self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0))
 				disp_iter = i / lbm_sim.options.every

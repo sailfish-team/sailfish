@@ -13,6 +13,47 @@ from sim import *
 
 from optparse import OptionParser, OptionValueError
 
+class LBMGeo(object):
+	"""Abstract class for the LBM geometry."""
+
+	def __init__(self, lat_w, lat_h):
+		self.lat_w = lat_w
+		self.lat_h = lat_h
+		self.map = numpy.zeros((lat_h, lat_w), numpy.int32)
+		self.gpu_map = cuda.mem_alloc(self.map.size * self.map.dtype.itemsize)
+		self.reset()
+
+	def update_map(self):
+		cuda.memcpy_htod(self.gpu_map, self.map)
+
+	def reset(self): abstract
+
+	def init_dist(self, dist): abstract
+
+
+class LBMGeoLDC(LBMGeo):
+	"""Lid-driven cavity geometry."""
+
+	def reset(self):
+		"""Initialize the simulation for the lid-driven cavity geometry."""
+		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
+		# bottom/top
+		for i in range(0, self.lat_w):
+			self.map[0][i] = numpy.int32(GEO_WALL)
+			self.map[self.lat_h-1][i] = numpy.int32(GEO_INFLOW)
+		# left/right
+		for i in range(0, self.lat_h):
+			self.map[i][0] = self.map[i][self.lat_w-1] = numpy.int32(GEO_WALL)
+		self.update_map()
+
+	def init_dist(self, dist):
+		for x in range(0, self.lat_w):
+			for y in range(0, self.lat_h):
+				dist[0][y][x] = numpy.float32(4.0/9.0)
+				dist[1][y][x] = dist[2][y][x] = dist[3][y][x] = dist[4][y][x] = numpy.float32(1.0/9.0)
+				dist[5][y][x] = dist[6][y][x] = dist[7][y][x] = dist[8][y][x] = numpy.float32(1.0/36.0)
+
+
 class LBMSim(object):
 
 	def __init__(self):
@@ -53,54 +94,36 @@ class LBMSim(object):
 		self.gpu_visc = self.mod.get_global('visc')[0]
 		cuda.memcpy_htod(self.gpu_visc, numpy.float32(self.options.visc))
 
-	def _init_geo(self):
-		# Initialize the map.
-		self.geo_map = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.int32)
-		self.gpu_geo_map = cuda.mem_alloc(self.geo_map.size * self.geo_map.dtype.itemsize)
-		self.reset_geo()
-
-	def reset_geo(self):
-		"""Initialize the simulation for the lid-driven cavity geometry."""
-		self.geo_map = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.int32)
-		# bottom/top
-		for i in range(0, self.options.lat_w):
-			self.geo_map[0][i] = numpy.int32(GEO_WALL)
-			self.geo_map[self.options.lat_h-1][i] = numpy.int32(GEO_INFLOW)
-		# left/right
-		for i in range(0, self.options.lat_h):
-			self.geo_map[i][0] = self.geo_map[i][self.options.lat_w-1] = numpy.int32(GEO_WALL)
-		self.update_map()
-
 	def _init_lbm(self):
+		# Velocity and density.
 		self.vx = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.float32)
 		self.vy = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.float32)
 		self.rho = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.float32)
 		self.gpu_vx = cuda.mem_alloc(self.vx.size * self.vx.dtype.itemsize)
 		self.gpu_vy = cuda.mem_alloc(self.vy.size * self.vy.dtype.itemsize)
 		self.gpu_rho = cuda.mem_alloc(self.rho.size * self.rho.dtype.itemsize)
-
-		self.tracer_x = numpy.random.random_sample(self.options.tracers).astype(numpy.float32) * self.options.lat_w
-		self.tracer_y = numpy.random.random_sample(self.options.tracers).astype(numpy.float32) * self.options.lat_h
-		self.gpu_tracer_x = cuda.mem_alloc(self.tracer_x.size * self.tracer_x.dtype.itemsize)
-		self.gpu_tracer_y = cuda.mem_alloc(self.tracer_y.size * self.tracer_y.dtype.itemsize)
-
-		cuda.memcpy_htod(self.gpu_tracer_x, self.tracer_x)
-		cuda.memcpy_htod(self.gpu_tracer_y, self.tracer_y)
-
 		cuda.memcpy_htod(self.gpu_vx, self.vx)
 		cuda.memcpy_htod(self.gpu_vy, self.vy)
 		cuda.memcpy_htod(self.gpu_rho, self.rho)
 		cuda.memcpy_htod(self.gpu_rho, self.rho)
 		cuda.memcpy_htod(self.gpu_rho, self.rho)
 
+		# Tracer particles.
+		self.tracer_x = numpy.random.random_sample(self.options.tracers).astype(numpy.float32) * self.options.lat_w
+		self.tracer_y = numpy.random.random_sample(self.options.tracers).astype(numpy.float32) * self.options.lat_h
+		self.gpu_tracer_x = cuda.mem_alloc(self.tracer_x.size * self.tracer_x.dtype.itemsize)
+		self.gpu_tracer_y = cuda.mem_alloc(self.tracer_y.size * self.tracer_y.dtype.itemsize)
+		cuda.memcpy_htod(self.gpu_tracer_x, self.tracer_x)
+		cuda.memcpy_htod(self.gpu_tracer_y, self.tracer_y)
+
+		# Particle distributions in host memory.
 		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), numpy.float32)
 
-		for x in range(0, self.options.lat_w):
-			for y in range(0, self.options.lat_h):
-				self.dist[0][y][x] = numpy.float32(4.0/9.0)
-				self.dist[1][y][x] = self.dist[2][y][x] = self.dist[3][y][x] = self.dist[4][y][x] = numpy.float32(1.0/9.0)
-				self.dist[5][y][x] = self.dist[6][y][x] = self.dist[7][y][x] = self.dist[8][y][x] = numpy.float32(1.0/36.0)
+		# Simulation geometry.
+		self.geo = LBMGeoLDC(self.options.lat_w, self.options.lat_h)
+		self.geo.init_dist(self.dist)
 
+		# Particle distributions in device memory, A-B access pattern.
 		self.gpu_dist1 = []
 		self.gpu_dist2 = []
 		for i in range(0, 9):
@@ -112,17 +135,19 @@ class LBMSim(object):
 		for i, gdist in enumerate(self.gpu_dist2):
 			cuda.memcpy_htod(gdist, self.dist[i])
 
+		# Prepared calls to the kernel.
 		self.lbm_cnp.prepare('P' * (4+2*9), block=(self.block_size,1,1), shared=(self.block_size*6*numpy.dtype(numpy.float32()).itemsize))
 		self.lbm_tracer.prepare('P' * (12), block=(self.options.tracers,1,1))
 
-		self.args_tracer2 = self.gpu_dist1 + [self.gpu_geo_map, self.gpu_tracer_x, self.gpu_tracer_y]
-		self.args_tracer1 = self.gpu_dist2 + [self.gpu_geo_map, self.gpu_tracer_x, self.gpu_tracer_y]
-		self.args1v = [self.gpu_geo_map] + self.gpu_dist1 + self.gpu_dist2 + [self.gpu_rho, self.gpu_vx, self.gpu_vy]
-		self.args1 = [self.gpu_geo_map] + self.gpu_dist1 + self.gpu_dist2 + [0,0,0]
-		self.args2 = [self.gpu_geo_map] + self.gpu_dist2 + self.gpu_dist1 + [0,0,0]
+		# Kernel arguments.
+		self.args_tracer2 = self.gpu_dist1 + [self.geo.gpu_map, self.gpu_tracer_x, self.gpu_tracer_y]
+		self.args_tracer1 = self.gpu_dist2 + [self.geo.gpu_map, self.gpu_tracer_x, self.gpu_tracer_y]
+		self.args1 = [self.geo.gpu_map] + self.gpu_dist1 + self.gpu_dist2 + [0,0,0]
+		self.args2 = [self.geo.gpu_map] + self.gpu_dist2 + self.gpu_dist1 + [0,0,0]
 
-	def update_map(self):
-		cuda.memcpy_htod(self.gpu_geo_map, self.geo_map)
+		# Special argument list for the case where macroscopic quantities data is to be
+		# saved in global memory, i.e. a visualization step.
+		self.args1v = [self.geo.gpu_map] + self.gpu_dist1 + self.gpu_dist2 + [self.gpu_rho, self.gpu_vx, self.gpu_vy]
 
 	def sim_step(self, i, tracers=True):
 		if i % 2 == 0:
@@ -148,7 +173,6 @@ class LBMSim(object):
 
 	def run(self):
 		self._init_code()
-		self._init_geo()
 		self._init_lbm()
 		self.vis.main(self)
 
