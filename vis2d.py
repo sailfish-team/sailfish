@@ -125,7 +125,7 @@ class Fluid2DVis(object):
 		# Draw the tracer particles
 		if self._tracers:
 			for x, y in zip(tx, ty):
-				pygame.draw.circle(self._screen, (0, 255, 0), (x * sw / width, sh - y * sh / height), 2)
+				pygame.draw.circle(self._screen, (0, 255, 0), (int(x * sw / width), int(sh - y * sh / height)), 2)
 
 	def _get_loc(self, event):
 		x = event.pos[0] * self.lat_w / self._screen.get_width()
@@ -198,7 +198,7 @@ class Fluid2DVis(object):
 
 				t_prev = time.time()
 #				print t_prev - t_now
-				print mlups
+				print mlups, avg_mlups
 
 			i += 1
 

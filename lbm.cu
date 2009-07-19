@@ -307,16 +307,12 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 	#define set_odist(idx, dir, val, mtype) if (mtype != GEO_INFLOW) { od.dir[idx] = val; }
 #endif
 
-	// N + S propagation (global memory)
-	if (blockIdx.y > 0)			set_odist(gi-LAT_W, fS, fi.fS, map[gi-LAT_W]);
-	if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fN, fi.fN, map[gi+LAT_W]);
-
 	// E propagation in shared memory
 	if (tix < blockDim.x-1) {
 		fo_E[tix+1] = fi.fE;
 		fo_NE[tix+1] = fi.fNE;
 		fo_SE[tix+1] = fi.fSE;
-	// E propagation in global memory (at block boundary)
+	// E propagation in global memory (at right block boundary)
 	} else if (ti < LAT_W) {
 		set_odist(gi+1, fE, fi.fE, map[gi+1]);
 		if (blockIdx.y > 0)			set_odist(gi-LAT_W+1, fSE, fi.fSE, map[gi-LAT_W+1]);
@@ -328,7 +324,7 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 		fo_W[tix-1] = fi.fW;
 		fo_NW[tix-1] = fi.fNW;
 		fo_SW[tix-1] = fi.fSW;
-	// W propagation in global memory (at block boundary)
+	// W propagation in global memory (at left block boundary)
 	} else if (ti > 0) {
 		set_odist(gi-1, fW, fi.fW, map[gi-1]);
 		if (blockIdx.y > 0)			set_odist(gi-LAT_W-1, fSW, fi.fSW, map[gi-LAT_W-1]);
@@ -349,6 +345,10 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 		if (blockIdx.y > 0)			set_odist(gi-LAT_W, fSE, fo_SE[tix], m2);
 		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fNE, fo_NE[tix], m3);
 	}
+
+	// N + S propagation (global memory)
+	if (blockIdx.y > 0)			set_odist(gi-LAT_W, fS, fi.fS, m2);
+	if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fN, fi.fN, m3);
 
 	// the rightmost thread is not updated in this block
 	if (tix < blockDim.x-1) {
