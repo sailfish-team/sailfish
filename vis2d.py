@@ -112,9 +112,8 @@ class Fluid2DVis(object):
 
 		# Draw the velocity field
 		if self._velocity:
-			max_v = 0.1
 			vfsp = 21
-			scale = max(sh, sw)/(vfsp-1) / max_v
+			scale = 0.8 * max(sh, sw)/(vfsp-1) / maxv
 
 			for i in range(1, vfsp):
 				for j in range(1, vfsp):
