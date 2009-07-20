@@ -1,0 +1,52 @@
+1. Purpose of the project.
+--------------------------
+This repository currently contains the results of my experiments with
+running Lattice Boltzmann solvers on the GPU.  The code isn't necessarily
+optimal or even correct in all cases.  It currently provides an
+interesting toy to play with and a practical illustration of the
+implementation of the LBM using CUDA.  It is my hope that at some
+point the project will be advanced enough to be used in some
+practical applications.
+
+Patches and other contributions are welcome.  If you plan to extend
+this code with a non-trivial feature, please contact me before you
+start implementing it, as I sometimes change the structure and
+organization of the existing code (there, I warned you -- this is
+all still experimental, remember?)
+
+
+2. Running the examples.
+------------------------
+Requirements:
+ - pygame-1.8.1
+ - pycuda-0.92
+ - nvidia-drivers, nvidia-cuda-toolkit
+
+No installation is necessary, just run any of the executable .py files.
+Use the --help command line option to learn about parameters adjustable
+from the command line.
+
+Currently supported visualization modes: rgb1, std, hsv.
+Currently supported LB models: bgk, mrt.
+
+Keyboard control during the simulation:
+- 0: visualize absolute fluid velocity
+- 1: visualize absolute x component of fluid velocity
+- 2: visualize absolute y component of fluid velocity
+- 3: visualize the absolute deviation of fluid density from 1.0
+- v: toggle the visualization of the velocity vector field
+- t: toggle the visualization of the fluid tracer particles
+- r: reset the simulation geometry
+- q: quit the program
+
+During the simulation, you can also use the mouse to place obstacles
+anywhere in the simulation domain.
+
+3. Misc info.
+-------------
+This code is licensed on the terms of the GPL3.
+
+If you have any questions, comments or patches to contribute, feel
+free to contact me at:
+
+Michal Januszewski <spock@gentoo.org>
