@@ -27,7 +27,7 @@ struct DistM {
 };
 
 //
-// Copy the idx-th distributin from din into dout.
+// Copy the idx-th distribution from din into dout.
 //
 __device__ void inline getDist(Dist &dout, DistP din, int idx)
 {
@@ -44,7 +44,7 @@ __device__ void inline getDist(Dist &dout, DistP din, int idx)
 
 //
 // Get macroscopic density rho and velocity v given a distribution fi, and
-// a the node class node_type.
+// the node class node_type.
 //
 __device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 {
