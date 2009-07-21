@@ -1,0 +1,14 @@
+* general
+  - implement benchmark mode with visualization turned off
+  - add option to take screenshots to a file
+  - add option to save the raw data to a file
+
+* D2Q9
+  - validate the code against at least 3 standard CFD testcases
+  - make the CFD testcases automated (regtests)
+  - implement the single-grid access pattern (50% space saving)
+  - implement grid refinement
+
+* D3Qx
+  - implement basic BGK/MRT code for these lattices
+

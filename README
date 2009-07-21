@@ -14,6 +14,10 @@ start implementing it, as I sometimes change the structure and
 organization of the existing code (there, I warned you -- this is
 all still experimental, remember?)
 
+If you want to help out, have a look at the TODO -- it should provide
+a good starting point and give you some ideas about what remains
+to be done.
+
 
 2. Running the examples.
 ------------------------
