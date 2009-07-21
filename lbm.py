@@ -11,7 +11,7 @@ import vis2d
 
 from sim import *
 
-from optparse import OptionParser, OptionValueError
+from optparse import OptionGroup, OptionParser, OptionValueError
 
 class LBMGeo(object):
 	"""Abstract class for the LBM geometry."""
@@ -31,6 +31,10 @@ class LBMGeo(object):
 
 	def init_dist(self, dist): abstract
 
+	def get_reynolds(self, viscosity):
+		"""Returns the Reynolds number for this geometry."""
+		abstract
+
 	def velocity_to_dist(self, vx, vy, dist, x, y):
 		"""Set the distributions at node (x,y) so that the fluid there has a specific velocity (vx,vy)."""
 		cusq = -1.5 * (vx*vx + vy*vy)
@@ -47,7 +51,7 @@ class LBMGeo(object):
 
 class LBMSim(object):
 
-	def __init__(self, geo_class):
+	def __init__(self, geo_class, misc_options=[]):
 		parser = OptionParser()
 		parser.add_option('--lat_w', dest='lat_w', help='lattice width', type='int', action='store', default=128)
 		parser.add_option('--lat_h', dest='lat_h', help='lattice height', type='int', action='store', default=128)
@@ -60,13 +64,21 @@ class LBMSim(object):
 		parser.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
 		parser.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=vis2d.vis_map.keys(), action='store', default='std')
 		parser.add_option('--benchmark', dest='benchmark', help='benchmark mode, implies no visualization', action='store_true', default=False)
-		parser.add_option('--benchmark_iters', dest='benchmark_iters', help='number of iterations to run in benchmark mode', action='store', type='int', default=0)
+		parser.add_option('--max_iters', dest='max_iters', help='number of iterations to run in benchmark/batch mode', action='store', type='int', default=0)
+		parser.add_option('--batch', dest='batch', help='run in batch mode, with no visualization', action='store_true', default=False)
+
+		group = OptionGroup(parser, 'Simulation-specific options')
+		for option in misc_options:
+			group.add_option(option)
+
+		parser.add_option_group(group)
 
 		self.geo_class = geo_class
 		self.options, self.args = parser.parse_args()
 		self.block_size = 64
 		self._mlups_calls = 0
 		self._mlups = 0.0
+		self._iter_hooks = {}
 
 		# If the size of the window has not been explicitly defined, automatically adjust it
 		# based on the size of the grid,
@@ -76,9 +88,13 @@ class LBMSim(object):
 		if self.options.scr_h == 0:
 			self.options.scr_h = self.options.lat_h * self.options.scr_scale
 
-		if not self.options.benchmark:
+	def _init_vis(self):
+		if not self.options.benchmark and not self.options.batch:
 			self.vis = vis2d.Fluid2DVis(self.options.scr_w, self.options.scr_h,
 										self.options.lat_w, self.options.lat_h)
+
+	def add_iter_hook(self, i, func):
+		self._iter_hooks.setdefault(i, []).append(func)
 
 	def _init_code(self):
 		fp = open('lbm.cu')
@@ -162,10 +178,10 @@ class LBMSim(object):
 			1: (self.args2, self.args2v, self.args_tracer2),
 		}
 
-	def sim_step(self, i, tracers=True):
+	def sim_step(self, i, tracers=True, get_data=False):
 		kargs = self.args_map[i & 1]
 
-		if not self.options.benchmark and i % self.options.every == 0:
+		if (not self.options.benchmark and i % self.options.every == 0) or get_data:
 			self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *kargs[1])
 			if tracers:
 				self.lbm_tracer.prepared_call((1,1), *kargs[2])
@@ -191,11 +207,11 @@ class LBMSim(object):
 		self._mlups_calls += 1
 		return (self._mlups, mlups)
 
-	def _benchmark(self):
+	def _run_benchmark(self):
 		i = 0
 
-		if self.options.benchmark_iters:
-			cycles = self.options.benchmark_iters
+		if self.options.max_iters:
+			cycles = self.options.max_iters
 		else:
 			cycles = 1000
 			print '# iters mlups_avg mlups_curr'
@@ -214,15 +230,29 @@ class LBMSim(object):
 			print i,
 			print '%.2f %.2f' % self.get_mlups(t_now - t_prev, cycles)
 
-			if self.options.benchmark_iters:
+			if self.options.max_iters:
 				break
 
+	def _run_batch(self):
+		assert self.options.max_iters > 0
+
+		for i in range(0, self.options.max_iters):
+			if i in self._iter_hooks:
+				self.sim_step(i, tracers=False, get_data=True)
+				for hook in self._iter_hooks[i]:
+					hook()
+			else:
+				self.sim_step(i, tracers=False)
+
 	def run(self):
+		self._init_vis()
 		self._init_code()
 		self._init_lbm()
 
 		if self.options.benchmark:
-			self._benchmark()
+			self._run_benchmark()
+		elif self.options.batch:
+			self._run_batch()
 		else:
 			self.vis.main(self)
 

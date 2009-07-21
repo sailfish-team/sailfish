@@ -5,8 +5,14 @@ import lbm
 
 from sim import *
 
+import optparse
+from optparse import OptionGroup, OptionParser, OptionValueError
+
+
 class LBMGeoLDC(lbm.LBMGeo):
 	"""Lid-driven cavity geometry."""
+
+	max_v = 0.1
 
 	def reset(self):
 		"""Initialize the simulation for the lid-driven cavity geometry."""
@@ -29,8 +35,43 @@ class LBMGeoLDC(lbm.LBMGeo):
 				dist[5][y][x] = dist[6][y][x] = dist[7][y][x] = dist[8][y][x] = numpy.float32(1.0/36.0)
 
 		for i in range(0, self.lat_w):
-			self.velocity_to_dist(0.1, 0.0, dist, i, self.lat_h-1)
+			self.velocity_to_dist(LBMGeoLDC.max_v, 0.0, dist, i, self.lat_h-1)
+
+	def get_reynolds(self, viscosity):
+		return int((self.lat_w-1) * LBMGeoLDC.max_v/viscosity)
+
+class LDCSim(lbm.LBMSim):
+
+	def __init__(self, geo_class):
+		opts = []
+		opts.append(optparse.make_option('--test_re100', dest='test_re100', action='store_true', default=False, help='generate test data for Re=100'))
+		opts.append(optparse.make_option('--test_re1000', dest='test_re1000', action='store_true', default=False, help='generate test data for Re=1000'))
+
+		lbm.LBMSim.__init__(self, geo_class, misc_options=opts)
+
+		if self.options.test_re100:
+			self.options.batch = True
+			self.options.max_iters = 50000
+			self.options.lat_w = 128
+			self.options.lat_h = 128
+			self.options.visc = 0.127
+		elif self.options.test_re1000:
+			self.options.batch = True
+			self.options.max_iters = 50000
+			self.options.lat_w = 128
+			self.options.lat_h = 128
+			self.options.visc = 0.0127
 
 
-sim = lbm.LBMSim(LBMGeoLDC)
+		self.add_iter_hook(49999, self.output_profile)
+
+	def output_profile(self):
+		print '# Re = %d' % self.geo.get_reynolds(self.options.visc)
+
+		for i, (x, y) in enumerate(zip(self.vx[:,int(self.options.lat_w/2)] / self.geo_class.max_v,
+										self.vy[int(self.options.lat_h/2),:] / self.geo_class.max_v)):
+			print float(i) / self.options.lat_h, x, y
+
+
+sim = LDCSim(LBMGeoLDC)
 sim.run()
