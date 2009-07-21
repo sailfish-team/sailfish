@@ -188,14 +188,12 @@ class Fluid2DVis(object):
 
 			if i % lbm_sim.options.every == 0:
 				t_now = time.time()
-				mlups = float(lbm_sim.options.every) * self.lat_w * self.lat_h * 1e-6 / (t_now - t_prev)
+				avg_mlups, mlups = lbm_sim.get_mlups(t_now - t_prev)
 				t_prev = t_now
 
 				ret = self._visualize(lbm_sim.geo.map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y, lbm_sim.options.vismode)
 				perf = self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0))
 				perf2 = self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0))
-				disp_iter = i / lbm_sim.options.every - 1
-				avg_mlups = (disp_iter*avg_mlups + mlups) / (disp_iter+1)
 
 				self._screen.blit(perf, (12, 12))
 				self._screen.blit(perf2, (12, 24))

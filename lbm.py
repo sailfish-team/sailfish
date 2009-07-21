@@ -59,19 +59,26 @@ class LBMSim(object):
 		parser.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
 		parser.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
 		parser.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=vis2d.vis_map.keys(), action='store', default='std')
+		parser.add_option('--benchmark', dest='benchmark', help='benchmark mode, implies no visualization', action='store_true', default=False)
+		parser.add_option('--benchmark_iters', dest='benchmark_iters', help='number of iterations to run in benchmark mode', action='store', type='int', default=0)
 
 		self.geo_class = geo_class
 		self.options, self.args = parser.parse_args()
 		self.block_size = 64
+		self._mlups_calls = 0
+		self._mlups = 0.0
 
+		# If the size of the window has not been explicitly defined, automatically adjust it
+		# based on the size of the grid,
 		if self.options.scr_w == 0:
 			self.options.scr_w = self.options.lat_w * self.options.scr_scale
 
 		if self.options.scr_h == 0:
 			self.options.scr_h = self.options.lat_h * self.options.scr_scale
 
-		self.vis = vis2d.Fluid2DVis(self.options.scr_w, self.options.scr_h,
-									self.options.lat_w, self.options.lat_h)
+		if not self.options.benchmark:
+			self.vis = vis2d.Fluid2DVis(self.options.scr_w, self.options.scr_h,
+										self.options.lat_w, self.options.lat_h)
 
 	def _init_code(self):
 		fp = open('lbm.cu')
@@ -147,32 +154,76 @@ class LBMSim(object):
 		# Special argument list for the case where macroscopic quantities data is to be
 		# saved in global memory, i.e. a visualization step.
 		self.args1v = [self.geo.gpu_map] + self.gpu_dist1 + self.gpu_dist2 + [self.gpu_rho, self.gpu_vx, self.gpu_vy]
+		self.args2v = [self.geo.gpu_map] + self.gpu_dist2 + self.gpu_dist1 + [self.gpu_rho, self.gpu_vx, self.gpu_vy]
+
+		# Map: iteration parity -> kernel arguments to use.
+		self.args_map = {
+			0: (self.args1, self.args1v, self.args_tracer1),
+			1: (self.args2, self.args2v, self.args_tracer2),
+		}
 
 	def sim_step(self, i, tracers=True):
-		if i % 2 == 0:
-			if i % self.options.every == 0:
-				self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *self.args1v)
-				if tracers:
-					self.lbm_tracer.prepared_call((1,1), *self.args_tracer1)
-					cuda.memcpy_dtoh(self.tracer_x, self.gpu_tracer_x)
-					cuda.memcpy_dtoh(self.tracer_y, self.gpu_tracer_y)
+		kargs = self.args_map[i & 1]
 
-				cuda.memcpy_dtoh(self.vx, self.gpu_vx)
-				cuda.memcpy_dtoh(self.vy, self.gpu_vy)
-				cuda.memcpy_dtoh(self.rho, self.gpu_rho)
-			else:
-				self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *self.args1)
-				if tracers:
-					self.lbm_tracer.prepared_call((1,1), *self.args_tracer1)
-		else:
-			self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *self.args2)
+		if not self.options.benchmark and i % self.options.every == 0:
+			self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *kargs[1])
 			if tracers:
-				self.lbm_tracer.prepared_call((1,1), *self.args_tracer2)
+				self.lbm_tracer.prepared_call((1,1), *kargs[2])
+				cuda.memcpy_dtoh(self.tracer_x, self.gpu_tracer_x)
+				cuda.memcpy_dtoh(self.tracer_y, self.gpu_tracer_y)
 
+			cuda.memcpy_dtoh(self.vx, self.gpu_vx)
+			cuda.memcpy_dtoh(self.vy, self.gpu_vy)
+			cuda.memcpy_dtoh(self.rho, self.gpu_rho)
+		else:
+			self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *kargs[0])
+			if tracers:
+				self.lbm_tracer.prepared_call((1,1), *kargs[2])
+
+	def get_mlups(self, tdiff, iters=None):
+		if iters is not None:
+			it = iters
+		else:
+			it = self.options.every
+
+		mlups = float(it) * self.options.lat_w * self.options.lat_h * 1e-6 / tdiff
+		self._mlups = (mlups + self._mlups * self._mlups_calls) / (self._mlups_calls + 1)
+		self._mlups_calls += 1
+		return (self._mlups, mlups)
+
+	def _benchmark(self):
+		i = 0
+
+		if self.options.benchmark_iters:
+			cycles = self.options.benchmark_iters
+		else:
+			cycles = 1000
+			print '# iters mlups_avg mlups_curr'
+
+		import time
+
+		while True:
+			t_prev = time.time()
+
+			for iter in range(0, cycles):
+				self.sim_step(i, tracers=False)
+				i += 1
+
+			cuda.Context.synchronize()
+			t_now = time.time()
+			print i,
+			print '%.2f %.2f' % self.get_mlups(t_now - t_prev, cycles)
+
+			if self.options.benchmark_iters:
+				break
 
 	def run(self):
 		self._init_code()
 		self._init_lbm()
-		self.vis.main(self)
+
+		if self.options.benchmark:
+			self._benchmark()
+		else:
+			self.vis.main(self)
 
 

@@ -1,5 +1,4 @@
 * general
-  - implement benchmark mode with visualization turned off
   - add option to take screenshots to a file
   - add option to save the raw data to a file
 
