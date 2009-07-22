@@ -19,11 +19,12 @@ class LBMGeoLDC(lbm.LBMGeo):
 		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
 		# bottom/top
 		for i in range(0, self.lat_w):
-			self.map[0][i] = numpy.int32(GEO_WALL)
-			self.map[self.lat_h-1][i] = numpy.int32(GEO_INFLOW)
+			self.set_geo(i, 0, GEO_WALL)
+			self.set_geo(i, self.lat_h-1, GEO_INFLOW)
 		# left/right
 		for i in range(0, self.lat_h):
-			self.map[i][0] = self.map[i][self.lat_w-1] = numpy.int32(GEO_WALL)
+			self.set_geo(0, i, GEO_WALL)
+			self.set_geo(self.lat_w-1, i, GEO_WALL)
 
 		self.update_map()
 

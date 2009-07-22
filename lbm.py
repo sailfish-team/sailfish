@@ -22,6 +22,7 @@ class LBMGeo(object):
 		self.model = model
 		self.map = numpy.zeros((lat_h, lat_w), numpy.int32)
 		self.gpu_map = cuda.mem_alloc(self.map.size * self.map.dtype.itemsize)
+		self._vel_map = {}
 		self.reset()
 
 	def update_map(self):
@@ -35,6 +36,9 @@ class LBMGeo(object):
 		"""Returns the Reynolds number for this geometry."""
 		abstract
 
+	def set_geo(self, x, y, type):
+		self.map[y][x] = numpy.int32(type)
+
 	def velocity_to_dist(self, vx, vy, dist, x, y):
 		"""Set the distributions at node (x,y) so that the fluid there has a specific velocity (vx,vy)."""
 		cusq = -1.5 * (vx*vx + vy*vy)
@@ -47,7 +51,20 @@ class LBMGeo(object):
 		dist[5][y][x] = numpy.float32((1.0 + cusq + 3.0*(vx-vy) + 4.5*(vx-vy)*(vx-vy)) / 36.0)
 		dist[6][y][x] = numpy.float32((1.0 + cusq + 3.0*(-vx-vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0)
 		dist[8][y][x] = numpy.float32((1.0 + cusq + 3.0*(-vx+vy) + 4.5*(-vx+vy)*(-vx+vy)) / 36.0)
+		self._vel_map.setdefault((vx,vy), []).append((x,y))
 
+	def get_params(self):
+		ret = []
+		i = 0
+		for v, pos_list in self._vel_map.iteritems():
+			ret.extend(v)
+			for x, y in pos_list:
+				self.map[y][x] += i
+
+			i += 1
+
+		self.update_map()
+		return ret
 
 class LBMSim(object):
 
@@ -97,12 +114,22 @@ class LBMSim(object):
 		self._iter_hooks.setdefault(i, []).append(func)
 
 	def _init_code(self):
+		# Particle distributions in host memory.
+		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), numpy.float32)
+
+		# Simulation geometry.
+		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h, self.options.model)
+		self.geo.init_dist(self.dist)
+		self.geo_params = numpy.float32(self.geo.get_params())
+
 		fp = open('lbm.cu')
 		src = fp.read()
 		fp.close()
 		src = '#define BLOCK_SIZE %d\n#define LAT_H %d\n#define LAT_W %d\n' % (self.block_size, self.options.lat_h, self.options.lat_w) + src
 		src = '#define GEO_FLUID %d\n#define GEO_WALL %d\n#define GEO_INFLOW %d\n' % (GEO_FLUID, GEO_WALL, GEO_INFLOW) + src
 		src = '#define RELAXATE RELAX_%s\n' % (self.options.model) + src
+		src = '#define NUM_PARAMS %d\n' % (len(self.geo_params)) + src
+		src = '#define INFLOW_PROP 1\n' + src
 
 		self.mod = cuda.SourceModule(src, options=['--use_fast_math', '-Xptxas', '-v'])
 		self.lbm_cnp = self.mod.get_function('LBMCollideAndPropagate')
@@ -115,6 +142,9 @@ class LBMSim(object):
 
 		self.gpu_visc = self.mod.get_global('visc')[0]
 		cuda.memcpy_htod(self.gpu_visc, numpy.float32(self.options.visc))
+
+		self.gpu_geo_params = self.mod.get_global('geo_params')[0]
+		cuda.memcpy_htod(self.gpu_geo_params, self.geo_params)
 
 	def _init_lbm(self):
 		# Velocity and density.
@@ -137,13 +167,6 @@ class LBMSim(object):
 		self.gpu_tracer_y = cuda.mem_alloc(self.tracer_y.size * self.tracer_y.dtype.itemsize)
 		cuda.memcpy_htod(self.gpu_tracer_x, self.tracer_x)
 		cuda.memcpy_htod(self.gpu_tracer_y, self.tracer_y)
-
-		# Particle distributions in host memory.
-		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), numpy.float32)
-
-		# Simulation geometry.
-		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h, self.options.model)
-		self.geo.init_dist(self.dist)
 
 		# Particle distributions in device memory, A-B access pattern.
 		self.gpu_dist1 = []

@@ -1,5 +1,6 @@
 // The following additional constants need to be defined:
 // LAT_H, LAT_W, BLOCK_SIZE, GEO_FLUID, GEO_WALL, GEO_INFLOW
+// NUM_PARAMS
 
 // If INFLOW_PROP is set, new distributions will be propagated into
 // GEO_INFLOW nodes and thus the velocity of these nodes will have to
@@ -12,6 +13,7 @@
 
 __constant__ float tau;			// relaxation time
 __constant__ float visc;		// viscosity
+__constant__ float geo_params[NUM_PARAMS];		// geometry parameters
 
 struct DistP {
 	float *fC, *fE, *fW, *fS, *fN, *fSE, *fSW, *fNE, *fNW;
@@ -50,9 +52,10 @@ __device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 {
 	rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
 #ifdef INFLOW_PROP
-	if (node_type == GEO_INFLOW) {
-		v.x = 0.1f;
-		v.y = 0.0f;
+	if (node_type >= GEO_INFLOW) {
+		int idx = (node_type - GEO_INFLOW) * 2;
+		v.x = geo_params[idx];
+		v.y = geo_params[idx+1];
 	} else
 #endif
 	{
@@ -136,8 +139,9 @@ __device__ void inline MS_relaxate(Dist &fi, int node_type)
 
 #ifdef INFLOW_PROP
 	if (node_type == GEO_INFLOW) {
-		fm.mx = 0.1f;
-		fm.my = 0.0f;
+		int idx = (node_type - GEO_INFLOW) * 2;
+		fm.mx = geo_params[idx];
+		fm.my = geo_params[idx+1];
 	}
 #endif
 
