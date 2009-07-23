@@ -317,7 +317,7 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 		fo_NE[tix+1] = fi.fNE;
 		fo_SE[tix+1] = fi.fSE;
 	// E propagation in global memory (at right block boundary)
-	} else if (ti < LAT_W) {
+	} else if (ti < LAT_W-1) {
 		set_odist(gi+1, fE, fi.fE, map[gi+1]);
 		if (blockIdx.y > 0)			set_odist(gi-LAT_W+1, fSE, fi.fSE, map[gi-LAT_W+1]);
 		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W+1, fNE, fi.fNE, map[gi+LAT_W+1]);
