@@ -3,7 +3,7 @@
 import numpy
 import lbm
 
-from sim import *
+from geo2d import *
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError

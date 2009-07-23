@@ -9,7 +9,7 @@ import time
 
 import vis2d
 
-from sim import *
+from geo2d import *
 
 from optparse import OptionGroup, OptionParser, OptionValueError
 

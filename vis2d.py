@@ -1,7 +1,7 @@
 import math
 import numpy
 import pygame
-import sim
+import geo2d
 import sys
 import time
 
@@ -96,7 +96,7 @@ class Fluid2DVis(object):
 		a = pygame.surfarray.pixels3d(srf)
 
 		# Draw the walls.
-		b = numpy.rot90(geo_map == sim.GEO_WALL, 3)
+		b = numpy.rot90(geo_map == geo2d.GEO_WALL, 3)
 		a[b] = (0, 0, 255)
 
 		# Draw the data field for all sites which are not marked as a wall.
@@ -139,7 +139,7 @@ class Fluid2DVis(object):
 
 	def _draw_wall(self, lbm_sim, event):
 		x, y = self._get_loc(event)
-		lbm_sim.geo.map[y][x] = self._draw_type == 1 and sim.GEO_WALL or sim.GEO_FLUID
+		lbm_sim.geo.map[y][x] = self._draw_type == 1 and geo2d.GEO_WALL or geo2d.GEO_FLUID
 		lbm_sim.geo.update_map()
 
 	def _process_events(self, lbm_sim):
