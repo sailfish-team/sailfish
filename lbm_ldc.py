@@ -2,31 +2,28 @@
 
 import numpy
 import lbm
-
-from geo2d import *
+import geo2d
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
 
 
-class LBMGeoLDC(lbm.LBMGeo):
+class LBMGeoLDC(geo2d.LBMGeo):
 	"""Lid-driven cavity geometry."""
 
 	max_v = 0.1
 
-	def reset(self):
+	def _reset(self):
 		"""Initialize the simulation for the lid-driven cavity geometry."""
 		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
 		# bottom/top
 		for i in range(0, self.lat_w):
-			self.set_geo(i, 0, GEO_WALL)
-			self.set_geo(i, self.lat_h-1, GEO_INFLOW)
+			self.set_geo(i, 0, geo2d.LBMGeo.NODE_WALL)
+			self.set_geo(i, self.lat_h-1, geo2d.LBMGeo.NODE_VELOCITY, (LBMGeoLDC.max_v, 0.0))
 		# left/right
 		for i in range(0, self.lat_h):
-			self.set_geo(0, i, GEO_WALL)
-			self.set_geo(self.lat_w-1, i, GEO_WALL)
-
-		self.update_map()
+			self.set_geo(0, i, geo2d.LBMGeo.NODE_WALL)
+			self.set_geo(self.lat_w-1, i, geo2d.LBMGeo.NODE_WALL)
 
 	def init_dist(self, dist):
 		for x in range(0, self.lat_w):

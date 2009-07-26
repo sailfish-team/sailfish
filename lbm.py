@@ -8,63 +8,9 @@ import sys
 import time
 
 import vis2d
-
-from geo2d import *
+import geo2d
 
 from optparse import OptionGroup, OptionParser, OptionValueError
-
-class LBMGeo(object):
-	"""Abstract class for the LBM geometry."""
-
-	def __init__(self, lat_w, lat_h, model):
-		self.lat_w = lat_w
-		self.lat_h = lat_h
-		self.model = model
-		self.map = numpy.zeros((lat_h, lat_w), numpy.int32)
-		self.gpu_map = cuda.mem_alloc(self.map.size * self.map.dtype.itemsize)
-		self._vel_map = {}
-		self.reset()
-
-	def update_map(self):
-		cuda.memcpy_htod(self.gpu_map, self.map)
-
-	def reset(self): abstract
-
-	def init_dist(self, dist): abstract
-
-	def get_reynolds(self, viscosity):
-		"""Returns the Reynolds number for this geometry."""
-		abstract
-
-	def set_geo(self, x, y, type):
-		self.map[y][x] = numpy.int32(type)
-
-	def velocity_to_dist(self, vx, vy, dist, x, y):
-		"""Set the distributions at node (x,y) so that the fluid there has a specific velocity (vx,vy)."""
-		cusq = -1.5 * (vx*vx + vy*vy)
-		dist[0][y][x] = numpy.float32((1.0 + cusq) * 4.0/9.0)
-		dist[4][y][x] = numpy.float32((1.0 + cusq + 3.0*vy + 4.5*vy*vy) / 9.0)
-		dist[1][y][x] = numpy.float32((1.0 + cusq + 3.0*vx + 4.5*vx*vx) / 9.0)
-		dist[3][y][x] = numpy.float32((1.0 + cusq - 3.0*vy + 4.5*vy*vy) / 9.0)
-		dist[2][y][x] = numpy.float32((1.0 + cusq - 3.0*vx + 4.5*vx*vx) / 9.0)
-		dist[7][y][x] = numpy.float32((1.0 + cusq + 3.0*(vx+vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0)
-		dist[5][y][x] = numpy.float32((1.0 + cusq + 3.0*(vx-vy) + 4.5*(vx-vy)*(vx-vy)) / 36.0)
-		dist[6][y][x] = numpy.float32((1.0 + cusq + 3.0*(-vx-vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0)
-		dist[8][y][x] = numpy.float32((1.0 + cusq + 3.0*(-vx+vy) + 4.5*(-vx+vy)*(-vx+vy)) / 36.0)
-		self._vel_map.setdefault((vx,vy), []).append((x,y))
-
-	def get_params(self):
-		ret = []
-		i = 0
-		for v, pos_list in self._vel_map.iteritems():
-			ret.extend(v)
-			for x, y in pos_list:
-				self.map[y][x] += i
-
-			i += 1
-
-		self.update_map()
-		return ret
 
 class LBMSim(object):
 
@@ -83,6 +29,10 @@ class LBMSim(object):
 		parser.add_option('--benchmark', dest='benchmark', help='benchmark mode, implies no visualization', action='store_true', default=False)
 		parser.add_option('--max_iters', dest='max_iters', help='number of iterations to run in benchmark/batch mode', action='store', type='int', default=0)
 		parser.add_option('--batch', dest='batch', help='run in batch mode, with no visualization', action='store_true', default=False)
+		parser.add_option('--force_x', dest='force_x', help='y component of the external force', action='store', type='float', default=0.0)
+		parser.add_option('--force_y', dest='force_y', help='x component of the external force', action='store', type='float', default=0.0)
+		parser.add_option('--periodic_x', dest='periodic_x', help='horizontally periodic lattice', action='store_true', default=False)
+		parser.add_option('--periodic_y', dest='periodic_y', help='vertically periodic lattice', action='store_true', default=False)
 
 		group = OptionGroup(parser, 'Simulation-specific options')
 		for option in misc_options:
@@ -113,6 +63,9 @@ class LBMSim(object):
 	def add_iter_hook(self, i, func):
 		self._iter_hooks.setdefault(i, []).append(func)
 
+	def get_tau(self):
+		return numpy.float32((6.0 * self.options.visc + 1.0)/2.0)
+
 	def _init_code(self):
 		# Particle distributions in host memory.
 		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), numpy.float32)
@@ -126,17 +79,19 @@ class LBMSim(object):
 		src = fp.read()
 		fp.close()
 		src = '#define BLOCK_SIZE %d\n#define LAT_H %d\n#define LAT_W %d\n' % (self.block_size, self.options.lat_h, self.options.lat_w) + src
-		src = '#define GEO_FLUID %d\n#define GEO_WALL %d\n#define GEO_INFLOW %d\n' % (GEO_FLUID, GEO_WALL, GEO_INFLOW) + src
+		src = self.geo.get_defines() + src
 		src = '#define RELAXATE RELAX_%s\n' % (self.options.model) + src
 		src = '#define NUM_PARAMS %d\n' % (len(self.geo_params)) + src
-		src = '#define INFLOW_PROP 1\n' + src
+		src = '#define ext_force_x %f\n#define ext_force_y %f\n' % (self.options.force_x, self.options.force_y) + src
+		src = '#define PERIODIC_X %d\n' % int(self.options.periodic_x) + src
+		src = '#define PERIODIC_Y %d\n' % int(self.options.periodic_y) + src
 
 		self.mod = cuda.SourceModule(src, options=['--use_fast_math', '-Xptxas', '-v'])
 		self.lbm_cnp = self.mod.get_function('LBMCollideAndPropagate')
 		self.lbm_tracer = self.mod.get_function('LBMUpdateTracerParticles')
 
 		# Set the 'tau' parameter.
-		self.tau = numpy.float32((6.0 * self.options.visc + 1.0)/2.0)
+		self.tau = self.get_tau()
 		self.gpu_tau = self.mod.get_global('tau')[0]
 		cuda.memcpy_htod(self.gpu_tau, self.tau)
 

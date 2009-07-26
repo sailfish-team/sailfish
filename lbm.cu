@@ -1,10 +1,6 @@
 // The following additional constants need to be defined:
-// LAT_H, LAT_W, BLOCK_SIZE, GEO_FLUID, GEO_WALL, GEO_INFLOW
+// LAT_H, LAT_W, BLOCK_SIZE, GEO_FLUID, GEO_WALL, GEO_BCV, GEO_BCP
 // NUM_PARAMS
-
-// If INFLOW_PROP is set, new distributions will be propagated into
-// GEO_INFLOW nodes and thus the velocity of these nodes will have to
-// be explicitly overridden at relaxation time.
 
 #define RELAX_bgk	BGK_relaxate(rho, v, fi, map[gi]);
 #define RELAX_mrt	MS_relaxate(fi, map[gi]);
@@ -51,17 +47,23 @@ __device__ void inline getDist(Dist &dout, DistP din, int idx)
 __device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 {
 	rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
-#ifdef INFLOW_PROP
-	if (node_type >= GEO_INFLOW) {
-		int idx = (node_type - GEO_INFLOW) * 2;
-		v.x = geo_params[idx];
-		v.y = geo_params[idx+1];
-	} else
-#endif
-	{
-		v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / rho;
-		v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / rho;
+	if (node_type >= GEO_BCV) {
+		// Velocity boundary condition.
+		if (node_type < GEO_BCP) {
+			int idx = (node_type - GEO_BCV) * 2;
+			v.x = geo_params[idx];
+			v.y = geo_params[idx+1];
+			return;
+		// Pressure boundary condition.
+		} else {
+			// c_s^2 = 1/3, P/c_s^2 = rho
+			int idx = (GEO_BCP-GEO_BCV) * 2 + (node_type - GEO_BCP);
+			rho = geo_params[idx] * 3.0;
+		}
 	}
+
+	v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW + tau * ext_force_x) / rho;
+	v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE + tau * ext_force_y) / rho;
 }
 
 //
@@ -137,13 +139,18 @@ __device__ void inline MS_relaxate(Dist &fi, int node_type)
 	fm.sd =  0.0f*fi.fC + 1.0f*fi.fE - 1.0f*fi.fN + 1.0f*fi.fW - 1.0f*fi.fS + 0.0f*fi.fNE + 0.0f*fi.fNW + 0.0f*fi.fSW - 0.0f*fi.fSE;
 	fm.sod = 0.0f*fi.fC + 0.0f*fi.fE + 0.0f*fi.fN + 0.0f*fi.fW + 0.0f*fi.fS + 1.0f*fi.fNE - 1.0f*fi.fNW + 1.0f*fi.fSW - 1.0f*fi.fSE;
 
-#ifdef INFLOW_PROP
-	if (node_type == GEO_INFLOW) {
-		int idx = (node_type - GEO_INFLOW) * 2;
-		fm.mx = geo_params[idx];
-		fm.my = geo_params[idx+1];
+	if (node_type >= GEO_BCV) {
+		// Velocity boundary condition.
+		if (node_type < GEO_BCP) {
+			int idx = (node_type - GEO_BCV) * 2;
+			fm.mx = geo_params[idx];
+			fm.my = geo_params[idx+1];
+		// Pressure boundary condition.
+		} else {
+			int idx = (GEO_BCP-GEO_BCV) * 2 + (node_type - GEO_BCP);
+			fm.rho = geo_params[idx] * 3.0f;
+		}
 	}
-#endif
 
 	float h = fm.mx*fm.mx + fm.my*fm.my;
 	feq.en  = -2.0f*fm.rho + 3.0f*h;
@@ -164,14 +171,8 @@ __device__ void inline MS_relaxate(Dist &fi, int node_type)
 		fm.ey  -= 1.92f * (fm.ey - feq.ey);
 		fm.sd  -= tau7 * (fm.sd - feq.sd);
 		fm.sod -= tau8 * (fm.sod - feq.sod);
-	} else if (node_type == GEO_INFLOW) {
-		fm.en  = feq.en;
-		fm.ens = feq.ens;
-		fm.ex  = feq.ex;
-		fm.ey  = feq.ey;
-		fm.sd  = feq.sd;
-		fm.sod = feq.sod;
 	} else if (node_type == GEO_WALL) {
+		// Bounce-back.
 		float t;
 		t = fi.fE;
 		fi.fE = fi.fW;
@@ -188,6 +189,13 @@ __device__ void inline MS_relaxate(Dist &fi, int node_type)
 		t = fi.fN;
 		fi.fN = fi.fS;
 		fi.fS = t;
+	} else {
+		fm.en  = feq.en;
+		fm.ens = feq.ens;
+		fm.ex  = feq.ex;
+		fm.ey  = feq.ey;
+		fm.sd  = feq.sd;
+		fm.sod = feq.sod;
 	}
 
 	if (node_type != GEO_WALL) {
@@ -237,16 +245,6 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type
 		fi.fNE += (feq.fNE - fi.fNE) / tau;
 		fi.fSW += (feq.fSW - fi.fSW) / tau;
 		fi.fNW += (feq.fNW - fi.fNW) / tau;
-	} else if (node_type == GEO_INFLOW) {
-		fi.fC  = feq.fC;
-		fi.fE  = feq.fE;
-		fi.fW  = feq.fW;
-		fi.fS  = feq.fS;
-		fi.fN  = feq.fN;
-		fi.fSE = feq.fSE;
-		fi.fNE = feq.fNE;
-		fi.fSW = feq.fSW;
-		fi.fNW = feq.fNW;
 	} else if (node_type == GEO_WALL) {
 		float t;
 		t = fi.fE;
@@ -264,6 +262,16 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type
 		t = fi.fN;
 		fi.fN = fi.fS;
 		fi.fS = t;
+	} else {
+		fi.fC  = feq.fC;
+		fi.fE  = feq.fE;
+		fi.fW  = feq.fW;
+		fi.fS  = feq.fS;
+		fi.fN  = feq.fN;
+		fi.fSE = feq.fSE;
+		fi.fNE = feq.fNE;
+		fi.fSW = feq.fSW;
+		fi.fNW = feq.fNW;
 	}
 }
 
@@ -305,11 +313,7 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 	// update the 0-th direction distribution
 	od.fC[gi] = fi.fC;
 
-#ifdef INFLOW_PROP
-	#define set_odist(idx, dir, val, mtype) od.dir[idx] = val;
-#else
-	#define set_odist(idx, dir, val, mtype) if (mtype != GEO_INFLOW) { od.dir[idx] = val; }
-#endif
+	#define set_odist(idx, dir, val) od.dir[idx] = val
 
 	// E propagation in shared memory
 	if (tix < blockDim.x-1) {
@@ -318,9 +322,17 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 		fo_SE[tix+1] = fi.fSE;
 	// E propagation in global memory (at right block boundary)
 	} else if (ti < LAT_W-1) {
-		set_odist(gi+1, fE, fi.fE, map[gi+1]);
-		if (blockIdx.y > 0)			set_odist(gi-LAT_W+1, fSE, fi.fSE, map[gi-LAT_W+1]);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W+1, fNE, fi.fNE, map[gi+LAT_W+1]);
+		set_odist(gi+1, fE, fi.fE);
+		if (blockIdx.y > 0)			set_odist(gi-LAT_W+1, fSE, fi.fSE);
+		else if (PERIODIC_Y)		set_odist(gi+LAT_W*(LAT_H-1)+1, fSE, fi.fSE);
+		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W+1, fNE, fi.fNE);
+		else if (PERIODIC_Y)		set_odist(ti+1, fNE, fi.fNE);
+	} else if (PERIODIC_X) {
+		set_odist(gi+1-LAT_W, fE, fi.fE);
+		if (blockIdx.y > 0)			set_odist(gi-2*LAT_W+1, fSE, fi.fSE);
+		else if (PERIODIC_Y)		set_odist((LAT_H-1)*LAT_W, fSE, fi.fSE);
+		if (blockIdx.y < LAT_H-1)	set_odist(gi+1, fNE, fi.fNE);
+		else if (PERIODIC_Y)		set_odist(0, fNE, fi.fNE);
 	}
 
 	// W propagation in shared memory
@@ -330,35 +342,43 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 		fo_SW[tix-1] = fi.fSW;
 	// W propagation in global memory (at left block boundary)
 	} else if (ti > 0) {
-		set_odist(gi-1, fW, fi.fW, map[gi-1]);
-		if (blockIdx.y > 0)			set_odist(gi-LAT_W-1, fSW, fi.fSW, map[gi-LAT_W-1]);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W-1, fNW, fi.fNW, map[gi+LAT_W-1]);
+		set_odist(gi-1, fW, fi.fW);
+		if (blockIdx.y > 0)			set_odist(gi-LAT_W-1, fSW, fi.fSW);
+		else if (PERIODIC_Y)		set_odist(gi+LAT_W*(LAT_H-1)-1, fSW, fi.fSW);
+		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W-1, fNW, fi.fNW);
+		else if (PERIODIC_Y)		set_odist(ti-1, fNW, fi.fNW);
+	} else if (PERIODIC_X) {
+		set_odist(gi-1+LAT_W, fW, fi.fW);
+		if (blockIdx.y > 0)			set_odist(gi-1, fSW, fi.fSW);
+		else if (PERIODIC_Y)		set_odist(LAT_H*LAT_W-1, fSW, fi.fSW);
+		if (blockIdx.y < LAT_H-1)	set_odist(gi+2*LAT_W-1, fNW, fi.fNW);
+		else if (PERIODIC_Y)		set_odist(LAT_W-1, fNW, fi.fNW);
 	}
 
 	__syncthreads();
 
-#ifndef INFLOW_PROP
-	int m1 = map[gi];
-	int m2 = map[gi-LAT_W];
-	int m3 = map[gi+LAT_W];
-#endif
-
 	// the leftmost thread is not updated in this block
 	if (tix > 0) {
-		set_odist(gi, fE, fo_E[tix], m1);
-		if (blockIdx.y > 0)			set_odist(gi-LAT_W, fSE, fo_SE[tix], m2);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fNE, fo_NE[tix], m3);
+		set_odist(gi, fE, fo_E[tix]);
+		if (blockIdx.y > 0)			set_odist(gi-LAT_W, fSE, fo_SE[tix]);
+		else if (PERIODIC_Y)		set_odist(gi+LAT_W*(LAT_H-1), fSE, fo_SE[tix]);
+		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fNE, fo_NE[tix]);
+		else if (PERIODIC_Y)		set_odist(ti, fNE, fo_NE[tix]);
 	}
 
 	// N + S propagation (global memory)
-	if (blockIdx.y > 0)			set_odist(gi-LAT_W, fS, fi.fS, m2);
-	if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fN, fi.fN, m3);
+	if (blockIdx.y > 0)			set_odist(gi-LAT_W, fS, fi.fS);
+	else if (PERIODIC_Y)		set_odist(gi+LAT_W*(LAT_H-1), fS, fi.fS);
+	if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fN, fi.fN);
+	else if (PERIODIC_Y)		set_odist(ti, fN, fi.fN);
 
 	// the rightmost thread is not updated in this block
 	if (tix < blockDim.x-1) {
-		set_odist(gi, fW, fo_W[tix], m1);
-		if (blockIdx.y > 0)			set_odist(gi-LAT_W, fSW, fo_SW[tix], m2);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fNW, fo_NW[tix], m3);
+		set_odist(gi, fW, fo_W[tix]);
+		if (blockIdx.y > 0)			set_odist(gi-LAT_W, fSW, fo_SW[tix]);
+		else if (PERIODIC_Y)		set_odist(gi+LAT_W*(LAT_H-1), fSW, fo_SW[tix]);
+		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fNW, fo_NW[tix]);
+		else if (PERIODIC_Y)		set_odist(ti, fNW, fo_NW[tix]);
 	}
 }
 
