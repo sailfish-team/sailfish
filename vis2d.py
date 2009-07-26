@@ -68,8 +68,8 @@ class Fluid2DVis(object):
 		self.lat_w = lat_w
 		self.lat_h = lat_h
 
-		self._tracers = True
-		self._velocity = True
+		self._tracers = False
+		self._velocity = False
 		self._drawing = False
 		self._draw_type = 1
 
@@ -80,6 +80,9 @@ class Fluid2DVis(object):
 		maxv = numpy.max(numpy.sqrt(vx*vx + vy*vy))
 		ret = []
 
+		ret.append(('max_v', maxv))
+		ret.append(('rho_avg', numpy.average(rho)))
+
 		if self._vismode == 0:
 			drw = numpy.sqrt(vx*vx + vy*vy) / maxv
 		elif self._vismode == 1:
@@ -87,16 +90,16 @@ class Fluid2DVis(object):
 		elif self._vismode == 2:
 			drw = numpy.abs(vy) / maxv
 		elif self._vismode == 3:
-			t = numpy.abs(rho - 1.00)
-			ret.append(('rho_avg', numpy.average(t)))
-			drw	= t / numpy.max(t)
+			rho_min = numpy.min(rho)
+			rho_max = numpy.max(rho)
+			drw	= ((rho - rho_min) / (rho_max - rho_min))
 
 		# Rotate the field to the correct position.
 		drw = numpy.rot90(drw.astype(numpy.float32), 3)
 		a = pygame.surfarray.pixels3d(srf)
 
 		# Draw the walls.
-		b = numpy.rot90(geo_map == geo2d.GEO_WALL, 3)
+		b = numpy.rot90(geo_map == geo2d.LBMGeo.NODE_WALL, 3)
 		a[b] = (0, 0, 255)
 
 		# Draw the data field for all sites which are not marked as a wall.
@@ -139,7 +142,7 @@ class Fluid2DVis(object):
 
 	def _draw_wall(self, lbm_sim, event):
 		x, y = self._get_loc(event)
-		lbm_sim.geo.map[y][x] = self._draw_type == 1 and geo2d.GEO_WALL or geo2d.GEO_FLUID
+		lbm_sim.geo.map[y][x] = self._draw_type == 1 and geo2d.LBMGeo.NODE_WALL or geo2d.LBMGeo.NODE_FLUID
 		lbm_sim.geo.update_map()
 
 	def _process_events(self, lbm_sim):

@@ -37,7 +37,7 @@ Keyboard control during the simulation:
 - 0: visualize absolute fluid velocity
 - 1: visualize absolute x component of fluid velocity
 - 2: visualize absolute y component of fluid velocity
-- 3: visualize the absolute deviation of fluid density from 1.0
+- 3: visualize the fluid density
 - v: toggle the visualization of the velocity vector field
 - t: toggle the visualization of the fluid tracer particles
 - r: reset the simulation geometry
