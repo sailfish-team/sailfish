@@ -83,6 +83,8 @@ class Fluid2DVis(object):
 		ret.append(('max_v', maxv))
 		ret.append(('rho_avg', numpy.average(rho)))
 
+		b = numpy.rot90(geo_map == geo2d.LBMGeo.NODE_WALL, 3)
+
 		if self._vismode == 0:
 			drw = numpy.sqrt(vx*vx + vy*vy) / maxv
 		elif self._vismode == 1:
@@ -90,8 +92,9 @@ class Fluid2DVis(object):
 		elif self._vismode == 2:
 			drw = numpy.abs(vy) / maxv
 		elif self._vismode == 3:
-			rho_min = numpy.min(rho)
-			rho_max = numpy.max(rho)
+			mrho = numpy.ma.array(rho, mask=(b))
+			rho_min = numpy.min(mrho)
+			rho_max = numpy.max(mrho)
 			drw	= ((rho - rho_min) / (rho_max - rho_min))
 
 		# Rotate the field to the correct position.
@@ -99,7 +102,6 @@ class Fluid2DVis(object):
 		a = pygame.surfarray.pixels3d(srf)
 
 		# Draw the walls.
-		b = numpy.rot90(geo_map == geo2d.LBMGeo.NODE_WALL, 3)
 		a[b] = (0, 0, 255)
 
 		# Draw the data field for all sites which are not marked as a wall.
@@ -195,22 +197,19 @@ class Fluid2DVis(object):
 				t_prev = t_now
 
 				ret = self._visualize(lbm_sim.geo.map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y, lbm_sim.options.vismode)
-				perf = self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0))
-				perf2 = self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0))
+				self._screen.blit(self._font.render('itr: %dk' % (i / 1000), True, (0, 255, 0)), (12, 12))
+				self._screen.blit(self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0)), (12, 24))
+				self._screen.blit(self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0)), (12, 36))
 
-				self._screen.blit(perf, (12, 12))
-				self._screen.blit(perf2, (12, 24))
-
-				y = 36
+				y = 48
 				for info in ret:
-					tmp = self._font.render('%s: %.2f' % info, True, (0, 255, 0))
+					tmp = self._font.render('%s: %.3f' % info, True, (0, 255, 0))
 					self._screen.blit(tmp, (12, y))
 					y += 12
 
 				pygame.display.flip()
 
 				t_prev = time.time()
-				print i, mlups, avg_mlups
 
 			i += 1
 
