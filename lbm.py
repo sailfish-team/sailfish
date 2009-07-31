@@ -29,8 +29,8 @@ class LBMSim(object):
 		parser.add_option('--benchmark', dest='benchmark', help='benchmark mode, implies no visualization', action='store_true', default=False)
 		parser.add_option('--max_iters', dest='max_iters', help='number of iterations to run in benchmark/batch mode', action='store', type='int', default=0)
 		parser.add_option('--batch', dest='batch', help='run in batch mode, with no visualization', action='store_true', default=False)
-		parser.add_option('--force_x', dest='force_x', help='y component of the external force', action='store', type='float', default=0.0)
-		parser.add_option('--force_y', dest='force_y', help='x component of the external force', action='store', type='float', default=0.0)
+		parser.add_option('--accel_x', dest='accel_x', help='y component of the external acceleration', action='store', type='float', default=0.0)
+		parser.add_option('--accel_y', dest='accel_y', help='x component of the external acceleration', action='store', type='float', default=0.0)
 		parser.add_option('--periodic_x', dest='periodic_x', help='horizontally periodic lattice', action='store_true', default=False)
 		parser.add_option('--periodic_y', dest='periodic_y', help='vertically periodic lattice', action='store_true', default=False)
 
@@ -48,6 +48,7 @@ class LBMSim(object):
 		self._iter_hooks = {}
 		self._iter_hooks_every = {}
 
+	def _calc_screen_size(self):
 		# If the size of the window has not been explicitly defined, automatically adjust it
 		# based on the size of the grid,
 		if self.options.scr_w == 0:
@@ -86,7 +87,7 @@ class LBMSim(object):
 		src = self.geo.get_defines() + src
 		src = '#define RELAXATE RELAX_%s\n' % (self.options.model) + src
 		src = '#define NUM_PARAMS %d\n' % (len(self.geo_params)) + src
-		src = '#define ext_force_x %f\n#define ext_force_y %f\n' % (self.options.force_x, self.options.force_y) + src
+		src = '#define ext_accel_x %f\n#define ext_accel_y %f\n' % (self.options.accel_x, self.options.accel_y) + src
 		src = '#define PERIODIC_X %d\n' % int(self.options.periodic_x) + src
 		src = '#define PERIODIC_Y %d\n' % int(self.options.periodic_y) + src
 
@@ -242,6 +243,7 @@ class LBMSim(object):
 
 
 	def run(self):
+		self._calc_screen_size()
 		self._init_vis()
 		self._init_code()
 		self._init_lbm()

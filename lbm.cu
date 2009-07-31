@@ -62,8 +62,8 @@ __device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 		}
 	}
 
-	v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW + tau * ext_force_x) / rho;
-	v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE + tau * ext_force_y) / rho;
+	v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / rho;
+	v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / rho;
 }
 
 //
@@ -235,7 +235,7 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type
 	feq.fSW = rho * (1.0f + Cusq + 3.0f*(-v.x-v.y) + 4.5f*(v.x+v.y)*(v.x+v.y)) / 36.0f;
 	feq.fNW = rho * (1.0f + Cusq + 3.0f*(-v.x+v.y) + 4.5f*(-v.x+v.y)*(-v.x+v.y)) / 36.0f;
 
-	if (node_type == GEO_FLUID) {
+	if (node_type == GEO_FLUID || node_type == GEO_WALL) {
 		fi.fC += (feq.fC - fi.fC) / tau;
 		fi.fE += (feq.fE - fi.fE) / tau;
 		fi.fW += (feq.fW - fi.fW) / tau;
@@ -245,23 +245,6 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type
 		fi.fNE += (feq.fNE - fi.fNE) / tau;
 		fi.fSW += (feq.fSW - fi.fSW) / tau;
 		fi.fNW += (feq.fNW - fi.fNW) / tau;
-	} else if (node_type == GEO_WALL) {
-		float t;
-		t = fi.fE;
-		fi.fE = fi.fW;
-		fi.fW = t;
-
-		t = fi.fNW;
-		fi.fNW = fi.fSE;
-		fi.fSE = t;
-
-		t = fi.fNE;
-		fi.fNE = fi.fSW;
-		fi.fSW = t;
-
-		t = fi.fN;
-		fi.fN = fi.fS;
-		fi.fS = t;
 	} else {
 		fi.fC  = feq.fC;
 		fi.fE  = feq.fE;
@@ -296,10 +279,31 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 	Dist fi;
 	getDist(fi, cd, gi);
 
+	int type = map[gi];
+
+	if (type == GEO_WALL) {
+		float t;
+		t = fi.fE;
+		fi.fE = fi.fW;
+		fi.fW = t;
+
+		t = fi.fNW;
+		fi.fNW = fi.fSE;
+		fi.fSE = t;
+
+		t = fi.fNE;
+		fi.fNE = fi.fSW;
+		fi.fSW = t;
+
+		t = fi.fN;
+		fi.fN = fi.fS;
+		fi.fS = t;
+	}
+
 	// macroscopic quantities for the current cell
 	float rho;
 	float2 v;
-	getMacro(fi, map[gi], rho, v);
+	getMacro(fi, type, rho, v);
 
 	// only save the macroscopic quantities if requested to do so
 	if (orho != NULL) {
@@ -310,10 +314,20 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 
 	RELAXATE;
 
+	fi.fNW += rho * ((ext_accel_y) - (ext_accel_x)) / 6.0f;
+	fi.fNE += rho * ((ext_accel_y) + (ext_accel_x)) / 6.0f;
+	fi.fN += rho * (ext_accel_y) / 6.0f;
+	fi.fS += rho * -(ext_accel_y) / 6.0f;
+	fi.fSE += rho * (-(ext_accel_y) + (ext_accel_x)) / 6.0f;
+	fi.fSW += rho * (-(ext_accel_y) - (ext_accel_x)) / 6.0f;
+	fi.fE += rho * (ext_accel_x) / 6.0f;
+	fi.fW += rho * -(ext_accel_x) / 6.0f;
+
 	// update the 0-th direction distribution
 	od.fC[gi] = fi.fC;
 
 	#define set_odist(idx, dir, val) od.dir[idx] = val
+	#define rel(x,y) ((x) + LAT_W*(y))
 
 	// E propagation in shared memory
 	if (tix < blockDim.x-1) {
@@ -322,16 +336,16 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 		fo_SE[tix+1] = fi.fSE;
 	// E propagation in global memory (at right block boundary)
 	} else if (ti < LAT_W-1) {
-		set_odist(gi+1, fE, fi.fE);
-		if (blockIdx.y > 0)			set_odist(gi-LAT_W+1, fSE, fi.fSE);
-		else if (PERIODIC_Y)		set_odist(gi+LAT_W*(LAT_H-1)+1, fSE, fi.fSE);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W+1, fNE, fi.fNE);
+		set_odist(gi+rel(1,0), fE, fi.fE);
+		if (blockIdx.y > 0)			set_odist(gi+rel(1,-1), fSE, fi.fSE);
+		else if (PERIODIC_Y)		set_odist(ti+LAT_W*(LAT_H-1)+1, fSE, fi.fSE);
+		if (blockIdx.y < LAT_H-1)	set_odist(gi+rel(1,1), fNE, fi.fNE);
 		else if (PERIODIC_Y)		set_odist(ti+1, fNE, fi.fNE);
 	} else if (PERIODIC_X) {
-		set_odist(gi+1-LAT_W, fE, fi.fE);
-		if (blockIdx.y > 0)			set_odist(gi-2*LAT_W+1, fSE, fi.fSE);
+		set_odist(gi+rel(-LAT_W+1, 0), fE, fi.fE);
+		if (blockIdx.y > 0)			set_odist(gi+rel(-LAT_W+1,-1), fSE, fi.fSE);
 		else if (PERIODIC_Y)		set_odist((LAT_H-1)*LAT_W, fSE, fi.fSE);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+1, fNE, fi.fNE);
+		if (blockIdx.y < LAT_H-1)	set_odist(gi+rel(-LAT_W+1,1), fNE, fi.fNE);
 		else if (PERIODIC_Y)		set_odist(0, fNE, fi.fNE);
 	}
 
@@ -342,16 +356,16 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 		fo_SW[tix-1] = fi.fSW;
 	// W propagation in global memory (at left block boundary)
 	} else if (ti > 0) {
-		set_odist(gi-1, fW, fi.fW);
-		if (blockIdx.y > 0)			set_odist(gi-LAT_W-1, fSW, fi.fSW);
-		else if (PERIODIC_Y)		set_odist(gi+LAT_W*(LAT_H-1)-1, fSW, fi.fSW);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W-1, fNW, fi.fNW);
+		set_odist(gi+rel(-1,0), fW, fi.fW);
+		if (blockIdx.y > 0)			set_odist(gi+rel(-1,-1), fSW, fi.fSW);
+		else if (PERIODIC_Y)		set_odist(ti+LAT_W*(LAT_H-1)-1, fSW, fi.fSW);
+		if (blockIdx.y < LAT_H-1)	set_odist(gi+rel(-1,1), fNW, fi.fNW);
 		else if (PERIODIC_Y)		set_odist(ti-1, fNW, fi.fNW);
 	} else if (PERIODIC_X) {
-		set_odist(gi-1+LAT_W, fW, fi.fW);
-		if (blockIdx.y > 0)			set_odist(gi-1, fSW, fi.fSW);
+		set_odist(gi+rel(LAT_W-1,0), fW, fi.fW);
+		if (blockIdx.y > 0)			set_odist(gi+rel(LAT_W-1,-1), fSW, fi.fSW);
 		else if (PERIODIC_Y)		set_odist(LAT_H*LAT_W-1, fSW, fi.fSW);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+2*LAT_W-1, fNW, fi.fNW);
+		if (blockIdx.y < LAT_H-1)	set_odist(gi+rel(LAT_W-1,1), fNW, fi.fNW);
 		else if (PERIODIC_Y)		set_odist(LAT_W-1, fNW, fi.fNW);
 	}
 
@@ -368,7 +382,7 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 
 	// N + S propagation (global memory)
 	if (blockIdx.y > 0)			set_odist(gi-LAT_W, fS, fi.fS);
-	else if (PERIODIC_Y)		set_odist(gi+LAT_W*(LAT_H-1), fS, fi.fS);
+	else if (PERIODIC_Y)		set_odist(ti+LAT_W*(LAT_H-1), fS, fi.fS);
 	if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fN, fi.fN);
 	else if (PERIODIC_Y)		set_odist(ti, fN, fi.fN);
 

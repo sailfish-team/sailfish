@@ -22,9 +22,7 @@ class LBMGeoPoiseuille(geo2d.LBMGeo):
 	def init_dist(self, dist):
 		for x in range(0, self.lat_w):
 			for y in range(0, self.lat_h):
-				dist[0][y][x] = numpy.float32(4.0/9.0)
-				dist[1][y][x] = dist[2][y][x] = dist[3][y][x] = dist[4][y][x] = numpy.float32(1.0/9.0)
-				dist[5][y][x] = dist[6][y][x] = dist[7][y][x] = dist[8][y][x] = numpy.float32(1.0/36.0)
+				self.velocity_to_dist(0.0, 0.0, dist, x, y)
 
 	def get_reynolds(self, viscosity):
 		return int((self.lat_w-1) * self.maxv/viscosity)
@@ -39,12 +37,12 @@ class LPoiSim(lbm.LBMSim):
 
 		if self.options.test_re100:
 			self.options.periodic_y = True
-			self.options.batch = True
+#			self.options.batch = True
 			self.options.max_iters = 500000
 			self.options.lat_w = 64
 			self.options.lat_h = 512
 			self.options.visc = 0.05
-			self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_w-1)**2)
+			self.options.accel_y = -geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_w-1)**2)
 
 		self.add_iter_hook(1000, self.output_pars, every=True)
 		self.add_iter_hook(499999, self.output_profile)
