@@ -43,10 +43,14 @@ class LPoiSim(lbm.LBMSim):
 			self.options.max_iters = 500000
 			self.options.lat_w = 64
 			self.options.lat_h = 512
-			self.options.visc = 0.01
+			self.options.visc = 0.05
 			self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_w-1)**2)
 
+		self.add_iter_hook(1000, self.output_pars, every=True)
 		self.add_iter_hook(499999, self.output_profile)
+
+	def output_pars(self):
+		print numpy.max(self.vx), numpy.max(self.vy), numpy.average(self.geo.mask_array_by_fluid(self.rho))
 
 	def output_profile(self):
 		print '# Re = %d' % self.geo.get_reynolds(self.options.visc)

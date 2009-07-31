@@ -52,6 +52,10 @@ class LBMGeo(object):
 			elif type == LBMGeo.NODE_PRESSURE:
 				self._pressure_map.setdefault(val, []).append((x,y))
 
+	def mask_array_by_fluid(self, array):
+		mask = numpy.rot90(self.map != LBMGeo.NODE_WALL, 3)
+		return numpy.ma.array(array, mask=mask)
+
 	def velocity_to_dist(self, vx, vy, dist, x, y):
 		"""Set the distributions at node (x,y) so that the fluid there has a specific velocity (vx,vy)."""
 		cusq = -1.5 * (vx*vx + vy*vy)

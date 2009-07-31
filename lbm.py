@@ -46,6 +46,7 @@ class LBMSim(object):
 		self._mlups_calls = 0
 		self._mlups = 0.0
 		self._iter_hooks = {}
+		self._iter_hooks_every = {}
 
 		# If the size of the window has not been explicitly defined, automatically adjust it
 		# based on the size of the grid,
@@ -60,8 +61,11 @@ class LBMSim(object):
 			self.vis = vis2d.Fluid2DVis(self.options.scr_w, self.options.scr_h,
 										self.options.lat_w, self.options.lat_h)
 
-	def add_iter_hook(self, i, func):
-		self._iter_hooks.setdefault(i, []).append(func)
+	def add_iter_hook(self, i, func, every=False):
+		if every:
+			self._iter_hooks_every.setdefault(i, []).append(func)
+		else:
+			self._iter_hooks.setdefault(i, []).append(func)
 
 	def get_tau(self):
 		return numpy.float32((6.0 * self.options.visc + 1.0)/2.0)
@@ -186,7 +190,7 @@ class LBMSim(object):
 		return (self._mlups, mlups)
 
 	def _run_benchmark(self):
-		i = 0
+		self.iter = 0
 
 		if self.options.max_iters:
 			cycles = self.options.max_iters
@@ -201,11 +205,11 @@ class LBMSim(object):
 
 			for iter in range(0, cycles):
 				self.sim_step(i, tracers=False)
-				i += 1
+				self.iter += 1
 
 			cuda.Context.synchronize()
 			t_now = time.time()
-			print i,
+			print self.iter,
 			print '%.2f %.2f' % self.get_mlups(t_now - t_prev, cycles)
 
 			if self.options.max_iters:
@@ -214,13 +218,28 @@ class LBMSim(object):
 	def _run_batch(self):
 		assert self.options.max_iters > 0
 
-		for i in range(0, self.options.max_iters):
-			if i in self._iter_hooks:
-				self.sim_step(i, tracers=False, get_data=True)
-				for hook in self._iter_hooks[i]:
+		for self.iter in range(0, self.options.max_iters):
+			need_data = False
+
+			if self.iter in self._iter_hooks:
+				need_data = True
+
+			if not need_data:
+				for k in self._iter_hooks_every:
+					if self.iter % k == 0:
+						need_data = True
+						break
+
+			self.sim_step(self.iter, tracers=False, get_data=need_data)
+
+			if need_data:
+				for hook in self._iter_hooks.get(self.iter, []):
 					hook()
-			else:
-				self.sim_step(i, tracers=False)
+				for k, v in self._iter_hooks_every.iteritems():
+					if self.iter % k == 0:
+						for hook in v:
+							hook()
+
 
 	def run(self):
 		self._init_vis()
