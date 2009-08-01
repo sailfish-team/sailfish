@@ -21,7 +21,7 @@ class LBMSim(object):
 		parser.add_option('--visc', dest='visc', help='viscosity', type='float', action='store', default=0.01)
 		parser.add_option('--scr_w', dest='scr_w', help='screen width', type='int', action='store', default=0)
 		parser.add_option('--scr_h', dest='scr_h', help='screen height', type='int', action='store', default=0)
-		parser.add_option('--scr_scale', dest='scr_scale', help='screen scale', type='int', action='store', default=3)
+		parser.add_option('--scr_scale', dest='scr_scale', help='screen scale', type='float', action='store', default=3.0)
 		parser.add_option('--every', dest='every', help='update the visualization every N steps', metavar='N', type='int', action='store', default=100)
 		parser.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
 		parser.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
