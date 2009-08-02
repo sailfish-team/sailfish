@@ -83,7 +83,7 @@ class Fluid2DVis(object):
 		ret.append(('max_v', maxv))
 		ret.append(('rho_avg', numpy.average(rho)))
 
-		b = numpy.rot90(geo_map == geo2d.LBMGeo.NODE_WALL, 3)
+		b = geo_map == geo2d.LBMGeo.NODE_WALL
 
 		if self._vismode == 0:
 			drw = numpy.sqrt(vx*vx + vy*vy) / maxv
@@ -100,6 +100,7 @@ class Fluid2DVis(object):
 		# Rotate the field to the correct position.
 		drw = numpy.rot90(drw.astype(numpy.float32), 3)
 		a = pygame.surfarray.pixels3d(srf)
+		b = numpy.rot90(b, 3)
 
 		# Draw the walls.
 		a[b] = (0, 0, 255)

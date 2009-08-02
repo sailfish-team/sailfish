@@ -53,7 +53,7 @@ class LBMGeo(object):
 				self._pressure_map.setdefault(val, []).append((x,y))
 
 	def mask_array_by_fluid(self, array):
-		mask = numpy.rot90(self.map != LBMGeo.NODE_WALL, 3)
+		mask = self.map == LBMGeo.NODE_WALL
 		return numpy.ma.array(array, mask=mask)
 
 	def velocity_to_dist(self, vx, vy, dist, x, y):

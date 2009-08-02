@@ -33,6 +33,7 @@ class LBMSim(object):
 		parser.add_option('--accel_y', dest='accel_y', help='x component of the external acceleration', action='store', type='float', default=0.0)
 		parser.add_option('--periodic_x', dest='periodic_x', help='horizontally periodic lattice', action='store_true', default=False)
 		parser.add_option('--periodic_y', dest='periodic_y', help='vertically periodic lattice', action='store_true', default=False)
+		parser.add_option('--save_src', dest='save_src', help='file to save the CUDA source code to', action='store', type='string', default='')
 
 		group = OptionGroup(parser, 'Simulation-specific options')
 		for option in misc_options:
@@ -87,9 +88,14 @@ class LBMSim(object):
 		src = self.geo.get_defines() + src
 		src = '#define RELAXATE RELAX_%s\n' % (self.options.model) + src
 		src = '#define NUM_PARAMS %d\n' % (len(self.geo_params)) + src
-		src = '#define ext_accel_x %f\n#define ext_accel_y %f\n' % (self.options.accel_x, self.options.accel_y) + src
+		src = '#define ext_accel_x %.9ff\n#define ext_accel_y %.9ff\n' % (self.options.accel_x, self.options.accel_y) + src
 		src = '#define PERIODIC_X %d\n' % int(self.options.periodic_x) + src
 		src = '#define PERIODIC_Y %d\n' % int(self.options.periodic_y) + src
+
+		if self.options.save_src:
+			fsrc = open(self.options.save_src, 'w')
+			print >>fsrc, src
+			fsrc.close()
 
 		self.mod = cuda.SourceModule(src, options=['--use_fast_math', '-Xptxas', '-v'])
 		self.lbm_cnp = self.mod.get_function('LBMCollideAndPropagate')
@@ -205,7 +211,7 @@ class LBMSim(object):
 			t_prev = time.time()
 
 			for iter in range(0, cycles):
-				self.sim_step(i, tracers=False)
+				self.sim_step(self.iter, tracers=False)
 				self.iter += 1
 
 			cuda.Context.synchronize()
