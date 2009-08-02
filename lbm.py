@@ -77,7 +77,7 @@ class LBMSim(object):
 		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), numpy.float32)
 
 		# Simulation geometry.
-		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h, self.options.model)
+		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h, self.options.model, self.options)
 		self.geo.init_dist(self.dist)
 		self.geo_params = numpy.float32(self.geo.get_params())
 

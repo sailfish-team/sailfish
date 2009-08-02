@@ -16,10 +16,11 @@ class LBMGeo(object):
 	NODE_VELOCITY = 2
 	NODE_PRESSURE = 3
 
-	def __init__(self, lat_w, lat_h, model):
+	def __init__(self, lat_w, lat_h, model, options):
 		self.lat_w = lat_w
 		self.lat_h = lat_h
 		self.model = model
+		self.options = options
 		self.map = numpy.zeros((lat_h, lat_w), numpy.int32)
 		self.gpu_map = cuda.mem_alloc(self.map.size * self.map.dtype.itemsize)
 		self._vel_map = {}
