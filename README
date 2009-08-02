@@ -42,6 +42,7 @@ Keyboard control during the simulation:
 - t: toggle the visualization of the fluid tracer particles
 - r: reset the simulation geometry
 - q: quit the program
+- s: take a screenshot
 
 During the simulation, you can also use the mouse to place obstacles
 anywhere in the simulation domain.

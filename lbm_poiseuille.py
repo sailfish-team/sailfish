@@ -38,6 +38,8 @@ class LBMGeoPoiseuille(geo2d.LBMGeo):
 
 class LPoiSim(lbm.LBMSim):
 
+	filename = 'poiseuille'
+
 	def __init__(self, geo_class):
 		opts = []
 		opts.append(optparse.make_option('--test_re100', dest='test_re100', action='store_true', default=False, help='generate test data for Re=100'))

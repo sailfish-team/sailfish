@@ -14,6 +14,8 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 
 class LBMSim(object):
 
+	filename = 'lbm_sim'
+
 	def __init__(self, geo_class, misc_options=[]):
 		parser = OptionParser()
 		parser.add_option('--lat_w', dest='lat_w', help='lattice width', type='int', action='store', default=128)

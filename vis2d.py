@@ -2,6 +2,7 @@ import math
 import numpy
 import pygame
 import geo2d
+import os
 import sys
 import time
 
@@ -182,6 +183,20 @@ class Fluid2DVis(object):
 					sys.exit()
 				elif event.key == pygame.K_r:
 					lbm_sim.geo.reset()
+				elif event.key == pygame.K_s:
+					i = 0
+
+					while os.path.exists('%s_%05d.png' % (lbm_sim.filename, i)):
+						i += 1
+						if i > 99999:
+							break
+
+					fname = '%s_%05d.png' % (lbm_sim.filename, i)
+					if os.path.exists(fname):
+						print 'Could not create screenshot.'
+
+					pygame.image.save(self._screen, fname)
+					print 'Saved %s.' % fname
 
 	def main(self, lbm_sim):
 		i = 1

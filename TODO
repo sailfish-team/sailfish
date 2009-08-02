@@ -1,5 +1,4 @@
 * general
-  - add option to take screenshots to a file
   - add option to save the raw data to a file
 
 * D2Q9
@@ -7,6 +6,7 @@
   - make the CFD testcases automated (regtests)
   - implement the single-grid access pattern (50% space saving)
   - implement grid refinement
+  - run the existing test cases with double precision, compare results
 
 * D3Qx
   - implement basic BGK/MRT code for these lattices
