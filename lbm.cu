@@ -164,31 +164,13 @@ __device__ void inline MS_relaxate(Dist &fi, int node_type)
 	float tau4 = 3.0f*(2.0f - tau7) / (3.0f - tau7);
 	float tau8 = 1.0f/((2.0f/tau7 - 1.0f)*0.5f + 0.5f);
 
-	if (node_type == GEO_FLUID) {
+	if (node_type == GEO_FLUID || node_type == GEO_WALL) {
 		fm.en  -= 1.63f * (fm.en - feq.en);
 		fm.ens -= 1.14f * (fm.ens - feq.ens);
 		fm.ex  -= tau4 * (fm.ex - feq.ex);
 		fm.ey  -= 1.92f * (fm.ey - feq.ey);
 		fm.sd  -= tau7 * (fm.sd - feq.sd);
 		fm.sod -= tau8 * (fm.sod - feq.sod);
-	} else if (node_type == GEO_WALL) {
-		// Bounce-back.
-		float t;
-		t = fi.fE;
-		fi.fE = fi.fW;
-		fi.fW = t;
-
-		t = fi.fNW;
-		fi.fNW = fi.fSE;
-		fi.fSE = t;
-
-		t = fi.fNE;
-		fi.fNE = fi.fSW;
-		fi.fSW = t;
-
-		t = fi.fN;
-		fi.fN = fi.fS;
-		fi.fS = t;
 	} else {
 		fm.en  = feq.en;
 		fm.ens = feq.ens;
@@ -198,21 +180,19 @@ __device__ void inline MS_relaxate(Dist &fi, int node_type)
 		fm.sod = feq.sod;
 	}
 
-	if (node_type != GEO_WALL) {
-		fi.fC  = (1.0f/9.0f)*fm.rho - (1.0f/9.0f)*fm.en + (1.0f/9.0f)*fm.ens;
-		fi.fE  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.mx - (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
-		fi.fN  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.my - (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
-		fi.fW  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.mx + (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
-		fi.fS  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.my + (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
-		fi.fNE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
-				 +(1.0f/6.0f)*fm.mx + (1.0f/12.0f)*fm.ex + (1.0f/6.0f)*fm.my + (1.0f/12.0f)*fm.ey + 0.25f*fm.sod;
-		fi.fNW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
-				 -(1.0f/6.0f)*fm.mx - (1.0f/12.0f)*fm.ex + (1.0f/6.0f)*fm.my + (1.0f/12.0f)*fm.ey - 0.25f*fm.sod;
-		fi.fSW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
-				 -(1.0f/6.0f)*fm.mx - (1.0f/12.0f)*fm.ex - (1.0f/6.0f)*fm.my - (1.0f/12.0f)*fm.ey + 0.25f*fm.sod;
-		fi.fSE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
-				 +(1.0f/6.0f)*fm.mx + (1.0f/12.0f)*fm.ex - (1.0f/6.0f)*fm.my - (1.0f/12.0f)*fm.ey - 0.25f*fm.sod;
-	}
+	fi.fC  = (1.0f/9.0f)*fm.rho - (1.0f/9.0f)*fm.en + (1.0f/9.0f)*fm.ens;
+	fi.fE  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.mx - (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
+	fi.fN  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.my - (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
+	fi.fW  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.mx + (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
+	fi.fS  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.my + (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
+	fi.fNE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+			 +(1.0f/6.0f)*fm.mx + (1.0f/12.0f)*fm.ex + (1.0f/6.0f)*fm.my + (1.0f/12.0f)*fm.ey + 0.25f*fm.sod;
+	fi.fNW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+			 -(1.0f/6.0f)*fm.mx - (1.0f/12.0f)*fm.ex + (1.0f/6.0f)*fm.my + (1.0f/12.0f)*fm.ey - 0.25f*fm.sod;
+	fi.fSW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+			 -(1.0f/6.0f)*fm.mx - (1.0f/12.0f)*fm.ex - (1.0f/6.0f)*fm.my - (1.0f/12.0f)*fm.ey + 0.25f*fm.sod;
+	fi.fSE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+			 +(1.0f/6.0f)*fm.mx + (1.0f/12.0f)*fm.ex - (1.0f/6.0f)*fm.my - (1.0f/12.0f)*fm.ey - 0.25f*fm.sod;
 }
 
 //
@@ -344,9 +324,9 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 	} else if (PERIODIC_X) {
 		set_odist(gi+rel(-LAT_W+1, 0), fE, fi.fE);
 		if (blockIdx.y > 0)			set_odist(gi+rel(-LAT_W+1,-1), fSE, fi.fSE);
-		else if (PERIODIC_Y)		set_odist((LAT_H-1)*LAT_W, fSE, fi.fSE);
+		else if (PERIODIC_Y)		set_odist(rel(0, LAT_H-1), fSE, fi.fSE);
 		if (blockIdx.y < LAT_H-1)	set_odist(gi+rel(-LAT_W+1,1), fNE, fi.fNE);
-		else if (PERIODIC_Y)		set_odist(0, fNE, fi.fNE);
+		else if (PERIODIC_Y)		set_odist(rel(0, 0), fNE, fi.fNE);
 	}
 
 	// W propagation in shared memory
