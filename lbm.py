@@ -37,7 +37,8 @@ class LBMSim(object):
 		parser.add_option('--periodic_x', dest='periodic_x', help='horizontally periodic lattice', action='store_true', default=False)
 		parser.add_option('--periodic_y', dest='periodic_y', help='vertically periodic lattice', action='store_true', default=False)
 		parser.add_option('--save_src', dest='save_src', help='file to save the CUDA source code to', action='store', type='string', default='')
-		parser.add_option('--save_res', dest='save_res', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
+		parser.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
+		parser.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat'], default='h5flat')
 
 		group = OptionGroup(parser, 'Simulation-specific options')
 		for option in misc_options:
@@ -185,7 +186,7 @@ class LBMSim(object):
 			cuda.memcpy_dtoh(self.vy, self.gpu_vy)
 			cuda.memcpy_dtoh(self.rho, self.gpu_rho)
 
-			if self.options.save_res:
+			if self.options.output:
 				self._output_data(i)
 		else:
 			self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *kargs[0])
@@ -204,31 +205,37 @@ class LBMSim(object):
 		return (self._mlups, mlups)
 
 	def _output_data(self, i):
-		record = self.h5tbl.row
-		record['iter'] = i
-		record['vx'] = self.vx
-		record['vy'] = self.vy
-		record['rho'] = self.rho
-		record.append()
-		self.h5tbl.flush()
+		if self.options.output_format == 'h5flat':
+			h5t = self.h5file.createGroup(self.h5grp, 'iter%d' % i, 'iteration %d' % i)
+			self.h5file.createArray(h5t, 'v', numpy.dstack([self.vx, self.vy]), 'velocity')
+			self.h5file.createArray(h5t, 'rho', self.rho, 'density')
+		else:
+			record = self.h5tbl.row
+			record['iter'] = i
+			record['vx'] = self.vx
+			record['vy'] = self.vy
+			record['rho'] = self.rho
+			record.append()
+			self.h5tbl.flush()
 
 	def _init_output(self):
-		if self.options.save_res:
-			self.h5file = tables.openFile(self.options.save_res, mode='w')
+		if self.options.output:
+			self.h5file = tables.openFile(self.options.output, mode='w')
 			self.h5grp = self.h5file.createGroup('/', 'results', 'simulation results')
-			desc = {
-				'iter': tables.Float32Col(pos=0),
-				'vx': tables.Float32Col(pos=1, shape=self.vx.shape),
-				'vy': tables.Float32Col(pos=2, shape=self.vy.shape),
-				'rho': tables.Float32Col(pos=3, shape=self.rho.shape)
-			}
+			self.h5file.setNodeAttr(self.h5grp, 'viscosity', self.options.visc)
+			self.h5file.setNodeAttr(self.h5grp, 'accel_x', self.options.accel_x)
+			self.h5file.setNodeAttr(self.h5grp, 'accel_y', self.options.accel_y)
+			self.h5file.setNodeAttr(self.h5grp, 'sample_rate', self.options.every)
+			self.h5file.setNodeAttr(self.h5grp, 'model', self.options.model)
 
-			self.h5tbl = self.h5file.createTable(self.h5grp, 'results', desc, 'results')
-			self.h5file.setNodeAttr(self.h5tbl, 'viscosity', self.options.visc)
-			self.h5file.setNodeAttr(self.h5tbl, 'accel_x', self.options.accel_x)
-			self.h5file.setNodeAttr(self.h5tbl, 'accel_y', self.options.accel_y)
-			self.h5file.setNodeAttr(self.h5tbl, 'sample_rate', self.options.every)
-			self.h5file.setNodeAttr(self.h5tbl, 'model', self.options.model)
+			if self.options.output_format == 'h5nested':
+				desc = {
+					'iter': tables.Float32Col(pos=0),
+					'vx': tables.Float32Col(pos=1, shape=self.vx.shape),
+					'vy': tables.Float32Col(pos=2, shape=self.vy.shape),
+					'rho': tables.Float32Col(pos=3, shape=self.rho.shape)
+				}
+				self.h5tbl = self.h5file.createTable(self.h5grp, 'results', desc, 'results')
 
 	def _run_benchmark(self):
 		self.iter = 0

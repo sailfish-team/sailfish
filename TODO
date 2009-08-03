@@ -1,5 +1,4 @@
 * general
-  - add option to save the raw data to a file
   - use a template engine to generate CUDA code
 
 * D2Q9
