@@ -49,7 +49,7 @@ class LPoiSim(lbm.LBMSim):
 
 		if self.options.test_re100:
 			self.options.periodic_y = True
-			self.options.periodic_x = True
+			self.options.periodic_x = False
 			self.options.batch = True
 			self.options.max_iters = 500000
 			self.options.visc = 0.01

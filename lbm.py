@@ -13,6 +13,12 @@ import geo2d
 
 from optparse import OptionGroup, OptionParser, OptionValueError
 
+
+def _convert_to_double(src):
+	import re
+	return re.sub('([0-9]+\.[0-9]*)f', '\\1', src.replace('float', 'double'))
+
+
 class LBMSim(object):
 
 	filename = 'lbm_sim'
@@ -39,6 +45,7 @@ class LBMSim(object):
 		parser.add_option('--save_src', dest='save_src', help='file to save the CUDA source code to', action='store', type='string', default='')
 		parser.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
 		parser.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat'], default='h5flat')
+		parser.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
 
 		group = OptionGroup(parser, 'Simulation-specific options')
 		for option in misc_options:
@@ -53,6 +60,14 @@ class LBMSim(object):
 		self._mlups = 0.0
 		self._iter_hooks = {}
 		self._iter_hooks_every = {}
+
+		if not self._is_double_precision():
+			self.float = numpy.float32
+		else:
+			self.float = numpy.float64
+
+	def _is_double_precision(self):
+		return self.options.precision == 'double'
 
 	def _calc_screen_size(self):
 		# If the size of the window has not been explicitly defined, automatically adjust it
@@ -75,16 +90,16 @@ class LBMSim(object):
 			self._iter_hooks.setdefault(i, []).append(func)
 
 	def get_tau(self):
-		return numpy.float32((6.0 * self.options.visc + 1.0)/2.0)
+		return self.float((6.0 * self.options.visc + 1.0)/2.0)
 
 	def _init_code(self):
 		# Particle distributions in host memory.
-		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), numpy.float32)
+		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), self.float)
 
 		# Simulation geometry.
-		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h, self.options.model, self.options)
+		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h, self.options.model, self.options, self.float)
 		self.geo.init_dist(self.dist)
-		self.geo_params = numpy.float32(self.geo.get_params())
+		self.geo_params = self.float(self.geo.get_params())
 
 		fp = open('lbm.cu')
 		src = fp.read()
@@ -93,9 +108,12 @@ class LBMSim(object):
 		src = self.geo.get_defines() + src
 		src = '#define RELAXATE RELAX_%s\n' % (self.options.model) + src
 		src = '#define NUM_PARAMS %d\n' % (len(self.geo_params)) + src
-		src = '#define ext_accel_x %.9ff\n#define ext_accel_y %.9ff\n' % (self.options.accel_x, self.options.accel_y) + src
+		src = '#define ext_accel_x ((float)%.20ff)\n#define ext_accel_y ((float)%.20ff)\n' % (self.options.accel_x, self.options.accel_y) + src
 		src = '#define PERIODIC_X %d\n' % int(self.options.periodic_x) + src
 		src = '#define PERIODIC_Y %d\n' % int(self.options.periodic_y) + src
+
+		if self._is_double_precision():
+			src = _convert_to_double(src)
 
 		if self.options.save_src:
 			fsrc = open(self.options.save_src, 'w')
@@ -112,16 +130,16 @@ class LBMSim(object):
 		cuda.memcpy_htod(self.gpu_tau, self.tau)
 
 		self.gpu_visc = self.mod.get_global('visc')[0]
-		cuda.memcpy_htod(self.gpu_visc, numpy.float32(self.options.visc))
+		cuda.memcpy_htod(self.gpu_visc, self.float(self.options.visc))
 
 		self.gpu_geo_params = self.mod.get_global('geo_params')[0]
 		cuda.memcpy_htod(self.gpu_geo_params, self.geo_params)
 
 	def _init_lbm(self):
 		# Velocity and density.
-		self.vx = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.float32)
-		self.vy = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.float32)
-		self.rho = numpy.zeros((self.options.lat_h, self.options.lat_w), numpy.float32)
+		self.vx = numpy.zeros((self.options.lat_h, self.options.lat_w), self.float)
+		self.vy = numpy.zeros((self.options.lat_h, self.options.lat_w), self.float)
+		self.rho = numpy.zeros((self.options.lat_h, self.options.lat_w), self.float)
 		self.gpu_vx = cuda.mem_alloc(self.vx.size * self.vx.dtype.itemsize)
 		self.gpu_vy = cuda.mem_alloc(self.vy.size * self.vy.dtype.itemsize)
 		self.gpu_rho = cuda.mem_alloc(self.rho.size * self.rho.dtype.itemsize)
@@ -132,8 +150,8 @@ class LBMSim(object):
 		cuda.memcpy_htod(self.gpu_rho, self.rho)
 
 		# Tracer particles.
-		self.tracer_x = numpy.random.random_sample(self.options.tracers).astype(numpy.float32) * self.options.lat_w
-		self.tracer_y = numpy.random.random_sample(self.options.tracers).astype(numpy.float32) * self.options.lat_h
+		self.tracer_x = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_w
+		self.tracer_y = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_h
 		self.gpu_tracer_x = cuda.mem_alloc(self.tracer_x.size * self.tracer_x.dtype.itemsize)
 		self.gpu_tracer_y = cuda.mem_alloc(self.tracer_y.size * self.tracer_y.dtype.itemsize)
 		cuda.memcpy_htod(self.gpu_tracer_x, self.tracer_x)
@@ -152,7 +170,7 @@ class LBMSim(object):
 			cuda.memcpy_htod(gdist, self.dist[i])
 
 		# Prepared calls to the kernel.
-		self.lbm_cnp.prepare('P' * (4+2*9), block=(self.block_size,1,1), shared=(self.block_size*6*numpy.dtype(numpy.float32()).itemsize))
+		self.lbm_cnp.prepare('P' * (4+2*9), block=(self.block_size,1,1), shared=(self.block_size*6*numpy.dtype(self.float()).itemsize))
 		self.lbm_tracer.prepare('P' * (12), block=(self.options.tracers,1,1))
 
 		# Kernel arguments.
