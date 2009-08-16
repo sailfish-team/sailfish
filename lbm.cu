@@ -62,8 +62,8 @@ __device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 		}
 	}
 
-	v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / rho;
-	v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / rho;
+	v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / rho + 0.5f * ext_accel_x;
+	v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / rho + 0.5f * ext_accel_y;
 }
 
 //
@@ -215,7 +215,7 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type
 	feq.fSW = rho * (1.0f + Cusq + 3.0f*(-v.x-v.y) + 4.5f*(v.x+v.y)*(v.x+v.y)) / 36.0f;
 	feq.fNW = rho * (1.0f + Cusq + 3.0f*(-v.x+v.y) + 4.5f*(-v.x+v.y)*(-v.x+v.y)) / 36.0f;
 
-	if (node_type == GEO_FLUID || node_type == GEO_WALL) {
+ 	if (node_type == GEO_FLUID || node_type == GEO_WALL) {
 		fi.fC += (feq.fC - fi.fC) / tau;
 		fi.fE += (feq.fE - fi.fE) / tau;
 		fi.fW += (feq.fW - fi.fW) / tau;
@@ -236,6 +236,21 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type
 		fi.fSW = feq.fSW;
 		fi.fNW = feq.fNW;
 	}
+
+	float pref = rho * (3.0f - 3.0f/(2.0f * tau));
+	#define eax ext_accel_x
+	#define eay ext_accel_y
+	float ue = eax*v.x + eay*v.y;
+
+	fi.fC += pref*(-ue) * 4.0f/9.0f;
+	fi.fN += pref*(eay - ue + 3.0f*(eay*v.y)) / 9.0f;
+	fi.fE += pref*(eax - ue + 3.0f*(eax*v.x)) / 9.0f;
+	fi.fS += pref*(-eay - ue + 3.0f*(eay*v.y)) / 9.0f;
+	fi.fW += pref*(-eax - ue + 3.0f*(eax*v.x)) / 9.0f;
+	fi.fNE += pref*(eax + eay - ue + 3.0f*((v.x+v.y)*(eax+eay))) / 36.0f;
+	fi.fSE += pref*(eax - eay - ue + 3.0f*((v.x-v.y)*(eax-eay))) / 36.0f;
+	fi.fSW += pref*(-eax - eay - ue + 3.0f*((v.x+v.y)*(eax+eay))) / 36.0f;
+	fi.fNW += pref*(-eax + eay - ue + 3.0f*((-v.x+v.y)*(-eax+eay))) / 36.0f;
 }
 
 // TODO:
@@ -293,15 +308,6 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 	}
 
 	RELAXATE;
-
-	fi.fNW += rho * ((ext_accel_y) - (ext_accel_x)) / 6.0f;
-	fi.fNE += rho * ((ext_accel_y) + (ext_accel_x)) / 6.0f;
-	fi.fN += rho * (ext_accel_y) / 6.0f;
-	fi.fS += rho * -(ext_accel_y) / 6.0f;
-	fi.fSE += rho * (-(ext_accel_y) + (ext_accel_x)) / 6.0f;
-	fi.fSW += rho * (-(ext_accel_y) - (ext_accel_x)) / 6.0f;
-	fi.fE += rho * (ext_accel_x) / 6.0f;
-	fi.fW += rho * -(ext_accel_x) / 6.0f;
 
 	// update the 0-th direction distribution
 	od.fC[gi] = fi.fC;

@@ -60,15 +60,16 @@ class LBMGeo(object):
 	def velocity_to_dist(self, vx, vy, dist, x, y):
 		"""Set the distributions at node (x,y) so that the fluid there has a specific velocity (vx,vy)."""
 		cusq = -1.5 * (vx*vx + vy*vy)
-		dist[0][y][x] = numpy.float32((1.0 + cusq) * 4.0/9.0)
-		dist[4][y][x] = numpy.float32((1.0 + cusq + 3.0*vy + 4.5*vy*vy) / 9.0)
-		dist[1][y][x] = numpy.float32((1.0 + cusq + 3.0*vx + 4.5*vx*vx) / 9.0)
-		dist[3][y][x] = numpy.float32((1.0 + cusq - 3.0*vy + 4.5*vy*vy) / 9.0)
-		dist[2][y][x] = numpy.float32((1.0 + cusq - 3.0*vx + 4.5*vx*vx) / 9.0)
-		dist[7][y][x] = numpy.float32((1.0 + cusq + 3.0*(vx+vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0)
-		dist[5][y][x] = numpy.float32((1.0 + cusq + 3.0*(vx-vy) + 4.5*(vx-vy)*(vx-vy)) / 36.0)
-		dist[6][y][x] = numpy.float32((1.0 + cusq + 3.0*(-vx-vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0)
-		dist[8][y][x] = numpy.float32((1.0 + cusq + 3.0*(-vx+vy) + 4.5*(-vx+vy)*(-vx+vy)) / 36.0)
+		eq_rho = 1.0
+		dist[0][y][x] = numpy.float32((1.0 + cusq) * 4.0/9.0 * eq_rho)
+		dist[4][y][x] = numpy.float32((1.0 + cusq + 3.0*vy + 4.5*vy*vy) / 9.0 * eq_rho)
+		dist[1][y][x] = numpy.float32((1.0 + cusq + 3.0*vx + 4.5*vx*vx) / 9.0 * eq_rho)
+		dist[3][y][x] = numpy.float32((1.0 + cusq - 3.0*vy + 4.5*vy*vy) / 9.0 * eq_rho)
+		dist[2][y][x] = numpy.float32((1.0 + cusq - 3.0*vx + 4.5*vx*vx) / 9.0 * eq_rho)
+		dist[7][y][x] = numpy.float32((1.0 + cusq + 3.0*(vx+vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0 * eq_rho)
+		dist[5][y][x] = numpy.float32((1.0 + cusq + 3.0*(vx-vy) + 4.5*(vx-vy)*(vx-vy)) / 36.0 * eq_rho)
+		dist[6][y][x] = numpy.float32((1.0 + cusq + 3.0*(-vx-vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0 * eq_rho)
+		dist[8][y][x] = numpy.float32((1.0 + cusq + 3.0*(-vx+vy) + 4.5*(-vx+vy)*(-vx+vy)) / 36.0 * eq_rho)
 
 	def get_params(self):
 		ret = []

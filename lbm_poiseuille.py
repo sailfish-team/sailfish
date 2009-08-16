@@ -11,7 +11,7 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 class LBMGeoPoiseuille(geo2d.LBMGeo):
 	"""2D Poiseuille geometry."""
 
-	maxv = 0.1
+	maxv = 0.02
 
 	def _reset(self):
 		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
@@ -52,22 +52,22 @@ class LPoiSim(lbm.LBMSim):
 			self.options.periodic_x = True
 			self.options.batch = True
 			self.options.max_iters = 500000
-			self.options.visc = 0.05
+			self.options.visc = 0.01
 			if self.options.horizontal:
-				self.options.lat_w = 512
+				self.options.lat_w = 128
 				self.options.lat_h = 64
 				self.options.accel_x = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_h-1)**2)
 				self.add_iter_hook(499999, self.output_profile_horiz)
 			else:
 				self.options.lat_w = 64
-				self.options.lat_h = 512
+				self.options.lat_h = 128
 				self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_w-1)**2)
 				self.add_iter_hook(499999, self.output_profile_vert)
 
 		self.add_iter_hook(1000, self.output_pars, every=True)
 
 	def output_pars(self):
-		print numpy.max(self.geo.mask_array_by_fluid(self.vx)),	numpy.max(self.geo.mask_array_by_fluid(self.vy)), numpy.average(self.geo.mask_array_by_fluid(self.rho))
+		print numpy.max(self.geo.mask_array_by_fluid(self.vx)),	numpy.max(self.geo.mask_array_by_fluid(self.vy)) / 0.02, numpy.average(self.geo.mask_array_by_fluid(self.rho))
 
 	def output_profile_vert(self):
 		print '# Re = %d' % self.geo.get_reynolds(self.options.visc)
