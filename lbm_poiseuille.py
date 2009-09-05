@@ -47,12 +47,16 @@ class LPoiSim(lbm.LBMSim):
 
 		lbm.LBMSim.__init__(self, geo_class, misc_options=opts)
 
+		defaults = {'batch': True, 'max_iters': 500000, 'visc': 0.1}
+
 		if self.options.test_re100:
 			self.options.periodic_y = not self.options.horizontal
 			self.options.periodic_x = self.options.horizontal
-			self.options.batch = True
-			self.options.max_iters = 500000
-			self.options.visc = 0.1
+
+			for k, v in defaults.iteritems():
+				if k not in self.options.specified:
+					setattr(self.options, k, v)
+
 			if self.options.horizontal:
 				self.options.lat_w = 64
 				self.options.lat_h = 64

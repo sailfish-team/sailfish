@@ -11,12 +11,24 @@ import time
 import vis2d
 import geo2d
 
+import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
 
 
 def _convert_to_double(src):
 	import re
 	return re.sub('([0-9]+\.[0-9]*)f', '\\1', src.replace('float', 'double'))
+
+
+class Values(optparse.Values):
+	def __init__(self, *args):
+		optparse.Values.__init__(self, *args)
+		self.specified = set()
+
+	def __setattr__(self, name, value):
+		self.__dict__[name] = value
+		if hasattr(self, 'specified'):
+			self.specified.add(name)
 
 
 class LBMSim(object):
@@ -38,6 +50,7 @@ class LBMSim(object):
 		parser.add_option('--benchmark', dest='benchmark', help='benchmark mode, implies no visualization', action='store_true', default=False)
 		parser.add_option('--max_iters', dest='max_iters', help='number of iterations to run in benchmark/batch mode', action='store', type='int', default=0)
 		parser.add_option('--batch', dest='batch', help='run in batch mode, with no visualization', action='store_true', default=False)
+		parser.add_option('--nobatch', dest='batch', help='run in interactive mode', action='store_false')
 		parser.add_option('--accel_x', dest='accel_x', help='y component of the external acceleration', action='store', type='float', default=0.0)
 		parser.add_option('--accel_y', dest='accel_y', help='x component of the external acceleration', action='store', type='float', default=0.0)
 		parser.add_option('--periodic_x', dest='periodic_x', help='horizontally periodic lattice', action='store_true', default=False)
@@ -54,7 +67,8 @@ class LBMSim(object):
 		parser.add_option_group(group)
 
 		self.geo_class = geo_class
-		self.options, self.args = parser.parse_args()
+		self.options = Values(parser.defaults)
+		parser.parse_args(sys.argv[1:], self.options)
 		self.block_size = 64
 		self._mlups_calls = 0
 		self._mlups = 0.0
