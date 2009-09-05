@@ -13,7 +13,7 @@ class LBMGeoPoiseuille(geo2d.LBMGeo):
 
 	maxv = 0.02
 
-	def _reset(self):
+	def _define_nodes(self):
 		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
 		if self.options.horizontal:
 			for i in range(0, self.lat_w):
@@ -48,19 +48,19 @@ class LPoiSim(lbm.LBMSim):
 		lbm.LBMSim.__init__(self, geo_class, misc_options=opts)
 
 		if self.options.test_re100:
-			self.options.periodic_y = True
-			self.options.periodic_x = False
+			self.options.periodic_y = not self.options.horizontal
+			self.options.periodic_x = self.options.horizontal
 			self.options.batch = True
 			self.options.max_iters = 500000
-			self.options.visc = 0.01
+			self.options.visc = 0.1
 			if self.options.horizontal:
-				self.options.lat_w = 128
+				self.options.lat_w = 64
 				self.options.lat_h = 64
 				self.options.accel_x = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_h-1)**2)
 				self.add_iter_hook(499999, self.output_profile_horiz)
 			else:
 				self.options.lat_w = 64
-				self.options.lat_h = 128
+				self.options.lat_h = 64
 				self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_w-1)**2)
 				self.add_iter_hook(499999, self.output_profile_vert)
 

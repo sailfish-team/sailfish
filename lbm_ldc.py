@@ -13,7 +13,7 @@ class LBMGeoLDC(geo2d.LBMGeo):
 
 	max_v = 0.1
 
-	def _reset(self):
+	def _define_nodes(self):
 		"""Initialize the simulation for the lid-driven cavity geometry."""
 		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
 		# bottom/top

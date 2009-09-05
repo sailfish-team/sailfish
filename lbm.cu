@@ -40,12 +40,42 @@ __device__ void inline getDist(Dist &dout, DistP din, int idx)
 	dout.fSW = din.fSW[idx];
 }
 
+__device__ bool isWallNode(int type) {
+	return type >= GEO_WALL_E && type <= GEO_WALL_S;
+}
+
 //
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
 //
 __device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 {
+	// Wall nodes are special, as some distributions (those pointing out of
+	// the simulation grid) are undefined.
+	if (isWallNode(node_type)) {
+		switch (node_type) {
+		case GEO_WALL_E:
+			rho = 2.0 * (fi.fNE + fi.fE + fi.fSE) + fi.fC + fi.fS + fi.fN;
+			break;
+
+		case GEO_WALL_W:
+			rho = 2.0 * (fi.fNW + fi.fSW + fi.fW) + fi.fC + fi.fS + fi.fN;
+			break;
+
+		case GEO_WALL_S:
+			rho = 2.0 * (fi.fSW + fi.fS + fi.fSE) + fi.fC + fi.fE + fi.fW;
+			break;
+
+		case GEO_WALL_N:
+			rho = 2.0 * (fi.fNW + fi.fN + fi.fNE) + fi.fC + fi.fE + fi.fW;
+			break;
+		}
+
+		v.x = 0.0f;
+		v.y = 0.0f;
+		return;
+	}
+
 	rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
 	if (node_type >= GEO_BCV) {
 		// Velocity boundary condition.
@@ -58,7 +88,7 @@ __device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 		} else {
 			// c_s^2 = 1/3, P/c_s^2 = rho
 			int idx = (GEO_BCP-GEO_BCV) * 2 + (node_type - GEO_BCP);
-			rho = geo_params[idx] * 3.0;
+			rho = geo_params[idx] * 3.0f;
 		}
 	}
 
@@ -164,7 +194,7 @@ __device__ void inline MS_relaxate(Dist &fi, int node_type)
 	float tau4 = 3.0f*(2.0f - tau7) / (3.0f - tau7);
 	float tau8 = 1.0f/((2.0f/tau7 - 1.0f)*0.5f + 0.5f);
 
-	if (node_type == GEO_FLUID || node_type == GEO_WALL) {
+	if (node_type == GEO_FLUID || isWallNode(node_type)) {
 		fm.en  -= 1.63f * (fm.en - feq.en);
 		fm.ens -= 1.14f * (fm.ens - feq.ens);
 		fm.ex  -= tau4 * (fm.ex - feq.ex);
@@ -215,7 +245,7 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type
 	feq.fSW = rho * (1.0f + Cusq + 3.0f*(-v.x-v.y) + 4.5f*(v.x+v.y)*(v.x+v.y)) / 36.0f;
 	feq.fNW = rho * (1.0f + Cusq + 3.0f*(-v.x+v.y) + 4.5f*(-v.x+v.y)*(-v.x+v.y)) / 36.0f;
 
- 	if (node_type == GEO_FLUID || node_type == GEO_WALL) {
+	if (node_type == GEO_FLUID || isWallNode(node_type)) {
 		fi.fC += (feq.fC - fi.fC) / tau;
 		fi.fE += (feq.fE - fi.fE) / tau;
 		fi.fW += (feq.fW - fi.fW) / tau;
@@ -237,6 +267,7 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type
 		fi.fNW = feq.fNW;
 	}
 
+	// External acceleration.
 	float pref = rho * (3.0f - 3.0f/(2.0f * tau));
 	#define eax ext_accel_x
 	#define eay ext_accel_y
@@ -276,7 +307,7 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 
 	int type = map[gi];
 
-	if (type == GEO_WALL) {
+	if (isWallNode(type)) {
 		float t;
 		t = fi.fE;
 		fi.fE = fi.fW;
