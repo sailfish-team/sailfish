@@ -47,7 +47,7 @@ class LBMSim(object):
 
 	filename = 'lbm_sim'
 
-	def __init__(self, geo_class, misc_options=[]):
+	def __init__(self, geo_class, misc_options=[], args=sys.argv[1:]):
 		parser = OptionParser()
 		parser.add_option('--lat_w', dest='lat_w', help='lattice width', type='int', action='store', default=128)
 		parser.add_option('--lat_h', dest='lat_h', help='lattice height', type='int', action='store', default=128)
@@ -81,12 +81,11 @@ class LBMSim(object):
 
 		self.geo_class = geo_class
 		self.options = Values(parser.defaults)
-		parser.parse_args(sys.argv[1:], self.options)
+		parser.parse_args(args, self.options)
 		self.block_size = 64
 		self._mlups_calls = 0
 		self._mlups = 0.0
-		self._iter_hooks = {}
-		self._iter_hooks_every = {}
+		self.clear_hooks()
 		self.backend = sys.modules[backends[self.options.backend]].backend()
 
 		print 'Using the "%s" backend.' % self.options.backend
@@ -118,6 +117,10 @@ class LBMSim(object):
 			self._iter_hooks_every.setdefault(i, []).append(func)
 		else:
 			self._iter_hooks.setdefault(i, []).append(func)
+
+	def clear_hooks(self):
+		self._iter_hooks = {}
+		self._iter_hooks_every = {}
 
 	def get_tau(self):
 		return self.float((6.0 * self.options.visc + 1.0)/2.0)

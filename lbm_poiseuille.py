@@ -1,5 +1,7 @@
 #!/usr/bin/python -u
 
+import sys
+
 import numpy
 import lbm
 import geo2d
@@ -40,16 +42,16 @@ class LPoiSim(lbm.LBMSim):
 
 	filename = 'poiseuille'
 
-	def __init__(self, geo_class):
+	def __init__(self, geo_class, args=sys.argv[1:]):
 		opts = []
-		opts.append(optparse.make_option('--test_re100', dest='test_re100', action='store_true', default=False, help='generate test data for Re=100'))
+		opts.append(optparse.make_option('--test', dest='test', action='store_true', default=False, help='generate test data'))
 		opts.append(optparse.make_option('--horizontal', dest='horizontal', action='store_true', default=False, help='use horizontal channel'))
 
-		lbm.LBMSim.__init__(self, geo_class, misc_options=opts)
+		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, args=args)
 
 		defaults = {'batch': True, 'max_iters': 500000, 'visc': 0.1}
 
-		if self.options.test_re100:
+		if self.options.test:
 			self.options.periodic_y = not self.options.horizontal
 			self.options.periodic_x = self.options.horizontal
 
@@ -61,12 +63,12 @@ class LPoiSim(lbm.LBMSim):
 				self.options.lat_w = 64
 				self.options.lat_h = 64
 				self.options.accel_x = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_h-1)**2)
-				self.add_iter_hook(499999, self.output_profile_horiz)
+				self.add_iter_hook(self.options.max_iters-1, self.output_profile_horiz)
 			else:
 				self.options.lat_w = 64
 				self.options.lat_h = 64
 				self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_w-1)**2)
-				self.add_iter_hook(499999, self.output_profile_vert)
+				self.add_iter_hook(self.options.max_iters-1, self.output_profile_vert)
 
 		self.add_iter_hook(1000, self.output_pars, every=True)
 
@@ -93,6 +95,6 @@ class LPoiSim(lbm.LBMSim):
 				)):
 			print i, x, y, z
 
-
-sim = LPoiSim(LBMGeoPoiseuille)
-sim.run()
+if __name__ == '__main__':
+	sim = LPoiSim(LBMGeoPoiseuille)
+	sim.run()
