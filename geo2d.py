@@ -13,14 +13,14 @@ class LBMGeo(object):
 
 	NODE_FLUID = 0
 	NODE_WALL = 1
-	NODE_VELOCITY = 5
-	NODE_PRESSURE = 6
+	NODE_VELOCITY = 6
+	NODE_PRESSURE = 7
 
 	# Internal constants.
-	_NODE_WALL_E = 1
-	_NODE_WALL_W = 2
-	_NODE_WALL_N = 3
-	_NODE_WALL_S = 4
+	_NODE_WALL_E = 2
+	_NODE_WALL_W = 3
+	_NODE_WALL_N = 4
+	_NODE_WALL_S = 5
 
 	def __init__(self, lat_w, lat_h, model, options, float):
 		self.lat_w = lat_w
@@ -104,13 +104,20 @@ class LBMGeo(object):
 		for x in range(0, self.lat_w):
 			for y in range(0, self.lat_h):
 				if self.map[y][x] == LBMGeo.NODE_WALL:
-					if y < self.lat_h-1 and self.map[y+1][x] == LBMGeo.NODE_FLUID:
+					# If the bool corresponding to a specific direction is True, the
+					# distributions in this direction are defined.
+					north = y < self.lat_h-1 and self.map[y+1][x] == LBMGeo.NODE_FLUID
+					south = y > 0 and self.map[y-1][x] == LBMGeo.NODE_FLUID
+					west  = x > 0 and self.map[y][x-1] == LBMGeo.NODE_FLUID
+					east  = x < self.lat_w-1 and self.map[x+1][y] == LBMGeo._NODE_WALL_E
+
+					if north and not west and not east:
 						self.map[y][x] = LBMGeo._NODE_WALL_N
-					elif y > 0 and self.map[y-1][x] == LBMGeo.NODE_FLUID:
+					elif south and not west and not east:
 						self.map[y][x] = LBMGeo._NODE_WALL_S
-					elif x > 0 and self.map[y][x-1] == LBMGeo.NODE_FLUID:
+					elif west and not south and not north:
 						self.map[y][x] = LBMGeo._NODE_WALL_W
-					elif x < self.lat_w-1 and self.map[x+1][y] == LBMGeo._NODE_WALL_E:
+					elif east and not south and not north:
 						self.map[y][x] = LBMGeo._NODE_WALL_E
 
 	def get_params(self):
@@ -135,11 +142,11 @@ class LBMGeo(object):
 		return ret
 
 	def get_defines(self):
-		return ('#define GEO_FLUID %d\n'
+		return ('#define GEO_FLUID %d\n#define GEO_WALL %d\n'
 				'#define GEO_WALL_E %d\n#define GEO_WALL_W %d\n'
 				'#define GEO_WALL_N %d\n#define GEO_WALL_S %d\n'
 				'#define GEO_BCV %d\n#define GEO_BCP %d\n' %
-				(LBMGeo.NODE_FLUID,
+				(LBMGeo.NODE_FLUID, LBMGeo.NODE_WALL,
 				 LBMGeo._NODE_WALL_E, LBMGeo._NODE_WALL_W,
 				 LBMGeo._NODE_WALL_N, LBMGeo._NODE_WALL_S,
 				 LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE + len(self._vel_map) - 1))

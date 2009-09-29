@@ -41,7 +41,7 @@ __device__ void inline getDist(Dist &dout, DistP din, int idx)
 }
 
 __device__ bool isWallNode(int type) {
-	return type >= GEO_WALL_E && type <= GEO_WALL_S;
+	return type >= GEO_WALL && type <= GEO_WALL_S;
 }
 
 //
@@ -54,6 +54,10 @@ __device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 	// the simulation grid) are undefined.
 	if (isWallNode(node_type)) {
 		switch (node_type) {
+		case GEO_WALL:
+			rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
+			break;
+
 		case GEO_WALL_E:
 			rho = 2.0 * (fi.fNE + fi.fE + fi.fSE) + fi.fC + fi.fS + fi.fN;
 			break;
