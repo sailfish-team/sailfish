@@ -126,7 +126,7 @@ class LBMSim(object):
 		ctx['lat_h'] = self.options.lat_h
 		ctx['lat_w'] = self.options.lat_w
 		ctx['num_params'] = len(self.geo_params)
-		ctx['relaxate'] = 'RELAX_%s' % self.options.model
+		ctx['model'] = self.options.model
 		ctx['periodic_x'] = int(self.options.periodic_x)
 		ctx['periodic_y'] = int(self.options.periodic_y)
 		ctx['dist_size'] = self.get_dist_size()

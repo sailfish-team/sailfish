@@ -1,13 +1,8 @@
 #define BLOCK_SIZE ${block_size}
-#define LAT_H ${lat_h}
-#define LAT_W ${lat_w}
 #define NUM_PARAMS ${num_params}
-#define RELAXATE ${relaxate}
 #define PERIODIC_X ${periodic_x}
 #define PERIODIC_Y ${periodic_y}
 #define DIST_SIZE ${dist_size}
-#define ext_accel_x ${ext_accel_x}
-#define ext_accel_y ${ext_accel_y}
 #define GEO_FLUID ${geo_fluid}
 #define GEO_WALL ${geo_wall}
 #define GEO_WALL_E ${geo_wall_e}
@@ -16,9 +11,6 @@
 #define GEO_WALL_N ${geo_wall_n}
 #define GEO_BCV ${geo_bcv}
 #define GEO_BCP ${geo_bcp}
-
-#define RELAX_bgk	BGK_relaxate(rho, v, fi, map[gi]);
-#define RELAX_mrt	MS_relaxate(fi, map[gi]);
 
 #define DT 1.0f
 
@@ -107,8 +99,8 @@ __device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 		}
 	}
 
-	v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / rho + 0.5f * ext_accel_x;
-	v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / rho + 0.5f * ext_accel_y;
+	v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / rho + 0.5f * ${ext_accel_x};
+	v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / rho + 0.5f * ${ext_accel_y};
 }
 
 //
@@ -135,13 +127,13 @@ __global__ void LBMUpdateTracerParticles(float *dist, int *map, float *x, float 
 	if (ix < 0)
 		ix = 0;
 
-	if (ix > LAT_W-1)
-		ix = LAT_W-1;
+	if (ix > ${lat_w-1})
+		ix = ${lat_w-1};
 
-	if (iy > LAT_H-1)
-		iy = LAT_H-1;
+	if (iy > ${lat_h-1})
+		iy = ${lat_h-1};
 
-	int dix = ix + LAT_W*iy;
+	int dix = ix + ${lat_w}*iy;
 
 	Dist fc;
 	getDist(fc, dist, dix);
@@ -151,17 +143,17 @@ __global__ void LBMUpdateTracerParticles(float *dist, int *map, float *x, float 
 	cy = cy + pv.y * DT;
 
 	// Periodic boundary conditions.
-	if (cx > LAT_W)
+	if (cx > ${lat_w})
 		cx = 0.0f;
 
-	if (cy > LAT_H)
+	if (cy > ${lat_h})
 		cy = 0.0f;
 
 	if (cx < 0.0f)
-		cx = (float)LAT_W;
+		cx = (float)${lat_w};
 
 	if (cy < 0.0f)
-		cy = (float)LAT_H;
+		cy = (float)${lat_h};
 
 	x[gi] = cx;
 	y[gi] = cy;
@@ -284,8 +276,8 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type
 
 	// External acceleration.
 	float pref = rho * (3.0f - 3.0f/(2.0f * tau));
-	#define eax ext_accel_x
-	#define eay ext_accel_y
+	#define eax ${ext_accel_x}
+	#define eay ${ext_accel_y}
 	float ue = eax*v.x + eay*v.y;
 
 	fi.fC += pref*(-ue) * 4.0f/9.0f;
@@ -306,7 +298,7 @@ __global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out
 {
 	int tix = threadIdx.x;
 	int ti = tix + blockIdx.x * blockDim.x;
-	int gi = ti + LAT_W*blockIdx.y;
+	int gi = ti + ${lat_w}*blockIdx.y;
 
 	// shared variables for in-block propagation
 	__shared__ float fo_E[BLOCK_SIZE];
@@ -353,7 +345,12 @@ __global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out
 		ovy[gi] = v.y;
 	}
 
-	RELAXATE;
+
+	% if model == 'bgk':
+		BGK_relaxate(rho, v, fi, map[gi]);
+	% else:
+		MS_relaxate(fi, map[gi]);
+	% endif
 
 	#define dir_fC 0
 	#define dir_fE 1
@@ -367,7 +364,7 @@ __global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out
 
 	#define dir_idx(idx) dir_##idx
 	#define set_odist(idx, dir, val) dist_out[DIST_SIZE*dir_idx(dir) + idx] = val
-	#define rel(x,y) ((x) + LAT_W*(y))
+	#define rel(x,y) ((x) + ${lat_w}*(y))
 
 	// update the 0-th direction distribution
 	set_odist(gi, fC, fi.fC);
@@ -378,17 +375,17 @@ __global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out
 		fo_NE[tix+1] = fi.fNE;
 		fo_SE[tix+1] = fi.fSE;
 	// E propagation in global memory (at right block boundary)
-	} else if (ti < LAT_W-1) {
+	} else if (ti < ${lat_w-1}) {
 		set_odist(gi+rel(1,0), fE, fi.fE);
 		if (blockIdx.y > 0)			set_odist(gi+rel(1,-1), fSE, fi.fSE);
-		else if (PERIODIC_Y)		set_odist(ti+LAT_W*(LAT_H-1)+1, fSE, fi.fSE);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+rel(1,1), fNE, fi.fNE);
+		else if (PERIODIC_Y)		set_odist(ti+${lat_w*(lat_h-1)+1}, fSE, fi.fSE);
+		if (blockIdx.y < ${lat_h-1})	set_odist(gi+rel(1,1), fNE, fi.fNE);
 		else if (PERIODIC_Y)		set_odist(ti+1, fNE, fi.fNE);
 	} else if (PERIODIC_X) {
-		set_odist(gi+rel(-LAT_W+1, 0), fE, fi.fE);
-		if (blockIdx.y > 0)			set_odist(gi+rel(-LAT_W+1,-1), fSE, fi.fSE);
-		else if (PERIODIC_Y)		set_odist(rel(0, LAT_H-1), fSE, fi.fSE);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+rel(-LAT_W+1,1), fNE, fi.fNE);
+		set_odist(gi+rel(${-lat_w+1}, 0), fE, fi.fE);
+		if (blockIdx.y > 0)			set_odist(gi+rel(${-lat_w+1},-1), fSE, fi.fSE);
+		else if (PERIODIC_Y)		set_odist(rel(0, ${lat_h-1}), fSE, fi.fSE);
+		if (blockIdx.y < ${lat_h-1})	set_odist(gi+rel(${-lat_w+1},1), fNE, fi.fNE);
 		else if (PERIODIC_Y)		set_odist(rel(0, 0), fNE, fi.fNE);
 	}
 
@@ -401,15 +398,15 @@ __global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out
 	} else if (ti > 0) {
 		set_odist(gi+rel(-1,0), fW, fi.fW);
 		if (blockIdx.y > 0)			set_odist(gi+rel(-1,-1), fSW, fi.fSW);
-		else if (PERIODIC_Y)		set_odist(ti+LAT_W*(LAT_H-1)-1, fSW, fi.fSW);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+rel(-1,1), fNW, fi.fNW);
+		else if (PERIODIC_Y)		set_odist(ti+${lat_w*(lat_h-1)-1}, fSW, fi.fSW);
+		if (blockIdx.y < ${lat_h-1})	set_odist(gi+rel(-1,1), fNW, fi.fNW);
 		else if (PERIODIC_Y)		set_odist(ti-1, fNW, fi.fNW);
 	} else if (PERIODIC_X) {
-		set_odist(gi+rel(LAT_W-1,0), fW, fi.fW);
-		if (blockIdx.y > 0)			set_odist(gi+rel(LAT_W-1,-1), fSW, fi.fSW);
-		else if (PERIODIC_Y)		set_odist(LAT_H*LAT_W-1, fSW, fi.fSW);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+rel(LAT_W-1,1), fNW, fi.fNW);
-		else if (PERIODIC_Y)		set_odist(LAT_W-1, fNW, fi.fNW);
+		set_odist(gi+rel(${lat_w-1},0), fW, fi.fW);
+		if (blockIdx.y > 0)			set_odist(gi+rel(${lat_w-1},-1), fSW, fi.fSW);
+		else if (PERIODIC_Y)		set_odist(${lat_h*lat_w-1}, fSW, fi.fSW);
+		if (blockIdx.y < ${lat_h-1})	set_odist(gi+rel(${lat_w-1},1), fNW, fi.fNW);
+		else if (PERIODIC_Y)		set_odist(${lat_w-1}, fNW, fi.fNW);
 	}
 
 	__syncthreads();
@@ -417,24 +414,24 @@ __global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out
 	// the leftmost thread is not updated in this block
 	if (tix > 0) {
 		set_odist(gi, fE, fo_E[tix]);
-		if (blockIdx.y > 0)			set_odist(gi-LAT_W, fSE, fo_SE[tix]);
-		else if (PERIODIC_Y)		set_odist(gi+LAT_W*(LAT_H-1), fSE, fo_SE[tix]);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fNE, fo_NE[tix]);
+		if (blockIdx.y > 0)			set_odist(gi-${lat_w}, fSE, fo_SE[tix]);
+		else if (PERIODIC_Y)		set_odist(gi+${lat_w*(lat_h-1)}, fSE, fo_SE[tix]);
+		if (blockIdx.y < ${lat_h-1})	set_odist(gi+${lat_w}, fNE, fo_NE[tix]);
 		else if (PERIODIC_Y)		set_odist(ti, fNE, fo_NE[tix]);
 	}
 
 	// N + S propagation (global memory)
-	if (blockIdx.y > 0)			set_odist(gi-LAT_W, fS, fi.fS);
-	else if (PERIODIC_Y)		set_odist(ti+LAT_W*(LAT_H-1), fS, fi.fS);
-	if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fN, fi.fN);
+	if (blockIdx.y > 0)			set_odist(gi-${lat_w}, fS, fi.fS);
+	else if (PERIODIC_Y)		set_odist(ti+${lat_w*(lat_h-1)}, fS, fi.fS);
+	if (blockIdx.y < ${lat_h-1})	set_odist(gi+${lat_w}, fN, fi.fN);
 	else if (PERIODIC_Y)		set_odist(ti, fN, fi.fN);
 
 	// the rightmost thread is not updated in this block
 	if (tix < blockDim.x-1) {
 		set_odist(gi, fW, fo_W[tix]);
-		if (blockIdx.y > 0)			set_odist(gi-LAT_W, fSW, fo_SW[tix]);
-		else if (PERIODIC_Y)		set_odist(gi+LAT_W*(LAT_H-1), fSW, fo_SW[tix]);
-		if (blockIdx.y < LAT_H-1)	set_odist(gi+LAT_W, fNW, fo_NW[tix]);
+		if (blockIdx.y > 0)			set_odist(gi-${lat_w}, fSW, fo_SW[tix]);
+		else if (PERIODIC_Y)		set_odist(gi+${lat_w*(lat_h-1)}, fSW, fo_SW[tix]);
+		if (blockIdx.y < ${lat_h-1})	set_odist(gi+${lat_w}, fNW, fo_NW[tix]);
 		else if (PERIODIC_Y)		set_odist(ti, fNW, fo_NW[tix]);
 	}
 }
