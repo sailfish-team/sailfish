@@ -1,13 +1,12 @@
 #!/usr/bin/python
 
-import pycuda.autoinit
-import pycuda.driver as cuda
 import math
 import numpy
 import sys
 import tables
 import time
 
+import backend_cuda
 import vis2d
 import geo2d
 
@@ -16,10 +15,21 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 
 from mako.template import Template
 
+backends = {'cuda': 'backend_cuda', 'opencl': 'backend_opencl'}
+
 def _convert_to_double(src):
 	import re
 	return re.sub('([0-9]+\.[0-9]*)f', '\\1', src.replace('float', 'double'))
 
+def get_backends():
+	global backends
+	ret = []
+
+	for k, v in backends.iteritems():
+		if v in sys.modules:
+			ret.append(k)
+
+	return ret
 
 class Values(optparse.Values):
 	def __init__(self, *args):
@@ -60,6 +70,7 @@ class LBMSim(object):
 		parser.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
 		parser.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat'], default='h5flat')
 		parser.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
+		parser.add_option('--backend', dest='backend', help='backend', type='choice', choices=get_backends(), default=get_backends()[0])
 
 		group = OptionGroup(parser, 'Simulation-specific options')
 		for option in misc_options:
@@ -75,6 +86,7 @@ class LBMSim(object):
 		self._mlups = 0.0
 		self._iter_hooks = {}
 		self._iter_hooks_every = {}
+		self.backend = sys.modules[backends[self.options.backend]].backend()
 
 		if not self._is_double_precision():
 			self.float = numpy.float32
@@ -115,12 +127,13 @@ class LBMSim(object):
 		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), self.float)
 
 		# Simulation geometry.
-		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h, self.options.model, self.options, self.float)
+		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h, self.options.model, self.options, self.float, self.backend)
 		self.geo.init_dist(self.dist)
 		self.geo_params = self.float(self.geo.get_params())
 
 		lbm_tmpl = Template(filename='lbm.mako')
 
+		self.tau = self.get_tau()
 		ctx = {}
 		ctx['block_size'] = self.block_size
 		ctx['lat_h'] = self.options.lat_h
@@ -132,6 +145,10 @@ class LBMSim(object):
 		ctx['dist_size'] = self.get_dist_size()
 		ctx['ext_accel_x'] = '((float)%.20ff)' % self.options.accel_x
 		ctx['ext_accel_y'] = '((float)%.20ff)' % self.options.accel_y
+		ctx['tau'] = self.tau
+		ctx['visc'] = self.float(self.options.visc)
+		ctx['backend'] = self.options.backend
+		ctx['geo_params'] = self.geo_params
 		ctx.update(self.geo.get_defines())
 
 		src = lbm_tmpl.render(**ctx)
@@ -144,53 +161,31 @@ class LBMSim(object):
 			print >>fsrc, src
 			fsrc.close()
 
-		self.mod = cuda.SourceModule(src, options=['--use_fast_math', '-Xptxas', '-v'])
-		self.lbm_cnp = self.mod.get_function('LBMCollideAndPropagate')
-		self.lbm_tracer = self.mod.get_function('LBMUpdateTracerParticles')
-
-		# Set the 'tau' parameter.
-		self.tau = self.get_tau()
-		self.gpu_tau = self.mod.get_global('tau')[0]
-		cuda.memcpy_htod(self.gpu_tau, self.tau)
-
-		self.gpu_visc = self.mod.get_global('visc')[0]
-		cuda.memcpy_htod(self.gpu_visc, self.float(self.options.visc))
-
-		self.gpu_geo_params = self.mod.get_global('geo_params')[0]
-		cuda.memcpy_htod(self.gpu_geo_params, self.geo_params)
+		self.mod = self.backend.build(src)
+		self.lbm_cnp = self.backend.get_kernel(self.mod, 'LBMCollideAndPropagate',
+					'P' * 6, block=(self.block_size,1,1),
+					shared=(self.block_size*6*numpy.dtype(self.float()).itemsize))
+		self.lbm_tracer = self.backend.get_kernel(self.mod, 'LBMUpdateTracerParticles',
+					'P' * 4, block=(self.options.tracers,1,1))
 
 	def _init_lbm(self):
 		# Velocity and density.
 		self.vx = numpy.zeros((self.options.lat_h, self.options.lat_w), self.float)
 		self.vy = numpy.zeros((self.options.lat_h, self.options.lat_w), self.float)
 		self.rho = numpy.zeros((self.options.lat_h, self.options.lat_w), self.float)
-		self.gpu_vx = cuda.mem_alloc(self.vx.size * self.vx.dtype.itemsize)
-		self.gpu_vy = cuda.mem_alloc(self.vy.size * self.vy.dtype.itemsize)
-		self.gpu_rho = cuda.mem_alloc(self.rho.size * self.rho.dtype.itemsize)
-		cuda.memcpy_htod(self.gpu_vx, self.vx)
-		cuda.memcpy_htod(self.gpu_vy, self.vy)
-		cuda.memcpy_htod(self.gpu_rho, self.rho)
-		cuda.memcpy_htod(self.gpu_rho, self.rho)
-		cuda.memcpy_htod(self.gpu_rho, self.rho)
+		self.gpu_vx = self.backend.alloc_buf(like=self.vx)
+		self.gpu_vy = self.backend.alloc_buf(like=self.vy)
+		self.gpu_rho = self.backend.alloc_buf(like=self.rho)
 
 		# Tracer particles.
 		self.tracer_x = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_w
 		self.tracer_y = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_h
-		self.gpu_tracer_x = cuda.mem_alloc(self.tracer_x.size * self.tracer_x.dtype.itemsize)
-		self.gpu_tracer_y = cuda.mem_alloc(self.tracer_y.size * self.tracer_y.dtype.itemsize)
-		cuda.memcpy_htod(self.gpu_tracer_x, self.tracer_x)
-		cuda.memcpy_htod(self.gpu_tracer_y, self.tracer_y)
+		self.gpu_tracer_x = self.backend.alloc_buf(like=self.tracer_x)
+		self.gpu_tracer_y = self.backend.alloc_buf(like=self.tracer_y)
 
 		# Particle distributions in device memory, A-B access pattern.
-		self.gpu_dist1 = cuda.mem_alloc(self.get_dist_size()*9*self.vx.dtype.itemsize)
-		self.gpu_dist2 = cuda.mem_alloc(self.get_dist_size()*9*self.vx.dtype.itemsize)
-
-		cuda.memcpy_htod(self.gpu_dist1, self.dist.flatten())
-		cuda.memcpy_htod(self.gpu_dist2, self.dist.flatten())
-
-		# Prepared calls to the kernel.
-		self.lbm_cnp.prepare('P' * 6, block=(self.block_size,1,1), shared=(self.block_size*6*numpy.dtype(self.float()).itemsize))
-		self.lbm_tracer.prepare('P' * 4, block=(self.options.tracers,1,1))
+		self.gpu_dist1 = self.backend.alloc_buf(like=self.dist)
+		self.gpu_dist2 = self.backend.alloc_buf(like=self.dist)
 
 		# Kernel arguments.
 		self.args_tracer2 = [self.gpu_dist1, self.geo.gpu_map, self.gpu_tracer_x, self.gpu_tracer_y]
@@ -213,22 +208,29 @@ class LBMSim(object):
 		kargs = self.args_map[i & 1]
 
 		if (not self.options.benchmark and i % self.options.every == 0) or get_data:
-			self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *kargs[1])
+			self.backend.run_kernel(self.lbm_cnp,
+						(self.options.lat_w/self.block_size, self.options.lat_h),
+						*kargs[1])
 			if tracers:
-				self.lbm_tracer.prepared_call((1,1), *kargs[2])
-				cuda.memcpy_dtoh(self.tracer_x, self.gpu_tracer_x)
-				cuda.memcpy_dtoh(self.tracer_y, self.gpu_tracer_y)
+				self.backend.run_kernel(self.lbm_tracer,
+						(1,1), *kargs[2])
+				self.backend.from_buf(self.gpu_tracer_x)
+				self.backend.from_buf(self.gpu_tracer_y)
 
-			cuda.memcpy_dtoh(self.vx, self.gpu_vx)
-			cuda.memcpy_dtoh(self.vy, self.gpu_vy)
-			cuda.memcpy_dtoh(self.rho, self.gpu_rho)
+			self.backend.from_buf(self.gpu_vx)
+			self.backend.from_buf(self.gpu_vy)
+			self.backend.from_buf(self.gpu_rho)
 
 			if self.options.output:
 				self._output_data(i)
 		else:
-			self.lbm_cnp.prepared_call((self.options.lat_w/self.block_size, self.options.lat_h), *kargs[0])
+			self.backend.run_kernel(self.lbm_cnp,
+						(self.options.lat_w/self.block_size, self.options.lat_h),
+						*kargs[0])
 			if tracers:
-				self.lbm_tracer.prepared_call((1,1), *kargs[2])
+				self.backend.run_kernel(self.lbm_tracer,
+						(1,1),
+						*kargs[2])
 
 	def get_mlups(self, tdiff, iters=None):
 		if iters is not None:
@@ -292,7 +294,7 @@ class LBMSim(object):
 				self.sim_step(self.iter, tracers=False)
 				self.iter += 1
 
-			cuda.Context.synchronize()
+			self.backend.sync()
 			t_now = time.time()
 			print self.iter,
 			print '%.2f %.2f' % self.get_mlups(t_now - t_prev, cycles)

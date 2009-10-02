@@ -6,6 +6,7 @@
   - make the CFD testcases automated (regtests)
   - implement the single-grid access pattern (50% space saving)
   - implement grid refinement
+  - add support for streamlines
 
 * D3Qx
   - implement basic BGK/MRT code for these lattices

@@ -1,5 +1,4 @@
 import numpy
-import pycuda.driver as cuda
 
 # Abstract class implementation, from Peter's Norvig site.
 def abstract():
@@ -22,13 +21,14 @@ class LBMGeo(object):
 	_NODE_WALL_N = 4
 	_NODE_WALL_S = 5
 
-	def __init__(self, lat_w, lat_h, model, options, float):
+	def __init__(self, lat_w, lat_h, model, options, float, backend):
 		self.lat_w = lat_w
 		self.lat_h = lat_h
 		self.model = model
 		self.options = options
+		self.backend = backend
 		self.map = numpy.zeros((lat_h, lat_w), numpy.int32)
-		self.gpu_map = cuda.mem_alloc(self.map.size * self.map.dtype.itemsize)
+		self.gpu_map = backend.alloc_buf(like=self.map)
 		self._vel_map = {}
 		self._pressure_map = {}
 		self._define_nodes()
@@ -60,7 +60,7 @@ class LBMGeo(object):
 		self.get_params()
 
 	def update_map(self):
-		cuda.memcpy_htod(self.gpu_map, self.map)
+		self.backend.to_buf(self.gpu_map, self.map)
 
 	def set_geo(self, x, y, type, val=None):
 		"""Set the type of a grid node.

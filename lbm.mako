@@ -1,5 +1,4 @@
 #define BLOCK_SIZE ${block_size}
-#define NUM_PARAMS ${num_params}
 #define PERIODIC_X ${periodic_x}
 #define PERIODIC_Y ${periodic_y}
 #define DIST_SIZE ${dist_size}
@@ -14,9 +13,13 @@
 
 #define DT 1.0f
 
-__constant__ float tau;			// relaxation time
-__constant__ float visc;		// viscosity
-__constant__ float geo_params[NUM_PARAMS];		// geometry parameters
+__constant__ float tau = ${tau};		// relaxation time
+__constant__ float visc = ${visc};		// viscosity
+__constant__ float geo_params[${num_params}] = {
+% for param in geo_params:
+	${param},
+% endfor
+};		// geometry parameters
 
 struct Dist {
 	float fC, fE, fW, fS, fN, fSE, fSW, fNE, fNW;
