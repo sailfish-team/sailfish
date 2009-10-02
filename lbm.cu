@@ -1,6 +1,6 @@
 // The following additional constants need to be defined:
 // LAT_H, LAT_W, BLOCK_SIZE, GEO_FLUID, GEO_WALL, GEO_BCV, GEO_BCP
-// NUM_PARAMS
+// NUM_PARAMS, DIST_SIZE
 
 #define RELAX_bgk	BGK_relaxate(rho, v, fi, map[gi]);
 #define RELAX_mrt	MS_relaxate(fi, map[gi]);
@@ -10,10 +10,6 @@
 __constant__ float tau;			// relaxation time
 __constant__ float visc;		// viscosity
 __constant__ float geo_params[NUM_PARAMS];		// geometry parameters
-
-struct DistP {
-	float *fC, *fE, *fW, *fS, *fN, *fSE, *fSW, *fNE, *fNW;
-};
 
 struct Dist {
 	float fC, fE, fW, fS, fN, fSE, fSW, fNE, fNW;
@@ -27,17 +23,17 @@ struct DistM {
 //
 // Copy the idx-th distribution from din into dout.
 //
-__device__ void inline getDist(Dist &dout, DistP din, int idx)
+__device__ void inline getDist(Dist &dout, float *din, int idx)
 {
-	dout.fC = din.fC[idx];
-	dout.fE = din.fE[idx];
-	dout.fW = din.fW[idx];
-	dout.fS = din.fS[idx];
-	dout.fN = din.fN[idx];
-	dout.fNE = din.fNE[idx];
-	dout.fNW = din.fNW[idx];
-	dout.fSE = din.fSE[idx];
-	dout.fSW = din.fSW[idx];
+	dout.fC = din[idx];
+	dout.fE = din[DIST_SIZE + idx];
+	dout.fW = din[DIST_SIZE*2 + idx];
+	dout.fS = din[DIST_SIZE*3 + idx];
+	dout.fN = din[DIST_SIZE*4 + idx];
+	dout.fSE = din[DIST_SIZE*5 + idx];
+	dout.fSW = din[DIST_SIZE*6 + idx];
+	dout.fNE = din[DIST_SIZE*7 + idx];
+	dout.fNW = din[DIST_SIZE*8 + idx];
 }
 
 __device__ bool isWallNode(int type) {
@@ -105,7 +101,7 @@ __device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 //
 // Each thread updates the position of a single particle using Euler's algorithm.
 //
-__global__ void LBMUpdateTracerParticles(DistP cd, int *map, float *x, float *y)
+__global__ void LBMUpdateTracerParticles(float *dist, int *map, float *x, float *y)
 {
 	float rho;
 	float2 pv;
@@ -133,7 +129,7 @@ __global__ void LBMUpdateTracerParticles(DistP cd, int *map, float *x, float *y)
 	int dix = ix + LAT_W*iy;
 
 	Dist fc;
-	getDist(fc, cd, dix);
+	getDist(fc, dist, dix);
 	getMacro(fc, map[dix], rho, pv);
 
 	cx = cx + pv.x * DT;
@@ -291,7 +287,7 @@ __device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type
 // TODO:
 // - try having dummy nodes as the edges of the lattice to avoid divergent threads
 
-__global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho, float *ovx, float *ovy)
+__global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out, float *orho, float *ovx, float *ovy)
 {
 	int tix = threadIdx.x;
 	int ti = tix + blockIdx.x * blockDim.x;
@@ -307,7 +303,7 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 
 	// cache the distribution in local variables
 	Dist fi;
-	getDist(fi, cd, gi);
+	getDist(fi, dist_in, gi);
 
 	int type = map[gi];
 
@@ -344,11 +340,22 @@ __global__ void LBMCollideAndPropagate(int *map, DistP cd, DistP od, float *orho
 
 	RELAXATE;
 
-	// update the 0-th direction distribution
-	od.fC[gi] = fi.fC;
+	#define dir_fC 0
+	#define dir_fE 1
+	#define dir_fW 2
+	#define dir_fS 3
+	#define dir_fN 4
+	#define dir_fSE 5
+	#define dir_fSW 6
+	#define dir_fNE 7
+	#define dir_fNW 8
 
-	#define set_odist(idx, dir, val) od.dir[idx] = val
+	#define dir_idx(idx) dir_##idx
+	#define set_odist(idx, dir, val) dist_out[DIST_SIZE*dir_idx(dir) + idx] = val
 	#define rel(x,y) ((x) + LAT_W*(y))
+
+	// update the 0-th direction distribution
+	set_odist(gi, fC, fi.fC);
 
 	// E propagation in shared memory
 	if (tix < blockDim.x-1) {

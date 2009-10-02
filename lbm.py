@@ -106,6 +106,9 @@ class LBMSim(object):
 	def get_tau(self):
 		return self.float((6.0 * self.options.visc + 1.0)/2.0)
 
+	def get_dist_size(self):
+		return self.options.lat_w * self.options.lat_h
+
 	def _init_code(self):
 		# Particle distributions in host memory.
 		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), self.float)
@@ -125,6 +128,7 @@ class LBMSim(object):
 		src = '#define ext_accel_x ((float)%.20ff)\n#define ext_accel_y ((float)%.20ff)\n' % (self.options.accel_x, self.options.accel_y) + src
 		src = '#define PERIODIC_X %d\n' % int(self.options.periodic_x) + src
 		src = '#define PERIODIC_Y %d\n' % int(self.options.periodic_y) + src
+		src = '#define DIST_SIZE %d\n' % self.get_dist_size() + src
 
 		if self._is_double_precision():
 			src = _convert_to_double(src)
@@ -172,31 +176,26 @@ class LBMSim(object):
 		cuda.memcpy_htod(self.gpu_tracer_y, self.tracer_y)
 
 		# Particle distributions in device memory, A-B access pattern.
-		self.gpu_dist1 = []
-		self.gpu_dist2 = []
-		for i in range(0, 9):
-			self.gpu_dist1.append(cuda.mem_alloc(self.vx.size * self.vx.dtype.itemsize))
-			self.gpu_dist2.append(cuda.mem_alloc(self.vx.size * self.vx.dtype.itemsize))
+		self.gpu_dist1 = cuda.mem_alloc(self.get_dist_size()*9*self.vx.dtype.itemsize)
+		self.gpu_dist2 = cuda.mem_alloc(self.get_dist_size()*9*self.vx.dtype.itemsize)
 
-		for i, gdist in enumerate(self.gpu_dist1):
-			cuda.memcpy_htod(gdist, self.dist[i])
-		for i, gdist in enumerate(self.gpu_dist2):
-			cuda.memcpy_htod(gdist, self.dist[i])
+		cuda.memcpy_htod(self.gpu_dist1, self.dist.flatten())
+		cuda.memcpy_htod(self.gpu_dist2, self.dist.flatten())
 
 		# Prepared calls to the kernel.
-		self.lbm_cnp.prepare('P' * (4+2*9), block=(self.block_size,1,1), shared=(self.block_size*6*numpy.dtype(self.float()).itemsize))
-		self.lbm_tracer.prepare('P' * (12), block=(self.options.tracers,1,1))
+		self.lbm_cnp.prepare('P' * 6, block=(self.block_size,1,1), shared=(self.block_size*6*numpy.dtype(self.float()).itemsize))
+		self.lbm_tracer.prepare('P' * 4, block=(self.options.tracers,1,1))
 
 		# Kernel arguments.
-		self.args_tracer2 = self.gpu_dist1 + [self.geo.gpu_map, self.gpu_tracer_x, self.gpu_tracer_y]
-		self.args_tracer1 = self.gpu_dist2 + [self.geo.gpu_map, self.gpu_tracer_x, self.gpu_tracer_y]
-		self.args1 = [self.geo.gpu_map] + self.gpu_dist1 + self.gpu_dist2 + [0,0,0]
-		self.args2 = [self.geo.gpu_map] + self.gpu_dist2 + self.gpu_dist1 + [0,0,0]
+		self.args_tracer2 = [self.gpu_dist1, self.geo.gpu_map, self.gpu_tracer_x, self.gpu_tracer_y]
+		self.args_tracer1 = [self.gpu_dist2, self.geo.gpu_map, self.gpu_tracer_x, self.gpu_tracer_y]
+		self.args1 = [self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, 0, 0, 0]
+		self.args2 = [self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, 0, 0, 0]
 
 		# Special argument list for the case where macroscopic quantities data is to be
 		# saved in global memory, i.e. a visualization step.
-		self.args1v = [self.geo.gpu_map] + self.gpu_dist1 + self.gpu_dist2 + [self.gpu_rho, self.gpu_vx, self.gpu_vy]
-		self.args2v = [self.geo.gpu_map] + self.gpu_dist2 + self.gpu_dist1 + [self.gpu_rho, self.gpu_vx, self.gpu_vy]
+		self.args1v = [self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, self.gpu_rho, self.gpu_vx, self.gpu_vy]
+		self.args2v = [self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho, self.gpu_vx, self.gpu_vy]
 
 		# Map: iteration parity -> kernel arguments to use.
 		self.args_map = {
