@@ -14,6 +14,7 @@ import geo2d
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
 
+from mako.template import Template
 
 def _convert_to_double(src):
 	import re
@@ -118,17 +119,22 @@ class LBMSim(object):
 		self.geo.init_dist(self.dist)
 		self.geo_params = self.float(self.geo.get_params())
 
-		fp = open('lbm.cu')
-		src = fp.read()
-		fp.close()
-		src = '#define BLOCK_SIZE %d\n#define LAT_H %d\n#define LAT_W %d\n' % (self.block_size, self.options.lat_h, self.options.lat_w) + src
-		src = self.geo.get_defines() + src
-		src = '#define RELAXATE RELAX_%s\n' % (self.options.model) + src
-		src = '#define NUM_PARAMS %d\n' % (len(self.geo_params)) + src
-		src = '#define ext_accel_x ((float)%.20ff)\n#define ext_accel_y ((float)%.20ff)\n' % (self.options.accel_x, self.options.accel_y) + src
-		src = '#define PERIODIC_X %d\n' % int(self.options.periodic_x) + src
-		src = '#define PERIODIC_Y %d\n' % int(self.options.periodic_y) + src
-		src = '#define DIST_SIZE %d\n' % self.get_dist_size() + src
+		lbm_tmpl = Template(filename='lbm.mako')
+
+		ctx = {}
+		ctx['block_size'] = self.block_size
+		ctx['lat_h'] = self.options.lat_h
+		ctx['lat_w'] = self.options.lat_w
+		ctx['num_params'] = len(self.geo_params)
+		ctx['relaxate'] = 'RELAX_%s' % self.options.model
+		ctx['periodic_x'] = int(self.options.periodic_x)
+		ctx['periodic_y'] = int(self.options.periodic_y)
+		ctx['dist_size'] = self.get_dist_size()
+		ctx['ext_accel_x'] = '((float)%.20ff)' % self.options.accel_x
+		ctx['ext_accel_y'] = '((float)%.20ff)' % self.options.accel_y
+		ctx.update(self.geo.get_defines())
+
+		src = lbm_tmpl.render(**ctx)
 
 		if self._is_double_precision():
 			src = _convert_to_double(src)

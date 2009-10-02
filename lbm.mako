@@ -1,6 +1,21 @@
-// The following additional constants need to be defined:
-// LAT_H, LAT_W, BLOCK_SIZE, GEO_FLUID, GEO_WALL, GEO_BCV, GEO_BCP
-// NUM_PARAMS, DIST_SIZE
+#define BLOCK_SIZE ${block_size}
+#define LAT_H ${lat_h}
+#define LAT_W ${lat_w}
+#define NUM_PARAMS ${num_params}
+#define RELAXATE ${relaxate}
+#define PERIODIC_X ${periodic_x}
+#define PERIODIC_Y ${periodic_y}
+#define DIST_SIZE ${dist_size}
+#define ext_accel_x ${ext_accel_x}
+#define ext_accel_y ${ext_accel_y}
+#define GEO_FLUID ${geo_fluid}
+#define GEO_WALL ${geo_wall}
+#define GEO_WALL_E ${geo_wall_e}
+#define GEO_WALL_W ${geo_wall_w}
+#define GEO_WALL_S ${geo_wall_s}
+#define GEO_WALL_N ${geo_wall_n}
+#define GEO_BCV ${geo_bcv}
+#define GEO_BCP ${geo_bcp}
 
 #define RELAX_bgk	BGK_relaxate(rho, v, fi, map[gi]);
 #define RELAX_mrt	MS_relaxate(fi, map[gi]);

@@ -142,11 +142,12 @@ class LBMGeo(object):
 		return ret
 
 	def get_defines(self):
-		return ('#define GEO_FLUID %d\n#define GEO_WALL %d\n'
-				'#define GEO_WALL_E %d\n#define GEO_WALL_W %d\n'
-				'#define GEO_WALL_N %d\n#define GEO_WALL_S %d\n'
-				'#define GEO_BCV %d\n#define GEO_BCP %d\n' %
-				(LBMGeo.NODE_FLUID, LBMGeo.NODE_WALL,
-				 LBMGeo._NODE_WALL_E, LBMGeo._NODE_WALL_W,
-				 LBMGeo._NODE_WALL_N, LBMGeo._NODE_WALL_S,
-				 LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE + len(self._vel_map) - 1))
+		return {'geo_fluid': LBMGeo.NODE_FLUID,
+				'geo_wall': LBMGeo.NODE_WALL,
+				'geo_wall_e': LBMGeo._NODE_WALL_E,
+				'geo_wall_w': LBMGeo._NODE_WALL_W,
+				'geo_wall_s': LBMGeo._NODE_WALL_S,
+				'geo_wall_n': LBMGeo._NODE_WALL_N,
+				'geo_bcv': LBMGeo.NODE_VELOCITY,
+				'geo_bcp': LBMGeo.NODE_PRESSURE + len(self._vel_map) - 1}
+

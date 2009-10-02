@@ -1,5 +1,4 @@
 * general
-  - use a template engine to generate CUDA code
   - switch to OpenCL once the NVIDIA implementation of OpenCL is stable and efficient
 
 * D2Q9

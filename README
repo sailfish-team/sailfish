@@ -25,6 +25,7 @@ Requirements:
  - pygame-1.8.1
  - pycuda-0.92
  - pytables-2.1.1
+ - mako-0.2.5
  - nvidia-drivers, nvidia-cuda-toolkit
 
 No installation is necessary, just run any of the executable .py files.
