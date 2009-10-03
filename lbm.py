@@ -150,6 +150,7 @@ class LBMSim(object):
 		ctx['backend'] = self.options.backend
 		ctx['geo_params'] = self.geo_params
 		ctx.update(self.geo.get_defines())
+		ctx.update(self.backend.get_defines())
 
 		src = lbm_tmpl.render(**ctx)
 

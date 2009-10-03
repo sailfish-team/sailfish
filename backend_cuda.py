@@ -48,4 +48,14 @@ class CUDABackend(object):
 	def sync(self):
 		cuda.Context.synchronize()
 
+	def get_defines(self):
+		return {
+			'shared_var': '__shared__',
+			'kernel': '__global__',
+			'global_ptr': '',
+			'const_ptr': '',
+			'device_func': '__device__'
+		}
+
+
 backend=CUDABackend

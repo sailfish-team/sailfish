@@ -30,10 +30,47 @@ typedef struct DistM {
 	float rho, en, ens, mx, ex, my, ey, sd, sod;
 } DistM;
 
+% if backend == 'cuda':
+
+// OpenCL compatibility code.
+__device__ int inline get_local_size(int i)
+{
+	if (i == 0) {
+		return blockDim.x;
+	} else {
+		return blockDim.y;
+	}
+}
+
+__device__ int inline get_group_id(int i)
+{
+	if (i == 0) {
+		return blockIdx.x;
+	} else {
+		return blockIdx.y;
+	}
+}
+
+__device__ int inline get_local_id(int i)
+{
+	if (i == 0) {
+		return threadIdx.x;
+	} else {
+		return threadIdx.y;
+	}
+}
+
+__device__ int inline get_global_id(int i)
+{
+	return threadIdx.x + blockIdx.x * blockDim.x;
+}
+
+% endif
+
 //
 // Copy the idx-th distribution from din into dout.
 //
-__device__ void inline getDist(Dist *dout, float *din, int idx)
+${device_func} void getDist(Dist *dout, ${global_ptr} float *din, int idx)
 {
 	dout->fC = din[idx];
 	dout->fE = din[DIST_SIZE + idx];
@@ -46,7 +83,7 @@ __device__ void inline getDist(Dist *dout, float *din, int idx)
 	dout->fNW = din[DIST_SIZE*8 + idx];
 }
 
-__device__ bool isWallNode(int type) {
+${device_func} bool isWallNode(int type) {
 	return type >= GEO_WALL && type <= GEO_WALL_S;
 }
 
@@ -54,7 +91,7 @@ __device__ bool isWallNode(int type) {
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
 //
-__device__ void inline getMacro(Dist fi, int node_type, float *rho, float *vx, float *vy)
+${device_func} void getMacro(Dist fi, int node_type, float *rho, float *vx, float *vy)
 {
 	// Wall nodes are special, as some distributions (those pointing out of
 	// the simulation grid) are undefined.
@@ -111,11 +148,12 @@ __device__ void inline getMacro(Dist fi, int node_type, float *rho, float *vx, f
 //
 // Each thread updates the position of a single particle using Euler's algorithm.
 //
-__global__ void LBMUpdateTracerParticles(float *dist, int *map, float *x, float *y)
+${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr} int *map,
+		${global_ptr} float *x, ${global_ptr} float *y)
 {
 	float rho, vx, vy;
 
-	int gi = threadIdx.x + blockDim.x * blockIdx.x;
+	int gi = get_global_id(0);
 	float cx = x[gi];
 	float cy = y[gi];
 
@@ -164,7 +202,7 @@ __global__ void LBMUpdateTracerParticles(float *dist, int *map, float *x, float 
 //
 // Relaxation in moment space.
 //
-__device__ void inline MS_relaxate(Dist *fi, int node_type)
+${device_func} void MS_relaxate(Dist *fi, int node_type)
 {
 	DistM fm, feq;
 
@@ -238,7 +276,7 @@ __device__ void inline MS_relaxate(Dist *fi, int node_type)
 // Performs the relaxation step in the BGK model given the density rho,
 // the velocity v and the distribution fi.
 //
-__device__ void inline BGK_relaxate(float rho, float vx, float vy, Dist *fi, int node_type)
+${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int node_type)
 {
 	// relaxation
 	float Cusq = -1.5f * (vx*vx + vy*vy);
@@ -296,19 +334,21 @@ __device__ void inline BGK_relaxate(float rho, float vx, float vy, Dist *fi, int
 // TODO:
 // - try having dummy nodes as the edges of the lattice to avoid divergent threads
 
-__global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out, float *orho, float *ovx, float *ovy)
+${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} float *dist_in,
+		${global_ptr} float *dist_out, ${global_ptr} float *orho, ${global_ptr} float *ovx,
+		${global_ptr} float *ovy)
 {
-	int tix = threadIdx.x;
-	int ti = tix + blockIdx.x * blockDim.x;
-	int gi = ti + ${lat_w}*blockIdx.y;
+	int tix = get_local_id(0);
+	int ti = get_global_id(0);
+	int gi = ti + ${lat_w}*get_group_id(1);
 
 	// shared variables for in-block propagation
-	__shared__ float fo_E[BLOCK_SIZE];
-	__shared__ float fo_W[BLOCK_SIZE];
-	__shared__ float fo_SE[BLOCK_SIZE];
-	__shared__ float fo_SW[BLOCK_SIZE];
-	__shared__ float fo_NE[BLOCK_SIZE];
-	__shared__ float fo_NW[BLOCK_SIZE];
+	${shared_var} float fo_E[BLOCK_SIZE];
+	${shared_var} float fo_W[BLOCK_SIZE];
+	${shared_var} float fo_SE[BLOCK_SIZE];
+	${shared_var} float fo_SW[BLOCK_SIZE];
+	${shared_var} float fo_NE[BLOCK_SIZE];
+	${shared_var} float fo_NW[BLOCK_SIZE];
 
 	// cache the distribution in local variables
 	Dist fi;
@@ -371,22 +411,22 @@ __global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out
 	set_odist(gi, fC, fi.fC);
 
 	// E propagation in shared memory
-	if (tix < blockDim.x-1) {
+	if (tix < get_local_size(0)-1) {
 		fo_E[tix+1] = fi.fE;
 		fo_NE[tix+1] = fi.fNE;
 		fo_SE[tix+1] = fi.fSE;
 	// E propagation in global memory (at right block boundary)
 	} else if (ti < ${lat_w-1}) {
 		set_odist(gi+rel(1,0), fE, fi.fE);
-		if (blockIdx.y > 0)			set_odist(gi+rel(1,-1), fSE, fi.fSE);
+		if (get_group_id(1) > 0)			set_odist(gi+rel(1,-1), fSE, fi.fSE);
 		else if (PERIODIC_Y)		set_odist(ti+${lat_w*(lat_h-1)+1}, fSE, fi.fSE);
-		if (blockIdx.y < ${lat_h-1})	set_odist(gi+rel(1,1), fNE, fi.fNE);
+		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(1,1), fNE, fi.fNE);
 		else if (PERIODIC_Y)		set_odist(ti+1, fNE, fi.fNE);
 	} else if (PERIODIC_X) {
 		set_odist(gi+rel(${-lat_w+1}, 0), fE, fi.fE);
-		if (blockIdx.y > 0)			set_odist(gi+rel(${-lat_w+1},-1), fSE, fi.fSE);
+		if (get_group_id(1) > 0)			set_odist(gi+rel(${-lat_w+1},-1), fSE, fi.fSE);
 		else if (PERIODIC_Y)		set_odist(rel(0, ${lat_h-1}), fSE, fi.fSE);
-		if (blockIdx.y < ${lat_h-1})	set_odist(gi+rel(${-lat_w+1},1), fNE, fi.fNE);
+		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(${-lat_w+1},1), fNE, fi.fNE);
 		else if (PERIODIC_Y)		set_odist(rel(0, 0), fNE, fi.fNE);
 	}
 
@@ -398,41 +438,45 @@ __global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out
 	// W propagation in global memory (at left block boundary)
 	} else if (ti > 0) {
 		set_odist(gi+rel(-1,0), fW, fi.fW);
-		if (blockIdx.y > 0)			set_odist(gi+rel(-1,-1), fSW, fi.fSW);
+		if (get_group_id(1) > 0)			set_odist(gi+rel(-1,-1), fSW, fi.fSW);
 		else if (PERIODIC_Y)		set_odist(ti+${lat_w*(lat_h-1)-1}, fSW, fi.fSW);
-		if (blockIdx.y < ${lat_h-1})	set_odist(gi+rel(-1,1), fNW, fi.fNW);
+		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(-1,1), fNW, fi.fNW);
 		else if (PERIODIC_Y)		set_odist(ti-1, fNW, fi.fNW);
 	} else if (PERIODIC_X) {
 		set_odist(gi+rel(${lat_w-1},0), fW, fi.fW);
-		if (blockIdx.y > 0)			set_odist(gi+rel(${lat_w-1},-1), fSW, fi.fSW);
+		if (get_group_id(1) > 0)			set_odist(gi+rel(${lat_w-1},-1), fSW, fi.fSW);
 		else if (PERIODIC_Y)		set_odist(${lat_h*lat_w-1}, fSW, fi.fSW);
-		if (blockIdx.y < ${lat_h-1})	set_odist(gi+rel(${lat_w-1},1), fNW, fi.fNW);
+		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(${lat_w-1},1), fNW, fi.fNW);
 		else if (PERIODIC_Y)		set_odist(${lat_w-1}, fNW, fi.fNW);
 	}
 
+% if backend == 'cuda':
 	__syncthreads();
+% else:
+	barrier(CLK_LOCAL_MEM_FENCE);
+% endif
 
 	// the leftmost thread is not updated in this block
 	if (tix > 0) {
 		set_odist(gi, fE, fo_E[tix]);
-		if (blockIdx.y > 0)			set_odist(gi-${lat_w}, fSE, fo_SE[tix]);
+		if (get_group_id(1) > 0)			set_odist(gi-${lat_w}, fSE, fo_SE[tix]);
 		else if (PERIODIC_Y)		set_odist(gi+${lat_w*(lat_h-1)}, fSE, fo_SE[tix]);
-		if (blockIdx.y < ${lat_h-1})	set_odist(gi+${lat_w}, fNE, fo_NE[tix]);
+		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+${lat_w}, fNE, fo_NE[tix]);
 		else if (PERIODIC_Y)		set_odist(ti, fNE, fo_NE[tix]);
 	}
 
 	// N + S propagation (global memory)
-	if (blockIdx.y > 0)			set_odist(gi-${lat_w}, fS, fi.fS);
+	if (get_group_id(1) > 0)			set_odist(gi-${lat_w}, fS, fi.fS);
 	else if (PERIODIC_Y)		set_odist(ti+${lat_w*(lat_h-1)}, fS, fi.fS);
-	if (blockIdx.y < ${lat_h-1})	set_odist(gi+${lat_w}, fN, fi.fN);
+	if (get_group_id(1) < ${lat_h-1})	set_odist(gi+${lat_w}, fN, fi.fN);
 	else if (PERIODIC_Y)		set_odist(ti, fN, fi.fN);
 
 	// the rightmost thread is not updated in this block
-	if (tix < blockDim.x-1) {
+	if (tix < get_local_size(0)-1) {
 		set_odist(gi, fW, fo_W[tix]);
-		if (blockIdx.y > 0)			set_odist(gi-${lat_w}, fSW, fo_SW[tix]);
+		if (get_group_id(1) > 0)			set_odist(gi-${lat_w}, fSW, fo_SW[tix]);
 		else if (PERIODIC_Y)		set_odist(gi+${lat_w*(lat_h-1)}, fSW, fo_SW[tix]);
-		if (blockIdx.y < ${lat_h-1})	set_odist(gi+${lat_w}, fNW, fo_NW[tix]);
+		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+${lat_w}, fNW, fo_NW[tix]);
 		else if (PERIODIC_Y)		set_odist(ti, fNW, fo_NW[tix]);
 	}
 }
