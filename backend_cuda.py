@@ -1,5 +1,23 @@
 import pycuda.autoinit
+from struct import calcsize, pack
+
 import pycuda.driver as cuda
+
+def _expand_block(block):
+	if block is int:
+		return (block, 1, 1)
+	elif len(block) == 1:
+		return (block[0], 1, 1)
+	elif len(block) == 2:
+		return (block[0], block[1], 1)
+	else:
+		return block
+
+def _expand_grid(grid):
+	if len(grid) == 1:
+		return (grid[0], 1)
+	else:
+		return grid
 
 class CUDABackend(object):
 
@@ -37,13 +55,18 @@ class CUDABackend(object):
 	def build(self, source):
 		return cuda.SourceModule(source, options=['--use_fast_math', '-Xptxas', '-v'])
 
-	def get_kernel(self, prog, name, args, block, shared=None):
+	def get_kernel(self, prog, name, block, args, args_format, shared=None):
 		kern = prog.get_function(name)
-		kern.prepare(args, block=block, shared=shared)
+		kern.param_set_size(calcsize(args_format))
+		setattr(kern, 'args', (args, args_format))
+		kern.set_block_shape(*_expand_block(block))
+		if shared is not None:
+			kern.set_shared_size(shared)
 		return kern
 
-	def run_kernel(self, kernel, grid, *args):
-		kernel.prepared_call(grid, *args)
+	def run_kernel(self, kernel, grid_size):
+		kernel.param_setv(0, pack(kernel.args[1], *kernel.args[0]))
+		kernel.launch_grid(*_expand_grid(grid_size))
 
 	def sync(self):
 		cuda.Context.synchronize()
@@ -54,7 +77,8 @@ class CUDABackend(object):
 			'kernel': '__global__',
 			'global_ptr': '',
 			'const_ptr': '',
-			'device_func': '__device__'
+			'device_func': '__device__',
+			'const_var': '__constant__',
 		}
 
 

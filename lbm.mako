@@ -13,9 +13,9 @@
 
 #define DT 1.0f
 
-__constant__ float tau = ${tau};		// relaxation time
-__constant__ float visc = ${visc};		// viscosity
-__constant__ float geo_params[${num_params}] = {
+${const_var} float tau = ${tau};		// relaxation time
+${const_var} float visc = ${visc};		// viscosity
+${const_var} float geo_params[${num_params}] = {
 % for param in geo_params:
 	${param},
 % endfor
@@ -336,7 +336,7 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 
 ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} float *dist_in,
 		${global_ptr} float *dist_out, ${global_ptr} float *orho, ${global_ptr} float *ovx,
-		${global_ptr} float *ovy)
+		${global_ptr} float *ovy, int save_macro)
 {
 	int tix = get_local_id(0);
 	int ti = get_global_id(0);
@@ -380,7 +380,7 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	getMacro(fi, type, &rho, &vx, &vy);
 
 	// only save the macroscopic quantities if requested to do so
-	if (orho != NULL) {
+	if (save_macro == 1) {
 		orho[gi] = rho;
 		ovx[gi] = vx;
 		ovy[gi] = vy;

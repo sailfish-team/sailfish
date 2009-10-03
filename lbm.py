@@ -7,6 +7,7 @@ import tables
 import time
 
 import backend_cuda
+import backend_opencl
 import vis2d
 import geo2d
 
@@ -88,6 +89,8 @@ class LBMSim(object):
 		self._iter_hooks_every = {}
 		self.backend = sys.modules[backends[self.options.backend]].backend()
 
+		print 'Using the "%s" backend.' % self.options.backend
+
 		if not self._is_double_precision():
 			self.float = numpy.float32
 		else:
@@ -163,11 +166,6 @@ class LBMSim(object):
 			fsrc.close()
 
 		self.mod = self.backend.build(src)
-		self.lbm_cnp = self.backend.get_kernel(self.mod, 'LBMCollideAndPropagate',
-					'P' * 6, block=(self.block_size,1,1),
-					shared=(self.block_size*6*numpy.dtype(self.float()).itemsize))
-		self.lbm_tracer = self.backend.get_kernel(self.mod, 'LBMUpdateTracerParticles',
-					'P' * 4, block=(self.options.tracers,1,1))
 
 	def _init_lbm(self):
 		# Velocity and density.
@@ -189,32 +187,65 @@ class LBMSim(object):
 		self.gpu_dist2 = self.backend.alloc_buf(like=self.dist)
 
 		# Kernel arguments.
-		self.args_tracer2 = [self.gpu_dist1, self.geo.gpu_map, self.gpu_tracer_x, self.gpu_tracer_y]
-		self.args_tracer1 = [self.gpu_dist2, self.geo.gpu_map, self.gpu_tracer_x, self.gpu_tracer_y]
-		self.args1 = [self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, 0, 0, 0]
-		self.args2 = [self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, 0, 0, 0]
+		args_tracer2 = [self.gpu_dist1, self.geo.gpu_map, self.gpu_tracer_x, self.gpu_tracer_y]
+		args_tracer1 = [self.gpu_dist2, self.geo.gpu_map, self.gpu_tracer_x, self.gpu_tracer_y]
+		args1 = [self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, self.gpu_rho, self.gpu_vx, self.gpu_vy, numpy.uint32(0)]
+		args2 = [self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho, self.gpu_vx, self.gpu_vy, numpy.uint32(0)]
 
 		# Special argument list for the case where macroscopic quantities data is to be
 		# saved in global memory, i.e. a visualization step.
-		self.args1v = [self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, self.gpu_rho, self.gpu_vx, self.gpu_vy]
-		self.args2v = [self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho, self.gpu_vx, self.gpu_vy]
+		args1v = [self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, self.gpu_rho, self.gpu_vx, self.gpu_vy, numpy.uint32(1)]
+		args2v = [self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho, self.gpu_vx, self.gpu_vy, numpy.uint32(1)]
+
+		kern_cnp1 = self.backend.get_kernel(self.mod,
+					'LBMCollideAndPropagate',
+					args=args1,
+					args_format='P'*6+'I',
+					block=(self.block_size,1),
+					shared=(self.block_size*6*numpy.dtype(self.float()).itemsize))
+		kern_cnp2 = self.backend.get_kernel(self.mod,
+					'LBMCollideAndPropagate',
+					args=args2,
+					args_format='P'*6+'I',
+					block=(self.block_size,1),
+					shared=(self.block_size*6*numpy.dtype(self.float()).itemsize))
+		kern_cnp1s = self.backend.get_kernel(self.mod,
+					'LBMCollideAndPropagate',
+					args=args1v,
+					args_format='P'*6+'I',
+					block=(self.block_size,1),
+					shared=(self.block_size*6*numpy.dtype(self.float()).itemsize))
+		kern_cnp2s = self.backend.get_kernel(self.mod,
+					'LBMCollideAndPropagate',
+					args=args2v,
+					args_format='P'*6+'I',
+					block=(self.block_size,1),
+					shared=(self.block_size*6*numpy.dtype(self.float()).itemsize))
+		kern_trac1 = self.backend.get_kernel(self.mod,
+					'LBMUpdateTracerParticles',
+					args=args_tracer1,
+					args_format='P'*4,
+					block=(1,))
+		kern_trac2 = self.backend.get_kernel(self.mod,
+					'LBMUpdateTracerParticles',
+					args=args_tracer2,
+					args_format='P'*4,
+					block=(1,))
 
 		# Map: iteration parity -> kernel arguments to use.
-		self.args_map = {
-			0: (self.args1, self.args1v, self.args_tracer1),
-			1: (self.args2, self.args2v, self.args_tracer2),
+		self.kern_map = {
+			0: (kern_cnp1, kern_cnp1s, kern_trac1),
+			1: (kern_cnp2, kern_cnp2s, kern_trac2),
 		}
 
 	def sim_step(self, i, tracers=True, get_data=False):
-		kargs = self.args_map[i & 1]
+		kerns = self.kern_map[i & 1]
 
 		if (not self.options.benchmark and i % self.options.every == 0) or get_data:
-			self.backend.run_kernel(self.lbm_cnp,
-						(self.options.lat_w/self.block_size, self.options.lat_h),
-						*kargs[1])
+			self.backend.run_kernel(kerns[1],
+						(self.options.lat_w/self.block_size, self.options.lat_h))
 			if tracers:
-				self.backend.run_kernel(self.lbm_tracer,
-						(1,1), *kargs[2])
+				self.backend.run_kernel(kerns[2], (self.options.tracers,))
 				self.backend.from_buf(self.gpu_tracer_x)
 				self.backend.from_buf(self.gpu_tracer_y)
 
@@ -225,13 +256,10 @@ class LBMSim(object):
 			if self.options.output:
 				self._output_data(i)
 		else:
-			self.backend.run_kernel(self.lbm_cnp,
-						(self.options.lat_w/self.block_size, self.options.lat_h),
-						*kargs[0])
+			self.backend.run_kernel(kerns[0],
+						(self.options.lat_w/self.block_size, self.options.lat_h))
 			if tracers:
-				self.backend.run_kernel(self.lbm_tracer,
-						(1,1),
-						*kargs[2])
+				self.backend.run_kernel(kerns[2], (self.options.tracers,))
 
 	def get_mlups(self, tdiff, iters=None):
 		if iters is not None:
