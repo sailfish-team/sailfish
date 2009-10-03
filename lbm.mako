@@ -21,29 +21,29 @@ __constant__ float geo_params[${num_params}] = {
 % endfor
 };		// geometry parameters
 
-struct Dist {
+typedef struct Dist {
 	float fC, fE, fW, fS, fN, fSE, fSW, fNE, fNW;
-};
+} Dist;
 
 // Distribution in momentum space.
-struct DistM {
+typedef struct DistM {
 	float rho, en, ens, mx, ex, my, ey, sd, sod;
-};
+} DistM;
 
 //
 // Copy the idx-th distribution from din into dout.
 //
-__device__ void inline getDist(Dist &dout, float *din, int idx)
+__device__ void inline getDist(Dist *dout, float *din, int idx)
 {
-	dout.fC = din[idx];
-	dout.fE = din[DIST_SIZE + idx];
-	dout.fW = din[DIST_SIZE*2 + idx];
-	dout.fS = din[DIST_SIZE*3 + idx];
-	dout.fN = din[DIST_SIZE*4 + idx];
-	dout.fSE = din[DIST_SIZE*5 + idx];
-	dout.fSW = din[DIST_SIZE*6 + idx];
-	dout.fNE = din[DIST_SIZE*7 + idx];
-	dout.fNW = din[DIST_SIZE*8 + idx];
+	dout->fC = din[idx];
+	dout->fE = din[DIST_SIZE + idx];
+	dout->fW = din[DIST_SIZE*2 + idx];
+	dout->fS = din[DIST_SIZE*3 + idx];
+	dout->fN = din[DIST_SIZE*4 + idx];
+	dout->fSE = din[DIST_SIZE*5 + idx];
+	dout->fSW = din[DIST_SIZE*6 + idx];
+	dout->fNE = din[DIST_SIZE*7 + idx];
+	dout->fNW = din[DIST_SIZE*8 + idx];
 }
 
 __device__ bool isWallNode(int type) {
@@ -54,56 +54,56 @@ __device__ bool isWallNode(int type) {
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
 //
-__device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
+__device__ void inline getMacro(Dist fi, int node_type, float *rho, float *vx, float *vy)
 {
 	// Wall nodes are special, as some distributions (those pointing out of
 	// the simulation grid) are undefined.
 	if (isWallNode(node_type)) {
 		switch (node_type) {
 		case GEO_WALL:
-			rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
+			*rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
 			break;
 
 		case GEO_WALL_E:
-			rho = 2.0 * (fi.fNE + fi.fE + fi.fSE) + fi.fC + fi.fS + fi.fN;
+			*rho = 2.0 * (fi.fNE + fi.fE + fi.fSE) + fi.fC + fi.fS + fi.fN;
 			break;
 
 		case GEO_WALL_W:
-			rho = 2.0 * (fi.fNW + fi.fSW + fi.fW) + fi.fC + fi.fS + fi.fN;
+			*rho = 2.0 * (fi.fNW + fi.fSW + fi.fW) + fi.fC + fi.fS + fi.fN;
 			break;
 
 		case GEO_WALL_S:
-			rho = 2.0 * (fi.fSW + fi.fS + fi.fSE) + fi.fC + fi.fE + fi.fW;
+			*rho = 2.0 * (fi.fSW + fi.fS + fi.fSE) + fi.fC + fi.fE + fi.fW;
 			break;
 
 		case GEO_WALL_N:
-			rho = 2.0 * (fi.fNW + fi.fN + fi.fNE) + fi.fC + fi.fE + fi.fW;
+			*rho = 2.0 * (fi.fNW + fi.fN + fi.fNE) + fi.fC + fi.fE + fi.fW;
 			break;
 		}
 
-		v.x = 0.0f;
-		v.y = 0.0f;
+		*vx = 0.0f;
+		*vy = 0.0f;
 		return;
 	}
 
-	rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
+	*rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
 	if (node_type >= GEO_BCV) {
 		// Velocity boundary condition.
 		if (node_type < GEO_BCP) {
 			int idx = (node_type - GEO_BCV) * 2;
-			v.x = geo_params[idx];
-			v.y = geo_params[idx+1];
+			*vx = geo_params[idx];
+			*vy = geo_params[idx+1];
 			return;
 		// Pressure boundary condition.
 		} else {
 			// c_s^2 = 1/3, P/c_s^2 = rho
 			int idx = (GEO_BCP-GEO_BCV) * 2 + (node_type - GEO_BCP);
-			rho = geo_params[idx] * 3.0f;
+			*rho = geo_params[idx] * 3.0f;
 		}
 	}
 
-	v.x = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / rho + 0.5f * ${ext_accel_x};
-	v.y = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / rho + 0.5f * ${ext_accel_y};
+	*vx = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / *rho + 0.5f * ${ext_accel_x};
+	*vy = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / *rho + 0.5f * ${ext_accel_y};
 }
 
 //
@@ -113,8 +113,7 @@ __device__ void inline getMacro(Dist fi, int node_type, float &rho, float2 &v)
 //
 __global__ void LBMUpdateTracerParticles(float *dist, int *map, float *x, float *y)
 {
-	float rho;
-	float2 pv;
+	float rho, vx, vy;
 
 	int gi = threadIdx.x + blockDim.x * blockIdx.x;
 	float cx = x[gi];
@@ -139,11 +138,11 @@ __global__ void LBMUpdateTracerParticles(float *dist, int *map, float *x, float 
 	int dix = ix + ${lat_w}*iy;
 
 	Dist fc;
-	getDist(fc, dist, dix);
-	getMacro(fc, map[dix], rho, pv);
+	getDist(&fc, dist, dix);
+	getMacro(fc, map[dix], &rho, &vx, &vy);
 
-	cx = cx + pv.x * DT;
-	cy = cy + pv.y * DT;
+	cx = cx + vx * DT;
+	cy = cy + vy * DT;
 
 	// Periodic boundary conditions.
 	if (cx > ${lat_w})
@@ -165,19 +164,19 @@ __global__ void LBMUpdateTracerParticles(float *dist, int *map, float *x, float 
 //
 // Relaxation in moment space.
 //
-__device__ void inline MS_relaxate(Dist &fi, int node_type)
+__device__ void inline MS_relaxate(Dist *fi, int node_type)
 {
 	DistM fm, feq;
 
-	fm.rho = 1.0f*fi.fC + 1.0f*fi.fE + 1.0f*fi.fN + 1.0f*fi.fW + 1.0f*fi.fS + 1.0f*fi.fNE + 1.0f*fi.fNW + 1.0f*fi.fSW + 1.0f*fi.fSE;
-	fm.en = -4.0f*fi.fC - 1.0f*fi.fE - 1.0f*fi.fN - 1.0f*fi.fW - 1.0f*fi.fS + 2.0f*fi.fNE + 2.0f*fi.fNW + 2.0f*fi.fSW + 2.0f*fi.fSE;
-	fm.ens = 4.0f*fi.fC - 2.0f*fi.fE - 2.0f*fi.fN - 2.0f*fi.fW - 2.0f*fi.fS + 1.0f*fi.fNE + 1.0f*fi.fNW + 1.0f*fi.fSW + 1.0f*fi.fSE;
-	fm.mx =  0.0f*fi.fC + 1.0f*fi.fE + 0.0f*fi.fN - 1.0f*fi.fW + 0.0f*fi.fS + 1.0f*fi.fNE - 1.0f*fi.fNW - 1.0f*fi.fSW + 1.0f*fi.fSE;
-	fm.ex =  0.0f*fi.fC - 2.0f*fi.fE + 0.0f*fi.fN + 2.0f*fi.fW + 0.0f*fi.fS + 1.0f*fi.fNE - 1.0f*fi.fNW - 1.0f*fi.fSW + 1.0f*fi.fSE;
-	fm.my =  0.0f*fi.fC + 0.0f*fi.fE + 1.0f*fi.fN + 0.0f*fi.fW - 1.0f*fi.fS + 1.0f*fi.fNE + 1.0f*fi.fNW - 1.0f*fi.fSW - 1.0f*fi.fSE;
-	fm.ey =  0.0f*fi.fC + 0.0f*fi.fE - 2.0f*fi.fN + 0.0f*fi.fW + 2.0f*fi.fS + 1.0f*fi.fNE + 1.0f*fi.fNW - 1.0f*fi.fSW - 1.0f*fi.fSE;
-	fm.sd =  0.0f*fi.fC + 1.0f*fi.fE - 1.0f*fi.fN + 1.0f*fi.fW - 1.0f*fi.fS + 0.0f*fi.fNE + 0.0f*fi.fNW + 0.0f*fi.fSW - 0.0f*fi.fSE;
-	fm.sod = 0.0f*fi.fC + 0.0f*fi.fE + 0.0f*fi.fN + 0.0f*fi.fW + 0.0f*fi.fS + 1.0f*fi.fNE - 1.0f*fi.fNW + 1.0f*fi.fSW - 1.0f*fi.fSE;
+	fm.rho = 1.0f*fi->fC + 1.0f*fi->fE + 1.0f*fi->fN + 1.0f*fi->fW + 1.0f*fi->fS + 1.0f*fi->fNE + 1.0f*fi->fNW + 1.0f*fi->fSW + 1.0f*fi->fSE;
+	fm.en = -4.0f*fi->fC - 1.0f*fi->fE - 1.0f*fi->fN - 1.0f*fi->fW - 1.0f*fi->fS + 2.0f*fi->fNE + 2.0f*fi->fNW + 2.0f*fi->fSW + 2.0f*fi->fSE;
+	fm.ens = 4.0f*fi->fC - 2.0f*fi->fE - 2.0f*fi->fN - 2.0f*fi->fW - 2.0f*fi->fS + 1.0f*fi->fNE + 1.0f*fi->fNW + 1.0f*fi->fSW + 1.0f*fi->fSE;
+	fm.mx =  0.0f*fi->fC + 1.0f*fi->fE + 0.0f*fi->fN - 1.0f*fi->fW + 0.0f*fi->fS + 1.0f*fi->fNE - 1.0f*fi->fNW - 1.0f*fi->fSW + 1.0f*fi->fSE;
+	fm.ex =  0.0f*fi->fC - 2.0f*fi->fE + 0.0f*fi->fN + 2.0f*fi->fW + 0.0f*fi->fS + 1.0f*fi->fNE - 1.0f*fi->fNW - 1.0f*fi->fSW + 1.0f*fi->fSE;
+	fm.my =  0.0f*fi->fC + 0.0f*fi->fE + 1.0f*fi->fN + 0.0f*fi->fW - 1.0f*fi->fS + 1.0f*fi->fNE + 1.0f*fi->fNW - 1.0f*fi->fSW - 1.0f*fi->fSE;
+	fm.ey =  0.0f*fi->fC + 0.0f*fi->fE - 2.0f*fi->fN + 0.0f*fi->fW + 2.0f*fi->fS + 1.0f*fi->fNE + 1.0f*fi->fNW - 1.0f*fi->fSW - 1.0f*fi->fSE;
+	fm.sd =  0.0f*fi->fC + 1.0f*fi->fE - 1.0f*fi->fN + 1.0f*fi->fW - 1.0f*fi->fS + 0.0f*fi->fNE + 0.0f*fi->fNW + 0.0f*fi->fSW - 0.0f*fi->fSE;
+	fm.sod = 0.0f*fi->fC + 0.0f*fi->fE + 0.0f*fi->fN + 0.0f*fi->fW + 0.0f*fi->fS + 1.0f*fi->fNE - 1.0f*fi->fNW + 1.0f*fi->fSW - 1.0f*fi->fSE;
 
 	if (node_type >= GEO_BCV) {
 		// Velocity boundary condition.
@@ -220,18 +219,18 @@ __device__ void inline MS_relaxate(Dist &fi, int node_type)
 		fm.sod = feq.sod;
 	}
 
-	fi.fC  = (1.0f/9.0f)*fm.rho - (1.0f/9.0f)*fm.en + (1.0f/9.0f)*fm.ens;
-	fi.fE  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.mx - (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
-	fi.fN  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.my - (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
-	fi.fW  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.mx + (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
-	fi.fS  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.my + (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
-	fi.fNE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+	fi->fC  = (1.0f/9.0f)*fm.rho - (1.0f/9.0f)*fm.en + (1.0f/9.0f)*fm.ens;
+	fi->fE  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.mx - (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
+	fi->fN  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.my - (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
+	fi->fW  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.mx + (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
+	fi->fS  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.my + (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
+	fi->fNE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
 			 +(1.0f/6.0f)*fm.mx + (1.0f/12.0f)*fm.ex + (1.0f/6.0f)*fm.my + (1.0f/12.0f)*fm.ey + 0.25f*fm.sod;
-	fi.fNW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+	fi->fNW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
 			 -(1.0f/6.0f)*fm.mx - (1.0f/12.0f)*fm.ex + (1.0f/6.0f)*fm.my + (1.0f/12.0f)*fm.ey - 0.25f*fm.sod;
-	fi.fSW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+	fi->fSW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
 			 -(1.0f/6.0f)*fm.mx - (1.0f/12.0f)*fm.ex - (1.0f/6.0f)*fm.my - (1.0f/12.0f)*fm.ey + 0.25f*fm.sod;
-	fi.fSE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
+	fi->fSE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
 			 +(1.0f/6.0f)*fm.mx + (1.0f/12.0f)*fm.ex - (1.0f/6.0f)*fm.my - (1.0f/12.0f)*fm.ey - 0.25f*fm.sod;
 }
 
@@ -239,59 +238,59 @@ __device__ void inline MS_relaxate(Dist &fi, int node_type)
 // Performs the relaxation step in the BGK model given the density rho,
 // the velocity v and the distribution fi.
 //
-__device__ void inline BGK_relaxate(float rho, float2 v, Dist &fi, int node_type)
+__device__ void inline BGK_relaxate(float rho, float vx, float vy, Dist *fi, int node_type)
 {
 	// relaxation
-	float Cusq = -1.5f * (v.x*v.x + v.y*v.y);
+	float Cusq = -1.5f * (vx*vx + vy*vy);
 	Dist feq;
 
 	feq.fC = rho * (1.0f + Cusq) * 4.0f/9.0f;
-	feq.fN = rho * (1.0f + Cusq + 3.0f*v.y + 4.5f*v.y*v.y) / 9.0f;
-	feq.fE = rho * (1.0f + Cusq + 3.0f*v.x + 4.5f*v.x*v.x) / 9.0f;
-	feq.fS = rho * (1.0f + Cusq - 3.0f*v.y + 4.5f*v.y*v.y) / 9.0f;
-	feq.fW = rho * (1.0f + Cusq - 3.0f*v.x + 4.5f*v.x*v.x) / 9.0f;
-	feq.fNE = rho * (1.0f + Cusq + 3.0f*(v.x+v.y) + 4.5f*(v.x+v.y)*(v.x+v.y)) / 36.0f;
-	feq.fSE = rho * (1.0f + Cusq + 3.0f*(v.x-v.y) + 4.5f*(v.x-v.y)*(v.x-v.y)) / 36.0f;
-	feq.fSW = rho * (1.0f + Cusq + 3.0f*(-v.x-v.y) + 4.5f*(v.x+v.y)*(v.x+v.y)) / 36.0f;
-	feq.fNW = rho * (1.0f + Cusq + 3.0f*(-v.x+v.y) + 4.5f*(-v.x+v.y)*(-v.x+v.y)) / 36.0f;
+	feq.fN = rho * (1.0f + Cusq + 3.0f*vy + 4.5f*vy*vy) / 9.0f;
+	feq.fE = rho * (1.0f + Cusq + 3.0f*vx + 4.5f*vx*vx) / 9.0f;
+	feq.fS = rho * (1.0f + Cusq - 3.0f*vy + 4.5f*vy*vy) / 9.0f;
+	feq.fW = rho * (1.0f + Cusq - 3.0f*vx + 4.5f*vx*vx) / 9.0f;
+	feq.fNE = rho * (1.0f + Cusq + 3.0f*(vx+vy) + 4.5f*(vx+vy)*(vx+vy)) / 36.0f;
+	feq.fSE = rho * (1.0f + Cusq + 3.0f*(vx-vy) + 4.5f*(vx-vy)*(vx-vy)) / 36.0f;
+	feq.fSW = rho * (1.0f + Cusq + 3.0f*(-vx-vy) + 4.5f*(vx+vy)*(vx+vy)) / 36.0f;
+	feq.fNW = rho * (1.0f + Cusq + 3.0f*(-vx+vy) + 4.5f*(-vx+vy)*(-vx+vy)) / 36.0f;
 
 	if (node_type == GEO_FLUID || isWallNode(node_type)) {
-		fi.fC += (feq.fC - fi.fC) / tau;
-		fi.fE += (feq.fE - fi.fE) / tau;
-		fi.fW += (feq.fW - fi.fW) / tau;
-		fi.fS += (feq.fS - fi.fS) / tau;
-		fi.fN += (feq.fN - fi.fN) / tau;
-		fi.fSE += (feq.fSE - fi.fSE) / tau;
-		fi.fNE += (feq.fNE - fi.fNE) / tau;
-		fi.fSW += (feq.fSW - fi.fSW) / tau;
-		fi.fNW += (feq.fNW - fi.fNW) / tau;
+		fi->fC += (feq.fC - fi->fC) / tau;
+		fi->fE += (feq.fE - fi->fE) / tau;
+		fi->fW += (feq.fW - fi->fW) / tau;
+		fi->fS += (feq.fS - fi->fS) / tau;
+		fi->fN += (feq.fN - fi->fN) / tau;
+		fi->fSE += (feq.fSE - fi->fSE) / tau;
+		fi->fNE += (feq.fNE - fi->fNE) / tau;
+		fi->fSW += (feq.fSW - fi->fSW) / tau;
+		fi->fNW += (feq.fNW - fi->fNW) / tau;
 	} else {
-		fi.fC  = feq.fC;
-		fi.fE  = feq.fE;
-		fi.fW  = feq.fW;
-		fi.fS  = feq.fS;
-		fi.fN  = feq.fN;
-		fi.fSE = feq.fSE;
-		fi.fNE = feq.fNE;
-		fi.fSW = feq.fSW;
-		fi.fNW = feq.fNW;
+		fi->fC  = feq.fC;
+		fi->fE  = feq.fE;
+		fi->fW  = feq.fW;
+		fi->fS  = feq.fS;
+		fi->fN  = feq.fN;
+		fi->fSE = feq.fSE;
+		fi->fNE = feq.fNE;
+		fi->fSW = feq.fSW;
+		fi->fNW = feq.fNW;
 	}
 
 	// External acceleration.
 	float pref = rho * (3.0f - 3.0f/(2.0f * tau));
 	#define eax ${ext_accel_x}
 	#define eay ${ext_accel_y}
-	float ue = eax*v.x + eay*v.y;
+	float ue = eax*vx + eay*vy;
 
-	fi.fC += pref*(-ue) * 4.0f/9.0f;
-	fi.fN += pref*(eay - ue + 3.0f*(eay*v.y)) / 9.0f;
-	fi.fE += pref*(eax - ue + 3.0f*(eax*v.x)) / 9.0f;
-	fi.fS += pref*(-eay - ue + 3.0f*(eay*v.y)) / 9.0f;
-	fi.fW += pref*(-eax - ue + 3.0f*(eax*v.x)) / 9.0f;
-	fi.fNE += pref*(eax + eay - ue + 3.0f*((v.x+v.y)*(eax+eay))) / 36.0f;
-	fi.fSE += pref*(eax - eay - ue + 3.0f*((v.x-v.y)*(eax-eay))) / 36.0f;
-	fi.fSW += pref*(-eax - eay - ue + 3.0f*((v.x+v.y)*(eax+eay))) / 36.0f;
-	fi.fNW += pref*(-eax + eay - ue + 3.0f*((-v.x+v.y)*(-eax+eay))) / 36.0f;
+	fi->fC += pref*(-ue) * 4.0f/9.0f;
+	fi->fN += pref*(eay - ue + 3.0f*(eay*vy)) / 9.0f;
+	fi->fE += pref*(eax - ue + 3.0f*(eax*vx)) / 9.0f;
+	fi->fS += pref*(-eay - ue + 3.0f*(eay*vy)) / 9.0f;
+	fi->fW += pref*(-eax - ue + 3.0f*(eax*vx)) / 9.0f;
+	fi->fNE += pref*(eax + eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
+	fi->fSE += pref*(eax - eay - ue + 3.0f*((vx-vy)*(eax-eay))) / 36.0f;
+	fi->fSW += pref*(-eax - eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
+	fi->fNW += pref*(-eax + eay - ue + 3.0f*((-vx+vy)*(-eax+eay))) / 36.0f;
 }
 
 // TODO:
@@ -313,7 +312,7 @@ __global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out
 
 	// cache the distribution in local variables
 	Dist fi;
-	getDist(fi, dist_in, gi);
+	getDist(&fi, dist_in, gi);
 
 	int type = map[gi];
 
@@ -337,22 +336,21 @@ __global__ void LBMCollideAndPropagate(int *map, float *dist_in, float *dist_out
 	}
 
 	// macroscopic quantities for the current cell
-	float rho;
-	float2 v;
-	getMacro(fi, type, rho, v);
+	float rho, vx, vy;
+	getMacro(fi, type, &rho, &vx, &vy);
 
 	// only save the macroscopic quantities if requested to do so
 	if (orho != NULL) {
 		orho[gi] = rho;
-		ovx[gi] = v.x;
-		ovy[gi] = v.y;
+		ovx[gi] = vx;
+		ovy[gi] = vy;
 	}
 
 
 	% if model == 'bgk':
-		BGK_relaxate(rho, v, fi, map[gi]);
+		BGK_relaxate(rho, vx, vy, &fi, map[gi]);
 	% else:
-		MS_relaxate(fi, map[gi]);
+		MS_relaxate(&fi, map[gi]);
 	% endif
 
 	#define dir_fC 0
