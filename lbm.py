@@ -30,7 +30,7 @@ def get_backends():
 		if v in sys.modules:
 			ret.append(k)
 
-	return ret
+	return sorted(ret)
 
 class Values(optparse.Values):
 	def __init__(self, *args):
