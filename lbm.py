@@ -5,9 +5,6 @@ import numpy
 import sys
 import tables
 import time
-
-import backend_cuda
-import backend_opencl
 import vis2d
 import geo2d
 
@@ -15,6 +12,16 @@ import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
 
 from mako.template import Template
+
+try:
+	import backend_cuda
+except ImportError:
+	pass
+
+try:
+	import backend_opencl
+except ImportError:
+	pass
 
 backends = {'cuda': 'backend_cuda', 'opencl': 'backend_opencl'}
 
