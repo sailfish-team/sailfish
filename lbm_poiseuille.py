@@ -49,7 +49,7 @@ class LPoiSim(lbm.LBMSim):
 
 		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, args=args)
 
-		defaults = {'batch': True, 'max_iters': 500000, 'visc': 0.1}
+		defaults = {'batch': True, 'max_iters': 500000, 'visc': 0.1, 'lat_w': 64, 'lat_h': 64}
 
 		if self.options.test:
 			self.options.periodic_y = not self.options.horizontal
@@ -60,13 +60,9 @@ class LPoiSim(lbm.LBMSim):
 					setattr(self.options, k, v)
 
 			if self.options.horizontal:
-				self.options.lat_w = 64
-				self.options.lat_h = 64
 				self.options.accel_x = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_h-1)**2)
 				self.add_iter_hook(self.options.max_iters-1, self.output_profile_horiz)
 			else:
-				self.options.lat_w = 64
-				self.options.lat_h = 64
 				self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_w-1)**2)
 				self.add_iter_hook(self.options.max_iters-1, self.output_profile_vert)
 

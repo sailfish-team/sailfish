@@ -15,11 +15,11 @@
 
 ${const_var} float tau = ${tau};		// relaxation time
 ${const_var} float visc = ${visc};		// viscosity
-${const_var} float geo_params[${num_params}] = {
+${const_var} float geo_params[${num_params+1}] = {
 % for param in geo_params:
 	${param},
 % endfor
-};		// geometry parameters
+0};		// geometry parameters
 
 typedef struct Dist {
 	float fC, fE, fW, fS, fN, fSE, fSW, fNE, fNW;
