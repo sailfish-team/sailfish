@@ -109,7 +109,7 @@ class LBMGeo(object):
 					north = y < self.lat_h-1 and self.map[y+1][x] == LBMGeo.NODE_FLUID
 					south = y > 0 and self.map[y-1][x] == LBMGeo.NODE_FLUID
 					west  = x > 0 and self.map[y][x-1] == LBMGeo.NODE_FLUID
-					east  = x < self.lat_w-1 and self.map[x+1][y] == LBMGeo._NODE_WALL_E
+					east  = x < self.lat_w-1 and self.map[y][x+1] == LBMGeo.NODE_FLUID
 
 					if north and not west and not east:
 						self.map[y][x] = LBMGeo._NODE_WALL_N
