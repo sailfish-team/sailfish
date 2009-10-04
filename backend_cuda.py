@@ -53,7 +53,7 @@ class CUDABackend(object):
 			cuda.memcpy_dtoh(target, cl_buf)
 
 	def build(self, source):
-		return cuda.SourceModule(source, options=['--use_fast_math', '-Xptxas', '-v'])
+		return cuda.SourceModule(source, options=['--use_fast_math'])
 
 	def get_kernel(self, prog, name, block, args, args_format, shared=None):
 		kern = prog.get_function(name)
