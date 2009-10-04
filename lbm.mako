@@ -13,11 +13,11 @@
 
 #define DT 1.0f
 
-${const_var} float tau = ${tau};		// relaxation time
-${const_var} float visc = ${visc};		// viscosity
+${const_var} float tau = ${tau}f;		// relaxation time
+${const_var} float visc = ${visc}f;		// viscosity
 ${const_var} float geo_params[${num_params+1}] = {
 % for param in geo_params:
-	${param},
+	${param}f,
 % endfor
 0};		// geometry parameters
 

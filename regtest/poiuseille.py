@@ -10,7 +10,7 @@ result = 0
 
 class LTestPoiSim(LPoiSim):
 	def __init__(self, visc):
-		args = ['--test', '--visc=%f' % visc]
+		args = ['--test', '--visc=%f' % visc, '--quiet']
 		super(LTestPoiSim, self).__init__(LBMGeoPoiseuille, args)
 		self.clear_hooks()
 		self.options.max_iters = 50000

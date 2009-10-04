@@ -57,6 +57,8 @@ class LBMSim(object):
 	def __init__(self, geo_class, misc_options=[], args=sys.argv[1:]):
 		parser = OptionParser()
 
+		parser.add_option('-q', '--quiet', dest='quiet', help='reduce verbosity', action='store_true', default=False)
+
 		group = OptionGroup(parser, 'LB engine settings')
 		group.add_option('--lat_w', dest='lat_w', help='lattice width', type='int', action='store', default=128)
 		group.add_option('--lat_h', dest='lat_h', help='lattice height', type='int', action='store', default=128)
@@ -104,7 +106,8 @@ class LBMSim(object):
 		self.clear_hooks()
 		self.backend = sys.modules[backends[self.options.backend]].backend()
 
-		print 'Using the "%s" backend.' % self.options.backend
+		if not self.options.quiet:
+			print 'Using the "%s" backend.' % self.options.backend
 
 		if not self._is_double_precision():
 			self.float = numpy.float32
