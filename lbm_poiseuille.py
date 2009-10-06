@@ -31,12 +31,24 @@ class LBMGeoPoiseuille(geo2d.LBMGeo):
 			for y in range(0, self.lat_h):
 				self.velocity_to_dist(0.0, 0.0, dist, x, y)
 
-	def get_reynolds(self, viscosity):
+	def get_velocity_profile(self):
+		width = self.get_width()
+		ret = []
+
+		for x in range(0, width+1):
+			ret.append(-4.0*self.maxv/width**2 * (x - width/2.0)**2 + self.maxv)
+
+		return ret
+
+	def get_width(self):
 		if self.options.horizontal:
-			x = self.lat_h-1
+			return self.lat_h-1
 		else:
-			x = self.lat_w-1
-		return int(x * self.maxv/viscosity)
+			return self.lat_w-1
+
+
+	def get_reynolds(self, viscosity):
+		return int(self.get_width() * self.maxv/viscosity)
 
 class LPoiSim(lbm.LBMSim):
 
@@ -67,6 +79,12 @@ class LPoiSim(lbm.LBMSim):
 				self.add_iter_hook(self.options.max_iters-1, self.output_profile_vert)
 
 		self.add_iter_hook(1000, self.output_pars, every=True)
+
+	def get_profile(self):
+		if self.options.horizontal:
+			return self.vx[:,int(self.options.lat_w/2)]
+		else:
+			return self.vy[int(self.options.lat_h/2),:]
 
 	def output_pars(self):
 		print numpy.max(self.geo.mask_array_by_fluid(self.vx)),	numpy.max(self.geo.mask_array_by_fluid(self.vy)) / 0.02, numpy.average(self.geo.mask_array_by_fluid(self.rho))
