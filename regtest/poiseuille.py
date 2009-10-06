@@ -26,6 +26,8 @@ class LTestPoiSim(LPoiSim):
 xvec = []
 yvec = []
 
+f = open('regtest/results/poiseuille.dat', 'w')
+
 for visc in numpy.logspace(-3, -1, num=10):
 	sim = LTestPoiSim(visc)
 	sim.run()
@@ -33,7 +35,9 @@ for visc in numpy.logspace(-3, -1, num=10):
 	xvec.append(visc)
 	yvec.append(sim.result)
 
-	print visc, sim.result
+	print >>f, visc, sim.result
+
+f.close()
 
 plt.semilogx(xvec, yvec, 'bo-')
 plt.title('Simulation convergence at %d iters' % MAX_ITERS)
@@ -43,6 +47,6 @@ plt.gca().xaxis.grid(True)
 plt.gca().xaxis.grid(True, which='minor')
 plt.ylabel('max velocity / theoretical max velocity')
 plt.xlabel('viscosity')
-plt.savefig('poiseuille.pdf', format='pdf')
+plt.savefig('regtest/results/poiseuille.pdf', format='pdf')
 
 
