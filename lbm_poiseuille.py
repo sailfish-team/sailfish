@@ -27,9 +27,23 @@ class LBMGeoPoiseuille(geo2d.LBMGeo):
 				self.set_geo(self.lat_w-1, i, geo2d.LBMGeo.NODE_WALL)
 
 	def init_dist(self, dist):
-		for x in range(0, self.lat_w):
-			for y in range(0, self.lat_h):
-				self.velocity_to_dist(0.0, 0.0, dist, x, y)
+		if self.options.static:
+			profile = self.get_velocity_profile()
+
+			if self.options.horizontal:
+				for y in range(0, self.lat_h):
+					self.velocity_to_dist(profile[y], 0.0, dist, 0, y)
+				for x in range(1, self.lat_w):
+					dist[:,:,x:] = dist[:,:,0]
+			else:
+				for x in range(0, self.lat_w):
+					self.velocity_to_dist(0.0, profile[x], dist, x, 0)
+				for y in range(1, self.lat_h):
+					dist[:,y,:] = dist[:,0,:]
+		else:
+			for x in range(0, self.lat_w):
+				for y in range(0, self.lat_h):
+					self.velocity_to_dist(0.0, 0.0, dist, x, y)
 
 	def get_velocity_profile(self):
 		width = self.get_width()
@@ -58,6 +72,7 @@ class LPoiSim(lbm.LBMSim):
 		opts = []
 		opts.append(optparse.make_option('--test', dest='test', action='store_true', default=False, help='generate test data'))
 		opts.append(optparse.make_option('--horizontal', dest='horizontal', action='store_true', default=False, help='use horizontal channel'))
+		opts.append(optparse.make_option('--static', dest='static', action='store_true', default=False, help='start with the correct velocity profile in the whole simulation domain'))
 
 		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, args=args)
 
