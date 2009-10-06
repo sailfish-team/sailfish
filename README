@@ -23,10 +23,12 @@ to be done.
 ------------------------
 Requirements:
  - pygame-1.8.1
- - pycuda-0.92
  - pytables-2.1.1
+ - numpy
  - mako-0.2.5
- - nvidia-drivers, nvidia-cuda-toolkit
+   - for the CUDA backend: pycuda-0.92, nvidia-drivers, nvidia-cuda-toolkit
+   - for the OpenCL backend: pyopencl, any OpenCL implementation
+ - matplotlib (for regtests)
 
 No installation is necessary, just run any of the executable .py files.
 Use the --help command line option to learn about parameters adjustable

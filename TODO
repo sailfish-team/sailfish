@@ -1,6 +1,3 @@
-* general
-  - switch to OpenCL once the NVIDIA implementation of OpenCL is stable and efficient
-
 * D2Q9
   - validate the code against at least 3 standard CFD testcases
   - make the CFD testcases automated (regtests)
