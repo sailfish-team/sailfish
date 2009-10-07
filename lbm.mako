@@ -214,6 +214,7 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 	y[gi] = cy;
 }
 
+% if model == 'mrt':
 //
 // Relaxation in moment space.
 //
@@ -286,7 +287,9 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	fi->fSE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
 			 +(1.0f/6.0f)*fm.mx + (1.0f/12.0f)*fm.ex - (1.0f/6.0f)*fm.my - (1.0f/12.0f)*fm.ey - 0.25f*fm.sod;
 }
+% endif
 
+% if model == 'bgk':
 //
 // Performs the relaxation step in the BGK model given the density rho,
 // the velocity v and the distribution fi.
@@ -345,6 +348,7 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 	fi->fSW += pref*(-eax - eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
 	fi->fNW += pref*(-eax + eay - ue + 3.0f*((-vx+vy)*(-eax+eay))) / 36.0f;
 }
+% endif
 
 // TODO:
 // - try having dummy nodes as the edges of the lattice to avoid divergent threads
