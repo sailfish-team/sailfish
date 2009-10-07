@@ -173,11 +173,26 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 	if (iy > ${lat_h-1})
 		iy = ${lat_h-1};
 
-	int dix = ix + ${lat_w}*iy;
+	int idx = ix + ${lat_w}*iy;
 
 	Dist fc;
-	getDist(&fc, dist, dix);
-	getMacro(fc, map[dix], &rho, &vx, &vy);
+
+## HACK: If a call to getDist() is made below, the overall performance of the simulation
+## will be decreased by a factor of 2, regardless of whether this kernel is even executed.
+## This might be caused by the NVIDIA OpenCL compiler not inlining the getDist function.
+## To avoid the performance loss, we temporarily inline getDist manually.
+	// getDist(&fc, dist, idx);
+	fc.fC = dist[idx];
+	fc.fE = dist[DIST_SIZE + idx];
+	fc.fW = dist[DIST_SIZE*2 + idx];
+	fc.fS = dist[DIST_SIZE*3 + idx];
+	fc.fN = dist[DIST_SIZE*4 + idx];
+	fc.fSE = dist[DIST_SIZE*5 + idx];
+	fc.fSW = dist[DIST_SIZE*6 + idx];
+	fc.fNE = dist[DIST_SIZE*7 + idx];
+	fc.fNW = dist[DIST_SIZE*8 + idx];
+
+	getMacro(fc, map[idx], &rho, &vx, &vy);
 
 	cx = cx + vx * DT;
 	cy = cy + vy * DT;
