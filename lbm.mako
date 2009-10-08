@@ -70,7 +70,7 @@ __device__ int inline get_global_id(int i)
 //
 // Copy the idx-th distribution from din into dout.
 //
-${device_func} void getDist(Dist *dout, ${global_ptr} float *din, int idx)
+${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int idx)
 {
 	dout->fC = din[idx];
 	dout->fE = din[DIST_SIZE + idx];
@@ -83,7 +83,7 @@ ${device_func} void getDist(Dist *dout, ${global_ptr} float *din, int idx)
 	dout->fNW = din[DIST_SIZE*8 + idx];
 }
 
-${device_func} bool isWallNode(int type) {
+${device_func} inline bool isWallNode(int type) {
 	return type >= GEO_WALL && type <= GEO_WALL_S;
 }
 
@@ -91,7 +91,7 @@ ${device_func} bool isWallNode(int type) {
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
 //
-${device_func} void getMacro(Dist fi, int node_type, float *rho, float *vx, float *vy)
+${device_func} inline void getMacro(Dist fi, int node_type, float *rho, float *vx, float *vy)
 {
 	// Wall nodes are special, as some distributions (those pointing out of
 	// the simulation grid) are undefined.
