@@ -102,19 +102,19 @@ ${device_func} inline void getMacro(Dist fi, int node_type, float *rho, float *v
 			break;
 
 		case GEO_WALL_E:
-			*rho = 2.0 * (fi.fNE + fi.fE + fi.fSE) + fi.fC + fi.fS + fi.fN;
+			*rho = 2.0f * (fi.fNE + fi.fE + fi.fSE) + fi.fC + fi.fS + fi.fN;
 			break;
 
 		case GEO_WALL_W:
-			*rho = 2.0 * (fi.fNW + fi.fSW + fi.fW) + fi.fC + fi.fS + fi.fN;
+			*rho = 2.0f * (fi.fNW + fi.fSW + fi.fW) + fi.fC + fi.fS + fi.fN;
 			break;
 
 		case GEO_WALL_S:
-			*rho = 2.0 * (fi.fSW + fi.fS + fi.fSE) + fi.fC + fi.fE + fi.fW;
+			*rho = 2.0f * (fi.fSW + fi.fS + fi.fSE) + fi.fC + fi.fE + fi.fW;
 			break;
 
 		case GEO_WALL_N:
-			*rho = 2.0 * (fi.fNW + fi.fN + fi.fNE) + fi.fC + fi.fE + fi.fW;
+			*rho = 2.0f * (fi.fNW + fi.fN + fi.fNE) + fi.fC + fi.fE + fi.fW;
 			break;
 		}
 
