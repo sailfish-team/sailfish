@@ -12,6 +12,7 @@ import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
 
 from mako.template import Template
+from mako.lookup import TemplateLookup
 
 try:
 	import backend_cuda
@@ -156,7 +157,7 @@ class LBMSim(object):
 		self.geo.init_dist(self.dist)
 		self.geo_params = self.float(self.geo.get_params())
 
-		lbm_tmpl = Template(filename='lbm.mako')
+		lbm_tmpl = Template(filename='lbm.mako', lookup=TemplateLookup(directories=['.']))
 
 		self.tau = self.get_tau()
 		ctx = {}
