@@ -56,43 +56,54 @@ ${device_func} inline bool isWallNode(int type) {
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
 //
-${device_func} inline void getMacro(Dist fi, int node_type, float *rho, float *vx, float *vy)
+${device_func} void getMacro(Dist *fi, int node_type, float *rho, float *vx, float *vy)
 {
-	% if boundary_type != 'fullbb' and boundary_type != 'halfbb':
-	// Wall nodes are special, as some distributions (those pointing out of
-	// the simulation grid) are undefined.
-	if (isWallNode(node_type)) {
-		switch (node_type) {
-		case GEO_WALL:
-			*rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
-			break;
+	% if boundary_type == 'zouhe':
+		if (isWallNode(node_type)) {
+			// FIXME: This should be read from an array.
+			*vx = 0.0f;
+			*vy = 0.0f;
 
-		case GEO_WALL_E:
-			*rho = 2.0f * (fi.fNE + fi.fE + fi.fSE) + fi.fC + fi.fS + fi.fN;
-			break;
+			switch (node_type) {
+			case GEO_WALL_N:
+				*rho = (2.0f * (fi->fSW + fi->fS + fi->fSE) + fi->fC + fi->fE + fi->fW) / (1.0f - *vy);
+				fi->fN = fi->fS + 2.0f * *rho * *vy / 3.0f;	// + feq_N - feq_S;
+				fi->fNE = fi->fSW + (fi->fW - fi->fE + *rho * (*vx + *vy/3.0f)) / 2.0f;
+				fi->fNW = fi->fSE + (fi->fE - fi->fW + *rho * (-*vx + *vy/3.0f)) / 2.0f;
+				break;
 
-		case GEO_WALL_W:
-			*rho = 2.0f * (fi.fNW + fi.fSW + fi.fW) + fi.fC + fi.fS + fi.fN;
-			break;
+			case GEO_WALL_S:
+				*rho = (2.0f * (fi->fNW + fi->fN + fi->fNE) + fi->fC + fi->fE + fi->fW) / (1.0f + *vy);
+				fi->fS = fi->fN - 2.0f * *rho  * *vy/ 3.0f;	// + feq_S - feq_N;
+				fi->fSE = fi->fNW + (fi->fW - fi->fE + *rho * (*vx - *vy/3.0f)) / 2.0f;
+				fi->fSW = fi->fNE + (fi->fE - fi->fW + *rho * -(*vx + *vy/3.0f)) / 2.0f;
+				break;
 
-		case GEO_WALL_S:
-			*rho = 2.0f * (fi.fSW + fi.fS + fi.fSE) + fi.fC + fi.fE + fi.fW;
-			break;
+			case GEO_WALL_E:
+				*rho = (2.0f * (fi->fNW + fi->fW + fi->fSW) + fi->fC + fi->fS + fi->fN) / (1.0f - *vx);
+				fi->fE = fi->fW + 2.0f * *rho * *vx / 3.0f;	// + feq_E - feq_W;
+				fi->fNE = fi->fSW + (fi->fS - fi->fN + *rho * (*vx/3.0f + *vy)) / 2.0f;
+				fi->fSE = fi->fNW + (fi->fN - fi->fS + *rho * (*vx/3.0f - *vy)) / 2.0f;
+				break;
 
-		case GEO_WALL_N:
-			*rho = 2.0f * (fi.fNW + fi.fN + fi.fNE) + fi.fC + fi.fE + fi.fW;
-			break;
+			case GEO_WALL_W:
+				*rho = (2.0f * (fi->fNE + fi->fSE + fi->fE) + fi->fC + fi->fS + fi->fN) / (1.0 + *vx);
+				fi->fW = fi->fE - 2.0f * *rho * *vx / 3.0f;	// + feq_W - feq_E;
+				fi->fNW = fi->fSE + (fi->fS - fi->fN + *rho * (-*vx/3.0f + *vy)) / 2.0f;
+				fi->fSW = fi->fNE + (fi->fN - fi->fS + *rho * -(*vx/3.0f + *vy)) / 2.0f;
+				break;
+
+			// FIXME
+			case GEO_WALL:
+				*rho = fi->fC + fi->fE + fi->fW + fi->fS + fi->fN + fi->fNE + fi->fNW + fi->fSE + fi->fSW;
+				break;
+			}
 		}
-
-		*vx = 0.0f;
-		*vy = 0.0f;
-		return;
-	}
 	% endif
 
-	*rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
+	*rho = fi->fC + fi->fE + fi->fW + fi->fS + fi->fN + fi->fNE + fi->fNW + fi->fSE + fi->fSW;
 
-	% if boundary_type != 'fullbb'and boundary_type != 'halfbb':
+	% if boundary_type != 'fullbb' and boundary_type != 'halfbb':
 	if (node_type >= GEO_BCV) {
 		// Velocity boundary condition.
 		if (node_type < GEO_BCP) {
@@ -109,8 +120,8 @@ ${device_func} inline void getMacro(Dist fi, int node_type, float *rho, float *v
 	}
 	% endif
 
-	*vx = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / *rho;
-	*vy = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / *rho;
+	*vx = (fi->fE + fi->fSE + fi->fNE - fi->fW - fi->fSW - fi->fNW) / *rho;
+	*vy = (fi->fN + fi->fNW + fi->fNE - fi->fS - fi->fSW - fi->fSE) / *rho;
 
 	if (!isWallNode(node_type)) {
 		*vx += 0.5f * ${ext_accel_x};
@@ -167,7 +178,7 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 	fc.fNE = dist[DIST_SIZE*7 + idx];
 	fc.fNW = dist[DIST_SIZE*8 + idx];
 
-	getMacro(fc, map[idx], &rho, &vx, &vy);
+	getMacro(&fc, map[idx], &rho, &vx, &vy);
 
 	cx = cx + vx * DT;
 	cy = cy + vy * DT;
@@ -410,7 +421,7 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 
 	// macroscopic quantities for the current cell
 	float rho, vx, vy;
-	getMacro(fi, type, &rho, &vx, &vy);
+	getMacro(&fi, type, &rho, &vx, &vy);
 
 	// only save the macroscopic quantities if requested to do so
 	if (save_macro == 1) {

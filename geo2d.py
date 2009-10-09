@@ -16,7 +16,9 @@ class LBMBC(object):
 		self.local = local
 
 SUPPORTED_BCS = [LBMBC('fullbb', midgrid=True),
-				 LBMBC('halfbb', midgrid=True)]
+				 LBMBC('halfbb', midgrid=True),
+				 LBMBC('zouhe', midgrid=False)
+				 ]
 BCS_MAP = dict((x.name, x) for x in SUPPORTED_BCS)
 
 class LBMGeo(object):
