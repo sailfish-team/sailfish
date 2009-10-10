@@ -46,6 +46,7 @@ class LBMGeo(object):
 		self._vel_map = {}
 		self._pressure_map = {}
 		self._define_nodes()
+		self._postprocess_nodes()
 		self.float = float
 
 	def _define_nodes(self):
