@@ -161,6 +161,8 @@ class LBMSim(object):
 		self.geo = self.geo_class(self.options.lat_w, self.options.lat_h, self.options.model, self.options, self.float, self.backend)
 		self.geo.init_dist(self.dist)
 		self.geo_params = self.float(self.geo.get_params())
+		# HACK: Prevent this method from being called again.
+		self._init_geo = lambda: True
 
 	def _init_code(self):
 		lbm_tmpl = Template(filename='lbm.mako', lookup=TemplateLookup(directories=['.']))

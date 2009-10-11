@@ -7,7 +7,6 @@
 #define PERIODIC_Y ${periodic_y}
 #define DIST_SIZE ${dist_size}
 #define GEO_FLUID ${geo_fluid}
-#define GEO_WALL ${geo_wall}
 #define GEO_WALL_E ${geo_wall_e}
 #define GEO_WALL_W ${geo_wall_w}
 #define GEO_WALL_S ${geo_wall_s}
@@ -54,53 +53,91 @@ ${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int idx
 }
 
 ${device_func} inline bool isWallNode(int type) {
-	return type >= GEO_WALL && type <= GEO_WALL_S;
+	return type == ${geo_wall};
+}
+
+// This assumes we're dealing with a wall node.
+${device_func} inline bool isVelocityNode(int type) {
+	return (type >= ${geo_bcv}) && (type < GEO_BCP);
+}
+
+${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *type) {
+	*orientation = nodetype & ${geo_orientation_mask};
+	*type = nodetype >> ${geo_orientation_shift};
 }
 
 //
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
 //
-${device_func} void getMacro(Dist *fi, int node_type, float *rho, float *vx, float *vy)
+${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, float *rho, float *vx, float *vy)
 {
 	% if boundary_type == 'zouhe':
-		if (isWallNode(node_type)) {
-			// FIXME: This should be read from an array.
-			*vx = 0.0f;
-			*vy = 0.0f;
+		if (isWallNode(node_type) || isVelocityNode(node_type)) {
+			if (node_type > ${geo_wall}) {
+				int idx = (node_type - GEO_BCV) * 2;
+				*vx = geo_params[idx];
+				*vy = geo_params[idx+1];
+			} else {
+				*vx = 0.0f;
+				*vy = 0.0f;
+			}
 
-			switch (node_type) {
-			case GEO_WALL_N:
+			switch (orientation) {
+			case ${geo_wall_n}:
 				*rho = (2.0f * (fi->fSW + fi->fS + fi->fSE) + fi->fC + fi->fE + fi->fW) / (1.0f - *vy);
 				fi->fN = fi->fS + 2.0f * *rho * *vy / 3.0f;	// + feq_N - feq_S;
 				fi->fNE = fi->fSW + (fi->fW - fi->fE + *rho * (*vx + *vy/3.0f)) / 2.0f;
 				fi->fNW = fi->fSE + (fi->fE - fi->fW + *rho * (-*vx + *vy/3.0f)) / 2.0f;
 				break;
 
-			case GEO_WALL_S:
+			case ${geo_wall_s}:
 				*rho = (2.0f * (fi->fNW + fi->fN + fi->fNE) + fi->fC + fi->fE + fi->fW) / (1.0f + *vy);
 				fi->fS = fi->fN - 2.0f * *rho  * *vy/ 3.0f;	// + feq_S - feq_N;
 				fi->fSE = fi->fNW + (fi->fW - fi->fE + *rho * (*vx - *vy/3.0f)) / 2.0f;
 				fi->fSW = fi->fNE + (fi->fE - fi->fW + *rho * -(*vx + *vy/3.0f)) / 2.0f;
 				break;
 
-			case GEO_WALL_E:
+			case ${geo_wall_e}:
 				*rho = (2.0f * (fi->fNW + fi->fW + fi->fSW) + fi->fC + fi->fS + fi->fN) / (1.0f - *vx);
 				fi->fE = fi->fW + 2.0f * *rho * *vx / 3.0f;	// + feq_E - feq_W;
 				fi->fNE = fi->fSW + (fi->fS - fi->fN + *rho * (*vx/3.0f + *vy)) / 2.0f;
 				fi->fSE = fi->fNW + (fi->fN - fi->fS + *rho * (*vx/3.0f - *vy)) / 2.0f;
 				break;
 
-			case GEO_WALL_W:
-				*rho = (2.0f * (fi->fNE + fi->fSE + fi->fE) + fi->fC + fi->fS + fi->fN) / (1.0 + *vx);
+			case ${geo_wall_w}:
+				*rho = (2.0f * (fi->fNE + fi->fSE + fi->fE) + fi->fC + fi->fS + fi->fN) / (1.0f + *vx);
 				fi->fW = fi->fE - 2.0f * *rho * *vx / 3.0f;	// + feq_W - feq_E;
 				fi->fNW = fi->fSE + (fi->fS - fi->fN + *rho * (-*vx/3.0f + *vy)) / 2.0f;
 				fi->fSW = fi->fNE + (fi->fN - fi->fS + *rho * -(*vx/3.0f + *vy)) / 2.0f;
 				break;
 
-			// FIXME
-			case GEO_WALL:
-				*rho = fi->fC + fi->fE + fi->fW + fi->fS + fi->fN + fi->fNE + fi->fNW + fi->fSE + fi->fSW;
+			case ${geo_wall_ne}:
+				*rho = (2.0f * (fi->fW + fi->fS + fi->fSW) + fi->fC + fi->fNW + fi->fSE) / (1.0f - 11.0f/12.0f*(*vx + *vy));
+				fi->fNE = fi->fSW + 1.0f/12.0f * *rho * (*vx + *vy);
+				fi->fE = *rho * (11.0f/12.0f * *vx - 1.0f/12.0f * *vy) - fi->fSE + fi->fW + fi->fNW;
+				fi->fN = *rho * (-1.0f/12.0f * *vx + 11.0f/12.0f * *vy) -fi->fNW + fi->fS + fi->fSE;
+				break;
+
+			case ${geo_wall_se}:
+				*rho = (2.0f * (fi->fN + fi->fW + fi->fNW) + fi->fC + fi->fSW + fi->fNE) / (1.0f - 11.0f/12.0f*(*vx - *vy));
+				fi->fSE = fi->fNW + 1.0f/12.0f * *rho * (*vx - *vy);
+				fi->fE = *rho * (11.0f/12.0f * *vx + 1.0f/12.0f * *vy) - fi->fNE + fi->fW + fi->fSW;
+				fi->fS = *rho * (-1.0f/12.0f * *vx - 11.0f/12.0f * *vy) - fi->fSW + fi->fN + fi->fNE;
+				break;
+
+			case ${geo_wall_nw}:
+				*rho = (2.0f * (fi->fE + fi->fS + fi->fSE) + fi->fC + fi->fSW + fi->fNE) / (1.0f - 11.0f/12.0f*(-*vx + *vy));
+				fi->fNW = fi->fSE + 1.0f/12.0f * *rho * (-*vx + *vy);
+				fi->fW = *rho * (-11.0f/12.0f * *vx - 1.0f/12.0f * *vy) - fi->fSW + fi->fE + fi->fNE;
+				fi->fN = *rho * (1.0f/12.0f * *vx + 11.0f/12.0f * *vy) - fi->fNE + fi->fS + fi->fSW;
+				break;
+
+			case ${geo_wall_sw}:
+				*rho = (2.0f * (fi->fE + fi->fN + fi->fNE) + fi->fC + fi->fSE + fi->fNW) / (1.0f + 11.0f/12.0f*(*vx + *vy));
+				fi->fSW = fi->fNE + 1.0f/12.0f * *rho * -(*vx + *vy);
+				fi->fW = *rho * (-11.0f/12.0f * *vx + 1.0f/12.0f * *vy) - fi->fNW + fi->fE + fi->fSE;
+				fi->fS = *rho * (1.0f/12.0f * *vx - 11.0f/12.0f * *vy) - fi->fSE + fi->fN + fi->fNW;
 				break;
 			}
 
@@ -180,7 +217,9 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 		fc.${dname} = dist[idx + DIST_SIZE*${i}];
 	%endfor
 
-	getMacro(&fc, map[idx], &rho, &vx, &vy);
+	int type, orientation;
+	decodeNodeType(map[idx], &orientation, &type);
+	getMacro(&fc, type, orientation, &rho, &vx, &vy);
 
 	cx = cx + vx * DT;
 	cy = cy + vy * DT;
@@ -314,9 +353,9 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 
 <%def name="relaxate()">
 	% if model == 'bgk':
-		BGK_relaxate(rho, vx, vy, &fi, map[gi]);
+		BGK_relaxate(rho, vx, vy, &fi, type);
 	% else:
-		MS_relaxate(&fi, map[gi]);
+		MS_relaxate(&fi, type, type);
 	% endif
 </%def>
 
@@ -381,7 +420,8 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	Dist fi;
 	getDist(&fi, dist_in, gi);
 
-	int type = map[gi];
+	int type, orientation;
+	decodeNodeType(map[gi], &orientation, &type);
 
 	% if boundary_type == 'fullbb':
 		if (isWallNode(type)) {
@@ -395,7 +435,7 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 
 	// macroscopic quantities for the current cell
 	float rho, vx, vy;
-	getMacro(&fi, type, &rho, &vx, &vy);
+	getMacro(&fi, type, orientation, &rho, &vx, &vy);
 
 	// only save the macroscopic quantities if requested to do so
 	if (save_macro == 1) {

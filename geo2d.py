@@ -28,14 +28,31 @@ class LBMGeo(object):
 
 	NODE_FLUID = 0
 	NODE_WALL = 1
-	NODE_VELOCITY = 6
-	NODE_PRESSURE = 7
+	NODE_VELOCITY = 2
+	NODE_PRESSURE = 3
 
-	# Internal constants.
-	_NODE_WALL_E = 2
-	_NODE_WALL_W = 3
-	_NODE_WALL_N = 4
-	_NODE_WALL_S = 5
+	# Constants to specify node orientation.
+	NODE_WALL_E = 0
+	NODE_WALL_W = 1
+	NODE_WALL_N = 2
+	NODE_WALL_S = 3
+	NODE_WALL_NE = 4
+	NODE_WALL_NW = 5
+	NODE_WALL_SE = 6
+	NODE_WALL_SW = 7
+
+	NODE_TYPE_MASK = 0xfffffff8
+	NODE_ORIENTATION_SHIFT = 3
+	NODE_ORIENTATION_MASK = 0x7
+
+	@classmethod
+	def _encode_node(cls, orientation, type):
+		return orientation | (type << cls.NODE_ORIENTATION_SHIFT)
+
+	@classmethod
+	def _decode_node(cls, code):
+		return (code & cls.NODE_ORIENTATION_MASK,
+			    (code & cls.NODE_TYPE_MASK) >> cls.NODE_ORIENTATION_SHIFT)
 
 	def __init__(self, lat_w, lat_h, model, options, float, backend):
 		self.lat_w = lat_w
@@ -94,8 +111,11 @@ class LBMGeo(object):
 		self.map[y][x] = numpy.int32(type)
 
 		if val is not None:
-			if type == LBMGeo.NODE_VELOCITY and len(val) == 2:
-				self._vel_map.setdefault(val, []).append((x,y))
+			if type == LBMGeo.NODE_VELOCITY:
+				if len(val) == 2:
+					self._vel_map.setdefault(val, []).append((x,y))
+				else:
+					raise ValueError('Invalid velocity specified')
 			elif type == LBMGeo.NODE_PRESSURE:
 				self._pressure_map.setdefault(val, []).append((x,y))
 
@@ -124,7 +144,7 @@ class LBMGeo(object):
 
 		for x in range(0, self.lat_w):
 			for y in range(0, self.lat_h):
-				if self.map[y][x] == LBMGeo.NODE_WALL:
+				if self.map[y][x] != LBMGeo.NODE_FLUID:
 					# If the bool corresponding to a specific direction is True, the
 					# distributions in this direction are undefined.
 					north = y < self.lat_h-1 and self.map[y+1][x] == LBMGeo.NODE_FLUID
@@ -133,13 +153,21 @@ class LBMGeo(object):
 					east  = x < self.lat_w-1 and self.map[y][x+1] == LBMGeo.NODE_FLUID
 
 					if north and not west and not east:
-						self.map[y][x] = LBMGeo._NODE_WALL_N
+						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_N, self.map[y][x])
 					elif south and not west and not east:
-						self.map[y][x] = LBMGeo._NODE_WALL_S
+						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_S, self.map[y][x])
 					elif west and not south and not north:
-						self.map[y][x] = LBMGeo._NODE_WALL_W
+						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_W, self.map[y][x])
 					elif east and not south and not north:
-						self.map[y][x] = LBMGeo._NODE_WALL_E
+						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_E, self.map[y][x])
+					elif y > 0 and x > 0 and self.map[y-1][x-1] == LBMGeo.NODE_FLUID:
+						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_SW, self.map[y][x])
+					elif y > 0 and x < self.lat_w-1 and self.map[y-1][x+1] == LBMGeo.NODE_FLUID:
+						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_SE, self.map[y][x])
+					elif y < self.lat_h-1 and x > 0 and self.map[y+1][x-1] == LBMGeo.NODE_FLUID:
+						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_NW, self.map[y][x])
+					elif y < self.lat_h-1 and x < self.lat_w-1 and self.map[y+1][x+1] == LBMGeo.NODE_FLUID:
+						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_NE, self.map[y][x])
 
 	def get_params(self):
 		ret = []
@@ -147,7 +175,8 @@ class LBMGeo(object):
 		for v, pos_list in self._vel_map.iteritems():
 			ret.extend(v)
 			for x, y in pos_list:
-				self.map[y][x] += i
+				orientation, type = self._decode_node(self.map[y][x])
+				self.map[y][x] = self._encode_node(orientation, type + i)
 
 			i += 1
 
@@ -156,7 +185,9 @@ class LBMGeo(object):
 		for p, pos_list in self._pressure_map.iteritems():
 			ret.append(p)
 			for x, y in pos_list:
-				self.map[y][x] += i
+				orientation, type = self._decode_node(self.map[y][x])
+				self.map[y][x] = self._encode_node(orientation, type + i)
+
 			i += 1
 
 		self.update_map()
@@ -165,12 +196,20 @@ class LBMGeo(object):
 	def get_defines(self):
 		return {'geo_fluid': LBMGeo.NODE_FLUID,
 				'geo_wall': LBMGeo.NODE_WALL,
-				'geo_wall_e': LBMGeo._NODE_WALL_E,
-				'geo_wall_w': LBMGeo._NODE_WALL_W,
-				'geo_wall_s': LBMGeo._NODE_WALL_S,
-				'geo_wall_n': LBMGeo._NODE_WALL_N,
+				'geo_wall_e': LBMGeo.NODE_WALL_E,
+				'geo_wall_w': LBMGeo.NODE_WALL_W,
+				'geo_wall_s': LBMGeo.NODE_WALL_S,
+				'geo_wall_n': LBMGeo.NODE_WALL_N,
+				'geo_wall_ne': LBMGeo.NODE_WALL_NE,
+				'geo_wall_se': LBMGeo.NODE_WALL_SE,
+				'geo_wall_nw': LBMGeo.NODE_WALL_NW,
+				'geo_wall_sw': LBMGeo.NODE_WALL_SW,
 				'geo_bcv': LBMGeo.NODE_VELOCITY,
-				'geo_bcp': LBMGeo.NODE_PRESSURE + len(self._vel_map) - 1}
+				'geo_bcp': LBMGeo.NODE_PRESSURE + len(self._vel_map) - 1,
+				'geo_orientation_mask': LBMGeo.NODE_ORIENTATION_MASK,
+				'geo_orientation_shift': LBMGeo.NODE_ORIENTATION_SHIFT,
+				}
+
 
 	def get_bc(self):
 		return BCS_MAP[self.options.boundary]
