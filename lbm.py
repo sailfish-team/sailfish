@@ -100,7 +100,12 @@ class LBMSim(object):
 		self.geo_class = geo_class
 		self.options = Values(parser.defaults)
 		parser.parse_args(args, self.options)
-		self.block_size = 64
+
+		if self.options.lat_w < 64:
+			self.block_size = self.options.lat_w
+		else:
+			self.block_size = 64
+
 		self._mlups_calls = 0
 		self._mlups = 0.0
 		self.clear_hooks()
