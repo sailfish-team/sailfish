@@ -13,11 +13,12 @@ from lbm_poiseuille import LPoiSim, LBMGeoPoiseuille
 import geo2d
 
 MAX_ITERS = 50000
-POINTS = 10
+POINTS = 30
 
 class LTestPoiSim(LPoiSim):
-	def __init__(self, visc, bc, static=False, lat_w=64, max_iters=MAX_ITERS):
-		args = ['--test', '--visc=%f' % visc, '--quiet', '--boundary=%s' % bc, '--lat_w=%d' % lat_w]
+	def __init__(self, visc, bc, static=False, lat_w=64, lat_h=64, max_iters=MAX_ITERS):
+		args = ['--test', '--visc=%f' % visc, '--quiet', '--boundary=%s' % bc,
+				'--lat_w=%d' % lat_w, '--lat_h=%d' % lat_h, '--precision=double']
 		if static:
 			args.append('--static')
 		super(LTestPoiSim, self).__init__(LBMGeoPoiseuille, args)
@@ -26,7 +27,7 @@ class LTestPoiSim(LPoiSim):
 		self.add_iter_hook(self.options.max_iters-1, self.save_output)
 
 	def save_output(self):
-		self.result = numpy.max(self.vy[32,1:self.geo.lat_w-1]) / max(self.geo.get_velocity_profile())
+		self.result = numpy.max(self.vy[16,1:self.geo.lat_w-1]) / max(self.geo.get_velocity_profile())
 		self.res_maxv = numpy.max(self.geo.mask_array_by_fluid(self.vy))
 		self.th_maxv = max(self.geo.get_velocity_profile())
 
@@ -109,15 +110,20 @@ for bc in bcs:
 	print '  Testing error scaling'
 
 	for lat_w in range(64, 1024, 64):
-		sim = LTestPoiSim(0.005, bc, static=True, lat_w=lat_w)
+		sim = LTestPoiSim(0.005, bc, static=True, lat_w=lat_w, lat_h=32)
 		sim.run()
 
 		rel_err = math.sqrt(numpy.max(
-			numpy.power(sim.vx[32,1:lat_w-1], 2) +
-			numpy.power(sim.vy[32,1:lat_w-1] - sim.geo.get_velocity_profile()[1:lat_w-1], 2))) / LBMGeoPoiseuille.maxv
+			numpy.power(sim.vx[16,1:lat_w-1], 2) +
+			numpy.power(sim.vy[16,1:lat_w-1] - sim.geo.get_velocity_profile()[1:lat_w-1], 2))) / LBMGeoPoiseuille.maxv
 
 		xvec.append(1.0/sim.geo.get_chan_width())
 		yvec.append(rel_err)
+
+	f = open('regtest/results/poiseuille-%s-error.dat' % bc, 'w')
+	for x, y in zip(xvec, yvec):
+		print >>f, x, y
+	f.close()
 
 	plt.clf()
 	plt.plot(xvec, yvec, 'bo-')

@@ -98,6 +98,8 @@ ${device_func} void getMacro(Dist *fi, int node_type, float *rho, float *vx, flo
 				*rho = fi->fC + fi->fE + fi->fW + fi->fS + fi->fN + fi->fNE + fi->fNW + fi->fSE + fi->fSW;
 				break;
 			}
+
+			return;
 		}
 	% endif
 

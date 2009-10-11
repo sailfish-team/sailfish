@@ -8,5 +8,3 @@
 * D3Qx
   - implement basic BGK/MRT code for these lattices
 
-BUGS:
- - the Poiseuille test case doesn't work in double precision
