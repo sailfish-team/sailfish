@@ -24,17 +24,12 @@ try:
 except ImportError:
 	pass
 
-backends = {'cuda': 'backend_cuda', 'opencl': 'backend_opencl'}
-
-def _convert_to_double(src):
-	import re
-	return re.sub('([0-9]+\.[0-9]*)f', '\\1', src.replace('float', 'double'))
+SUPPORTED_BACKENDS = {'cuda': 'backend_cuda', 'opencl': 'backend_opencl'}
 
 def get_backends():
-	global backends
 	ret = []
 
-	for k, v in backends.iteritems():
+	for k, v in SUPPORTED_BACKENDS.iteritems():
 		if v in sys.modules:
 			ret.append(k)
 
@@ -50,6 +45,9 @@ class Values(optparse.Values):
 		if hasattr(self, 'specified'):
 			self.specified.add(name)
 
+def _convert_to_double(src):
+	import re
+	return re.sub('([0-9]+\.[0-9]*)f', '\\1', src.replace('float', 'double'))
 
 class LBMSim(object):
 
@@ -70,6 +68,7 @@ class LBMSim(object):
 		group.add_option('--periodic_x', dest='periodic_x', help='horizontally periodic lattice', action='store_true', default=False)
 		group.add_option('--periodic_y', dest='periodic_y', help='vertically periodic lattice', action='store_true', default=False)
 		group.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
+		group.add_option('--boundary', dest='boundary', help='boundary condition implementation', type='choice', choices=[x.name for x in geo2d.SUPPORTED_BCS], default='fullbb')
 		parser.add_option_group(group)
 
 		group = OptionGroup(parser, 'Run mode settings')
@@ -105,7 +104,7 @@ class LBMSim(object):
 		self._mlups_calls = 0
 		self._mlups = 0.0
 		self.clear_hooks()
-		self.backend = sys.modules[backends[self.options.backend]].backend()
+		self.backend = sys.modules[SUPPORTED_BACKENDS[self.options.backend]].backend()
 
 		if not self.options.quiet:
 			print 'Using the "%s" backend.' % self.options.backend
@@ -148,7 +147,7 @@ class LBMSim(object):
 	def get_dist_size(self):
 		return self.options.lat_w * self.options.lat_h
 
-	def _init_code(self):
+	def _init_geo(self):
 		# Particle distributions in host memory.
 		self.dist = numpy.zeros((9, self.options.lat_h, self.options.lat_w), self.float)
 
@@ -157,6 +156,7 @@ class LBMSim(object):
 		self.geo.init_dist(self.dist)
 		self.geo_params = self.float(self.geo.get_params())
 
+	def _init_code(self):
 		lbm_tmpl = Template(filename='lbm.mako', lookup=TemplateLookup(directories=['.']))
 
 		self.tau = self.get_tau()
@@ -175,6 +175,7 @@ class LBMSim(object):
 		ctx['visc'] = self.float(self.options.visc)
 		ctx['backend'] = self.options.backend
 		ctx['geo_params'] = self.geo_params
+		ctx['boundary_type'] = self.options.boundary
 		ctx.update(self.geo.get_defines())
 		ctx.update(self.backend.get_defines())
 
@@ -383,6 +384,7 @@ class LBMSim(object):
 	def run(self):
 		self._calc_screen_size()
 		self._init_vis()
+		self._init_geo()
 		self._init_code()
 		self._init_lbm()
 		self._init_output()

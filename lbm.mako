@@ -58,6 +58,7 @@ ${device_func} inline bool isWallNode(int type) {
 //
 ${device_func} inline void getMacro(Dist fi, int node_type, float *rho, float *vx, float *vy)
 {
+	% if boundary_type != 'fullbb' and boundary_type != 'halfbb':
 	// Wall nodes are special, as some distributions (those pointing out of
 	// the simulation grid) are undefined.
 	if (isWallNode(node_type)) {
@@ -87,8 +88,11 @@ ${device_func} inline void getMacro(Dist fi, int node_type, float *rho, float *v
 		*vy = 0.0f;
 		return;
 	}
+	% endif
 
 	*rho = fi.fC + fi.fE + fi.fW + fi.fS + fi.fN + fi.fNE + fi.fNW + fi.fSE + fi.fSW;
+
+	% if boundary_type != 'fullbb'and boundary_type != 'halfbb':
 	if (node_type >= GEO_BCV) {
 		// Velocity boundary condition.
 		if (node_type < GEO_BCP) {
@@ -103,9 +107,15 @@ ${device_func} inline void getMacro(Dist fi, int node_type, float *rho, float *v
 			*rho = geo_params[idx] * 3.0f;
 		}
 	}
+	% endif
 
-	*vx = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / *rho + 0.5f * ${ext_accel_x};
-	*vy = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / *rho + 0.5f * ${ext_accel_y};
+	*vx = (fi.fE + fi.fSE + fi.fNE - fi.fW - fi.fSW - fi.fNW) / *rho;
+	*vy = (fi.fN + fi.fNW + fi.fNE - fi.fS - fi.fSW - fi.fSE) / *rho;
+
+	if (!isWallNode(node_type)) {
+		*vx += 0.5f * ${ext_accel_x};
+		*vy += 0.5f * ${ext_accel_y};
+	}
 }
 
 //
@@ -275,48 +285,96 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 	feq.fSW = rho * (1.0f + Cusq + 3.0f*(-vx-vy) + 4.5f*(vx+vy)*(vx+vy)) / 36.0f;
 	feq.fNW = rho * (1.0f + Cusq + 3.0f*(-vx+vy) + 4.5f*(-vx+vy)*(-vx+vy)) / 36.0f;
 
-	if (node_type == GEO_FLUID || isWallNode(node_type)) {
-		fi->fC += (feq.fC - fi->fC) / tau;
-		fi->fE += (feq.fE - fi->fE) / tau;
-		fi->fW += (feq.fW - fi->fW) / tau;
-		fi->fS += (feq.fS - fi->fS) / tau;
-		fi->fN += (feq.fN - fi->fN) / tau;
-		fi->fSE += (feq.fSE - fi->fSE) / tau;
-		fi->fNE += (feq.fNE - fi->fNE) / tau;
-		fi->fSW += (feq.fSW - fi->fSW) / tau;
-		fi->fNW += (feq.fNW - fi->fNW) / tau;
-	} else {
-		fi->fC  = feq.fC;
-		fi->fE  = feq.fE;
-		fi->fW  = feq.fW;
-		fi->fS  = feq.fS;
-		fi->fN  = feq.fN;
-		fi->fSE = feq.fSE;
-		fi->fNE = feq.fNE;
-		fi->fSW = feq.fSW;
-		fi->fNW = feq.fNW;
+	fi->fC += (feq.fC - fi->fC) / tau;
+	fi->fE += (feq.fE - fi->fE) / tau;
+	fi->fW += (feq.fW - fi->fW) / tau;
+	fi->fS += (feq.fS - fi->fS) / tau;
+	fi->fN += (feq.fN - fi->fN) / tau;
+	fi->fSE += (feq.fSE - fi->fSE) / tau;
+	fi->fNE += (feq.fNE - fi->fNE) / tau;
+	fi->fSW += (feq.fSW - fi->fSW) / tau;
+	fi->fNW += (feq.fNW - fi->fNW) / tau;
+
+%if boundary_type == 'fullbb':
+	if (!isWallNode(node_type))
+%endif
+	{
+		// External acceleration.
+		float pref = rho * (3.0f - 3.0f/(2.0f * tau));
+		#define eax ${ext_accel_x}
+		#define eay ${ext_accel_y}
+		float ue = eax*vx + eay*vy;
+
+		fi->fC += pref*(-ue) * 4.0f/9.0f;
+		fi->fN += pref*(eay - ue + 3.0f*(eay*vy)) / 9.0f;
+		fi->fE += pref*(eax - ue + 3.0f*(eax*vx)) / 9.0f;
+		fi->fS += pref*(-eay - ue + 3.0f*(eay*vy)) / 9.0f;
+		fi->fW += pref*(-eax - ue + 3.0f*(eax*vx)) / 9.0f;
+		fi->fNE += pref*(eax + eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
+		fi->fSE += pref*(eax - eay - ue + 3.0f*((vx-vy)*(eax-eay))) / 36.0f;
+		fi->fSW += pref*(-eax - eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
+		fi->fNW += pref*(-eax + eay - ue + 3.0f*((-vx+vy)*(-eax+eay))) / 36.0f;
 	}
-
-	// External acceleration.
-	float pref = rho * (3.0f - 3.0f/(2.0f * tau));
-	#define eax ${ext_accel_x}
-	#define eay ${ext_accel_y}
-	float ue = eax*vx + eay*vy;
-
-	fi->fC += pref*(-ue) * 4.0f/9.0f;
-	fi->fN += pref*(eay - ue + 3.0f*(eay*vy)) / 9.0f;
-	fi->fE += pref*(eax - ue + 3.0f*(eax*vx)) / 9.0f;
-	fi->fS += pref*(-eay - ue + 3.0f*(eay*vy)) / 9.0f;
-	fi->fW += pref*(-eax - ue + 3.0f*(eax*vx)) / 9.0f;
-	fi->fNE += pref*(eax + eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
-	fi->fSE += pref*(eax - eay - ue + 3.0f*((vx-vy)*(eax-eay))) / 36.0f;
-	fi->fSW += pref*(-eax - eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
-	fi->fNW += pref*(-eax + eay - ue + 3.0f*((-vx+vy)*(-eax+eay))) / 36.0f;
 }
 % endif
 
-// TODO:
-// - try having dummy nodes as the edges of the lattice to avoid divergent threads
+<%def name="relaxate()">
+	% if model == 'bgk':
+		BGK_relaxate(rho, vx, vy, &fi, map[gi]);
+	% else:
+		MS_relaxate(&fi, map[gi]);
+	% endif
+</%def>
+
+${device_func} inline void bounce_back(Dist *fi)
+{
+	float t;
+	t = fi->fE;
+	fi->fE = fi->fW;
+	fi->fW = t;
+
+	t = fi->fNW;
+	fi->fNW = fi->fSE;
+	fi->fSE = t;
+
+	t = fi->fNE;
+	fi->fNE = fi->fSW;
+	fi->fSW = t;
+
+	t = fi->fN;
+	fi->fN = fi->fS;
+	fi->fS = t;
+}
+
+${device_func} inline void half_bb(Dist *fi, const int node_type)
+{
+	// TODO: add support for corners
+	switch (node_type) {
+	case GEO_WALL_E:
+		fi->fNE = fi->fSW;
+		fi->fSE = fi->fNW;
+		fi->fE = fi->fW;
+		break;
+
+	case GEO_WALL_W:
+		fi->fNW = fi->fSE;
+		fi->fSW = fi->fNE;
+		fi->fW = fi->fE;
+		break;
+
+	case GEO_WALL_S:
+		fi->fSE = fi->fNW;
+		fi->fSW = fi->fNE;
+		fi->fS = fi->fN;
+		break;
+
+	case GEO_WALL_N:
+		fi->fNE = fi->fSW;
+		fi->fNW = fi->fSE;
+		fi->fN = fi->fS;
+		break;
+	}
+}
 
 ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} float *dist_in,
 		${global_ptr} float *dist_out, ${global_ptr} float *orho, ${global_ptr} float *ovx,
@@ -340,24 +398,15 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 
 	int type = map[gi];
 
-	if (isWallNode(type)) {
-		float t;
-		t = fi.fE;
-		fi.fE = fi.fW;
-		fi.fW = t;
-
-		t = fi.fNW;
-		fi.fNW = fi.fSE;
-		fi.fSE = t;
-
-		t = fi.fNE;
-		fi.fNE = fi.fSW;
-		fi.fSW = t;
-
-		t = fi.fN;
-		fi.fN = fi.fS;
-		fi.fS = t;
-	}
+	% if boundary_type == 'fullbb':
+		if (isWallNode(type)) {
+			bounce_back(&fi);
+		}
+	% elif boundary_type == 'halfbb':
+		if (isWallNode(type)) {
+			half_bb(&fi, type);
+		}
+	% endif
 
 	// macroscopic quantities for the current cell
 	float rho, vx, vy;
@@ -370,11 +419,12 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 		ovy[gi] = vy;
 	}
 
-
-	% if model == 'bgk':
-		BGK_relaxate(rho, vx, vy, &fi, map[gi]);
+	% if boundary_type == 'fullbb':
+		if (!isWallNode(type)) {
+			${relaxate()}
+		}
 	% else:
-		MS_relaxate(&fi, map[gi]);
+		${relaxate()}
 	% endif
 
 	#define dir_fC 0

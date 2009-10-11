@@ -46,20 +46,34 @@ class LBMGeoPoiseuille(geo2d.LBMGeo):
 					self.velocity_to_dist(0.0, 0.0, dist, x, y)
 
 	def get_velocity_profile(self):
-		width = self.get_width()
+		width = self.get_chan_width()
+		lat_width = self.get_width()
 		ret = []
+		h = 0
 
-		for x in range(0, width+1):
-			ret.append(-4.0*self.maxv/width**2 * (x - width/2.0)**2 + self.maxv)
+		bc = self.get_bc()
+		if bc.midgrid:
+			h = -0.5
+
+		for x in range(0, lat_width):
+			tx = x+h
+			ret.append(4.0*self.maxv/width**2 * tx * (width-tx))
 
 		return ret
 
+	def get_chan_width(self):
+		width = self.get_width() - 1
+		bc = self.get_bc()
+		if bc.midgrid:
+			return width - 1
+		else:
+			return width
+
 	def get_width(self):
 		if self.options.horizontal:
-			return self.lat_h-1
+			return self.lat_h
 		else:
-			return self.lat_w-1
-
+			return self.lat_w
 
 	def get_reynolds(self, viscosity):
 		return int(self.get_width() * self.maxv/viscosity)
@@ -86,11 +100,13 @@ class LPoiSim(lbm.LBMSim):
 				if k not in self.options.specified:
 					setattr(self.options, k, v)
 
+			self._init_geo()
+
 			if self.options.horizontal:
-				self.options.accel_x = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_h-1)**2)
+				self.options.accel_x = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
 				self.add_iter_hook(self.options.max_iters-1, self.output_profile_horiz)
 			else:
-				self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / ((self.options.lat_w-1)**2)
+				self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
 				self.add_iter_hook(self.options.max_iters-1, self.output_profile_vert)
 
 		self.add_iter_hook(1000, self.output_pars, every=True)

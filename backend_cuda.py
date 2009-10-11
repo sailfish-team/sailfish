@@ -1,7 +1,8 @@
 import pycuda.autoinit
-from struct import calcsize, pack
-
+import pycuda.compiler
 import pycuda.driver as cuda
+
+from struct import calcsize, pack
 
 def _expand_block(block):
 	if block is int:
@@ -53,7 +54,7 @@ class CUDABackend(object):
 			cuda.memcpy_dtoh(target, cl_buf)
 
 	def build(self, source):
-		return cuda.SourceModule(source, options=['--use_fast_math'])
+		return pycuda.compiler.SourceModule(source, options=['--use_fast_math'])
 
 	def get_kernel(self, prog, name, block, args, args_format, shared=None):
 		kern = prog.get_function(name)

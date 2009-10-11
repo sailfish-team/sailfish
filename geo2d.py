@@ -6,6 +6,18 @@ def abstract():
 	caller = inspect.getouterframes(inspect.currentframe())[1][3]
 	raise NotImplementedError(caller + ' must be implemented in subclass')
 
+#
+# Boundary conditions
+#
+class LBMBC(object):
+	def __init__(self, name, midgrid=False, local=True):
+		self.name = name
+		self.midgrid = midgrid
+		self.local = local
+
+SUPPORTED_BCS = [LBMBC('fullbb', midgrid=True),
+				 LBMBC('halfbb', midgrid=True)]
+BCS_MAP = dict((x.name, x) for x in SUPPORTED_BCS)
 
 class LBMGeo(object):
 	"""Abstract class for the LBM geometry."""
@@ -105,7 +117,7 @@ class LBMGeo(object):
 			for y in range(0, self.lat_h):
 				if self.map[y][x] == LBMGeo.NODE_WALL:
 					# If the bool corresponding to a specific direction is True, the
-					# distributions in this direction are defined.
+					# distributions in this direction are undefined.
 					north = y < self.lat_h-1 and self.map[y+1][x] == LBMGeo.NODE_FLUID
 					south = y > 0 and self.map[y-1][x] == LBMGeo.NODE_FLUID
 					west  = x > 0 and self.map[y][x-1] == LBMGeo.NODE_FLUID
@@ -150,4 +162,8 @@ class LBMGeo(object):
 				'geo_wall_n': LBMGeo._NODE_WALL_N,
 				'geo_bcv': LBMGeo.NODE_VELOCITY,
 				'geo_bcp': LBMGeo.NODE_PRESSURE + len(self._vel_map) - 1}
+
+	def get_bc(self):
+		return BCS_MAP[self.options.boundary]
+
 
