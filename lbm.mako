@@ -26,7 +26,14 @@ ${const_var} float geo_params[${num_params+1}] = {
 0};		// geometry parameters
 
 typedef struct Dist {
-	float fC, fE, fW, fS, fN, fSE, fSW, fNE, fNW;
+	float \
+	%for i, dname in enumerate(sym.idx_name):
+${dname}\
+		%if i < len(sym.idx_name)-1:
+, \
+		%endif
+	%endfor
+	;
 } Dist;
 
 // Distribution in momentum space.
@@ -41,15 +48,9 @@ typedef struct DistM {
 //
 ${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int idx)
 {
-	dout->fC = din[idx];
-	dout->fE = din[DIST_SIZE + idx];
-	dout->fW = din[DIST_SIZE*2 + idx];
-	dout->fS = din[DIST_SIZE*3 + idx];
-	dout->fN = din[DIST_SIZE*4 + idx];
-	dout->fSE = din[DIST_SIZE*5 + idx];
-	dout->fSW = din[DIST_SIZE*6 + idx];
-	dout->fNE = din[DIST_SIZE*7 + idx];
-	dout->fNW = din[DIST_SIZE*8 + idx];
+	%for i, dname in enumerate(sym.idx_name):
+		dout->${dname} = din[idx + DIST_SIZE*${i}];
+	%endfor
 }
 
 ${device_func} inline bool isWallNode(int type) {

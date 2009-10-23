@@ -8,3 +8,6 @@
 * D3Qx
   - implement basic BGK/MRT code for these lattices
 
+* optimization
+  - investigate impact of the order of the distributions in the struct
+    and of their processing in the BGK kernel
