@@ -290,35 +290,35 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 {
 	Dist feq;
 
-%for feq, idx in sym.get_bgk_collision():
-	feq.${idx} = ${feq};
-%endfor
+	%for feq, idx in sym.get_bgk_collision():
+		feq.${idx} = ${feq};
+	%endfor
 
-%for idx in sym.idx_name:
-	fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
-%endfor
+	%for idx in sym.idx_name:
+		fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
+	%endfor
 
-%if ext_accel_x != 0.0 and ext_accel_y != 0.0:
-	%if boundary_type == 'fullbb':
-	if (!isWallNode(node_type))
-	%endif
-	{
-		// External acceleration.
-		float pref = rho * (3.0f - 3.0f/(2.0f * tau));
-		#define eax ${'%.20ff' % ext_accel_x}
-		#define eay ${'%.20ff' % ext_accel_y}
-		float ue = eax*vx + eay*vy;
+	%if ext_accel_x != 0.0 and ext_accel_y != 0.0:
+		%if boundary_type == 'fullbb':
+			if (!isWallNode(node_type))
+		%endif
+		{
+			// External acceleration.
+			float pref = rho * (3.0f - 3.0f/(2.0f * tau));
+			#define eax ${'%.20ff' % ext_accel_x}
+			#define eay ${'%.20ff' % ext_accel_y}
+			float ue = eax*vx + eay*vy;
 
-		fi->fC += pref*(-ue) * 4.0f/9.0f;
-		fi->fN += pref*(eay - ue + 3.0f*(eay*vy)) / 9.0f;
-		fi->fE += pref*(eax - ue + 3.0f*(eax*vx)) / 9.0f;
-		fi->fS += pref*(-eay - ue + 3.0f*(eay*vy)) / 9.0f;
-		fi->fW += pref*(-eax - ue + 3.0f*(eax*vx)) / 9.0f;
-		fi->fNE += pref*(eax + eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
-		fi->fSE += pref*(eax - eay - ue + 3.0f*((vx-vy)*(eax-eay))) / 36.0f;
-		fi->fSW += pref*(-eax - eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
-		fi->fNW += pref*(-eax + eay - ue + 3.0f*((-vx+vy)*(-eax+eay))) / 36.0f;
-	}
+			fi->fC += pref*(-ue) * 4.0f/9.0f;
+			fi->fN += pref*(eay - ue + 3.0f*(eay*vy)) / 9.0f;
+			fi->fE += pref*(eax - ue + 3.0f*(eax*vx)) / 9.0f;
+			fi->fS += pref*(-eay - ue + 3.0f*(eay*vy)) / 9.0f;
+			fi->fW += pref*(-eax - ue + 3.0f*(eax*vx)) / 9.0f;
+			fi->fNE += pref*(eax + eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
+			fi->fSE += pref*(eax - eay - ue + 3.0f*((vx-vy)*(eax-eay))) / 36.0f;
+			fi->fSW += pref*(-eax - eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
+			fi->fNW += pref*(-eax + eay - ue + 3.0f*((-vx+vy)*(-eax+eay))) / 36.0f;
+		}
 %endif
 }
 %endif
@@ -334,21 +334,12 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 ${device_func} inline void bounce_back(Dist *fi)
 {
 	float t;
-	t = fi->fE;
-	fi->fE = fi->fW;
-	fi->fW = t;
 
-	t = fi->fNW;
-	fi->fNW = fi->fSE;
-	fi->fSE = t;
-
-	t = fi->fNE;
-	fi->fNE = fi->fSW;
-	fi->fSW = t;
-
-	t = fi->fN;
-	fi->fN = fi->fS;
-	fi->fS = t;
+	%for i in sym.bb_swap_pairs():
+		t = fi->${sym.idx_name[i]};
+		fi->${sym.idx_name[i]} = fi->${sym.idx_name[sym.idx_opposite[i]]};
+		fi->${sym.idx_name[sym.idx_opposite[i]]} = t;
+	%endfor
 }
 
 ${device_func} inline void half_bb(Dist *fi, const int node_type)

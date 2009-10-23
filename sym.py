@@ -17,7 +17,6 @@ rho = Symbol('rho')
 vx = Symbol('vx')
 vy = Symbol('vy')
 v = Matrix(([vx, vy],))
-csq = Rational(1, 3)  # fluid velocity
 
 def poly_factorize(poly):
 	"""Factorize multivariate polynomials into a sum of products of monomials.
@@ -86,3 +85,14 @@ def get_bgk_collision():
 
 	return out
 
+def bb_swap_pairs():
+	ret = set()
+
+	for i, j in enumerate(idx_opposite):
+		# Nothing to swap with.
+		if i == j:
+			continue
+
+		ret.add(min(i,j))
+
+	return ret
