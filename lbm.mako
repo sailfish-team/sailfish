@@ -298,26 +298,19 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 		fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
 	%endfor
 
-	%if ext_accel_x != 0.0 and ext_accel_y != 0.0:
+	%if ext_accel_x != 0.0 or ext_accel_y != 0.0:
 		%if boundary_type == 'fullbb':
 			if (!isWallNode(node_type))
 		%endif
 		{
 			// External acceleration.
-			float pref = rho * (3.0f - 3.0f/(2.0f * tau));
 			#define eax ${'%.20ff' % ext_accel_x}
 			#define eay ${'%.20ff' % ext_accel_y}
-			float ue = eax*vx + eay*vy;
+			float pref = ${sym.bgk_external_force_pref()};
 
-			fi->fC += pref*(-ue) * 4.0f/9.0f;
-			fi->fN += pref*(eay - ue + 3.0f*(eay*vy)) / 9.0f;
-			fi->fE += pref*(eax - ue + 3.0f*(eax*vx)) / 9.0f;
-			fi->fS += pref*(-eay - ue + 3.0f*(eay*vy)) / 9.0f;
-			fi->fW += pref*(-eax - ue + 3.0f*(eax*vx)) / 9.0f;
-			fi->fNE += pref*(eax + eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
-			fi->fSE += pref*(eax - eay - ue + 3.0f*((vx-vy)*(eax-eay))) / 36.0f;
-			fi->fSW += pref*(-eax - eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
-			fi->fNW += pref*(-eax + eay - ue + 3.0f*((-vx+vy)*(-eax+eay))) / 36.0f;
+			%for val, idx in sym.bgk_external_force():
+				fi->${idx} += ${val};
+			%endfor
 		}
 %endif
 }

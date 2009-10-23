@@ -92,7 +92,7 @@ class LPoiSim(lbm.LBMSim):
 
 		defaults = {'batch': True, 'max_iters': 500000, 'visc': 0.1, 'lat_w': 64, 'lat_h': 64}
 
-		if self.options.test:
+		if self.options.test or self.options.benchmark:
 			self.options.periodic_y = not self.options.horizontal
 			self.options.periodic_x = self.options.horizontal
 
@@ -104,12 +104,17 @@ class LPoiSim(lbm.LBMSim):
 
 			if self.options.horizontal:
 				self.options.accel_x = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
-				self.add_iter_hook(self.options.max_iters-1, self.output_profile_horiz)
+				if self.options.test:
+					self.add_iter_hook(self.options.max_iters-1, self.output_profile_horiz)
 			else:
 				self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
-				self.add_iter_hook(self.options.max_iters-1, self.output_profile_vert)
+				if self.options.test:
+					self.add_iter_hook(self.options.max_iters-1, self.output_profile_vert)
 
-		self.add_iter_hook(1000, self.output_pars, every=True)
+			if self.options.test:
+				self.add_iter_hook(1000, self.output_pars, every=True)
+			else:
+				self.options.max_iters = 0
 
 	def get_profile(self):
 		if self.options.horizontal:

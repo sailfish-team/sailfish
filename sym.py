@@ -53,6 +53,9 @@ def poly_factorize(poly):
 				drop_idx.append(i)
 				new_poly.append((poly.coeff(*monom), monom))
 
+		if not new_poly:
+			continue
+
 		ret_poly += factor(Poly(new_poly, *poly.symbols))
 
 		for idx in reversed(drop_idx):
@@ -69,9 +72,15 @@ def poly_factorize(poly):
 	return ret_poly / denom
 
 def expand_powers(t):
-	 return re.sub('([a-z]+)\*\*2', '\\1*\\1', t)
+	# FIXME: This should work for powers other than 2.
+	return re.sub('([a-z]+)\*\*2', '\\1*\\1', t)
 
 def get_bgk_collision():
+	"""Get expressions for the BGK equilibrium distribution.
+
+	Returns:
+	   a list of strings representing the equilibrium distribution functions
+	"""
 	out = []
 
 	for i, ei in enumerate(basis):
@@ -85,7 +94,26 @@ def get_bgk_collision():
 
 	return out
 
+def bgk_external_force():
+	eax = Symbol('eax')
+	eay = Symbol('eay')
+	pref = Symbol('pref')
+	ea = Matrix(([eax, eay],))
+	ret = []
+
+	for i, ei in enumerate(basis):
+		t = expand_powers(str(pref * weights[i] *
+			poly_factorize( (ei - v + ei.dot(v)*ei*3).dot(ea) )))
+		ret.append((t, idx_name[i]))
+
+	return ret
+
+def bgk_external_force_pref():
+	# This includes a factor of c_s^2.
+	return 'rho * (3.0f - 3.0f/(2.0f * tau))'
+
 def bb_swap_pairs():
+	"""Get a set of indices which have to be swapped for a full bounce-back."""
 	ret = set()
 
 	for i, j in enumerate(idx_opposite):

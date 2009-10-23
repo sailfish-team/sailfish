@@ -345,7 +345,8 @@ class LBMSim(object):
 			cycles = self.options.max_iters
 		else:
 			cycles = 1000
-			print '# iters mlups_avg mlups_curr'
+
+		print '# iters mlups_avg mlups_curr'
 
 		import time
 
