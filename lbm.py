@@ -77,7 +77,8 @@ class LBMSim(object):
 		group.add_option('--max_iters', dest='max_iters', help='number of iterations to run in benchmark/batch mode', action='store', type='int', default=0)
 		group.add_option('--batch', dest='batch', help='run in batch mode, with no visualization', action='store_true', default=False)
 		group.add_option('--nobatch', dest='batch', help='run in interactive mode', action='store_false')
-		group.add_option('--save_src', dest='save_src', help='file to save the CUDA source code to', action='store', type='string', default='')
+		group.add_option('--save_src', dest='save_src', help='file to save the CUDA/OpenCL source code to', action='store', type='string', default='')
+		group.add_option('--use_src', dest='use_src', help='CUDA/OpenCL source to use instead of the automatically generated one', action='store', type='string', default='')
 		group.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
 		group.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat'], default='h5flat')
 		parser.add_option_group(group)
@@ -174,8 +175,8 @@ class LBMSim(object):
 		ctx['periodic_x'] = int(self.options.periodic_x)
 		ctx['periodic_y'] = int(self.options.periodic_y)
 		ctx['dist_size'] = self.get_dist_size()
-		ctx['ext_accel_x'] = '((float)%.20ff)' % self.options.accel_x
-		ctx['ext_accel_y'] = '((float)%.20ff)' % self.options.accel_y
+		ctx['ext_accel_x'] = self.options.accel_x
+		ctx['ext_accel_y'] = self.options.accel_y
 		ctx['tau'] = self.tau
 		ctx['visc'] = self.float(self.options.visc)
 		ctx['backend'] = self.options.backend
@@ -190,9 +191,12 @@ class LBMSim(object):
 			src = _convert_to_double(src)
 
 		if self.options.save_src:
-			fsrc = open(self.options.save_src, 'w')
-			print >>fsrc, src
-			fsrc.close()
+			with open(self.options.save_src, 'w') as fsrc:
+				print >>fsrc, src
+
+		if self.options.use_src:
+			with open(self.options.use_src, 'r') as fsrc:
+				src = fsrc.read()
 
 		self.mod = self.backend.build(src)
 

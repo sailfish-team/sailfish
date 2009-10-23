@@ -1,3 +1,7 @@
+<%!
+    import sym
+%>
+
 #define BLOCK_SIZE ${block_size}
 #define PERIODIC_X ${periodic_x}
 #define PERIODIC_Y ${periodic_y}
@@ -126,8 +130,8 @@ ${device_func} void getMacro(Dist *fi, int node_type, float *rho, float *vx, flo
 	*vy = (fi->fN + fi->fNW + fi->fNE - fi->fS - fi->fSW - fi->fSE) / *rho;
 
 	if (!isWallNode(node_type)) {
-		*vx += 0.5f * ${ext_accel_x};
-		*vy += 0.5f * ${ext_accel_y};
+		*vx += ${'%.20f' % (0.5 * ext_accel_x)};
+		*vy += ${'%.20f' % (0.5 * ext_accel_y)};
 	}
 }
 
@@ -284,38 +288,25 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 //
 ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int node_type)
 {
-	// relaxation
-	float Cusq = -1.5f * (vx*vx + vy*vy);
 	Dist feq;
 
-	feq.fC = rho * (1.0f + Cusq) * 4.0f/9.0f;
-	feq.fN = rho * (1.0f + Cusq + 3.0f*vy + 4.5f*vy*vy) / 9.0f;
-	feq.fE = rho * (1.0f + Cusq + 3.0f*vx + 4.5f*vx*vx) / 9.0f;
-	feq.fS = rho * (1.0f + Cusq - 3.0f*vy + 4.5f*vy*vy) / 9.0f;
-	feq.fW = rho * (1.0f + Cusq - 3.0f*vx + 4.5f*vx*vx) / 9.0f;
-	feq.fNE = rho * (1.0f + Cusq + 3.0f*(vx+vy) + 4.5f*(vx+vy)*(vx+vy)) / 36.0f;
-	feq.fSE = rho * (1.0f + Cusq + 3.0f*(vx-vy) + 4.5f*(vx-vy)*(vx-vy)) / 36.0f;
-	feq.fSW = rho * (1.0f + Cusq + 3.0f*(-vx-vy) + 4.5f*(vx+vy)*(vx+vy)) / 36.0f;
-	feq.fNW = rho * (1.0f + Cusq + 3.0f*(-vx+vy) + 4.5f*(-vx+vy)*(-vx+vy)) / 36.0f;
+%for feq, idx in sym.get_bgk_collision():
+	feq.${idx} = ${feq};
+%endfor
 
-	fi->fC += (feq.fC - fi->fC) / tau;
-	fi->fE += (feq.fE - fi->fE) / tau;
-	fi->fW += (feq.fW - fi->fW) / tau;
-	fi->fS += (feq.fS - fi->fS) / tau;
-	fi->fN += (feq.fN - fi->fN) / tau;
-	fi->fSE += (feq.fSE - fi->fSE) / tau;
-	fi->fNE += (feq.fNE - fi->fNE) / tau;
-	fi->fSW += (feq.fSW - fi->fSW) / tau;
-	fi->fNW += (feq.fNW - fi->fNW) / tau;
+%for idx in sym.idx_name:
+	fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
+%endfor
 
-%if boundary_type == 'fullbb':
+%if ext_accel_x != 0.0 and ext_accel_y != 0.0:
+	%if boundary_type == 'fullbb':
 	if (!isWallNode(node_type))
-%endif
+	%endif
 	{
 		// External acceleration.
 		float pref = rho * (3.0f - 3.0f/(2.0f * tau));
-		#define eax ${ext_accel_x}
-		#define eay ${ext_accel_y}
+		#define eax ${'%.20ff' % ext_accel_x}
+		#define eay ${'%.20ff' % ext_accel_y}
 		float ue = eax*vx + eay*vy;
 
 		fi->fC += pref*(-ue) * 4.0f/9.0f;
@@ -328,8 +319,9 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 		fi->fSW += pref*(-eax - eay - ue + 3.0f*((vx+vy)*(eax+eay))) / 36.0f;
 		fi->fNW += pref*(-eax + eay - ue + 3.0f*((-vx+vy)*(-eax+eay))) / 36.0f;
 	}
+%endif
 }
-% endif
+%endif
 
 <%def name="relaxate()">
 	% if model == 'bgk':
