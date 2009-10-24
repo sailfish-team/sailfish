@@ -124,3 +124,22 @@ def bb_swap_pairs():
 		ret.add(min(i,j))
 
 	return ret
+
+def ex_rho(distp):
+	syms = [Symbol('%s->%s' % (distp, x)) for x in idx_name]
+	ret = 0
+
+	for sym in syms:
+		ret += sym
+
+	return ret
+
+def ex_velocity(distp, dim, rho):
+	syms = [Symbol('%s->%s' % (distp, x)) for x in idx_name]
+	srho = Symbol(rho)
+	ret = 0
+
+	for i, sym in enumerate(syms):
+		 ret += basis[i][dim] * sym
+
+	return ret / srho

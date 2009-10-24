@@ -108,7 +108,7 @@ ${device_func} void getMacro(Dist *fi, int node_type, float *rho, float *vx, flo
 		}
 	% endif
 
-	*rho = fi->fC + fi->fE + fi->fW + fi->fS + fi->fN + fi->fNE + fi->fNW + fi->fSE + fi->fSW;
+	*rho = ${sym.ex_rho('fi')};
 
 	% if boundary_type != 'fullbb' and boundary_type != 'halfbb':
 	if (node_type >= GEO_BCV) {
@@ -127,8 +127,8 @@ ${device_func} void getMacro(Dist *fi, int node_type, float *rho, float *vx, flo
 	}
 	% endif
 
-	*vx = (fi->fE + fi->fSE + fi->fNE - fi->fW - fi->fSW - fi->fNW) / *rho;
-	*vy = (fi->fN + fi->fNW + fi->fNE - fi->fS - fi->fSW - fi->fSE) / *rho;
+	*vx = ${str(sym.ex_velocity('fi', 0, '*rho')).replace('/*', '/ *')};
+	*vy = ${str(sym.ex_velocity('fi', 1, '*rho')).replace('/*', '/ *')};
 
 	if (!isWallNode(node_type)) {
 		*vx += ${'%.20f' % (0.5 * ext_accel_x)};
