@@ -175,15 +175,10 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 ## This might be caused by the NVIDIA OpenCL compiler not inlining the getDist function.
 ## To avoid the performance loss, we temporarily inline getDist manually.
 	// getDist(&fc, dist, idx);
-	fc.fC = dist[idx];
-	fc.fE = dist[DIST_SIZE + idx];
-	fc.fW = dist[DIST_SIZE*2 + idx];
-	fc.fS = dist[DIST_SIZE*3 + idx];
-	fc.fN = dist[DIST_SIZE*4 + idx];
-	fc.fSE = dist[DIST_SIZE*5 + idx];
-	fc.fSW = dist[DIST_SIZE*6 + idx];
-	fc.fNE = dist[DIST_SIZE*7 + idx];
-	fc.fNW = dist[DIST_SIZE*8 + idx];
+
+	%for i, dname in enumerate(sym.idx_name):
+		fc.${dname} = dist[idx + DIST_SIZE*${i}];
+	%endfor
 
 	getMacro(&fc, map[idx], &rho, &vx, &vy);
 
@@ -417,15 +412,9 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 		${relaxate()}
 	% endif
 
-	#define dir_fC 0
-	#define dir_fE 1
-	#define dir_fW 2
-	#define dir_fS 3
-	#define dir_fN 4
-	#define dir_fSE 5
-	#define dir_fSW 6
-	#define dir_fNE 7
-	#define dir_fNW 8
+	%for i, dname in enumerate(sym.idx_name):
+		#define dir_${dname} ${i}
+	%endfor
 
 	#define dir_idx(idx) dir_##idx
 	#define set_odist(idx, dir, val) dist_out[DIST_SIZE*dir_idx(dir) + idx] = val

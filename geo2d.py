@@ -1,4 +1,6 @@
 import numpy
+import sym
+import sympy
 
 # Abstract class implementation, from Peter's Norvig site.
 def abstract():
@@ -48,6 +50,10 @@ class LBMGeo(object):
 		self._define_nodes()
 		self._postprocess_nodes()
 		self.float = float
+
+		# Cache for equilibrium distributions.  Sympy numerical evaluation
+		# is expensive.
+		self.feq_cache = {}
 
 	def _define_nodes(self):
 		"""Define the types of all nodes."""
@@ -101,17 +107,17 @@ class LBMGeo(object):
 		"""Set the distributions at node (x,y) so that the fluid there has a
 		specific velocity (vx,vy).
 		"""
-		cusq = -1.5 * (vx*vx + vy*vy)
-		eq_rho = 1.0
-		dist[0][y][x] = self.float((1.0 + cusq) * 4.0/9.0 * eq_rho)
-		dist[4][y][x] = self.float((1.0 + cusq + 3.0*vy + 4.5*vy*vy) / 9.0 * eq_rho)
-		dist[1][y][x] = self.float((1.0 + cusq + 3.0*vx + 4.5*vx*vx) / 9.0 * eq_rho)
-		dist[3][y][x] = self.float((1.0 + cusq - 3.0*vy + 4.5*vy*vy) / 9.0 * eq_rho)
-		dist[2][y][x] = self.float((1.0 + cusq - 3.0*vx + 4.5*vx*vx) / 9.0 * eq_rho)
-		dist[7][y][x] = self.float((1.0 + cusq + 3.0*(vx+vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0 * eq_rho)
-		dist[5][y][x] = self.float((1.0 + cusq + 3.0*(vx-vy) + 4.5*(vx-vy)*(vx-vy)) / 36.0 * eq_rho)
-		dist[6][y][x] = self.float((1.0 + cusq + 3.0*(-vx-vy) + 4.5*(vx+vy)*(vx+vy)) / 36.0 * eq_rho)
-		dist[8][y][x] = self.float((1.0 + cusq + 3.0*(-vx+vy) + 4.5*(-vx+vy)*(-vx+vy)) / 36.0 * eq_rho)
+		if (vx, vy) not in self.feq_cache:
+			vals = []
+			eq_rho = 1.0
+			eq_dist = sym.get_bgk_collision()
+			for i, (eqd, idx) in enumerate(eq_dist):
+				vals.append(self.float(sympy.N(eqd,
+						subs={sym.rho: eq_rho, sym.vx: vx, sym.vy: vy})))
+			self.feq_cache[(vx, vy)] = vals
+
+		for i, val in enumerate(self.feq_cache[(vx, vy)]):
+			dist[i][y][x] = val
 
 	def _postprocess_nodes(self):
 		"""Detect types of wall nodes and mark them appropriately."""
