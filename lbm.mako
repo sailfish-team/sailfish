@@ -3,8 +3,6 @@
 %>
 
 #define BLOCK_SIZE ${block_size}
-#define PERIODIC_X ${periodic_x}
-#define PERIODIC_Y ${periodic_y}
 #define DIST_SIZE ${dist_size}
 #define GEO_FLUID ${geo_fluid}
 #define GEO_WALL_E ${geo_wall_e}
@@ -471,17 +469,28 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	// E propagation in global memory (at right block boundary)
 	} else if (ti < ${lat_w-1}) {
 		set_odist(gi+rel(1,0), fE, fi.fE);
-		if (get_group_id(1) > 0)			set_odist(gi+rel(1,-1), fSE, fi.fSE);
-		else if (PERIODIC_Y)		set_odist(ti+${lat_w*(lat_h-1)+1}, fSE, fi.fSE);
+		if (get_group_id(1) > 0)	set_odist(gi+rel(1,-1), fSE, fi.fSE);
+		%if periodic_y:
+			else					set_odist(ti+${lat_w*(lat_h-1)+1}, fSE, fi.fSE);
+		%endif
 		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(1,1), fNE, fi.fNE);
-		else if (PERIODIC_Y)		set_odist(ti+1, fNE, fi.fNE);
-	} else if (PERIODIC_X) {
+		%if periodic_y:
+			else					set_odist(ti+1, fNE, fi.fNE);
+		%endif
+	}
+	%if periodic_x:
+	else {
 		set_odist(gi+rel(${-lat_w+1}, 0), fE, fi.fE);
 		if (get_group_id(1) > 0)			set_odist(gi+rel(${-lat_w+1},-1), fSE, fi.fSE);
-		else if (PERIODIC_Y)		set_odist(rel(0, ${lat_h-1}), fSE, fi.fSE);
+		%if periodic_y:
+			else							set_odist(rel(0, ${lat_h-1}), fSE, fi.fSE);
+		%endif
 		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(${-lat_w+1},1), fNE, fi.fNE);
-		else if (PERIODIC_Y)		set_odist(rel(0, 0), fNE, fi.fNE);
+		%if periodic_y:
+			else							set_odist(rel(0, 0), fNE, fi.fNE);
+		%endif
 	}
+	%endif
 
 	// W propagation in shared memory
 	if (tix > 0) {
@@ -491,17 +500,28 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	// W propagation in global memory (at left block boundary)
 	} else if (ti > 0) {
 		set_odist(gi+rel(-1,0), fW, fi.fW);
-		if (get_group_id(1) > 0)			set_odist(gi+rel(-1,-1), fSW, fi.fSW);
-		else if (PERIODIC_Y)		set_odist(ti+${lat_w*(lat_h-1)-1}, fSW, fi.fSW);
+		if (get_group_id(1)	> 0)			set_odist(gi+rel(-1,-1), fSW, fi.fSW);
+		%if periodic_y:
+			else							set_odist(ti+${lat_w*(lat_h-1)-1}, fSW, fi.fSW);
+		%endif
 		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(-1,1), fNW, fi.fNW);
-		else if (PERIODIC_Y)		set_odist(ti-1, fNW, fi.fNW);
-	} else if (PERIODIC_X) {
+		%if periodic_y:
+			else							set_odist(ti-1, fNW, fi.fNW);
+		%endif
+	}
+	%if periodic_x:
+	else {
 		set_odist(gi+rel(${lat_w-1},0), fW, fi.fW);
 		if (get_group_id(1) > 0)			set_odist(gi+rel(${lat_w-1},-1), fSW, fi.fSW);
-		else if (PERIODIC_Y)		set_odist(${lat_h*lat_w-1}, fSW, fi.fSW);
+		%if periodic_y:
+			else							set_odist(${lat_h*lat_w-1}, fSW, fi.fSW);
+		%endif
 		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(${lat_w-1},1), fNW, fi.fNW);
-		else if (PERIODIC_Y)		set_odist(${lat_w-1}, fNW, fi.fNW);
+		%if periodic_y:
+			else							set_odist(${lat_w-1}, fNW, fi.fNW);
+		%endif
 	}
+	%endif
 
 % if backend == 'cuda':
 	__syncthreads();
@@ -513,24 +533,36 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	if (tix > 0) {
 		set_odist(gi, fE, fo_E[tix]);
 		if (get_group_id(1) > 0)			set_odist(gi-${lat_w}, fSE, fo_SE[tix]);
-		else if (PERIODIC_Y)		set_odist(gi+${lat_w*(lat_h-1)}, fSE, fo_SE[tix]);
+		%if periodic_y:
+			else							set_odist(gi+${lat_w*(lat_h-1)}, fSE, fo_SE[tix]);
+		%endif
 		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+${lat_w}, fNE, fo_NE[tix]);
-		else if (PERIODIC_Y)		set_odist(ti, fNE, fo_NE[tix]);
+		%if periodic_y:
+			else							set_odist(ti, fNE, fo_NE[tix]);
+		%endif
 	}
 
 	// N + S propagation (global memory)
 	if (get_group_id(1) > 0)			set_odist(gi-${lat_w}, fS, fi.fS);
-	else if (PERIODIC_Y)		set_odist(ti+${lat_w*(lat_h-1)}, fS, fi.fS);
+	%if periodic_y:
+		else							set_odist(ti+${lat_w*(lat_h-1)}, fS, fi.fS);
+	%endif
 	if (get_group_id(1) < ${lat_h-1})	set_odist(gi+${lat_w}, fN, fi.fN);
-	else if (PERIODIC_Y)		set_odist(ti, fN, fi.fN);
+	%if periodic_y:
+		else							set_odist(ti, fN, fi.fN);
+	%endif
 
 	// the rightmost thread is not updated in this block
 	if (tix < get_local_size(0)-1) {
 		set_odist(gi, fW, fo_W[tix]);
 		if (get_group_id(1) > 0)			set_odist(gi-${lat_w}, fSW, fo_SW[tix]);
-		else if (PERIODIC_Y)		set_odist(gi+${lat_w*(lat_h-1)}, fSW, fo_SW[tix]);
+		%if periodic_y:
+			else							set_odist(gi+${lat_w*(lat_h-1)}, fSW, fo_SW[tix]);
+		%endif
 		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+${lat_w}, fNW, fo_NW[tix]);
-		else if (PERIODIC_Y)		set_odist(ti, fNW, fo_NW[tix]);
+		%if periodic_y:
+			else							set_odist(ti, fNW, fo_NW[tix]);
+		%endif
 	}
 }
 
