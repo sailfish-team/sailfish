@@ -296,6 +296,19 @@ class LBMSim(object):
 			if tracers:
 				self.backend.run_kernel(kerns[2], (self.options.tracers,))
 
+	def get_macro_quantities(self, gpu_dist):
+		self.backend.from_buf(gpu_dist)
+
+		import sym
+		mx = 0.0
+		my = 0.0
+
+		for i, mval in enumerate(self.dist):
+			mx += sym.basis[i][0] * numpy.sum(mval)
+			my += sym.basis[i][1] * numpy.sum(mval)
+
+		return mx, my, numpy.sum(self.dist)
+
 	def get_mlups(self, tdiff, iters=None):
 		if iters is not None:
 			it = iters
