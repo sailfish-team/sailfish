@@ -64,6 +64,14 @@ ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *t
 	*type = nodetype >> ${geo_orientation_shift};
 }
 
+<%def name="zouhe_velocity(orientation)">
+	case ${orientation}:
+		%for arg, val in sym.zouhe_velocity(orientation):
+			${sym.use_pointers(str(arg))} = ${sym.use_pointers(str(val))};
+		%endfor
+		break;
+</%def>
+
 //
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
@@ -82,33 +90,10 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 			}
 
 			switch (orientation) {
-			case ${geo_wall_n}:
-				*rho = (2.0f * (fi->fSW + fi->fS + fi->fSE) + fi->fC + fi->fE + fi->fW) / (1.0f - *vy);
-				fi->fN = fi->fS + 2.0f * *rho * *vy / 3.0f;	// + feq_N - feq_S;
-				fi->fNE = fi->fSW + (fi->fW - fi->fE + *rho * (*vx + *vy/3.0f)) / 2.0f;
-				fi->fNW = fi->fSE + (fi->fE - fi->fW + *rho * (-*vx + *vy/3.0f)) / 2.0f;
-				break;
-
-			case ${geo_wall_s}:
-				*rho = (2.0f * (fi->fNW + fi->fN + fi->fNE) + fi->fC + fi->fE + fi->fW) / (1.0f + *vy);
-				fi->fS = fi->fN - 2.0f * *rho  * *vy/ 3.0f;	// + feq_S - feq_N;
-				fi->fSE = fi->fNW + (fi->fW - fi->fE + *rho * (*vx - *vy/3.0f)) / 2.0f;
-				fi->fSW = fi->fNE + (fi->fE - fi->fW + *rho * -(*vx + *vy/3.0f)) / 2.0f;
-				break;
-
-			case ${geo_wall_e}:
-				*rho = (2.0f * (fi->fNW + fi->fW + fi->fSW) + fi->fC + fi->fS + fi->fN) / (1.0f - *vx);
-				fi->fE = fi->fW + 2.0f * *rho * *vx / 3.0f;	// + feq_E - feq_W;
-				fi->fNE = fi->fSW + (fi->fS - fi->fN + *rho * (*vx/3.0f + *vy)) / 2.0f;
-				fi->fSE = fi->fNW + (fi->fN - fi->fS + *rho * (*vx/3.0f - *vy)) / 2.0f;
-				break;
-
-			case ${geo_wall_w}:
-				*rho = (2.0f * (fi->fNE + fi->fSE + fi->fE) + fi->fC + fi->fS + fi->fN) / (1.0f + *vx);
-				fi->fW = fi->fE - 2.0f * *rho * *vx / 3.0f;	// + feq_W - feq_E;
-				fi->fNW = fi->fSE + (fi->fS - fi->fN + *rho * (-*vx/3.0f + *vy)) / 2.0f;
-				fi->fSW = fi->fNE + (fi->fN - fi->fS + *rho * -(*vx/3.0f + *vy)) / 2.0f;
-				break;
+			${zouhe_velocity(geo_wall_n)}
+			${zouhe_velocity(geo_wall_s)}
+			${zouhe_velocity(geo_wall_e)}
+			${zouhe_velocity(geo_wall_w)}
 
 			case ${geo_wall_ne}:
 				*rho = (2.0f * (fi->fW + fi->fS + fi->fSW) + fi->fC + fi->fNW + fi->fSE) / (1.0f - 11.0f/12.0f*(*vx + *vy));
@@ -323,7 +308,7 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 {
 	Dist feq;
 
-	%for feq, idx in sym.get_bgk_collision():
+	%for feq, idx in sym.bgk_equilibrium():
 		feq.${idx} = ${feq};
 	%endfor
 

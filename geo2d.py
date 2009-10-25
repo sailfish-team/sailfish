@@ -31,15 +31,16 @@ class LBMGeo(object):
 	NODE_VELOCITY = 2
 	NODE_PRESSURE = 3
 
-	# Constants to specify node orientation.
+	# Constants to specify node orientation.  This needs to match the order
+	# in sym.basis.
 	NODE_WALL_E = 0
-	NODE_WALL_W = 1
-	NODE_WALL_N = 2
+	NODE_WALL_N = 1
+	NODE_WALL_W = 2
 	NODE_WALL_S = 3
 	NODE_WALL_NE = 4
 	NODE_WALL_NW = 5
-	NODE_WALL_SE = 6
-	NODE_WALL_SW = 7
+	NODE_WALL_SW = 6
+	NODE_WALL_SE = 7
 
 	NODE_TYPE_MASK = 0xfffffff8
 	NODE_ORIENTATION_SHIFT = 3
@@ -130,7 +131,7 @@ class LBMGeo(object):
 		if (vx, vy) not in self.feq_cache:
 			vals = []
 			eq_rho = 1.0
-			eq_dist = sym.get_bgk_collision()
+			eq_dist = sym.bgk_equilibrium()
 			for i, (eqd, idx) in enumerate(eq_dist):
 				vals.append(self.float(sympy.N(eqd,
 						subs={sym.rho: eq_rho, sym.vx: vx, sym.vy: vy})))

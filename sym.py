@@ -4,18 +4,22 @@ import re
 
 #set_main(sys.modules[__name__])
 
+# Discretized velocities.
 basis = map(lambda x: Matrix((x,)),
 			[(0,0), (1,0), (0, 1), (-1, 0), (0, -1), (1, 1), (-1, 1), (-1, -1), (1, -1)])
 
+# BGK weights.
 weights = map(lambda x: Rational(*x),
 		[(4, 9), (1, 9), (1, 9), (1, 9), (1, 9), (1, 36), (1, 36), (1, 36), (1, 36)])
 
+# Names of the distributions to use in the code.
 idx_name = ['fC', 'fE', 'fN', 'fW', 'fS', 'fNE', 'fNW', 'fSW', 'fSE']
 idx_opposite = [0, 3, 4, 1, 2, 7, 8, 5, 6]
 
 rho = Symbol('rho')
 vx = Symbol('vx')
 vy = Symbol('vy')
+
 v = Matrix(([vx, vy],))
 
 def poly_factorize(poly):
@@ -75,7 +79,7 @@ def expand_powers(t):
 	# FIXME: This should work for powers other than 2.
 	return re.sub('([a-z]+)\*\*2', '\\1*\\1', t)
 
-def get_bgk_collision():
+def bgk_equilibrium(as_string=True):
 	"""Get expressions for the BGK equilibrium distribution.
 
 	Returns:
@@ -84,12 +88,14 @@ def get_bgk_collision():
 	out = []
 
 	for i, ei in enumerate(basis):
-		t = expand_powers(str(
-				rho * weights[i] *
+		t = (rho * weights[i] *
 					(1 + poly_factorize(
 						3*ei.dot(v) +
 						Rational(9, 2) * (ei.dot(v))**2 -
-						Rational(3, 2) * v.dot(v)))))
+						Rational(3, 2) * v.dot(v))))
+		if as_string:
+			t = expand_powers(str(t))
+
 		out.append((t, idx_name[i]))
 
 	return out
@@ -143,3 +149,67 @@ def ex_velocity(distp, dim, rho):
 		 ret += basis[i][dim] * sym
 
 	return ret / srho
+
+def _get_known_dists(normal):
+	unknown = []
+	known = []
+
+	for i, vec in enumerate(basis):
+		if normal.dot(vec) == 1:
+			unknown.append(i)
+		else:
+			known.append(i)
+
+	return known, unknown
+
+def zouhe_velocity(orientation):
+	# TODO: Add some code to factor out the common factors in the
+	# expressions returned by this function.
+	idx = orientation + 1
+	normal = basis[idx]
+	known, unknown = _get_known_dists(normal)
+
+	# First, compute an expression for the density.
+	vrho = 0
+	for didx in known:
+		if basis[didx].dot(normal) == -1:
+			vrho += 2 * Symbol('fi->%s' % idx_name[didx])
+		else:
+			vrho += Symbol('fi->%s' % idx_name[didx])
+	vrho /= (1 - v.dot(normal))
+
+	ret = []
+	ret.append((Symbol('rho'), vrho))
+
+	# Bounce-back of the non-equilibrium part of the distributions
+	# in the direction of the normal vector.
+	oidx = idx_opposite[idx]
+	sym_norm = Symbol('fi->%s' % idx_name[idx])
+	sym_opp  = Symbol('fi->%s' % idx_name[oidx])
+
+	val_norm = solve(bgk_equilibrium(as_string=False)[idx][0] - sym_norm -
+					  bgk_equilibrium(as_string=False)[oidx][0] + sym_opp, sym_norm)[0]
+
+	ret.append((sym_norm, poly_factorize(val_norm)))
+
+	# Compute expressions for the remaining distributions.
+	remaining = [Symbol('fi->%s' % idx_name[x]) for x in unknown if x != idx]
+
+	vxe = ex_velocity('fi', 0, 'rho')
+	vye = ex_velocity('fi', 1, 'rho')
+
+	# Substitute the distribution calculated from the bounce-back procedure above.
+	vx2 = vxe.subs({sym_norm: val_norm})
+	vy2 = vye.subs({sym_norm: val_norm})
+
+	for sym, val in solve((vx - vx2, vy - vy2), *remaining).iteritems():
+		ret.append((sym, poly_factorize(val)))
+
+	return ret
+
+def use_pointers(str):
+	ret = str.replace('rho', ' *rho')
+	ret = ret.replace('vx', ' *vx')
+	return ret.replace('vy', ' *vy')
+
+
