@@ -138,15 +138,10 @@ class LBMGeo(object):
 		specific velocity (vx,vy).
 		"""
 
-		# FIXME: Move this code to the sym module.
 		if (vx, vy) not in self.feq_cache:
 			vals = []
 			eq_rho = 1.0
-			eq_dist = sym.bgk_equilibrium()
-			for i, (eqd, idx) in enumerate(eq_dist):
-				vals.append(self.float(sympy.N(eqd,
-						subs={sym.GRID.rho: eq_rho, sym.GRID.vx: vx, sym.GRID.vy: vy})))
-			self.feq_cache[(vx, vy)] = vals
+			self.feq_cache[(vx, vy)] = map(self.float, sym.eval_bgk_equilibrium((vx, vy), eq_rho))
 
 		for i, val in enumerate(self.feq_cache[(vx, vy)]):
 			dist[i][y][x] = val

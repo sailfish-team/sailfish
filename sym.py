@@ -142,6 +142,20 @@ def bgk_equilibrium(as_string=True):
 
 	return out
 
+def eval_bgk_equilibrium(velocity, rho):
+	eq_dist = bgk_equilibrium()
+	vals = []
+
+	subs={GRID.rho: rho}
+
+	for i, v in enumerate(velocity):
+		subs[GRID.v[i]] = v
+
+	for i, (eqd, idx) in enumerate(eq_dist):
+		vals.append(sympy.N(eqd, subs=subs))
+
+	return vals
+
 def bgk_external_force():
 	eax = Symbol('eax')
 	eay = Symbol('eay')
