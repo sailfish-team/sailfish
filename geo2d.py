@@ -137,13 +137,15 @@ class LBMGeo(object):
 		"""Set the distributions at node (x,y) so that the fluid there has a
 		specific velocity (vx,vy).
 		"""
+
+		# FIXME: Move this code to the sym module.
 		if (vx, vy) not in self.feq_cache:
 			vals = []
 			eq_rho = 1.0
 			eq_dist = sym.bgk_equilibrium()
 			for i, (eqd, idx) in enumerate(eq_dist):
 				vals.append(self.float(sympy.N(eqd,
-						subs={sym.rho: eq_rho, sym.vx: vx, sym.vy: vy})))
+						subs={sym.GRID.rho: eq_rho, sym.GRID.vx: vx, sym.GRID.vy: vy})))
 			self.feq_cache[(vx, vy)] = vals
 
 		for i, val in enumerate(self.feq_cache[(vx, vy)]):

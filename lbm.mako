@@ -24,9 +24,9 @@ ${const_var} float geo_params[${num_params+1}] = {
 
 typedef struct Dist {
 	float \
-	%for i, dname in enumerate(sym.idx_name):
+	%for i, dname in enumerate(sym.GRID.idx_name):
 ${dname}\
-		%if i < len(sym.idx_name)-1:
+		%if i < len(sym.GRID.idx_name)-1:
 , \
 		%endif
 	%endfor
@@ -45,7 +45,7 @@ typedef struct DistM {
 //
 ${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int idx)
 {
-	%for i, dname in enumerate(sym.idx_name):
+	%for i, dname in enumerate(sym.GRID.idx_name):
 		dout->${dname} = din[idx + DIST_SIZE*${i}];
 	%endfor
 }
@@ -196,7 +196,7 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 ## To avoid the performance loss, we temporarily inline getDist manually.
 	// getDist(&fc, dist, idx);
 
-	%for i, dname in enumerate(sym.idx_name):
+	%for i, dname in enumerate(sym.GRID.idx_name):
 		fc.${dname} = dist[idx + DIST_SIZE*${i}];
 	%endfor
 
@@ -312,7 +312,7 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 		feq.${idx} = ${feq};
 	%endfor
 
-	%for idx in sym.idx_name:
+	%for idx in sym.GRID.idx_name:
 		fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
 	%endfor
 
@@ -347,9 +347,9 @@ ${device_func} inline void bounce_back(Dist *fi)
 	float t;
 
 	%for i in sym.bb_swap_pairs():
-		t = fi->${sym.idx_name[i]};
-		fi->${sym.idx_name[i]} = fi->${sym.idx_name[sym.idx_opposite[i]]};
-		fi->${sym.idx_name[sym.idx_opposite[i]]} = t;
+		t = fi->${sym.GRID.idx_name[i]};
+		fi->${sym.GRID.idx_name[i]} = fi->${sym.GRID.idx_name[sym.GRID.idx_opposite[i]]};
+		fi->${sym.GRID.idx_name[sym.GRID.idx_opposite[i]]} = t;
 	%endfor
 }
 
@@ -435,7 +435,7 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 		${relaxate()}
 	% endif
 
-	%for i, dname in enumerate(sym.idx_name):
+	%for i, dname in enumerate(sym.GRID.idx_name):
 		#define dir_${dname} ${i}
 	%endfor
 
