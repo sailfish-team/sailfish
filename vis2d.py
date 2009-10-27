@@ -74,7 +74,7 @@ class Fluid2DVis(object):
 		self._drawing = False
 		self._draw_type = 1
 
-	def _visualize(self, geo_map, vx, vy, rho, tx, ty, vismode):
+	def _visualize(self, sim, vx, vy, rho, tx, ty, vismode):
 		height, width = vx.shape
 		srf = pygame.Surface((width, height))
 
@@ -84,7 +84,7 @@ class Fluid2DVis(object):
 		ret.append(('max_v', maxv))
 		ret.append(('rho_avg', numpy.average(rho)))
 
-		b = (geo_map >= geo2d.LBMGeo.NODE_WALL) & (geo_map < geo2d.LBMGeo.NODE_VELOCITY)
+		b = (sim.geo.decode_map(sim.geo.map) == geo2d.LBMGeo.NODE_WALL)
 
 		if self._vismode == 0:
 			drw = numpy.sqrt(vx*vx + vy*vy) / maxv
@@ -146,8 +146,9 @@ class Fluid2DVis(object):
 
 	def _draw_wall(self, lbm_sim, event):
 		x, y = self._get_loc(event)
-		lbm_sim.geo.map[y][x] = self._draw_type == 1 and geo2d.LBMGeo.NODE_WALL or geo2d.LBMGeo.NODE_FLUID
-		lbm_sim.geo.update_map()
+		lbm_sim.geo.set_geo(x, y,
+				self._draw_type == 1 and geo2d.LBMGeo.NODE_WALL or geo2d.LBMGeo.NODE_FLUID,
+				update=True)
 
 	def _process_events(self, lbm_sim):
 		for event in pygame.event.get():
@@ -212,7 +213,9 @@ class Fluid2DVis(object):
 				avg_mlups, mlups = lbm_sim.get_mlups(t_now - t_prev)
 				t_prev = t_now
 
-				ret = self._visualize(lbm_sim.geo.map, lbm_sim.vx, lbm_sim.vy, lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y, lbm_sim.options.vismode)
+				ret = self._visualize(lbm_sim, lbm_sim.vx, lbm_sim.vy,
+						lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y,
+						lbm_sim.options.vismode)
 				self._screen.blit(self._font.render('itr: %dk' % (i / 1000), True, (0, 255, 0)), (12, 12))
 				self._screen.blit(self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0)), (12, 24))
 				self._screen.blit(self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0)), (12, 36))

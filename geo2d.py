@@ -55,6 +55,10 @@ class LBMGeo(object):
 		return (code & cls.NODE_ORIENTATION_MASK,
 			    (code & cls.NODE_TYPE_MASK) >> cls.NODE_ORIENTATION_SHIFT)
 
+	@classmethod
+	def map_to_node_type(cls, node_map):
+			return ((node_map & cls.NODE_TYPE_MASK) >> cls.NODE_ORIENTATION_SHIFT)
+
 	def __init__(self, lat_w, lat_h, model, options, float, backend):
 		self.lat_w = lat_w
 		self.lat_h = lat_h
@@ -76,7 +80,6 @@ class LBMGeo(object):
 	def _define_nodes(self):
 		"""Define the types of all nodes."""
 		abstract
-
 
 	def init_dist(self, dist):
 		"""Initialize the particle distributions in the whole simulation domain.
@@ -101,13 +104,14 @@ class LBMGeo(object):
 	def update_map(self):
 		self.backend.to_buf(self.gpu_map, self.map)
 
-	def set_geo(self, x, y, type, val=None):
+	def set_geo(self, x, y, type, val=None, update=False):
 		"""Set the type of a grid node.
 
 		Args:
 		  x, y: location of the node
 		  type: type of the node, one of the LBMGeo.NODE_* constants
 		  val: optional argument for the node, e.g. the value of velocity or pressure
+		  update: whether to automatically update the geometry for the simulation
 		"""
 		self.map[y][x] = numpy.int32(type)
 
@@ -120,7 +124,12 @@ class LBMGeo(object):
 			elif type == LBMGeo.NODE_PRESSURE:
 				self._pressure_map.setdefault(val, []).append((x,y))
 
+		if update:
+			self._postprocess_nodes(nodes=[(x, y)])
+			self.update_map()
+
 	def mask_array_by_fluid(self, array):
+		# FIXME
 		mask = self.map == LBMGeo.NODE_WALL
 		return numpy.ma.array(array, mask=mask)
 
@@ -140,35 +149,43 @@ class LBMGeo(object):
 		for i, val in enumerate(self.feq_cache[(vx, vy)]):
 			dist[i][y][x] = val
 
-	def _postprocess_nodes(self):
-		"""Detect types of wall nodes and mark them appropriately."""
+	def _postprocess_nodes(self, nodes=None):
+		"""Detect types of wall nodes and mark them appropriately.
 
-		for x in range(0, self.lat_w):
-			for y in range(0, self.lat_h):
-				if self.map[y][x] != LBMGeo.NODE_FLUID:
-					# If the bool corresponding to a specific direction is True, the
-					# distributions in this direction are undefined.
-					north = y < self.lat_h-1 and self.map[y+1][x] == LBMGeo.NODE_FLUID
-					south = y > 0 and self.map[y-1][x] == LBMGeo.NODE_FLUID
-					west  = x > 0 and self.map[y][x-1] == LBMGeo.NODE_FLUID
-					east  = x < self.lat_w-1 and self.map[y][x+1] == LBMGeo.NODE_FLUID
+		Args:
+		  nodes: optional iterable of locations to postprocess
+		"""
 
-					if north and not west and not east:
-						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_N, self.map[y][x])
-					elif south and not west and not east:
-						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_S, self.map[y][x])
-					elif west and not south and not north:
-						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_W, self.map[y][x])
-					elif east and not south and not north:
-						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_E, self.map[y][x])
-					elif y > 0 and x > 0 and self.map[y-1][x-1] == LBMGeo.NODE_FLUID:
-						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_SW, self.map[y][x])
-					elif y > 0 and x < self.lat_w-1 and self.map[y-1][x+1] == LBMGeo.NODE_FLUID:
-						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_SE, self.map[y][x])
-					elif y < self.lat_h-1 and x > 0 and self.map[y+1][x-1] == LBMGeo.NODE_FLUID:
-						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_NW, self.map[y][x])
-					elif y < self.lat_h-1 and x < self.lat_w-1 and self.map[y+1][x+1] == LBMGeo.NODE_FLUID:
-						self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_NE, self.map[y][x])
+		if nodes is None:
+			nodes_ = ((x, y) for x in range(0, self.lat_w) for y in range(0, self.lat_h))
+		else:
+			nodes_ = nodes
+
+		for x, y in nodes_:
+			if self.map[y][x] != LBMGeo.NODE_FLUID:
+				# If the bool corresponding to a specific direction is True, the
+				# distributions in this direction are undefined.
+				north = y < self.lat_h-1 and self.map[y+1][x] == LBMGeo.NODE_FLUID
+				south = y > 0 and self.map[y-1][x] == LBMGeo.NODE_FLUID
+				west  = x > 0 and self.map[y][x-1] == LBMGeo.NODE_FLUID
+				east  = x < self.lat_w-1 and self.map[y][x+1] == LBMGeo.NODE_FLUID
+
+				if north and not west and not east:
+					self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_N, self.map[y][x])
+				elif south and not west and not east:
+					self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_S, self.map[y][x])
+				elif west and not south and not north:
+					self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_W, self.map[y][x])
+				elif east and not south and not north:
+					self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_E, self.map[y][x])
+				elif y > 0 and x > 0 and self.map[y-1][x-1] == LBMGeo.NODE_FLUID:
+					self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_SW, self.map[y][x])
+				elif y > 0 and x < self.lat_w-1 and self.map[y-1][x+1] == LBMGeo.NODE_FLUID:
+					self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_SE, self.map[y][x])
+				elif y < self.lat_h-1 and x > 0 and self.map[y+1][x-1] == LBMGeo.NODE_FLUID:
+					self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_NW, self.map[y][x])
+				elif y < self.lat_h-1 and x < self.lat_w-1 and self.map[y+1][x+1] == LBMGeo.NODE_FLUID:
+					self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_NE, self.map[y][x])
 
 	def get_params(self):
 		ret = []
