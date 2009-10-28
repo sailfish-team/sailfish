@@ -72,6 +72,7 @@ class Fluid2DVis(object):
 		self._tracers = False
 		self._velocity = False
 		self._drawing = False
+		self._paused = False
 		self._draw_type = 1
 
 	def _visualize(self, sim, vx, vy, rho, tx, ty, vismode):
@@ -150,7 +151,7 @@ class Fluid2DVis(object):
 				self._draw_type == 1 and geo2d.LBMGeo.NODE_WALL or geo2d.LBMGeo.NODE_FLUID,
 				update=True)
 
-	def _process_events(self, lbm_sim):
+	def _process_events(self, lbm_sim, curr_iter):
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				sys.exit()
@@ -180,6 +181,10 @@ class Fluid2DVis(object):
 					self._velocity = not self._velocity
 				elif event.key == pygame.K_t:
 					self._tracers = not self._tracers
+				elif event.key == pygame.K_p:
+					self._paused = not self._paused
+					if self._paused:
+						print 'Simulation paused @ iter = %d.' % curr_iter
 				elif event.key == pygame.K_q:
 					sys.exit()
 				elif event.key == pygame.K_r:
@@ -205,7 +210,11 @@ class Fluid2DVis(object):
 		avg_mlups = 0.0
 
 		while 1:
-			self._process_events(lbm_sim)
+			self._process_events(lbm_sim, i)
+
+			if self._paused:
+				continue
+
 			lbm_sim.sim_step(i, self._tracers)
 
 			if i % lbm_sim.options.every == 0:
