@@ -3,7 +3,6 @@
 import math
 import numpy
 import sys
-import tables
 import time
 import vis2d
 import geo2d
@@ -336,6 +335,7 @@ class LBMSim(object):
 
 	def _init_output(self):
 		if self.options.output:
+			import tables
 			self.h5file = tables.openFile(self.options.output, mode='w')
 			self.h5grp = self.h5file.createGroup('/', 'results', 'simulation results')
 			self.h5file.setNodeAttr(self.h5grp, 'viscosity', self.options.visc)
