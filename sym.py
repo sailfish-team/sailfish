@@ -62,65 +62,6 @@ class D3Q19(DxQy):
 				(1,36), (1,36), (1,36), (1,36), (1,36), (1,36),
 				(1,36), (1,36), (1,36), (1,36), (1,36), (1,36)])
 
-KNOWN_GRIDS = [D2Q9, D3Q15, D3Q19]
-
-def _prepare_grids():
-	"""Decorate grid classes with useful info computable from the basic definitions
-	of the grids.
-
-	This approach saves the programmer's time and automatically ensures correctness
-	of the computed values."""
-
-	for grid in KNOWN_GRIDS:
-		if len(grid.basis) != len(grid.weights):
-			raise TypeError('Grid %s is ill-defined: not all BGK weights have been specified.' % grid.__name__)
-
-		if sum(grid.weights) != 1:
-			raise TypeError('BGK weights for grid %s do not sum up to unity.' % grid.__name__)
-
-		grid.idx_name = []
-		grid.idx_opposite = []
-
-		if grid.dim == 2:
-			names = [{-1: 'S', 1: 'N', 0: ''},
-					{-1: 'W', 1: 'E', 0: ''}]
-			grid.v = Matrix(([grid.vx, grid.vy],))
-		else:
-			names = [{-1: 'B', 1: 'T', 0: ''},
-					 {-1: 'S', 1: 'N', 0: ''},
-					 {-1: 'W', 1: 'E', 0: ''}]
-			grid.v = Matrix(([grid.vx, grid.vy, grid.vz],))
-
-		for ei in grid.basis:
-			# Compute direction names.
-			name = 'f'
-			for i, comp in enumerate(reversed(ei.tolist()[0])):
-				name += names[i][int(comp)]
-
-			if name == 'f':
-				name += 'C'
-
-			grid.idx_name.append(name)
-
-			# Find opposite direction.
-			for j, ej in enumerate(grid.basis):
-				if ej == -1 * ei:
-					grid.idx_opposite.append(j)
-					break
-			else:
-				raise TypeError('Opposite vector for %s not found.' % ei)
-
-_prepare_grids()
-
-# The grid type used in the simulation.  One of the classes defined above.
-GRID = D2Q9
-
-def use_grid(grid):
-	if grid not in KNOWN_GRIDS:
-		raise ValueError('Unknown grid type "%s"' % grid)
-
-	GRID = grid
-
 def bgk_equilibrium(as_string=True):
 	"""Get expressions for the BGK equilibrium distribution.
 
@@ -143,7 +84,6 @@ def bgk_equilibrium(as_string=True):
 	return out
 
 def eval_bgk_equilibrium(velocity, rho):
-	eq_dist = bgk_equilibrium()
 	vals = []
 
 	subs={GRID.rho: rho}
@@ -151,7 +91,7 @@ def eval_bgk_equilibrium(velocity, rho):
 	for i, v in enumerate(velocity):
 		subs[GRID.v[i]] = v
 
-	for i, (eqd, idx) in enumerate(eq_dist):
+	for i, (eqd, idx) in enumerate(EQ_DIST):
 		vals.append(sympy.N(eqd, subs=subs))
 
 	return vals
@@ -159,11 +99,17 @@ def eval_bgk_equilibrium(velocity, rho):
 def bgk_external_force():
 	eax = Symbol('eax')
 	eay = Symbol('eay')
+	eaz = Symbol('eaz')
 	pref = Symbol('pref')
-	ea = Matrix(([eax, eay],))
+
+	if GRID.dim == 2:
+		ea = Matrix(([eax, eay],))
+	else:
+		ea = Matrix(([eax, eay, eaz],))
+
 	ret = []
 
-	for i, ei in enumerate(basis):
+	for i, ei in enumerate(GRID.basis):
 		t = expand_powers(str(pref * GRID.weights[i] *
 			poly_factorize( (ei - GRID.v + ei.dot(GRID.v)*ei*3).dot(ea) )))
 		ret.append((t, GRID.idx_name[i]))
@@ -263,6 +209,20 @@ def zouhe_velocity(orientation):
 
 	return ret
 
+def get_prop_dists(dir, res=1):
+	ret = []
+
+	if GRID.dim == 2:
+		vdir = Matrix(((dir,0),))
+	else:
+		vdir = Matrix(((dir,0,0),))
+
+	for i, ei in enumerate(GRID.basis):
+		if ei.dot(vdir) == res and i > 0:
+			ret.append((i, GRID.idx_name[i]))
+
+	return ret
+
 #
 # Sympy stuff.
 #
@@ -326,7 +286,66 @@ def expand_powers(t):
 
 def use_pointers(str):
 	ret = str.replace('rho', ' *rho')
-	ret = ret.replace('vx', ' *vx')
-	return ret.replace('vy', ' *vy')
+	ret = ret.replace('vx', 'v[0]')
+	ret = ret.replace('vy', 'v[1]')
+	ret = ret.replace('vz', 'v[2]')
 
+def _prepare_grids():
+	"""Decorate grid classes with useful info computable from the basic definitions
+	of the grids.
+
+	This approach saves the programmer's time and automatically ensures correctness
+	of the computed values."""
+
+	for grid in KNOWN_GRIDS:
+		if len(grid.basis) != len(grid.weights):
+			raise TypeError('Grid %s is ill-defined: not all BGK weights have been specified.' % grid.__name__)
+
+		if sum(grid.weights) != 1:
+			raise TypeError('BGK weights for grid %s do not sum up to unity.' % grid.__name__)
+
+		grid.idx_name = []
+		grid.idx_opposite = []
+
+		if grid.dim == 2:
+			names = [{-1: 'S', 1: 'N', 0: ''},
+					{-1: 'W', 1: 'E', 0: ''}]
+			grid.v = Matrix(([grid.vx, grid.vy],))
+		else:
+			names = [{-1: 'B', 1: 'T', 0: ''},
+					 {-1: 'S', 1: 'N', 0: ''},
+					 {-1: 'W', 1: 'E', 0: ''}]
+			grid.v = Matrix(([grid.vx, grid.vy, grid.vz],))
+
+		for ei in grid.basis:
+			# Compute direction names.
+			name = 'f'
+			for i, comp in enumerate(reversed(ei.tolist()[0])):
+				name += names[i][int(comp)]
+
+			if name == 'f':
+				name += 'C'
+
+			grid.idx_name.append(name)
+
+			# Find opposite direction.
+			for j, ej in enumerate(grid.basis):
+				if ej == -1 * ei:
+					grid.idx_opposite.append(j)
+					break
+			else:
+				raise TypeError('Opposite vector for %s not found.' % ei)
+
+def use_grid(grid):
+	global GRID, EQ_DIST
+	if grid not in KNOWN_GRIDS:
+		raise ValueError('Unknown grid type "%s"' % grid)
+
+	GRID = grid
+	EQ_DIST = bgk_equilibrium()
+
+KNOWN_GRIDS = [D2Q9, D3Q15, D3Q19]
+
+_prepare_grids()
+use_grid(D2Q9)
 

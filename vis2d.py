@@ -5,6 +5,7 @@ import geo2d
 import os
 import sys
 import time
+import sym
 
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
@@ -76,6 +77,12 @@ class Fluid2DVis(object):
 		self._draw_type = 1
 
 	def _visualize(self, sim, vx, vy, rho, tx, ty, vismode):
+
+		if sym.GRID.dim == 3:
+			vx = vx[10,:,:]
+			vy = vy[10,:,:]
+			rho = rho[10,:,:]
+
 		height, width = vx.shape
 		srf = pygame.Surface((width, height))
 
@@ -85,7 +92,7 @@ class Fluid2DVis(object):
 		ret.append(('max_v', maxv))
 		ret.append(('rho_avg', numpy.average(rho)))
 
-		b = (sim.geo.map_to_node_type(sim.geo.map) == geo2d.LBMGeo.NODE_WALL)
+		b = (sim.geo.map_to_node_type(sim.geo.map[10,:,:]) == geo2d.LBMGeo.NODE_WALL)
 
 		if self._vismode == 0:
 			drw = numpy.sqrt(vx*vx + vy*vy) / maxv
@@ -147,7 +154,7 @@ class Fluid2DVis(object):
 
 	def _draw_wall(self, lbm_sim, event):
 		x, y = self._get_loc(event)
-		lbm_sim.geo.set_geo(x, y,
+		lbm_sim.geo.set_geo((x, y),
 				self._draw_type == 1 and geo2d.LBMGeo.NODE_WALL or geo2d.LBMGeo.NODE_FLUID,
 				update=True)
 

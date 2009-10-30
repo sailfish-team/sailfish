@@ -18,20 +18,20 @@ class LBMGeoLDC(geo2d.LBMGeo):
 		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
 		# bottom/top
 		for i in range(0, self.lat_w):
-			self.set_geo(i, 0, geo2d.LBMGeo.NODE_WALL)
-			self.set_geo(i, self.lat_h-1, geo2d.LBMGeo.NODE_VELOCITY, (LBMGeoLDC.max_v, 0.0))
+			self.set_geo((i, 0), geo2d.LBMGeo.NODE_WALL)
+			self.set_geo((i, self.lat_h-1), geo2d.LBMGeo.NODE_VELOCITY, (LBMGeoLDC.max_v, 0.0))
 		# left/right
 		for i in range(0, self.lat_h):
-			self.set_geo(0, i, geo2d.LBMGeo.NODE_WALL)
-			self.set_geo(self.lat_w-1, i, geo2d.LBMGeo.NODE_WALL)
+			self.set_geo((0, i), geo2d.LBMGeo.NODE_WALL)
+			self.set_geo((self.lat_w-1, i), geo2d.LBMGeo.NODE_WALL)
 
 	def init_dist(self, dist):
 		for x in range(0, self.lat_w):
 			for y in range(0, self.lat_h):
-				self.velocity_to_dist(0.0, 0.0, dist, x, y)
+				self.velocity_to_dist((0.0, 0.0), dist, (x, y))
 
 		for i in range(0, self.lat_w):
-			self.velocity_to_dist(LBMGeoLDC.max_v, 0.0, dist, i, self.lat_h-1)
+			self.velocity_to_dist((LBMGeoLDC.max_v, 0.0), dist, (i, self.lat_h-1))
 
 	def get_reynolds(self, viscosity):
 		return int((self.lat_w-1) * LBMGeoLDC.max_v/viscosity)

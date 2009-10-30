@@ -59,13 +59,21 @@ class LBMGeo(object):
 	def map_to_node_type(cls, node_map):
 			return ((node_map & cls.NODE_TYPE_MASK) >> cls.NODE_ORIENTATION_SHIFT)
 
-	def __init__(self, lat_w, lat_h, model, options, float, backend):
-		self.lat_w = lat_w
-		self.lat_h = lat_h
+	def __init__(self, shape, model, options, float, backend):
+		self.dim = len(shape)
+		self.lat_w = shape[0]
+		self.lat_h = shape[1]
+		if self.dim == 3:
+			self.lat_d = shape[2]
+			self._set_map = self._set_map_3d
+			self._get_map = self._get_map_3d
+		else:
+			self._set_map = self._set_map_2d
+			self._get_map = self._get_map_2d
 		self.model = model
 		self.options = options
 		self.backend = backend
-		self.map = numpy.zeros((lat_h, lat_w), numpy.int32)
+		self.map = numpy.zeros(shape, numpy.int32)
 		self.gpu_map = backend.alloc_buf(like=self.map)
 		self._vel_map = {}
 		self._pressure_map = {}
@@ -104,7 +112,7 @@ class LBMGeo(object):
 	def update_map(self):
 		self.backend.to_buf(self.gpu_map, self.map)
 
-	def set_geo(self, x, y, type, val=None, update=False):
+	def set_geo(self, location, type, val=None, update=False):
 		"""Set the type of a grid node.
 
 		Args:
@@ -113,19 +121,25 @@ class LBMGeo(object):
 		  val: optional argument for the node, e.g. the value of velocity or pressure
 		  update: whether to automatically update the geometry for the simulation
 		"""
-		self.map[y][x] = numpy.int32(type)
+
+		if self.dim == 2:
+			x, y = location
+			self.map[y][x] = numpy.int32(type)
+		else:
+			x, y, z = location
+			self.map[z][y][x] = numpy.int32(type)
 
 		if val is not None:
 			if type == LBMGeo.NODE_VELOCITY:
-				if len(val) == 2:
-					self._vel_map.setdefault(val, []).append((x,y))
+				if len(val) == sym.GRID.dim:
+					self._vel_map.setdefault(val, []).append(location)
 				else:
 					raise ValueError('Invalid velocity specified')
 			elif type == LBMGeo.NODE_PRESSURE:
-				self._pressure_map.setdefault(val, []).append((x,y))
+				self._pressure_map.setdefault(val, []).append(location)
 
 		if update:
-			self._postprocess_nodes(nodes=[(x, y)])
+			self._postprocess_nodes(nodes=[location])
 			self.update_map()
 
 	def mask_array_by_fluid(self, array):
@@ -133,18 +147,24 @@ class LBMGeo(object):
 		mask = self.map == LBMGeo.NODE_WALL
 		return numpy.ma.array(array, mask=mask)
 
-	def velocity_to_dist(self, vx, vy, dist, x, y):
+	def velocity_to_dist(self, velocity, dist, location):
 		"""Set the distributions at node (x,y) so that the fluid there has a
 		specific velocity (vx,vy).
 		"""
 
-		if (vx, vy) not in self.feq_cache:
+		if velocity not in self.feq_cache:
 			vals = []
 			eq_rho = 1.0
-			self.feq_cache[(vx, vy)] = map(self.float, sym.eval_bgk_equilibrium((vx, vy), eq_rho))
+			self.feq_cache[velocity] = map(self.float, sym.eval_bgk_equilibrium(velocity, eq_rho))
 
-		for i, val in enumerate(self.feq_cache[(vx, vy)]):
-			dist[i][y][x] = val
+		if self.dim == 2:
+			x, y = location
+			for i, val in enumerate(self.feq_cache[velocity]):
+				dist[i][y][x] = val
+		else:
+			x, y, z = location
+			for i, val in enumerate(self.feq_cache[velocity]):
+				dist[i][z][y][x] = val
 
 	def _postprocess_nodes(self, nodes=None):
 		"""Detect types of wall nodes and mark them appropriately.
@@ -154,9 +174,21 @@ class LBMGeo(object):
 		"""
 
 		if nodes is None:
-			nodes_ = ((x, y) for x in range(0, self.lat_w) for y in range(0, self.lat_h))
+			if self.dim == 2:
+				nodes_ = ((x, y) for x in range(0, self.lat_w) for y in range(0, self.lat_h))
+			else:
+				nodes_ = ((x, y, z) for x in range(0, self.lat_w) for y in range(0, self.lat_h) for z in range(0, self.lat_d))
 		else:
 			nodes_ = nodes
+
+		# FIXME: Eventually, we will need to postprocess nodes in 3D grids as well.
+		if self.dim > 2:
+			for loc in nodes_:
+				cnode_type = self._get_map(loc)
+
+				if cnode_type != LBMGeo.NODE_FLUID:
+					self._set_map(loc, self._encode_node(LBMGeo.NODE_WALL_E, cnode_type))
+			return
 
 		for x, y in nodes_:
 			if self.map[y][x] != LBMGeo.NODE_FLUID:
@@ -184,14 +216,30 @@ class LBMGeo(object):
 				elif y < self.lat_h-1 and x < self.lat_w-1 and self.map[y+1][x+1] == LBMGeo.NODE_FLUID:
 					self.map[y][x] = self._encode_node(LBMGeo.NODE_WALL_NE, self.map[y][x])
 
+	def _set_map_2d(self, location, val):
+		x, y = location
+		self.map[y][x] = val
+
+	def _set_map_3d(self, location, val):
+		x, y, z = location
+		self.map[z][y][x] = val
+
+	def _get_map_2d(self, location):
+		x, y = location
+		return self.map[y][x]
+
+	def _get_map_3d(self, location):
+		x, y, z = location
+		return self.map[z][y][x]
+
 	def get_params(self):
 		ret = []
 		i = 0
 		for v, pos_list in self._vel_map.iteritems():
 			ret.extend(v)
-			for x, y in pos_list:
-				orientation, type = self._decode_node(self.map[y][x])
-				self.map[y][x] = self._encode_node(orientation, type + i)
+			for location in pos_list:
+				orientation, type = self._decode_node(self._get_map(location))
+				self._set_map(location, self._encode_node(orientation, type + i))
 
 			i += 1
 
@@ -199,9 +247,9 @@ class LBMGeo(object):
 
 		for p, pos_list in self._pressure_map.iteritems():
 			ret.append(p)
-			for x, y in pos_list:
-				orientation, type = self._decode_node(self.map[y][x])
-				self.map[y][x] = self._encode_node(orientation, type + i)
+			for location in pos_list:
+				orientation, type = self._decode_node(self._get_map(location))
+				self._set_map(location, self._encode_node(orientation, type + i))
 
 			i += 1
 
@@ -224,7 +272,6 @@ class LBMGeo(object):
 				'geo_orientation_mask': LBMGeo.NODE_ORIENTATION_MASK,
 				'geo_orientation_shift': LBMGeo.NODE_ORIENTATION_SHIFT,
 				}
-
 
 	def get_bc(self):
 		return BCS_MAP[self.options.boundary]

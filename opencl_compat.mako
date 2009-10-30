@@ -30,7 +30,11 @@ __device__ int inline get_local_id(int i)
 
 __device__ int inline get_global_id(int i)
 {
-	return threadIdx.x + blockIdx.x * blockDim.x;
+	if (i == 0) {
+		return threadIdx.x + blockIdx.x * blockDim.x;
+	} else {
+		return threadIdx.y + blockIdx.y * blockDim.y;
+	}
 }
 
 % endif

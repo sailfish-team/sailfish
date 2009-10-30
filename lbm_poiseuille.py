@@ -19,12 +19,12 @@ class LBMGeoPoiseuille(geo2d.LBMGeo):
 		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
 		if self.options.horizontal:
 			for i in range(0, self.lat_w):
-				self.set_geo(i, 0, geo2d.LBMGeo.NODE_WALL)
-				self.set_geo(i, self.lat_h-1, geo2d.LBMGeo.NODE_WALL)
+				self.set_geo((i, 0), geo2d.LBMGeo.NODE_WALL)
+				self.set_geo((i, self.lat_h-1), geo2d.LBMGeo.NODE_WALL)
 		else:
 			for i in range(0, self.lat_h):
-				self.set_geo(0, i, geo2d.LBMGeo.NODE_WALL)
-				self.set_geo(self.lat_w-1, i, geo2d.LBMGeo.NODE_WALL)
+				self.set_geo((0, i), geo2d.LBMGeo.NODE_WALL)
+				self.set_geo((self.lat_w-1, i), geo2d.LBMGeo.NODE_WALL)
 
 	def init_dist(self, dist):
 		if self.options.static:
@@ -32,18 +32,18 @@ class LBMGeoPoiseuille(geo2d.LBMGeo):
 
 			if self.options.horizontal:
 				for y in range(0, self.lat_h):
-					self.velocity_to_dist(profile[y], 0.0, dist, 0, y)
+					self.velocity_to_dist((profile[y], 0.0), dist, (0, y))
 				for x in range(1, self.lat_w):
-					dist[:,:,x:] = dist[:,:,0]
+					dist[:,:,x] = dist[:,:,0]
 			else:
 				for x in range(0, self.lat_w):
-					self.velocity_to_dist(0.0, profile[x], dist, x, 0)
+					self.velocity_to_dist((0.0, profile[x]), dist, (x, 0))
 				for y in range(1, self.lat_h):
 					dist[:,y,:] = dist[:,0,:]
 		else:
 			for x in range(0, self.lat_w):
 				for y in range(0, self.lat_h):
-					self.velocity_to_dist(0.0, 0.0, dist, x, y)
+					self.velocity_to_dist((0.0, 0.0), dist, (x, y))
 
 	def get_velocity_profile(self):
 		width = self.get_chan_width()

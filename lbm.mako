@@ -76,17 +76,17 @@ ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *t
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
 //
-${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, float *rho, float *vx, float *vy)
+${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, float *rho, float *v)
 {
 	% if boundary_type == 'zouhe':
 		if (isWallNode(node_type) || isVelocityNode(node_type)) {
 			if (node_type > ${geo_wall}) {
 				int idx = (node_type - GEO_BCV) * 2;
-				*vx = geo_params[idx];
-				*vy = geo_params[idx+1];
+				v[0] = geo_params[idx];
+				v[1] = geo_params[idx+1];
 			} else {
-				*vx = 0.0f;
-				*vy = 0.0f;
+				v[0] = 0.0f;
+				v[1] = 0.0f;
 			}
 
 			switch (orientation) {
@@ -96,31 +96,31 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 			${zouhe_velocity(geo_wall_w)}
 
 			case ${geo_wall_ne}:
-				*rho = (2.0f * (fi->fW + fi->fS + fi->fSW) + fi->fC + fi->fNW + fi->fSE) / (1.0f - 11.0f/12.0f*(*vx + *vy));
-				fi->fNE = fi->fSW + 1.0f/12.0f * *rho * (*vx + *vy);
-				fi->fE = *rho * (11.0f/12.0f * *vx - 1.0f/12.0f * *vy) - fi->fSE + fi->fW + fi->fNW;
-				fi->fN = *rho * (-1.0f/12.0f * *vx + 11.0f/12.0f * *vy) -fi->fNW + fi->fS + fi->fSE;
+				*rho = (2.0f * (fi->fW + fi->fS + fi->fSW) + fi->fC + fi->fNW + fi->fSE) / (1.0f - 11.0f/12.0f*(v[0] + v[1]));
+				fi->fNE = fi->fSW + 1.0f/12.0f * *rho * (v[0] + v[1]);
+				fi->fE = *rho * (11.0f/12.0f * v[0] - 1.0f/12.0f * v[1]) - fi->fSE + fi->fW + fi->fNW;
+				fi->fN = *rho * (-1.0f/12.0f * v[0] + 11.0f/12.0f * v[1]) -fi->fNW + fi->fS + fi->fSE;
 				break;
 
 			case ${geo_wall_se}:
-				*rho = (2.0f * (fi->fN + fi->fW + fi->fNW) + fi->fC + fi->fSW + fi->fNE) / (1.0f - 11.0f/12.0f*(*vx - *vy));
-				fi->fSE = fi->fNW + 1.0f/12.0f * *rho * (*vx - *vy);
-				fi->fE = *rho * (11.0f/12.0f * *vx + 1.0f/12.0f * *vy) - fi->fNE + fi->fW + fi->fSW;
-				fi->fS = *rho * (-1.0f/12.0f * *vx - 11.0f/12.0f * *vy) - fi->fSW + fi->fN + fi->fNE;
+				*rho = (2.0f * (fi->fN + fi->fW + fi->fNW) + fi->fC + fi->fSW + fi->fNE) / (1.0f - 11.0f/12.0f*(v[0] - v[1]));
+				fi->fSE = fi->fNW + 1.0f/12.0f * *rho * (v[0] - v[1]);
+				fi->fE = *rho * (11.0f/12.0f * v[0] + 1.0f/12.0f * v[1]) - fi->fNE + fi->fW + fi->fSW;
+				fi->fS = *rho * (-1.0f/12.0f * v[0] - 11.0f/12.0f * v[1]) - fi->fSW + fi->fN + fi->fNE;
 				break;
 
 			case ${geo_wall_nw}:
-				*rho = (2.0f * (fi->fE + fi->fS + fi->fSE) + fi->fC + fi->fSW + fi->fNE) / (1.0f - 11.0f/12.0f*(-*vx + *vy));
-				fi->fNW = fi->fSE + 1.0f/12.0f * *rho * (-*vx + *vy);
-				fi->fW = *rho * (-11.0f/12.0f * *vx - 1.0f/12.0f * *vy) - fi->fSW + fi->fE + fi->fNE;
-				fi->fN = *rho * (1.0f/12.0f * *vx + 11.0f/12.0f * *vy) - fi->fNE + fi->fS + fi->fSW;
+				*rho = (2.0f * (fi->fE + fi->fS + fi->fSE) + fi->fC + fi->fSW + fi->fNE) / (1.0f - 11.0f/12.0f*(-v[0] + v[1]));
+				fi->fNW = fi->fSE + 1.0f/12.0f * *rho * (-v[0] + v[1]);
+				fi->fW = *rho * (-11.0f/12.0f * v[0] - 1.0f/12.0f * v[1]) - fi->fSW + fi->fE + fi->fNE;
+				fi->fN = *rho * (1.0f/12.0f * v[0] + 11.0f/12.0f * v[1]) - fi->fNE + fi->fS + fi->fSW;
 				break;
 
 			case ${geo_wall_sw}:
-				*rho = (2.0f * (fi->fE + fi->fN + fi->fNE) + fi->fC + fi->fSE + fi->fNW) / (1.0f + 11.0f/12.0f*(*vx + *vy));
-				fi->fSW = fi->fNE + 1.0f/12.0f * *rho * -(*vx + *vy);
-				fi->fW = *rho * (-11.0f/12.0f * *vx + 1.0f/12.0f * *vy) - fi->fNW + fi->fE + fi->fSE;
-				fi->fS = *rho * (1.0f/12.0f * *vx - 11.0f/12.0f * *vy) - fi->fSE + fi->fN + fi->fNW;
+				*rho = (2.0f * (fi->fE + fi->fN + fi->fNE) + fi->fC + fi->fSE + fi->fNW) / (1.0f + 11.0f/12.0f*(v[0] + v[1]));
+				fi->fSW = fi->fNE + 1.0f/12.0f * *rho * -(v[0] + v[1]);
+				fi->fW = *rho * (-11.0f/12.0f * v[0] + 1.0f/12.0f * v[1]) - fi->fNW + fi->fE + fi->fSE;
+				fi->fS = *rho * (1.0f/12.0f * v[0] - 11.0f/12.0f * v[1]) - fi->fSE + fi->fN + fi->fNW;
 				break;
 			}
 
@@ -135,8 +135,8 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 		// Velocity boundary condition.
 		if (node_type < GEO_BCP) {
 			int idx = (node_type - GEO_BCV) * 2;
-			*vx = geo_params[idx];
-			*vy = geo_params[idx+1];
+			v[0] = geo_params[idx];
+			v[1] = geo_params[idx+1];
 			return;
 		// Pressure boundary condition.
 		} else {
@@ -147,12 +147,18 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 	}
 	% endif
 
-	*vx = ${str(sym.ex_velocity('fi', 0, '*rho')).replace('/*', '/ *')};
-	*vy = ${str(sym.ex_velocity('fi', 1, '*rho')).replace('/*', '/ *')};
+	v[0] = ${str(sym.ex_velocity('fi', 0, '*rho')).replace('/*', '/ *')};
+	v[1] = ${str(sym.ex_velocity('fi', 1, '*rho')).replace('/*', '/ *')};
+	%if dim == 3:
+		v[2] = ${str(sym.ex_velocity('fi', 2, '*rho')).replace('/*', '/ *')};
+	%endif
 
 	if (!isWallNode(node_type)) {
-		*vx += ${'%.20f' % (0.5 * ext_accel_x)};
-		*vy += ${'%.20f' % (0.5 * ext_accel_y)};
+		v[0] += ${'%.20f' % (0.5 * ext_accel_x)};
+		v[1] += ${'%.20f' % (0.5 * ext_accel_y)};
+		%if dim == 3:
+			v[2] += ${'%.20f' % (0.5 * ext_accel_z)};
+		%endif
 	}
 }
 
@@ -162,9 +168,13 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 // Each thread updates the position of a single particle using Euler's algorithm.
 //
 ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr} int *map,
-		${global_ptr} float *x, ${global_ptr} float *y)
+		${global_ptr} float *x, ${global_ptr} float *y \
+%if dim == 3:
+	, ${global_ptr} float *z \
+%endif
+		)
 {
-	float rho, vx, vy;
+	float rho, v[${dim}];
 
 	int gi = get_global_id(0);
 	float cx = x[gi];
@@ -172,6 +182,17 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 
 	int ix = (int)(cx);
 	int iy = (int)(cy);
+
+	%if dim == 3:
+		float cz = z[gi];
+		int iz = (int)(cz);
+
+		if (iz < 0)
+			iz  = 0;
+
+		if (iz > ${lat_d-1})
+			iz = ${lat_d-1};
+	%endif
 
 	// Sanity checks.
 	if (iy < 0)
@@ -186,7 +207,11 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 	if (iy > ${lat_h-1})
 		iy = ${lat_h-1};
 
-	int idx = ix + ${lat_w}*iy;
+	%if dim == 2:
+		int idx = ix + ${lat_w}*iy;
+	%else:
+		int idx = ix + ${lat_w}*iy + ${lat_w*lat_h}*iz;
+	%endif
 
 	Dist fc;
 
@@ -202,10 +227,13 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 
 	int type, orientation;
 	decodeNodeType(map[idx], &orientation, &type);
-	getMacro(&fc, type, orientation, &rho, &vx, &vy);
+	getMacro(&fc, type, orientation, &rho, v);
 
-	cx = cx + vx * DT;
-	cy = cy + vy * DT;
+	cx = cx + v[0] * DT;
+	cy = cy + v[1] * DT;
+	%if dim == 3:
+		cz = cz + v[2] * DT;
+	%endif
 
 	// Periodic boundary conditions.
 	if (cx > ${lat_w})
@@ -220,6 +248,15 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 	if (cy < 0.0f)
 		cy = (float)${lat_h};
 
+	%if dim == 3:
+		if (cz > ${lat_d})
+			cz = 0.0f;
+
+		if (cz < 0.0f)
+			cz = (float)(${lat_d});
+
+		z[gi] = cz;
+	%endif
 	x[gi] = cx;
 	y[gi] = cy;
 }
@@ -304,9 +341,13 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 // Performs the relaxation step in the BGK model given the density rho,
 // the velocity v and the distribution fi.
 //
-${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int node_type)
+${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 {
 	Dist feq;
+
+	#define vx v[0]
+	#define vy v[1]
+	#define vz v[2]
 
 	%for feq, idx in sym.bgk_equilibrium():
 		feq.${idx} = ${feq};
@@ -316,7 +357,7 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 		fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
 	%endfor
 
-	%if ext_accel_x != 0.0 or ext_accel_y != 0.0:
+	%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
 		%if boundary_type == 'fullbb':
 			if (!isWallNode(node_type))
 		%endif
@@ -324,6 +365,7 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 			// External acceleration.
 			#define eax ${'%.20ff' % ext_accel_x}
 			#define eay ${'%.20ff' % ext_accel_y}
+			#define eaz ${'%.20ff' % ext_accel_z}
 			float pref = ${sym.bgk_external_force_pref()};
 
 			%for val, idx in sym.bgk_external_force():
@@ -336,7 +378,7 @@ ${device_func} void BGK_relaxate(float rho, float vx, float vy, Dist *fi, int no
 
 <%def name="relaxate()">
 	% if model == 'bgk':
-		BGK_relaxate(rho, vx, vy, &fi, type);
+		BGK_relaxate(rho, v, &fi, type);
 	% else:
 		MS_relaxate(&fi, type, type);
 	% endif
@@ -383,23 +425,77 @@ ${device_func} inline void half_bb(Dist *fi, const int node_type)
 	}
 }
 
+<%def name="prop_bnd(dir, effective_dir, i, di, dname, dist_source, offset)">
+	%if di == dim:
+		%if dim == 2:
+			set_odist(gi+rel(${effective_dir},${sym.GRID.basis[i][1]},0)+${offset}, ${dname}, ${dist_source}(${dname}));
+		%else:
+			set_odist(gi+rel(${effective_dir},${sym.GRID.basis[i][1]},${sym.GRID.basis[i][2]})+${offset}, ${dname}, ${dist_source}(${dname}));
+		%endif
+	%else:
+		%if sym.GRID.basis[i][di] > 0:
+			if (${loc_names[di]} < ${bnd_limits[di]-1}) { \
+		%elif sym.GRID.basis[i][di] < 0:
+			if (${loc_names[di]} > 0) { \
+		%endif
+			${prop_bnd(dir, effective_dir, i, di+1, dname, dist_source, offset)}
+		%if sym.GRID.basis[i][di] != 0:
+			} \
+		%endif
+		%if periodicity[di] and sym.GRID.basis[i][di] != 0:
+			else {
+				${prop_bnd(dir, effective_dir, i, di+1, dname, dist_source, offset+pbc_offsets[di][int(sym.GRID.basis[i][di])])}
+			}
+		%endif
+	%endif
+</%def>
+
+## Propagate eastwards or westwards knowing that there is an east/westward
+## node layer to propagate to.
+<%def name="prop_block_bnd(dir, effective_dir, res, dist_source, offset=0)">
+	%for i, dname in sym.get_prop_dists(dir, res):
+		${prop_bnd(dir, effective_dir, i, 1, dname, dist_source, offset)}
+	%endfor
+</%def>
+
 ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} float *dist_in,
 		${global_ptr} float *dist_out, ${global_ptr} float *orho, ${global_ptr} float *ovx,
-		${global_ptr} float *ovy, int save_macro)
+		${global_ptr} float *ovy, \
+%if dim == 3:
+		${global_ptr} float *ovz, \
+%endif
+		int save_macro)
 {
-	int tix = get_local_id(0);
-	int ti = get_global_id(0);
-	int gi = ti + ${lat_w}*get_group_id(1);
+	int lx = get_local_id(0);	// ID inside the current block
+	%if dim == 2:
+		int gx = get_global_id(0);
+		int gy = get_group_id(1);
+		int gi = gx + ${lat_w}*gy;
+	%else:
+		// This is a workaround for the limitations of current CUDA devices.
+		// We would like the grid to be 3 dimensional, but only 2 dimensions
+		// are supported.  We thus encode the first two dimensions (x, y) of
+		// the simulation grid into the x dimension of the CUDA/OpenCL grid
+		// as:
+		//   x_dev = y * num_blocks + x.
+		//
+		// This works fine, as x is relatively small, since:
+		//   x = x_sim / block_size.
+		int gx = get_global_id(0) % ${lat_w};
+		int gy = get_global_id(0) / ${lat_w};
+		int gz = get_global_id(1);
+		int gi = gx + gy*${lat_w} + ${lat_w*lat_h}*gz;
+	%endif
 
 	// shared variables for in-block propagation
-	${shared_var} float fo_E[BLOCK_SIZE];
-	${shared_var} float fo_W[BLOCK_SIZE];
-	${shared_var} float fo_SE[BLOCK_SIZE];
-	${shared_var} float fo_SW[BLOCK_SIZE];
-	${shared_var} float fo_NE[BLOCK_SIZE];
-	${shared_var} float fo_NW[BLOCK_SIZE];
+	%for i, dir in sym.get_prop_dists(1):
+		${shared_var} float prop_${dir}[BLOCK_SIZE];
+	%endfor
+	%for i ,dir in sym.get_prop_dists(-1):
+		${shared_var} float prop_${dir}[BLOCK_SIZE];
+	%endfor
 
-	// cache the distribution in local variables
+	// cache the distributions in local variables
 	Dist fi;
 	getDist(&fi, dist_in, gi);
 
@@ -417,14 +513,17 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	% endif
 
 	// macroscopic quantities for the current cell
-	float rho, vx, vy;
-	getMacro(&fi, type, orientation, &rho, &vx, &vy);
+	float rho, v[${dim}];
+	getMacro(&fi, type, orientation, &rho, v);
 
 	// only save the macroscopic quantities if requested to do so
 	if (save_macro == 1) {
 		orho[gi] = rho;
-		ovx[gi] = vx;
-		ovy[gi] = vy;
+		ovx[gi] = v[0];
+		ovy[gi] = v[1];
+		%if dim == 3:
+			ovz[gi] = v[2];
+		%endif
 	}
 
 	% if boundary_type == 'fullbb':
@@ -441,70 +540,48 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 
 	#define dir_idx(idx) dir_##idx
 	#define set_odist(idx, dir, val) dist_out[DIST_SIZE*dir_idx(dir) + idx] = val
-	#define rel(x,y) ((x) + ${lat_w}*(y))
+
+	#define prop_global(dir) fi.dir
+	#define prop_local(dir) prop_##dir[lx]
+
+	%if dim == 2:
+		#define rel(x,y,z) ((x) + ${lat_w}*(y))
+	%else:
+		#define rel(x,y,z) ((x) + ${lat_w}*(y) + ${lat_w*lat_h}*(z))
+	%endif
 
 	// update the 0-th direction distribution
 	set_odist(gi, fC, fi.fC);
 
 	// E propagation in shared memory
-	if (tix < get_local_size(0)-1) {
-		fo_E[tix+1] = fi.fE;
-		fo_NE[tix+1] = fi.fNE;
-		fo_SE[tix+1] = fi.fSE;
+	if (lx < ${block_size-1}) {
+		%for i, dir in sym.get_prop_dists(1):
+			prop_${dir}[lx+1] = fi.${dir};
+		%endfor
 	// E propagation in global memory (at right block boundary)
-	} else if (ti < ${lat_w-1}) {
-		set_odist(gi+rel(1,0), fE, fi.fE);
-		if (get_group_id(1) > 0)	set_odist(gi+rel(1,-1), fSE, fi.fSE);
-		%if periodic_y:
-			else					set_odist(ti+${lat_w*(lat_h-1)+1}, fSE, fi.fSE);
-		%endif
-		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(1,1), fNE, fi.fNE);
-		%if periodic_y:
-			else					set_odist(ti+1, fNE, fi.fNE);
-		%endif
+	} else if (gx < ${lat_w-1}) {
+		${prop_block_bnd(1, 1, 1, 'prop_global')}
 	}
 	%if periodic_x:
+	// periodic boundary conditions in the X direction
 	else {
-		set_odist(gi+rel(${-lat_w+1}, 0), fE, fi.fE);
-		if (get_group_id(1) > 0)			set_odist(gi+rel(${-lat_w+1},-1), fSE, fi.fSE);
-		%if periodic_y:
-			else							set_odist(rel(0, ${lat_h-1}), fSE, fi.fSE);
-		%endif
-		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(${-lat_w+1},1), fNE, fi.fNE);
-		%if periodic_y:
-			else							set_odist(rel(0, 0), fNE, fi.fNE);
-		%endif
+		${prop_block_bnd(1, 1, 1, 'prop_global', pbc_offsets[0][1])}
 	}
 	%endif
 
 	// W propagation in shared memory
-	if (tix > 0) {
-		fo_W[tix-1] = fi.fW;
-		fo_NW[tix-1] = fi.fNW;
-		fo_SW[tix-1] = fi.fSW;
+	if (lx > 0) {
+		%for i, dir in sym.get_prop_dists(-1):
+			prop_${dir}[lx-1] = fi.${dir};
+		%endfor
 	// W propagation in global memory (at left block boundary)
-	} else if (ti > 0) {
-		set_odist(gi+rel(-1,0), fW, fi.fW);
-		if (get_group_id(1)	> 0)			set_odist(gi+rel(-1,-1), fSW, fi.fSW);
-		%if periodic_y:
-			else							set_odist(ti+${lat_w*(lat_h-1)-1}, fSW, fi.fSW);
-		%endif
-		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(-1,1), fNW, fi.fNW);
-		%if periodic_y:
-			else							set_odist(ti-1, fNW, fi.fNW);
-		%endif
+	} else if (gx > 0) {
+		${prop_block_bnd(-1, -1, 1, 'prop_global')}
 	}
 	%if periodic_x:
+	// periodic boundary conditions in the X direction
 	else {
-		set_odist(gi+rel(${lat_w-1},0), fW, fi.fW);
-		if (get_group_id(1) > 0)			set_odist(gi+rel(${lat_w-1},-1), fSW, fi.fSW);
-		%if periodic_y:
-			else							set_odist(${lat_h*lat_w-1}, fSW, fi.fSW);
-		%endif
-		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+rel(${lat_w-1},1), fNW, fi.fNW);
-		%if periodic_y:
-			else							set_odist(${lat_w-1}, fNW, fi.fNW);
-		%endif
+		${prop_block_bnd(-1, -1, 1, 'prop_global', pbc_offsets[0][-1])}
 	}
 	%endif
 
@@ -514,40 +591,18 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	barrier(CLK_LOCAL_MEM_FENCE);
 % endif
 
-	// the leftmost thread is not updated in this block
-	if (tix > 0) {
-		set_odist(gi, fE, fo_E[tix]);
-		if (get_group_id(1) > 0)			set_odist(gi-${lat_w}, fSE, fo_SE[tix]);
-		%if periodic_y:
-			else							set_odist(gi+${lat_w*(lat_h-1)}, fSE, fo_SE[tix]);
-		%endif
-		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+${lat_w}, fNE, fo_NE[tix]);
-		%if periodic_y:
-			else							set_odist(ti, fNE, fo_NE[tix]);
-		%endif
+	// Save locally propagated distributions into global memory.
+	// The leftmost thread is not updated in this block
+	if (lx > 0) {
+		${prop_block_bnd(1, 0, 1, 'prop_local')}
 	}
 
-	// N + S propagation (global memory)
-	if (get_group_id(1) > 0)			set_odist(gi-${lat_w}, fS, fi.fS);
-	%if periodic_y:
-		else							set_odist(ti+${lat_w*(lat_h-1)}, fS, fi.fS);
-	%endif
-	if (get_group_id(1) < ${lat_h-1})	set_odist(gi+${lat_w}, fN, fi.fN);
-	%if periodic_y:
-		else							set_odist(ti, fN, fi.fN);
-	%endif
+	// N, S propagation (global memory)
+	${prop_block_bnd(1, 0, 0, 'prop_global')}
 
 	// the rightmost thread is not updated in this block
-	if (tix < get_local_size(0)-1) {
-		set_odist(gi, fW, fo_W[tix]);
-		if (get_group_id(1) > 0)			set_odist(gi-${lat_w}, fSW, fo_SW[tix]);
-		%if periodic_y:
-			else							set_odist(gi+${lat_w*(lat_h-1)}, fSW, fo_SW[tix]);
-		%endif
-		if (get_group_id(1) < ${lat_h-1})	set_odist(gi+${lat_w}, fNW, fo_NW[tix]);
-		%if periodic_y:
-			else							set_odist(ti, fNW, fo_NW[tix]);
-		%endif
+	if (lx < ${block_size-1}) {
+		${prop_block_bnd(-1, 0, 1, 'prop_local')}
 	}
 }
 
