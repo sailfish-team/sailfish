@@ -6,7 +6,7 @@
   - add support for streamlines
 
 * D3Qx
-  - implement basic BGK/MRT code for these lattices
+  - implement MRT
 
 * optimization
   - investigate impact of the order of the distributions in the struct
