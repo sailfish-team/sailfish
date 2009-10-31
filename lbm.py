@@ -84,7 +84,7 @@ class LBMSim(object):
 		group.add_option('--save_src', dest='save_src', help='file to save the CUDA/OpenCL source code to', action='store', type='string', default='')
 		group.add_option('--use_src', dest='use_src', help='CUDA/OpenCL source to use instead of the automatically generated one', action='store', type='string', default='')
 		group.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
-		group.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat'], default='h5flat')
+		group.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat', 'vtk'], default='h5flat')
 		parser.add_option_group(group)
 
 		group = OptionGroup(parser, 'Visualization options')
@@ -380,6 +380,16 @@ class LBMSim(object):
 			h5t = self.h5file.createGroup(self.h5grp, 'iter%d' % i, 'iteration %d' % i)
 			self.h5file.createArray(h5t, 'v', numpy.dstack(self.velocity), 'velocity')
 			self.h5file.createArray(h5t, 'rho', self.rho, 'density')
+		elif self.options.output_format == 'vtk':
+			from enthought.tvtk.api import tvtk
+			id = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
+			id.point_data.scalars = self.rho.flatten()
+			id.point_data.scalars.name = 'density'
+			id.point_data.vectors = numpy.c_[self.vx.flatten(), self.vy.flatten(), self.vz.flatten()]
+			id.point_data.vectors.name = 'velocity'
+			id.dimensions = self.rho.shape
+			w = tvtk.XMLPImageDataWriter(input=id, file_name='%s%05d.xml' % (self.options.output, i))
+			w.write()
 		else:
 			record = self.h5tbl.row
 			record['iter'] = i
@@ -392,7 +402,7 @@ class LBMSim(object):
 			self.h5tbl.flush()
 
 	def _init_output(self):
-		if self.options.output:
+		if self.options.output and self.options.output_format != 'vtk':
 			import tables
 			self.h5file = tables.openFile(self.options.output, mode='w')
 			self.h5grp = self.h5file.createGroup('/', 'results', 'simulation results')
