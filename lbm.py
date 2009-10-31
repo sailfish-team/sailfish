@@ -138,12 +138,18 @@ class LBMSim(object):
 
 	def _init_vis(self):
 		if not self.options.benchmark and not self.options.batch:
-#			if sym.GRID.dim == 2:
-			self._init_vis_2d()
+			if sym.GRID.dim == 2:
+				self._init_vis_2d()
+			elif sym.GRID.dim == 3:
+				self._init_vis_3d()
 
 	def _init_vis_2d(self):
 		self.vis = vis2d.Fluid2DVis(self.options.scr_w, self.options.scr_h,
 									self.options.lat_w, self.options.lat_h)
+
+	def _init_vis_3d(self):
+		import vis3d
+		self.vis = vis3d.Fluid3DVis()
 
 	def add_iter_hook(self, i, func, every=False):
 		if every:
