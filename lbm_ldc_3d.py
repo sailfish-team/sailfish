@@ -36,10 +36,10 @@ class LBMGeoLDC(geo2d.LBMGeo):
 				self.set_geo((self.lat_w-1, y, z), geo2d.LBMGeo.NODE_WALL)
 
 	def init_dist(self, dist):
-		for x in range(0, self.lat_w):
-			for y in range(0, self.lat_h):
-				for z in range(0, self.lat_d):
-					self.velocity_to_dist((0.0, 0.0, 0.0), dist, (x, y, z))
+		self.velocity_to_dist((0.0, 0.0, 0.0), dist, (0, 0, 0))
+
+		for i in range(0, len(sym.GRID.basis)):
+			dist[i,:,:,:] = dist[i,0,0,0]
 
 		for x in range(0, self.lat_w):
 			for y in range(0, self.lat_h):
