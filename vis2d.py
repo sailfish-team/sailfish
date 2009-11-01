@@ -7,6 +7,8 @@ import sys
 import time
 import sym
 
+from scipy import signal
+
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
 
@@ -36,6 +38,7 @@ def hsv_to_rgb(a):
 	return numpy.choose(i, choices)
 
 def _vis_hsv(drw, width, height):
+	drw = numpy.abs(drw)
 	drw = drw.reshape((width, height, 1)) * numpy.float32([1.0, 1.0, 1.0])
 	drw[:,:,2] = 1.0
 	drw[:,:,1] = 1.0
@@ -43,27 +46,49 @@ def _vis_hsv(drw, width, height):
 	return drw.astype(numpy.uint8)
 
 def _vis_std(drw, width, height):
+	drw = numpy.abs(drw)
 	return (drw.reshape((width, height, 1)) * 255.0).astype(numpy.uint8) * numpy.uint8([1,1,0])
+
+def _vis_2col(drw, width, height):
+	drw = ((drw*(drw>0).astype(int)).reshape((width, height, 1)) * numpy.uint8([255, 0, 0])
+		- ( drw*(drw<0).astype(int)).reshape((width, height, 1)) * numpy.uint8([0, 0, 255]))
+	drw[drw>255] = 255
+	drw[drw<-255] = -255
+	return drw.astype(numpy.uint8)
 
 def _vis_rgb1(drw, width, height):
 	"""This is the default color palette from gnuplot."""
+	drw = numpy.abs(drw)
 	r = numpy.sqrt(drw)
 	g = numpy.power(drw, 3)
 	b = numpy.sin(drw * math.pi)
 
 	return (numpy.dstack([r,g,b]) * 250.0).astype(numpy.uint8)
 
+def gauss_kernel(size, sizey=None):
+	"""Return a normalized 2D gauss kernel array for convolutions"""
+	size = int(size)
+	if not sizey:
+		sizey = size
+	else:
+		sizey = int(sizey)
+	x, y = numpy.mgrid[-size:size+1, -sizey:sizey+1]
+	g = numpy.exp(-(x**2/float(size) + y**2/float(sizey)))
+	return g / g.sum()
 
 vis_map = {
 	'std': _vis_std,
 	'rgb1': _vis_rgb1,
 	'hsv': _vis_hsv,
+	'2col': _vis_2col,
 	}
 
 class Fluid2DVis(object):
 
 	def __init__(self, width, height, lat_w, lat_h):
 		self._vismode = 0
+		self._convolve = False
+		self._vscale  = 0.005
 		self._font = pygame.font.SysFont('Liberation Mono', 14)
 		self._screen = pygame.display.set_mode((width, height),
 				pygame.RESIZABLE)
@@ -77,12 +102,6 @@ class Fluid2DVis(object):
 		self._draw_type = 1
 
 	def _visualize(self, sim, vx, vy, rho, tx, ty, vismode):
-
-		if sym.GRID.dim == 3:
-			vx = vx[10,:,:]
-			vy = vy[10,:,:]
-			rho = rho[10,:,:]
-
 		height, width = vx.shape
 		srf = pygame.Surface((width, height))
 
@@ -92,27 +111,33 @@ class Fluid2DVis(object):
 		ret.append(('max_v', maxv))
 		ret.append(('rho_avg', numpy.average(rho)))
 
-		b = (sim.geo.map_to_node_type(sim.geo.map[10,:,:]) == geo2d.LBMGeo.NODE_WALL)
+		b = (sim.geo.map_to_node_type(sim.geo.map) == geo2d.LBMGeo.NODE_WALL)
 
 		if self._vismode == 0:
 			drw = numpy.sqrt(vx*vx + vy*vy) / maxv
 		elif self._vismode == 1:
-			drw = numpy.abs(vx) / maxv
+			drw = (vx) / maxv
 		elif self._vismode == 2:
-			drw = numpy.abs(vy) / maxv
+			drw = (vy) / maxv
 		elif self._vismode == 3:
 			mrho = numpy.ma.array(rho, mask=(b))
 			rho_min = numpy.min(mrho)
 			rho_max = numpy.max(mrho)
-			drw	= ((rho - rho_min) / (rho_max - rho_min))
+			drw = ((rho - rho_min) / (rho_max - rho_min))
+		elif self._vismode == 4:
+			self.curl_v = (numpy.hstack( (vy[:,1:]-vy[:,:-1],numpy.zeros((height,1))))
+					- numpy.vstack( (vx[1:,:]-vx[:-1,:],numpy.zeros((1,width)))))
+			drw = -(self.curl_v) / self._vscale
+			if self._convolve:
+				g = gauss_kernel(1, sizey=1)
+				drw = signal.convolve(drw,g, mode='same')
 
 		# Rotate the field to the correct position.
 		drw = numpy.rot90(drw.astype(numpy.float32), 3)
 		a = pygame.surfarray.pixels3d(srf)
 		b = numpy.rot90(b, 3)
-
 		# Draw the walls.
-		a[b] = (0, 0, 255)
+		a[b] = (255, 255, 255)
 
 		# Draw the data field for all sites which are not marked as a wall.
 		b = numpy.logical_not(b)
@@ -143,7 +168,7 @@ class Fluid2DVis(object):
 		# Draw the tracer particles
 		if self._tracers:
 			for x, y in zip(tx, ty):
-				pygame.draw.circle(self._screen, (0, 255, 0), (int(x * sw / width), int(sh - y * sh / height)), 2)
+				pygame.draw.circle(self._screen, (0, 255, 255), (int(x * sw / width), int(sh - y * sh / height)), 2)
 
 		return ret
 
@@ -184,10 +209,14 @@ class Fluid2DVis(object):
 					self._vismode = 2
 				elif event.key == pygame.K_3:
 					self._vismode = 3
+				elif event.key == pygame.K_4:
+					self._vismode = 4
 				elif event.key == pygame.K_v:
 					self._velocity = not self._velocity
 				elif event.key == pygame.K_t:
 					self._tracers = not self._tracers
+				elif event.key == pygame.K_c:
+					self._convolve = not self._convolve
 				elif event.key == pygame.K_p:
 					self._paused = not self._paused
 					if self._paused:
