@@ -13,28 +13,19 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 from mako.template import Template
 from mako.lookup import TemplateLookup
 
-try:
-	import backend_cuda
-except ImportError:
-	pass
-
-try:
-	import backend_opencl
-except ImportError:
-	pass
-
 import sym
 
 SUPPORTED_BACKENDS = {'cuda': 'backend_cuda', 'opencl': 'backend_opencl'}
 
+for backend in SUPPORTED_BACKENDS.values():
+	try:
+		__import__(backend)
+	except ImportError:
+		pass
+
 def get_backends():
-	ret = []
-
-	for k, v in SUPPORTED_BACKENDS.iteritems():
-		if v in sys.modules:
-			ret.append(k)
-
-	return sorted(ret)
+	"""Get a list of available backends."""
+	return sorted([k for k, v in SUPPORTED_BACKENDS.iteritems() if v in sys.modules])
 
 class Values(optparse.Values):
 	def __init__(self, *args):
@@ -52,6 +43,7 @@ def _convert_to_double(src):
 
 class LBMSim(object):
 
+	# The filename base for screenshots.
 	filename = 'lbm_sim'
 
 	def __init__(self, geo_class, misc_options=[], args=sys.argv[1:]):
@@ -106,9 +98,13 @@ class LBMSim(object):
 		self.options = Values(parser.defaults)
 		parser.parse_args(args, self.options)
 
+		# Adjust workgroup size if necessary to ensure that we will be able to
+		# successfully execute the main LBM kernel.
 		if self.options.lat_w < 64:
 			self.block_size = self.options.lat_w
 		else:
+			# TODO: This should be dynamically adjusted based on both the lat_w
+			# value and device capabilities.
 			self.block_size = 64
 
 		self._mlups_calls = 0
@@ -152,12 +148,20 @@ class LBMSim(object):
 		self.vis = vis3d.Fluid3DVis()
 
 	def add_iter_hook(self, i, func, every=False):
+		"""Add a hook that will be executed during the simulation.
+
+		Args:
+		  i: number of the time step after which the hook is to be run
+		  func: a callable representing the hook
+		  every: if True, the hook will be executed every i steps
+		"""
 		if every:
 			self._iter_hooks_every.setdefault(i, []).append(func)
 		else:
 			self._iter_hooks.setdefault(i, []).append(func)
 
 	def clear_hooks(self):
+		"""Remove all hooks."""
 		self._iter_hooks = {}
 		self._iter_hooks_every = {}
 
@@ -219,7 +223,6 @@ class LBMSim(object):
 		ctx.update(self.geo.get_defines())
 		ctx.update(self.backend.get_defines())
 
-
 		src = lbm_tmpl.render(**ctx)
 
 		if self._is_double_precision():
@@ -229,6 +232,8 @@ class LBMSim(object):
 			with open(self.options.save_src, 'w') as fsrc:
 				print >>fsrc, src
 
+		# If external source code was requested, ignore the code that we have
+		# just generated above.
 		if self.options.use_src:
 			with open(self.options.use_src, 'r') as fsrc:
 				src = fsrc.read()
@@ -331,6 +336,14 @@ class LBMSim(object):
 			self.kern_grid_size = (self.options.lat_w/self.block_size * self.options.lat_h, self.options.lat_d)
 
 	def sim_step(self, i, tracers=True, get_data=False):
+		"""Perform a single step of the simulation.
+
+		Args:
+		  i: current timestep
+		  tracers: if True, the position of tracer particles will be updated
+		  get_data: if True, macroscopic variables will be copied from the compute unit
+		    and made available as properties of this class
+		"""
 		kerns = self.kern_map[i & 1]
 
 		if (not self.options.benchmark and i % self.options.every == 0) or get_data:
@@ -352,17 +365,31 @@ class LBMSim(object):
 				self.backend.run_kernel(kerns[2], (self.options.tracers,))
 
 	def get_macro_quantities(self, gpu_dist):
+		"""Compute global macroscopic quantities of the fluid directly from the distributions.
+
+		Args:
+		  gpu_dist: a compute unit memory object containing the distributions
+
+		Returns:
+		  A tuple of momentum, density.  Momentum is a 2- or 3-vector, depending on the
+		  dimensionality of the grid used in the simulation.
+		"""
 		self.backend.from_buf(gpu_dist)
 
-		import sym
 		mx = 0.0
 		my = 0.0
+		mz = 0.0
 
 		for i, mval in enumerate(self.dist):
 			mx += sym.GRID.basis[i][0] * numpy.sum(mval)
 			my += sym.GRID.basis[i][1] * numpy.sum(mval)
+			if sym.GRID.dim == 3:
+				mz += sym.GRID>basis[i][2] * numpy.sum(mval)
 
-		return mx, my, numpy.sum(self.dist)
+		if sym.GRID.dim == 3:
+			return (mx, my, mz), numpy.sum(self.dist)
+		else:
+			return (mx, my), numpy.sum(self.dist)
 
 	def get_mlups(self, tdiff, iters=None):
 		if iters is not None:
