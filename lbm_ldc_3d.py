@@ -9,7 +9,7 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 
 import sym
 
-sym.use_grid(sym.D3Q19)
+sym.use_grid(sym.D3Q13)
 
 class LBMGeoLDC(geo2d.LBMGeo):
 	"""Lid-driven cavity geometry."""

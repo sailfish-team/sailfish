@@ -395,6 +395,9 @@ ${device_func} inline void bounce_back(Dist *fi)
 	%endfor
 }
 
+/*
+FIXME: Temporarily disable this until it is converted into a grid-independent form.
+
 ${device_func} inline void half_bb(Dist *fi, const int node_type)
 {
 	// TODO: add support for corners
@@ -424,6 +427,7 @@ ${device_func} inline void half_bb(Dist *fi, const int node_type)
 		break;
 	}
 }
+*/
 
 <%def name="prop_bnd(dir, effective_dir, i, di, dname, dist_source, offset)">
 	%if di == dim:

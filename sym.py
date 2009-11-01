@@ -29,12 +29,15 @@ class D2Q9(DxQy):
 	weights = map(lambda x: Rational(*x),
 			[(4,9), (1,9), (1,9), (1,9), (1,9), (1,36), (1,36), (1,36), (1,36)])
 
-# TODO: Finish this.
 class D3Q13(DxQy):
 	dim = 3
 	basis = map(lambda x: Matrix((x, )),
 				[(0,0,0), (1,1,0), (-1,-1,0), (1,-1,0), (-1,1,0), (1,0,1),
 				 (-1,0,-1), (1,0,-1), (-1,0,1), (0,1,1), (0,-1,-1), (0,1,-1), (0,-1,1)])
+
+	weights = map(lambda x: Rational(*x),
+			[(1,2), (1,24), (1,24), (1,24), (1,24), (1,24), (1,24),
+			 (1,24), (1,24), (1,24), (1,24), (1,24), (1,24)])
 
 class D3Q15(DxQy):
 	dim = 3
@@ -46,7 +49,6 @@ class D3Q15(DxQy):
 	weights = map(lambda x: Rational(*x),
 			[(2,9), (1,9), (1,9), (1,9), (1,9), (1,9), (1,9),
 				(1,72), (1,72), (1,72), (1,72), (1,72), (1,72), (1,72), (1,72)])
-
 
 class D3Q19(DxQy):
 	dim = 3
@@ -344,7 +346,7 @@ def use_grid(grid):
 	GRID = grid
 	EQ_DIST = bgk_equilibrium()
 
-KNOWN_GRIDS = [D2Q9, D3Q15, D3Q19]
+KNOWN_GRIDS = [D2Q9, D3Q13, D3Q15, D3Q19]
 
 _prepare_grids()
 use_grid(D2Q9)
