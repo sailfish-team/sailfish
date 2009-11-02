@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 import math
 import numpy
 import sys
