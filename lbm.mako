@@ -5,10 +5,6 @@
 #define BLOCK_SIZE ${block_size}
 #define DIST_SIZE ${dist_size}
 #define GEO_FLUID ${geo_fluid}
-#define GEO_WALL_E ${geo_wall_e}
-#define GEO_WALL_W ${geo_wall_w}
-#define GEO_WALL_S ${geo_wall_s}
-#define GEO_WALL_N ${geo_wall_n}
 #define GEO_BCV ${geo_bcv}
 #define GEO_BCP ${geo_bcp}
 
