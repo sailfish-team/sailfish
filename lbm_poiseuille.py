@@ -32,18 +32,18 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 
 			if self.options.horizontal:
 				for y in range(0, self.lat_h):
-					self.velocity_to_dist((profile[y], 0.0), dist, (0, y))
+					self.velocity_to_dist((0, y), (profile[y], 0.0), dist)
 				for x in range(1, self.lat_w):
 					dist[:,:,x] = dist[:,:,0]
 			else:
 				for x in range(0, self.lat_w):
-					self.velocity_to_dist((0.0, profile[x]), dist, (x, 0))
+					self.velocity_to_dist((x, 0), (0.0, profile[x]), dist)
 				for y in range(1, self.lat_h):
 					dist[:,y,:] = dist[:,0,:]
 		else:
 			for x in range(0, self.lat_w):
 				for y in range(0, self.lat_h):
-					self.velocity_to_dist((0.0, 0.0), dist, (x, y))
+					self.velocity_to_dist((x, y), (0.0, 0.0), dist)
 
 	def get_velocity_profile(self):
 		width = self.get_chan_width()

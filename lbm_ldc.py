@@ -28,10 +28,10 @@ class LBMGeoLDC(geo.LBMGeo2D):
 	def init_dist(self, dist):
 		for x in range(0, self.lat_w):
 			for y in range(0, self.lat_h):
-				self.velocity_to_dist((0.0, 0.0), dist, (x, y))
+				self.velocity_to_dist((x, y), (0.0, 0.0), dist)
 
 		for i in range(0, self.lat_w):
-			self.velocity_to_dist((self.max_v, 0.0), dist, (i, self.lat_h-1))
+			self.velocity_to_dist((i, self.lat_h-1), (self.max_v, 0.0), dist)
 
 	def get_reynolds(self, viscosity):
 		return int((self.lat_w-1) * self.max_v/viscosity)

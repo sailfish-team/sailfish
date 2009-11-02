@@ -36,14 +36,14 @@ class LBMGeoLDC(geo.LBMGeo3D):
 				self.set_geo((self.lat_w-1, y, z), self.NODE_WALL)
 
 	def init_dist(self, dist):
-		self.velocity_to_dist((0.0, 0.0, 0.0), dist, (0, 0, 0))
+		self.velocity_to_dist((0, 0, 0), (0.0, 0.0, 0.0), dist)
 
 		for i in range(0, len(sym.GRID.basis)):
 			dist[i,:,:,:] = dist[i,0,0,0]
 
 		for x in range(0, self.lat_w):
 			for y in range(0, self.lat_h):
-				self.velocity_to_dist((self.max_v, 0.0, 0.0), dist, (x, y, self.lat_d-1))
+				self.velocity_to_dist((x, y, self.lat_d-1), (self.max_v, 0.0, 0.0), dist)
 
 	# FIXME
 	def get_reynolds(self, viscosity):

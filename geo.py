@@ -179,7 +179,7 @@ class LBMGeo(object):
 		mask = (self.map_to_node_type(self.map) == self.NODE_WALL)
 		return numpy.ma.array(array, mask=mask)
 
-	def velocity_to_dist(self, velocity, dist, location):
+	def velocity_to_dist(self, location, velocity, dist):
 		"""Set the distributions for a node so that the fluid there has a
 		specific velocity.
 
