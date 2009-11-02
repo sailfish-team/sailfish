@@ -8,7 +8,7 @@ import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
 
 
-class LBMGeoLDC(geo.LBMGeo):
+class LBMGeoLDC(geo.LBMGeo2D):
 	"""Lid-driven cavity geometry."""
 
 	max_v = 0.1
@@ -18,12 +18,12 @@ class LBMGeoLDC(geo.LBMGeo):
 		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
 		# bottom/top
 		for i in range(0, self.lat_w):
-			self.set_geo((i, 0), geo.LBMGeo.NODE_WALL)
-			self.set_geo((i, self.lat_h-1), geo.LBMGeo.NODE_VELOCITY, (LBMGeoLDC.max_v, 0.0))
+			self.set_geo((i, 0), self.NODE_WALL)
+			self.set_geo((i, self.lat_h-1), self.NODE_VELOCITY, (self.max_v, 0.0))
 		# left/right
 		for i in range(0, self.lat_h):
-			self.set_geo((0, i), geo.LBMGeo.NODE_WALL)
-			self.set_geo((self.lat_w-1, i), geo.LBMGeo.NODE_WALL)
+			self.set_geo((0, i), self.NODE_WALL)
+			self.set_geo((self.lat_w-1, i), self.NODE_WALL)
 
 	def init_dist(self, dist):
 		for x in range(0, self.lat_w):
@@ -31,10 +31,10 @@ class LBMGeoLDC(geo.LBMGeo):
 				self.velocity_to_dist((0.0, 0.0), dist, (x, y))
 
 		for i in range(0, self.lat_w):
-			self.velocity_to_dist((LBMGeoLDC.max_v, 0.0), dist, (i, self.lat_h-1))
+			self.velocity_to_dist((self.max_v, 0.0), dist, (i, self.lat_h-1))
 
 	def get_reynolds(self, viscosity):
-		return int((self.lat_w-1) * LBMGeoLDC.max_v/viscosity)
+		return int((self.lat_w-1) * self.max_v/viscosity)
 
 class LDCSim(lbm.LBMSim):
 
