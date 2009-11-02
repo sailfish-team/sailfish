@@ -4,7 +4,7 @@ import math
 import numpy
 import sys
 import time
-import geo2d
+import geo
 import vis2d
 
 import optparse
@@ -64,7 +64,7 @@ class LBMSim(object):
 		group.add_option('--periodic_y', dest='periodic_y', help='lattice periodic in the Y direction', action='store_true', default=False)
 		group.add_option('--periodic_z', dest='periodic_z', help='lattice periodic in the Z direction', action='store_true', default=False)
 		group.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
-		group.add_option('--boundary', dest='boundary', help='boundary condition implementation', type='choice', choices=[x.name for x in geo2d.SUPPORTED_BCS], default='fullbb')
+		group.add_option('--boundary', dest='boundary', help='boundary condition implementation', type='choice', choices=[x.name for x in geo.SUPPORTED_BCS], default='fullbb')
 		parser.add_option_group(group)
 
 		group = OptionGroup(parser, 'Run mode settings')

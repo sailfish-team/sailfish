@@ -1,7 +1,7 @@
 import math
 import numpy
 import pygame
-import geo2d
+import geo
 import os
 import sys
 import time
@@ -111,7 +111,7 @@ class Fluid2DVis(object):
 		ret.append(('max_v', maxv))
 		ret.append(('rho_avg', numpy.average(rho)))
 
-		b = (sim.geo.map_to_node_type(sim.geo.map) == geo2d.LBMGeo.NODE_WALL)
+		b = (sim.geo.map_to_node_type(sim.geo.map) == geo.LBMGeo.NODE_WALL)
 
 		if self._vismode == 0:
 			drw = numpy.sqrt(vx*vx + vy*vy) / maxv
@@ -180,7 +180,7 @@ class Fluid2DVis(object):
 	def _draw_wall(self, lbm_sim, event):
 		x, y = self._get_loc(event)
 		lbm_sim.geo.set_geo((x, y),
-				self._draw_type == 1 and geo2d.LBMGeo.NODE_WALL or geo2d.LBMGeo.NODE_FLUID,
+				self._draw_type == 1 and geo.LBMGeo.NODE_WALL or geo.LBMGeo.NODE_FLUID,
 				update=True)
 
 	def _process_events(self, lbm_sim, curr_iter):

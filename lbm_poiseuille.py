@@ -4,13 +4,13 @@ import sys
 
 import numpy
 import lbm
-import geo2d
+import geo
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
 
 
-class LBMGeoPoiseuille(geo2d.LBMGeo):
+class LBMGeoPoiseuille(geo.LBMGeo):
 	"""2D Poiseuille geometry."""
 
 	maxv = 0.02
@@ -19,12 +19,12 @@ class LBMGeoPoiseuille(geo2d.LBMGeo):
 		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
 		if self.options.horizontal:
 			for i in range(0, self.lat_w):
-				self.set_geo((i, 0), geo2d.LBMGeo.NODE_WALL)
-				self.set_geo((i, self.lat_h-1), geo2d.LBMGeo.NODE_WALL)
+				self.set_geo((i, 0), geo.LBMGeo.NODE_WALL)
+				self.set_geo((i, self.lat_h-1), geo.LBMGeo.NODE_WALL)
 		else:
 			for i in range(0, self.lat_h):
-				self.set_geo((0, i), geo2d.LBMGeo.NODE_WALL)
-				self.set_geo((self.lat_w-1, i), geo2d.LBMGeo.NODE_WALL)
+				self.set_geo((0, i), geo.LBMGeo.NODE_WALL)
+				self.set_geo((self.lat_w-1, i), geo.LBMGeo.NODE_WALL)
 
 	def init_dist(self, dist):
 		if self.options.static:

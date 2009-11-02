@@ -1,7 +1,7 @@
 import math
 import numpy
 import pygame
-import geo2d
+import geo
 import os
 import sys
 import time
