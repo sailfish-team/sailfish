@@ -18,8 +18,6 @@ class LBMGeoLDC(geo.LBMGeo3D):
 
 	def _define_nodes(self):
 		"""Initialize the simulation for the lid-driven cavity geometry."""
-		self.map = numpy.zeros((self.lat_d, self.lat_h, self.lat_w), numpy.int32)
-
 		# bottom/top
 		for x in range(0, self.lat_w):
 			for y in range(0, self.lat_h):
@@ -37,13 +35,10 @@ class LBMGeoLDC(geo.LBMGeo3D):
 
 	def init_dist(self, dist):
 		self.velocity_to_dist((0, 0, 0), (0.0, 0.0, 0.0), dist)
+		self.fill_dist((0, 0, 0), dist)
 
-		for i in range(0, len(sym.GRID.basis)):
-			dist[i,:,:,:] = dist[i,0,0,0]
-
-		for x in range(0, self.lat_w):
-			for y in range(0, self.lat_h):
-				self.velocity_to_dist((x, y, self.lat_d-1), (self.max_v, 0.0, 0.0), dist)
+		self.velocity_to_dist((0, 0, self.lat_d-1), (self.max_v, 0.0, 0.0), dist)
+		self.fill_dist((0, 0, self.lat_d-1), dist, target=(slice(None), slice(None), self.lat_d-1))
 
 	# FIXME
 	def get_reynolds(self, viscosity):

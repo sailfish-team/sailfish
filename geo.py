@@ -89,11 +89,8 @@ class LBMGeo(object):
 		self.backend = backend
 		self.map = numpy.zeros(shape, numpy.int32)
 		self.gpu_map = backend.alloc_buf(like=self.map)
-		self._vel_map = {}
-		self._pressure_map = {}
-		self._define_nodes()
-		self._postprocess_nodes()
 		self.float = float
+		self.reset(_get_params=False)
 
 		# Cache for equilibrium distributions.  Sympy numerical evaluation
 		# is expensive, so we try to avoid unnecessary recomputations.
@@ -122,13 +119,15 @@ class LBMGeo(object):
 	def get_defines(self):
 		abstract
 
-	def reset(self):
+	def reset(self, _get_params=True):
 		"""Perform a full reset of the geometry."""
 		self._vel_map = {}
 		self._pressure_map = {}
+		self.map = numpy.zeros(tuple(reversed(self.shape)), numpy.int32)
 		self._define_nodes()
 		self._postprocess_nodes()
-		self.get_params()
+		if _get_params:
+			self.get_params()
 
 	def _get_map(self, location):
 		"""Get a node map entry.
@@ -178,6 +177,27 @@ class LBMGeo(object):
 	def mask_array_by_fluid(self, array):
 		mask = (self.map_to_node_type(self.map) == self.NODE_WALL)
 		return numpy.ma.array(array, mask=mask)
+
+	def fill_dist(self, location, dist, target=None):
+		"""Fill the whole simulation domain with distributions from a specific node.
+
+		Args:
+		  location: location of the node, a n-tuple.  The location can also be a row,
+		    in which case the coordinate spanning the row should be set to slice(None).
+		  dist: the distribution array
+		  target: if not None, a n-tuple representing the area to which the data from
+		    the specified node is to be propagated
+		"""
+
+		if target is None:
+			tg = [slice(None)] * len(location)
+		else:
+			tg = list(reversed(target))
+
+		for i in range(0, len(sym.GRID.basis)):
+			addr = tuple([i] + list(reversed(location)))
+			dest = tuple([i] + tg)
+			dist[dest] = dist[addr]
 
 	def velocity_to_dist(self, location, velocity, dist):
 		"""Set the distributions for a node so that the fluid there has a
@@ -231,6 +251,8 @@ class LBMGeo(object):
 	def get_bc(self):
 		return BCS_MAP[self.options.boundary]
 
+	def init_dist(self, dist):
+		abstract
 
 class LBMGeo2D(LBMGeo):
 	def __init__(self, shape, *args, **kwargs):

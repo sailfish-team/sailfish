@@ -16,7 +16,6 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 	maxv = 0.02
 
 	def _define_nodes(self):
-		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
 		if self.options.horizontal:
 			for i in range(0, self.lat_w):
 				self.set_geo((i, 0), self.NODE_WALL)
@@ -33,17 +32,14 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 			if self.options.horizontal:
 				for y in range(0, self.lat_h):
 					self.velocity_to_dist((0, y), (profile[y], 0.0), dist)
-				for x in range(1, self.lat_w):
-					dist[:,:,x] = dist[:,:,0]
+				self.fill_dist((0, slice(None)), dist)
 			else:
 				for x in range(0, self.lat_w):
 					self.velocity_to_dist((x, 0), (0.0, profile[x]), dist)
-				for y in range(1, self.lat_h):
-					dist[:,y,:] = dist[:,0,:]
+				self.fill_dist((slice(None), 0), dist)
 		else:
-			for x in range(0, self.lat_w):
-				for y in range(0, self.lat_h):
-					self.velocity_to_dist((x, y), (0.0, 0.0), dist)
+			self.velocity_to_dist((0, 0), (0.0, 0.0), dist)
+			self.fill_dist((0, 0), dist)
 
 	def get_velocity_profile(self):
 		width = self.get_chan_width()

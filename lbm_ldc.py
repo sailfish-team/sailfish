@@ -15,7 +15,6 @@ class LBMGeoLDC(geo.LBMGeo2D):
 
 	def _define_nodes(self):
 		"""Initialize the simulation for the lid-driven cavity geometry."""
-		self.map = numpy.zeros((self.lat_h, self.lat_w), numpy.int32)
 		# bottom/top
 		for i in range(0, self.lat_w):
 			self.set_geo((i, 0), self.NODE_WALL)
@@ -26,9 +25,8 @@ class LBMGeoLDC(geo.LBMGeo2D):
 			self.set_geo((self.lat_w-1, i), self.NODE_WALL)
 
 	def init_dist(self, dist):
-		for x in range(0, self.lat_w):
-			for y in range(0, self.lat_h):
-				self.velocity_to_dist((x, y), (0.0, 0.0), dist)
+		self.velocity_to_dist((0,0), (0.0, 0.0), dist)
+		self.fill_dist((0,0), dist)
 
 		for i in range(0, self.lat_w):
 			self.velocity_to_dist((i, self.lat_h-1), (self.max_v, 0.0), dist)
