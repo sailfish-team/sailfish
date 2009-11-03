@@ -422,7 +422,7 @@ class LBMSim(object):
 			id.point_data.scalars.name = 'density'
 			id.point_data.vectors = numpy.c_[self.vx.flatten(), self.vy.flatten(), self.vz.flatten()]
 			id.point_data.vectors.name = 'velocity'
-			id.dimensions = self.rho.shape
+			id.dimensions = list(reversed(self.rho.shape))
 			w = tvtk.XMLPImageDataWriter(input=id, file_name='%s%05d.xml' % (self.options.output, i))
 			w.write()
 		else:
