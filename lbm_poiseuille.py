@@ -78,23 +78,22 @@ class LPoiSim(lbm.LBMSim):
 
 	filename = 'poiseuille'
 
-	def __init__(self, geo_class, args=sys.argv[1:]):
+	def __init__(self, geo_class, args=sys.argv[1:], defaults=None):
 		opts = []
 		opts.append(optparse.make_option('--test', dest='test', action='store_true', default=False, help='generate test data'))
 		opts.append(optparse.make_option('--horizontal', dest='horizontal', action='store_true', default=False, help='use horizontal channel'))
 		opts.append(optparse.make_option('--static', dest='static', action='store_true', default=False, help='start with the correct velocity profile in the whole simulation domain'))
 
-		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, args=args)
+		if defaults is not None:
+			defaults_ = defaults
+		else:
+			defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_w': 64, 'lat_h': 64}
 
-		defaults = {'batch': True, 'max_iters': 500000, 'visc': 0.1, 'lat_w': 64, 'lat_h': 64}
+		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, args=args, defaults=defaults_)
 
 		if self.options.test or self.options.benchmark:
 			self.options.periodic_y = not self.options.horizontal
 			self.options.periodic_x = self.options.horizontal
-
-			for k, v in defaults.iteritems():
-				if k not in self.options.specified:
-					setattr(self.options, k, v)
 
 			self._init_geo()
 

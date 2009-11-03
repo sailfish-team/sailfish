@@ -188,16 +188,38 @@ class LBMGeo(object):
 		  target: if not None, a n-tuple representing the area to which the data from
 		    the specified node is to be propagated
 		"""
+		loc = list(reversed(location))
+		out = dist
 
 		if target is None:
 			tg = [slice(None)] * len(location)
+
+			# In order for numpy's array broadcasting to work correctly, the dimensions
+			# indexed with the ':' operator must be to the right of any dimensions with
+			# a specific numerical index, i.e. t[:,:,:] = b[0,0,:] works, but
+			# t[:,:,:] = b[0,:,0] does not.
+			#
+			# To work around this, we swap the axes of the dist array to get the correct
+			# form for broadcasting.
+			start = None
+			for	i in reversed(range(0, len(loc))):
+				if start is None and loc[i] != slice(None):
+					start = i
+				elif start is not None and loc[i] == slice(None):
+					t = loc[start]
+					loc[start] = loc[i]
+					loc[i] = t
+
+					# +1 as the first dimension is for different velocity directions.
+					out = numpy.swapaxes(out, i+1, start+1)
+					start -= 1
 		else:
 			tg = list(reversed(target))
 
 		for i in range(0, len(sym.GRID.basis)):
-			addr = tuple([i] + list(reversed(location)))
+			addr = tuple([i] + loc)
 			dest = tuple([i] + tg)
-			dist[dest] = dist[addr]
+			out[dest] = out[addr]
 
 	def velocity_to_dist(self, location, velocity, dist):
 		"""Set the distributions for a node so that the fluid there has a
