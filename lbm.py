@@ -44,7 +44,7 @@ class LBMSim(object):
 	# The filename base for screenshots.
 	filename = 'lbm_sim'
 
-	def __init__(self, geo_class, misc_options=[], args=sys.argv[1:]):
+	def __init__(self, geo_class, misc_options=[], args=sys.argv[1:], defaults=None):
 		parser = OptionParser()
 
 		parser.add_option('-q', '--quiet', dest='quiet', help='reduce verbosity', action='store_true', default=False)
@@ -95,6 +95,14 @@ class LBMSim(object):
 		self.geo_class = geo_class
 		self.options = Values(parser.defaults)
 		parser.parse_args(args, self.options)
+
+		# Set default command line values for unspecified options.  This is different
+		# than the default values provided above, as these cannot be changed by
+		# subclasses.
+		if defaults is not None:
+			for k, v in defaults.iteritems():
+				if k not in self.options.specified:
+					setattr(self.options, k, v)
 
 		# Adjust workgroup size if necessary to ensure that we will be able to
 		# successfully execute the main LBM kernel.

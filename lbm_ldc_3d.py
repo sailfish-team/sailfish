@@ -50,7 +50,8 @@ class LDCSim(lbm.LBMSim):
 
 	def __init__(self, geo_class):
 		opts = []
-		lbm.LBMSim.__init__(self, geo_class, misc_options=opts)
+		defaults={'lat_d': 64, 'lat_h': 64, 'lat_w': 64}
+		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, defaults=defaults)
 
 sim = LDCSim(LBMGeoLDC)
 sim.run()
