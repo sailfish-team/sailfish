@@ -35,6 +35,7 @@ class Fluid3DVis(object):
 
 		mlab.pipeline.image_plane_widget(self.vx, plane_orientation='x_axes', slice_index=10)
 		mlab.pipeline.image_plane_widget(self.vx, plane_orientation='y_axes', slice_index=10)
+		mlab.pipeline.image_plane_widget(self.vx, plane_orientation='z_axes', slice_index=10)
 		mlab.axes()
 
 #		mlab.pipeline.vector_cut_plane(self.velocity, mask_points=2, scale_factor=3, plane_orientation='y_axes')

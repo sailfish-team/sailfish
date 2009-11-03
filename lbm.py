@@ -220,7 +220,9 @@ class LBMSim(object):
 		ctx['pbc_offsets'] = [{-1: self.options.lat_w,
 								1: -self.options.lat_w},
 							  {-1: self.options.lat_h*self.options.lat_w,
-								1: -self.options.lat_h*self.options.lat_w}]
+								1: -self.options.lat_h*self.options.lat_w},
+							  {-1: self.options.lat_d*self.options.lat_h*self.options.lat_w,
+								1: -self.options.lat_d*self.options.lat_h*self.options.lat_w}]
 		ctx['bnd_limits'] = [self.options.lat_w, self.options.lat_h, self.options.lat_d]
 		ctx['loc_names'] = ['gx', 'gy', 'gz']
 		ctx['periodicity'] = [int(self.options.periodic_x), int(self.options.periodic_y),
