@@ -129,7 +129,7 @@ class Fluid2DVis(object):
 					- numpy.vstack( (vx[1:,:]-vx[:-1,:],numpy.zeros((1,width)))))
 			drw = -(self.curl_v) / self._vscale
 			if self._convolve:
-				g = gauss_kernel(1, sizey=1)
+				g = gauss_kernel(2, sizey=2)
 				drw = signal.convolve(drw,g, mode='same')
 
 		# Rotate the field to the correct position.
