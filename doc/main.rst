@@ -25,7 +25,7 @@ The general goals of the project are as follows:
 * **agility and extendability**: by implementing large parts of the code in a very
   expressive language (Python), we aim at encouraging rapid experimentation.
   Running tests, playing with new boundary conditions or new models is easy, as
-  often only requires changing a few lines of the kernel code.
+  it often only requires changing a few lines of the kernel code.
 
 * **maintainability**: we keep the code clean and easy to understand.  The Mako
   templating engine makes it possible to dynamically generate optimized code without
@@ -69,10 +69,107 @@ Tutorial
 ========
 
 In this section, we show how to create a simple LBM simulation using Sailfish.
-We will stick to two dimension and we will build the lid-driven cavity geometry,
-which is one of the standard testcases in computational fluid dynamics.
+To keep things simple, we will stick to two dimensions and we will build the
+lid-driven cavity geometry, which is one of the standard testcases in
+computational fluid dynamics.
 
-TODO
+The program outline
+-------------------
+In order to build a Sailfish simulation, we will create a new Python script.
+In this script, we will need to import the ``lbm`` and ``geo`` Sailfish
+modules::
+
+    import lbm
+    import geo
+
+The ``lbm`` module contains a class which will drive our simulation, and the ``geo``
+module contains classes used to describe the geometry of the simulaton.  We will start
+with defining the main driver class for our example, and return to the issue of
+geometry later.
+
+Each Sailfish simulation is represented by a class derived from ``lbm.LBMSim``.
+In the simplest case, we don't need to define any additional members of that class,
+and a simple definition along the lines of::
+
+    class LDCSim(lbm.LBMSim):
+        pass
+
+will do just fine.  The part of that class that is of primary interest to the end-user
+is its ``__init__`` method.  When the class is instantiated, it parses the command
+line arguments and stores the simulation settings in ``self.options`` (using the standard
+Python ``optparse`` module).  The ``__init__`` method takes a single argument by default
+-- the class representing the simulation geometry.
+
+That class needs to be derived from either ``geo.LBMGeo2D`` or ``geo.LBMGeo3D``, depending
+on the dimensionality of the problem at hand.  In our present case, we will
+use the former one.  The derived geometry class needs to define at least the following
+two methods: ``_define_nodes`` and ``init_dist``.
+
+``_define_nodes`` is used to set the type of each node in the simulation domain.  The
+size of the simulation domain is already known when the geometry class is instantiated
+and can be accessed via its attributes ``lat_w`` (size along the X axis), ``lat_h``
+(size along the Y axis) and ``lat_d`` (size along the Z axis, for 2D simulations always
+equal to 1).
+
+By default, the whole domain is initialized as fluid nodes.  To define the geometry, we
+will want to redefine some of the nodes using the ``NODE_WALL``, ``NODE_VELOCITY`` or
+``NODE_PRESSURE`` class constants.  ``NODE_WALL`` represents the no-slip condition at a
+stationary domain boundary.  ``NODE_VELOCITY`` and ``NODE_PRESSURE`` represent a
+boundary condition with specified velocity or pressure, respectively.  To redefine
+the nodes, we will use the ``set_geo(location, type, data)`` function.  Here, ``location``
+is a tuple representing the location of the node to update, ``type`` is one of the class
+constants discussed above, and ``data`` is an optional argument used to specify the
+imposed velocity or pressure.
+
+In the lid-driven cavity (LDC) geometry, we consider a rectangular box, open at the top
+where the fluid flows horizontally with some predefined velocity.  We therefore write
+our function as follows::
+
+    class LBMGeoLDC(geo.LBMGeo2D):
+        max_v = 0.1
+        def _define_nodes(self):
+            for i in range(0, self.lat_w):
+                self.set_geo((i, 0), self.NODE_WALL)
+                self.set_geo((i, self.lat_h-1), self.NODE_VELOCITY, (self.max_v, 0.0))
+            for i in range(0, self.lat_h):
+                self.set_geo((0, i), self.NODE_WALL)
+                self.set_geo((self.lat_w-1, i), self.NODE_WALL)
+
+Now that we have the geometry out of the way, we can deal with the initial conditions.
+This is done in the ``init_dist(dist)`` function, which is responsible for setting the initial
+particle distributions in all nodes in the simulation domain.  The function takes a single
+``dist`` argument, which is a numpy array containing the distributions.  We normally won't
+be accessing that array directly anyway, so the exact details of how the distributions are
+stored is irrelevant.  To set them, we will use the ``velocity_to_dist(location, velocity, dist)``
+function, which will do all of the heavy lifting for us. To match our LDC geometry, we set
+the velocity of the fluid everywhere to be 0, except for the first row at the top, where
+we set the fluid to have to a ``max_v`` velocity in the horizontal direction::
+
+        def init_dist(self, dist):
+            self.velocity_to_dist((0,0), (0.0, 0.0), dist)
+            self.fill_dist((0,0), dist)
+
+            for i in range(0, self.lat_w):
+                self.velocity_to_dist((i, self.lat_h-1), (self.max_v, 0.0), dist)
+
+The only new thing here is the ``fill_dist`` function, which we use to copy the
+distributions from node (0,0) to the whole simulation domain.  We do so to make the
+code faster, as calculating the distributions multiple times and writing them to all
+nodes one by one is a costly process, which is best avoided.
+
+At this point, we are almost good to go.  The only remaining thing to do is to
+instantiate the ``LDCSim`` class and use its ``run`` method to actually start the
+simulation::
+
+    sim = LDCSim(LBMGeoLDC)
+    sim.run()
+
+How it works behind the scenes
+------------------------------
+
+Using the command-line arguments
+--------------------------------
+
 
 Simulation results processing
 =============================
