@@ -187,7 +187,7 @@ class LBMSim(object):
 		self.dist = numpy.zeros([len(sym.GRID.basis)] + list(self.shape), self.float)
 
 		# Simulation geometry.
-		self.geo = self.geo_class(list(reversed(self.shape)), self.options.model, self.options, self.float, self.backend)
+		self.geo = self.geo_class(list(reversed(self.shape)), self.options, self.float, self.backend)
 		self.geo.init_dist(self.dist)
 		self.geo_params = self.float(self.geo.get_params())
 		# HACK: Prevent this method from being called again.

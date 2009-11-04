@@ -1,6 +1,5 @@
 import numpy
 import sym
-import sympy
 
 # Abstract class implementation, from Peter's Norvig site.
 def abstract():
@@ -81,10 +80,9 @@ class LBMGeo(object):
 		"""
 		return ((node_map & cls.NODE_TYPE_MASK) >> cls.NODE_ORIENTATION_SHIFT)
 
-	def __init__(self, shape, model, options, float, backend):
+	def __init__(self, shape, options, float, backend):
 		self.dim = len(shape)
 		self.shape = shape
-		self.model = model
 		self.options = options
 		self.backend = backend
 		self.map = numpy.zeros(shape, numpy.int32)
