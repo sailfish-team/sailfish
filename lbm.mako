@@ -126,18 +126,21 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 
 	*rho = ${sym.ex_rho('fi')};
 
-	% if boundary_type != 'fullbb' and boundary_type != 'halfbb':
+	% if boundary_type == 'fullbb' or boundary_type == 'halfbb':
 	if (node_type >= GEO_BCV) {
 		// Velocity boundary condition.
 		if (node_type < GEO_BCP) {
-			int idx = (node_type - GEO_BCV) * 2;
+			int idx = (node_type - GEO_BCV) * ${dim};
 			v[0] = geo_params[idx];
 			v[1] = geo_params[idx+1];
+			%if dim == 3:
+				v[2] = geo_params[idx+2];
+			%endif
 			return;
 		// Pressure boundary condition.
 		} else {
 			// c_s^2 = 1/3, P/c_s^2 = rho
-			int idx = (GEO_BCP-GEO_BCV) * 2 + (node_type - GEO_BCP);
+			int idx = (GEO_BCP-GEO_BCV) * ${dim} + (node_type - GEO_BCP);
 			*rho = geo_params[idx] * 3.0f;
 		}
 	}
@@ -349,9 +352,20 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 		feq.${idx} = ${feq};
 	%endfor
 
-	%for idx in sym.GRID.idx_name:
-		fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
-	%endfor
+	%if boundary_type == 'fullbb' or boundary_type == 'halfbb':
+		// FIXME: Do the same for pressure nodes.
+		// Eenforce an equlibrium distribution for velocity nodes.
+		if (isVelocityNode(node_type)) {
+			%for idx in sym.GRID.idx_name:
+				fi->${idx} = feq.${idx};
+			%endfor
+		} else
+	%endif
+	{
+		%for idx in sym.GRID.idx_name:
+			fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
+		%endfor
+	}
 
 	%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
 		%if boundary_type == 'fullbb':
