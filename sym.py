@@ -55,30 +55,99 @@ class D3Q13(DxQy):
 			[(1,2), (1,24), (1,24), (1,24), (1,24), (1,24), (1,24),
 			 (1,24), (1,24), (1,24), (1,24), (1,24), (1,24)])
 
+	mrt_names = ['rho', 'en', 'mx', 'my', 'mz',
+				 'sd2', 'sd1', 'sod1', 'sod2', 'sod3', 'm3x', 'm3y', 'm3z']
+
+	@classmethod
+	def _init_mrt_basis(cls):
+		cls.mrt_basis = map(lambda x: Matrix(x), [
+			[1]*13,
+			[x.dot(x) for x in cls.basis],
+			[x[0] for x in cls.basis],
+			[x[1] for x in cls.basis],
+			[x[2] for x in cls.basis],
+			[x[1]*x[1] - x[2]*x[2] for x in cls.basis],
+			[x[0]*x[0] - x[1]*x[1] for x in cls.basis],
+			[x[0]*x[1] for x in cls.basis],
+			[x[1]*x[2] for x in cls.basis],
+			[x[0]*x[2] for x in cls.basis],
+			[(x[1]*x[1] - x[2]*x[2])*x[0] for x in cls.basis],
+			[(x[2]*x[2] - x[0]*x[0])*x[1] for x in cls.basis],
+			[(x[0]*x[0] - x[1]*x[1])*x[2] for x in cls.basis]])
+
 class D3Q15(DxQy):
 	dim = 3
 	basis = map(lambda x: Matrix((x, )),
-				[(0,0,0), (1,0,0), (0,1,0), (-1,0,0), (0,-1,0), (0,0,1), (0,0,-1),
-				 (1,1,1), (1,1,-1), (1,-1,1), (1,-1,-1), (-1,1,1), (-1,1,-1), (-1,-1,1),
-				 (-1,-1,-1)])
+				[(0,0,0), (1,0,0), (-1,0,0), (0,1,0), (0,-1,0), (0,0,1), (0,0,-1),
+				 (1,1,1), (-1,1,1), (1,-1,1), (-1,-1,1),
+				 (1,1,-1), (-1,1,-1), (1,-1,-1), (-1,-1,-1)])
 
 	weights = map(lambda x: Rational(*x),
 			[(2,9), (1,9), (1,9), (1,9), (1,9), (1,9), (1,9),
 				(1,72), (1,72), (1,72), (1,72), (1,72), (1,72), (1,72), (1,72)])
 
+	mrt_names = ['rho', 'en', 'ens', 'mx', 'ex', 'my', 'ey', 'mz', 'ez',
+				 'sd2', 'sd1', 'sod1', 'sod2', 'sod3', 'm15']
+
+	@classmethod
+	def _init_mrt_basis(cls):
+		cls.mrt_basis = map(lambda x: Matrix(x), [
+			[1]*15,
+			[x.dot(x) for x in cls.basis],
+			[(x.dot(x))**2 for x in cls.basis],
+			[x[0] for x in cls.basis],
+			[x[0] * x.dot(x) for x in cls.basis],
+			[x[1] for x in cls.basis],
+			[x[1] * x.dot(x) for x in cls.basis],
+			[x[2] for x in cls.basis],
+			[x[2] * x.dot(x) for x in cls.basis],
+			[x[1]*x[1] - x[2]*x[2] for x in cls.basis],
+			[x[0]*x[0] - x[1]*x[1] for x in cls.basis],
+			[x[0]*x[1] for x in cls.basis],
+			[x[1]*x[2] for x in cls.basis],
+			[x[0]*x[2] for x in cls.basis],
+			[x[0]*x[1]*x[2] for x in cls.basis]])
+
+
 class D3Q19(DxQy):
 	dim = 3
 	basis = map(lambda x: Matrix((x, )),
 				[(0,0,0),
-				(1,0,0), (0,1,0), (-1,0,0), (0,-1,0), (0,0,1), (0,0,-1),
-				(1,1,0), (-1,1,0), (-1,-1,0), (1,-1,0),
-				 (0,1,1), (0,1,-1), (0,-1,1), (0,-1,-1),
-				 (1,0,1), (1,0,-1), (-1,0,1), (-1,0,-1)])
+				(1,0,0), (-1,0,0), (0,1,0), (0,-1,0), (0,0,1), (0,0,-1),
+				(1,1,0), (-1,1,0), (1,-1,0), (-1,-1,0),
+				(1,0,1), (-1,0,1), (1,0,-1), (-1,0,-1),
+				(0,1,1), (0,-1,1), (0,1,-1), (0,-1,-1)])
 
 	weights = map(lambda x: Rational(*x),
 			[(1,3), (1,18), (1,18), (1,18), (1,18), (1,18), (1,18),
 				(1,36), (1,36), (1,36), (1,36), (1,36), (1,36),
 				(1,36), (1,36), (1,36), (1,36), (1,36), (1,36)])
+
+	mrt_names = ['rho', 'en', 'ens', 'mx', 'ex', 'my', 'ey', 'mz', 'ez',
+				 'sd2', 'sd21', 'sd1', 'sd11', 'sod1', 'sod2', 'sod3', 'm3x', 'm3y', 'm3z']
+
+	@classmethod
+	def _init_mrt_basis(cls):
+		cls.mrt_basis = map(lambda x: Matrix(x), [
+			[1]*19,
+			[x.dot(x) for x in cls.basis],
+			[(x.dot(x))**2 for x in cls.basis],
+			[x[0] for x in cls.basis],
+			[x[0] * x.dot(x) for x in cls.basis],
+			[x[1] for x in cls.basis],
+			[x[1] * x.dot(x) for x in cls.basis],
+			[x[2] for x in cls.basis],
+			[x[2] * x.dot(x) for x in cls.basis],
+			[x[1]*x[1] - x[2]*x[2] for x in cls.basis],
+			[x.dot(x) * (x[1]*x[1] - x[2]*x[2]) for x in cls.basis],
+			[x[0]*x[0] - x[1]*x[1] for x in cls.basis],
+			[x.dot(x) * (x[0]*x[0] - x[1]*x[1]) for x in cls.basis],
+			[x[0]*x[1] for x in cls.basis],
+			[x[1]*x[2] for x in cls.basis],
+			[x[0]*x[2] for x in cls.basis],
+			[(x[1]*x[1] - x[2]*x[2])*x[0] for x in cls.basis],
+			[(x[2]*x[2] - x[0]*x[0])*x[1] for x in cls.basis],
+			[(x[0]*x[0] - x[1]*x[1])*x[2] for x in cls.basis]])
 
 def bgk_equilibrium(as_string=True):
 	"""Get expressions for the BGK equilibrium distribution.
@@ -346,8 +415,8 @@ def orthogonalize(*vectors):
 				fact = fact * z.q
 
 		x = x * fact
-		cd = gcd(*x)
-		if cd > 0:
+		cd = abs(gcd(*x))
+		if cd > 1:
 			x /= cd
 
 		ret.append(x)
@@ -407,6 +476,15 @@ def _prepare_grids():
 		#  - the othogonal vectors form the transformation matrix
 		if hasattr(grid, '_init_mrt_basis'):
 			grid._init_mrt_basis()
+
+			if len(grid.mrt_basis) != len(grid.basis):
+				raise TypeError('The number of moment vectors for grid %s is different '
+					'than the number of vectors in velocity space.' % grid.__name__)
+
+			if len(grid.mrt_basis) != len(grid.mrt_names):
+				raise TypeError('The number of MRT names for grid %s is different '
+					'than the number of moments.' % grid.__name__)
+
 			grid.mrt_matrix = Matrix([x.transpose().tolist()[0] for x in orthogonalize(*grid.mrt_basis)])
 
 def use_grid(grid):
