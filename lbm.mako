@@ -31,7 +31,14 @@ ${dname}\
 
 // Distribution in momentum space.
 typedef struct DistM {
-	float rho, en, ens, mx, ex, my, ey, sd, sod;
+	float \
+	%for i, dname in enumerate(sym.GRID.mrt_names):
+${dname}\
+		%if i < len(sym.GRID.mrt_names)-1:
+, \
+		%endif
+	%endfor
+	;
 } DistM;
 
 <%include file="opencl_compat.mako"/>
@@ -268,15 +275,9 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 {
 	DistM fm, feq;
 
-	fm.rho = 1.0f*fi->fC + 1.0f*fi->fE + 1.0f*fi->fN + 1.0f*fi->fW + 1.0f*fi->fS + 1.0f*fi->fNE + 1.0f*fi->fNW + 1.0f*fi->fSW + 1.0f*fi->fSE;
-	fm.en = -4.0f*fi->fC - 1.0f*fi->fE - 1.0f*fi->fN - 1.0f*fi->fW - 1.0f*fi->fS + 2.0f*fi->fNE + 2.0f*fi->fNW + 2.0f*fi->fSW + 2.0f*fi->fSE;
-	fm.ens = 4.0f*fi->fC - 2.0f*fi->fE - 2.0f*fi->fN - 2.0f*fi->fW - 2.0f*fi->fS + 1.0f*fi->fNE + 1.0f*fi->fNW + 1.0f*fi->fSW + 1.0f*fi->fSE;
-	fm.mx =  0.0f*fi->fC + 1.0f*fi->fE + 0.0f*fi->fN - 1.0f*fi->fW + 0.0f*fi->fS + 1.0f*fi->fNE - 1.0f*fi->fNW - 1.0f*fi->fSW + 1.0f*fi->fSE;
-	fm.ex =  0.0f*fi->fC - 2.0f*fi->fE + 0.0f*fi->fN + 2.0f*fi->fW + 0.0f*fi->fS + 1.0f*fi->fNE - 1.0f*fi->fNW - 1.0f*fi->fSW + 1.0f*fi->fSE;
-	fm.my =  0.0f*fi->fC + 0.0f*fi->fE + 1.0f*fi->fN + 0.0f*fi->fW - 1.0f*fi->fS + 1.0f*fi->fNE + 1.0f*fi->fNW - 1.0f*fi->fSW - 1.0f*fi->fSE;
-	fm.ey =  0.0f*fi->fC + 0.0f*fi->fE - 2.0f*fi->fN + 0.0f*fi->fW + 2.0f*fi->fS + 1.0f*fi->fNE + 1.0f*fi->fNW - 1.0f*fi->fSW - 1.0f*fi->fSE;
-	fm.sd =  0.0f*fi->fC + 1.0f*fi->fE - 1.0f*fi->fN + 1.0f*fi->fW - 1.0f*fi->fS + 0.0f*fi->fNE + 0.0f*fi->fNW + 0.0f*fi->fSW - 0.0f*fi->fSE;
-	fm.sod = 0.0f*fi->fC + 0.0f*fi->fE + 0.0f*fi->fN + 0.0f*fi->fW + 0.0f*fi->fS + 1.0f*fi->fNE - 1.0f*fi->fNW + 1.0f*fi->fSW - 1.0f*fi->fSE;
+	%for mrt, val in sym.bgk_to_mrt('fi', 'fm'):
+		${mrt} = ${val};
+	%endfor
 
 	if (node_type >= GEO_BCV) {
 		// Velocity boundary condition.
@@ -291,49 +292,41 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 		}
 	}
 
-	float h = fm.mx*fm.mx + fm.my*fm.my;
-	feq.en  = -2.0f*fm.rho + 3.0f*h;
-	feq.ens = fm.rho - 3.0f*h;
-	feq.ex  = -fm.mx;
-	feq.ey  = -fm.my;
-	feq.sd  = (fm.mx*fm.mx - fm.my*fm.my);
-	feq.sod = (fm.mx*fm.my);
+	%if dim == 2:
+		float h = fm.mx*fm.mx + fm.my*fm.my;
+		feq.en  = -2.0f*fm.rho + 3.0f*h;
+		feq.ens = fm.rho - 3.0f*h;
+		feq.ex  = -fm.mx;
+		feq.ey  = -fm.my;
+		feq.sd  = (fm.mx*fm.mx - fm.my*fm.my);
+		feq.sod = (fm.mx*fm.my);
 
-	float tau7 = 4.0f / (12.0f*visc + 2.0f);
-	float tau4 = 3.0f*(2.0f - tau7) / (3.0f - tau7);
-	float tau8 = 1.0f/((2.0f/tau7 - 1.0f)*0.5f + 0.5f);
+		float tau7 = 4.0f / (12.0f*visc + 2.0f);
+		float tau4 = 3.0f*(2.0f - tau7) / (3.0f - tau7);
+		float tau8 = 1.0f/((2.0f/tau7 - 1.0f)*0.5f + 0.5f);
 
-	if (node_type == GEO_FLUID || isWallNode(node_type)) {
-		fm.en  -= 1.63f * (fm.en - feq.en);
-		fm.ens -= 1.14f * (fm.ens - feq.ens);
-		fm.ex  -= tau4 * (fm.ex - feq.ex);
-		fm.ey  -= 1.92f * (fm.ey - feq.ey);
-		fm.sd  -= tau7 * (fm.sd - feq.sd);
-		fm.sod -= tau8 * (fm.sod - feq.sod);
-	} else {
-		fm.en  = feq.en;
-		fm.ens = feq.ens;
-		fm.ex  = feq.ex;
-		fm.ey  = feq.ey;
-		fm.sd  = feq.sd;
-		fm.sod = feq.sod;
-	}
+		if (node_type == GEO_FLUID || isWallNode(node_type)) {
+			fm.en  -= 1.63f * (fm.en - feq.en);
+			fm.ens -= 1.14f * (fm.ens - feq.ens);
+			fm.ex  -= tau4 * (fm.ex - feq.ex);
+			fm.ey  -= 1.92f * (fm.ey - feq.ey);
+			fm.sd  -= tau7 * (fm.sd - feq.sd);
+			fm.sod -= tau8 * (fm.sod - feq.sod);
+		} else {
+			fm.en  = feq.en;
+			fm.ens = feq.ens;
+			fm.ex  = feq.ex;
+			fm.ey  = feq.ey;
+			fm.sd  = feq.sd;
+			fm.sod = feq.sod;
+		}
+	%endif
 
-	fi->fC  = (1.0f/9.0f)*fm.rho - (1.0f/9.0f)*fm.en + (1.0f/9.0f)*fm.ens;
-	fi->fE  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.mx - (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
-	fi->fN  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens + (1.0f/6.0f)*fm.my - (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
-	fi->fW  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.mx + (1.0f/6.0f)*fm.ex + 0.25f*fm.sd;
-	fi->fS  = (1.0f/9.0f)*fm.rho - (1.0f/36.0f)*fm.en - (1.0f/18.0f)*fm.ens - (1.0f/6.0f)*fm.my + (1.0f/6.0f)*fm.ey - 0.25f*fm.sd;
-	fi->fNE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
-			 +(1.0f/6.0f)*fm.mx + (1.0f/12.0f)*fm.ex + (1.0f/6.0f)*fm.my + (1.0f/12.0f)*fm.ey + 0.25f*fm.sod;
-	fi->fNW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
-			 -(1.0f/6.0f)*fm.mx - (1.0f/12.0f)*fm.ex + (1.0f/6.0f)*fm.my + (1.0f/12.0f)*fm.ey - 0.25f*fm.sod;
-	fi->fSW = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
-			 -(1.0f/6.0f)*fm.mx - (1.0f/12.0f)*fm.ex - (1.0f/6.0f)*fm.my - (1.0f/12.0f)*fm.ey + 0.25f*fm.sod;
-	fi->fSE = (1.0f/9.0f)*fm.rho + (1.0f/18.0f)*fm.en + (1.0f/36.0f)*fm.ens +
-			 +(1.0f/6.0f)*fm.mx + (1.0f/12.0f)*fm.ex - (1.0f/6.0f)*fm.my - (1.0f/12.0f)*fm.ey - 0.25f*fm.sod;
+	%for bgk, val in sym.mrt_to_bgk('fi', 'fm'):
+		${bgk} = ${val};
+	%endfor
 }
-% endif
+% endif	## model == mrt
 
 % if model == 'bgk':
 //
@@ -382,7 +375,7 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 				fi->${idx} += ${val};
 			%endfor
 		}
-%endif
+	%endif
 }
 %endif
 
@@ -390,7 +383,7 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 	% if model == 'bgk':
 		BGK_relaxate(rho, v, &fi, type);
 	% else:
-		MS_relaxate(&fi, type, type);
+		MS_relaxate(&fi, type);
 	% endif
 </%def>
 

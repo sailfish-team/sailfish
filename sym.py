@@ -29,6 +29,22 @@ class D2Q9(DxQy):
 	weights = map(lambda x: Rational(*x),
 			[(4,9), (1,9), (1,9), (1,9), (1,9), (1,36), (1,36), (1,36), (1,36)])
 
+	# Names of the moments.
+	mrt_names = ['rho', 'en', 'ens', 'mx', 'ex', 'my', 'ey', 'sd', 'sod']
+
+	# A matrix to convert BGK distributions into MRT moments.
+	mrt_matrix = Matrix([
+			[1, 1, 1, 1, 1, 1, 1, 1, 1],
+			[-4, -1, -1, -1, -1, 2, 2, 2, 2],
+			[4, -2, -2, -2, -2, 1, 1, 1, 1],
+			[0, 1, 0, -1, 0, 1, -1, -1, 1],
+			[0, -2, 0, 2, 0, 1, -1, -1, 1],
+			[0, 0, 1, 0, -1, 1, 1, -1, -1],
+			[0, 0, -2, 0, 2, 1, 1, -1, -1],
+			[0, 1, -1, 1, -1, 0, 0, 0, 0],
+			[0, 0, 0, 0, 0, 1, -1, 1, -1]])
+
+
 class D3Q13(DxQy):
 	dim = 3
 	basis = map(lambda x: Matrix((x, )),
@@ -153,6 +169,27 @@ def ex_velocity(distp, comp, rho):
 		 ret += GRID.basis[i][comp] * sym
 
 	return ret / srho
+
+def bgk_to_mrt(bgk_dist, mrt_dist):
+	bgk_syms = Matrix([Symbol('%s->%s' % (bgk_dist, x)) for x in GRID.idx_name])
+	mrt_syms = [Symbol('%s.%s' % (mrt_dist, x)) for x in GRID.mrt_names]
+
+	ret = []
+
+	for i, rhs in enumerate(GRID.mrt_matrix * bgk_syms):
+		ret.append((mrt_syms[i], rhs))
+
+	return ret
+
+def mrt_to_bgk(bgk_dist, mrt_dist):
+	bgk_syms = [Symbol('%s->%s' % (bgk_dist, x)) for x in GRID.idx_name]
+	mrt_syms = Matrix([Symbol('%s.%s' % (mrt_dist, x)) for x in GRID.mrt_names])
+
+	ret = []
+
+	for i, rhs in enumerate(GRID.mrt_matrix.inv() * mrt_syms):
+		ret.append((bgk_syms[i], rhs))
+	return ret
 
 def _get_known_dists(normal):
 	unknown = []
