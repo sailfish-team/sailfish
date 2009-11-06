@@ -32,17 +32,17 @@ class D2Q9(DxQy):
 	# Names of the moments.
 	mrt_names = ['rho', 'en', 'ens', 'mx', 'ex', 'my', 'ey', 'sd', 'sod']
 
-	# A matrix to convert BGK distributions into MRT moments.
-	mrt_matrix = Matrix([
-			[1, 1, 1, 1, 1, 1, 1, 1, 1],
-			[-4, -1, -1, -1, -1, 2, 2, 2, 2],
-			[4, -2, -2, -2, -2, 1, 1, 1, 1],
-			[0, 1, 0, -1, 0, 1, -1, -1, 1],
-			[0, -2, 0, 2, 0, 1, -1, -1, 1],
-			[0, 0, 1, 0, -1, 1, 1, -1, -1],
-			[0, 0, -2, 0, 2, 1, 1, -1, -1],
-			[0, 1, -1, 1, -1, 0, 0, 0, 0],
-			[0, 0, 0, 0, 0, 1, -1, 1, -1]])
+	@classmethod
+	def _init_mrt_basis(cls):
+		cls.mrt_basis = map(lambda x: Matrix(x), [[1]*9,
+				[x.dot(x) for x in cls.basis],
+				[(x.dot(x))**2 for x in cls.basis],
+				[x[0] for x in cls.basis],
+				[x[0] * x.dot(x) for x in cls.basis],
+				[x[1] for x in cls.basis],
+				[x[1] * x.dot(x) for x in cls.basis],
+				[x[0]*x[0] - x[1]*x[1] for x in cls.basis],
+				[x[0]*x[1] for x in cls.basis]])
 
 
 class D3Q13(DxQy):
@@ -329,6 +329,30 @@ def use_pointers(str):
 	ret = ret.replace('vy', 'v[1]')
 	ret = ret.replace('vz', 'v[2]')
 
+def _gcd(a,b):
+	while b:
+		a, b = b, a % b
+	return a
+
+def gcd(*terms):
+	return reduce(lambda a,b: _gcd(a,b), terms)
+
+def orthogonalize(*vectors):
+	ret = []
+	for x in sympy.GramSchmidt(vectors):
+		fact = 1
+		for z in x:
+			if isinstance(z, Rational) and z.q != 1 and fact % z.q != 0:
+				fact = fact * z.q
+
+		x = x * fact
+		cd = gcd(*x)
+		if cd > 0:
+			x /= cd
+
+		ret.append(x)
+	return ret
+
 def _prepare_grids():
 	"""Decorate grid classes with useful info computable from the basic definitions
 	of the grids.
@@ -375,6 +399,16 @@ def _prepare_grids():
 			else:
 				raise TypeError('Opposite vector for %s not found.' % ei)
 
+		# If MRT is supported for the current grid, compute the transformation
+		# matrix from the velocity space to moment space.  The procedure is as
+		# follows:
+		#  - _init_mrt_basis computes the moment vectors
+		#  - the moment vectors are orthogonalized using the Gram-Schmidt procedure
+		#  - the othogonal vectors form the transformation matrix
+		if hasattr(grid, '_init_mrt_basis'):
+			grid._init_mrt_basis()
+			grid.mrt_matrix = Matrix([x.transpose().tolist()[0] for x in orthogonalize(*grid.mrt_basis)])
+
 def use_grid(grid):
 	global GRID, EQ_DIST
 	if grid not in KNOWN_GRIDS:
@@ -387,4 +421,3 @@ KNOWN_GRIDS = [D2Q9, D3Q13, D3Q15, D3Q19]
 
 _prepare_grids()
 use_grid(D2Q9)
-
