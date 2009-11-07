@@ -1,4 +1,5 @@
 from operator import itemgetter
+import math
 import sympy
 from sympy import Matrix, Rational, Symbol, Poly
 import re
@@ -17,6 +18,13 @@ class DxQy(object):
 	vx = Symbol('vx')
 	vy = Symbol('vy')
 	vz = Symbol('vz')
+	mx = Symbol('mx')
+	my = Symbol('my')
+	mz = Symbol('mz')
+	visc = Symbol('visc')
+
+	# Square of the sound velocity.
+	cssq = Rational(1,3)
 
 class D2Q9(DxQy):
 	dim = 2
@@ -30,7 +38,12 @@ class D2Q9(DxQy):
 			[(4,9), (1,9), (1,9), (1,9), (1,9), (1,36), (1,36), (1,36), (1,36)])
 
 	# Names of the moments.
-	mrt_names = ['rho', 'en', 'ens', 'mx', 'ex', 'my', 'ey', 'sd', 'sod']
+	mrt_names = ['rho', 'en', 'ens', 'mx', 'ex', 'my', 'ey', 'pxx', 'pxy']
+
+	# The factor 0 is used for conserved moments.
+	# en -- bulk viscosity
+	# sd -- shear viscosity
+	mrt_collision = [0, 1.63, 1.14, 0, 1.9, 0, 1.9, 1.99, 1.99]
 
 	@classmethod
 	def _init_mrt_basis(cls):
@@ -44,6 +57,55 @@ class D2Q9(DxQy):
 				[x[0]*x[0] - x[1]*x[1] for x in cls.basis],
 				[x[0]*x[1] for x in cls.basis]])
 
+	@classmethod
+	def _init_mrt_equilibrium(cls):
+		cls.mrt_equilibrium = []
+
+		c1 = -2
+		cls.mrt_collision[7] = 1 / (0.5 + cls.visc * Rational(12, 2-c1))
+		cls.mrt_collision[8] = cls.mrt_collision[7]
+
+		# Name -> index map.
+		n2i = {}
+		for i, name in enumerate(cls.mrt_names):
+			n2i[name] = i
+
+		vec_rho = cls.mrt_matrix[n2i['rho'],:]
+		vec_mx = cls.mrt_matrix[n2i['mx'],:]
+		vec_my = cls.mrt_matrix[n2i['my'],:]
+
+		# We choose the form of the equilibrium distributions and the
+		# optimal parameters as shows in the PhysRevE.61.6546 paper about
+		# MRT in 2D.
+		for i, name in enumerate(cls.mrt_names):
+			if cls.mrt_collision[i] == 0:
+				cls.mrt_equilibrium.append(0)
+				continue
+
+			vec_e = cls.mrt_matrix[i,:]
+			if name == 'en':
+				t = (Rational(1, vec_e.dot(vec_e)) *
+						(-8*vec_rho.dot(vec_rho)*cls.rho +
+							18*(vec_mx.dot(vec_mx)*cls.mx**2 + vec_my.dot(vec_my)*cls.my**2)))
+			elif name == 'ens':
+				# The 4 and -18 below are freely adjustable parameters.
+				t = (Rational(1, vec_e.dot(vec_e)) *
+						(4*vec_rho.dot(vec_rho)*cls.rho +
+							-18*(vec_mx.dot(vec_mx)*cls.mx**2 + vec_my.dot(vec_my)*cls.my**2)))
+			elif name == 'ex':
+				t = Rational(1, vec_e.dot(vec_e)) * (c1 * vec_mx.dot(vec_mx)*cls.mx)
+			elif name == 'ey':
+				t = Rational(1, vec_e.dot(vec_e)) * (c1 * vec_my.dot(vec_my)*cls.my)
+			elif name == 'pxx':
+				t = (Rational(1, vec_e.dot(vec_e)) * Rational(2, 3) *
+						(vec_mx.dot(vec_mx)*cls.mx**2 - vec_my.dot(vec_my)*cls.my**2))
+			elif name == 'pxy':
+				t = (Rational(1, vec_e.dot(vec_e)) * Rational(2, 3) *
+						(math.sqrt(vec_mx.dot(vec_mx) * vec_my.dot(vec_my)) * cls.mx * cls.my))
+
+			t = poly_factorize(t)
+			t = expand_powers(str(t))
+			cls.mrt_equilibrium.append(t)
 
 class D3Q13(DxQy):
 	dim = 3
@@ -75,6 +137,12 @@ class D3Q13(DxQy):
 			[(x[2]*x[2] - x[0]*x[0])*x[1] for x in cls.basis],
 			[(x[0]*x[0] - x[1]*x[1])*x[2] for x in cls.basis]])
 
+	@classmethod
+	def _init_mrt_equilibrium(cls):
+		cls.mrt_equilibrium = []
+
+
+
 class D3Q15(DxQy):
 	dim = 3
 	basis = map(lambda x: Matrix((x, )),
@@ -88,6 +156,10 @@ class D3Q15(DxQy):
 
 	mrt_names = ['rho', 'en', 'ens', 'mx', 'ex', 'my', 'ey', 'mz', 'ez',
 				 'sd2', 'sd1', 'sod1', 'sod2', 'sod3', 'm15']
+
+	mrt_visc = Symbol('mrt_visc')
+	mrt_collision = [0.0, 1.6, 1.2, 0.0, 1.6, 0.0, 1.6, 0.0, 1.6,
+				mrt_visc, mrt_visc, mrt_visc, mrt_visc, mrt_visc, 1.2]
 
 	@classmethod
 	def _init_mrt_basis(cls):
@@ -107,6 +179,10 @@ class D3Q15(DxQy):
 			[x[1]*x[2] for x in cls.basis],
 			[x[0]*x[2] for x in cls.basis],
 			[x[0]*x[1]*x[2] for x in cls.basis]])
+
+	@classmethod
+	def _init_mrt_equilibrium(cls):
+		cls.mrt_equilibrium = []
 
 
 class D3Q19(DxQy):
@@ -148,6 +224,12 @@ class D3Q19(DxQy):
 			[(x[1]*x[1] - x[2]*x[2])*x[0] for x in cls.basis],
 			[(x[2]*x[2] - x[0]*x[0])*x[1] for x in cls.basis],
 			[(x[0]*x[0] - x[1]*x[1])*x[2] for x in cls.basis]])
+
+	@classmethod
+	def _init_mrt_equilibrium(cls):
+		cls.mrt_equilibrium = []
+
+
 
 def bgk_equilibrium(as_string=True):
 	"""Get expressions for the BGK equilibrium distribution.
@@ -398,6 +480,9 @@ def use_pointers(str):
 	ret = ret.replace('vy', 'v[1]')
 	ret = ret.replace('vz', 'v[2]')
 
+def make_float(t):
+	return re.sub(r'([0-9]+\.[0-9]*)', r'\1f', str(t))
+
 def _gcd(a,b):
 	while b:
 		a, b = b, a % b
@@ -486,6 +571,7 @@ def _prepare_grids():
 					'than the number of moments.' % grid.__name__)
 
 			grid.mrt_matrix = Matrix([x.transpose().tolist()[0] for x in orthogonalize(*grid.mrt_basis)])
+			grid._init_mrt_equilibrium()
 
 def use_grid(grid):
 	global GRID, EQ_DIST

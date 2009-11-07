@@ -62,6 +62,10 @@ ${device_func} inline bool isVelocityNode(int type) {
 	return (type >= ${geo_bcv}) && (type < GEO_BCP);
 }
 
+${device_func} inline bool isVelocityOrPressureNode(int type) {
+	return (type >= ${geo_bcv});
+}
+
 ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *type) {
 	*orientation = nodetype & ${geo_orientation_mask};
 	*type = nodetype >> ${geo_orientation_shift};
@@ -74,6 +78,25 @@ ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *t
 		%endfor
 		break;
 </%def>
+
+<%def name="get_boundary_params(node_type, mx, my, mz, rho)">
+	if (${node_type} >= GEO_BCV) {
+		// Velocity boundary condition.
+		if (${node_type} < GEO_BCP) {
+			int idx = (${node_type} - GEO_BCV) * ${dim};
+			${mx} = geo_params[idx];
+			${my} = geo_params[idx+1];
+			%if dim == 3:
+				${mz} = geo_params[idx+2];
+			%endif
+		// Pressure boundary condition.
+		} else {
+			int idx = (GEO_BCP-GEO_BCV) * ${dim} + (${node_type} - GEO_BCP);
+			${rho} = geo_params[idx] * 3.0f;
+		}
+	}
+</%def>
+
 
 //
 // Get macroscopic density rho and velocity v given a distribution fi, and
@@ -132,31 +155,16 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 	% endif
 
 	*rho = ${sym.ex_rho('fi')};
-
-	% if boundary_type == 'fullbb' or boundary_type == 'halfbb':
-	if (node_type >= GEO_BCV) {
-		// Velocity boundary condition.
-		if (node_type < GEO_BCP) {
-			int idx = (node_type - GEO_BCV) * ${dim};
-			v[0] = geo_params[idx];
-			v[1] = geo_params[idx+1];
-			%if dim == 3:
-				v[2] = geo_params[idx+2];
-			%endif
-			return;
-		// Pressure boundary condition.
-		} else {
-			// c_s^2 = 1/3, P/c_s^2 = rho
-			int idx = (GEO_BCP-GEO_BCV) * ${dim} + (node_type - GEO_BCP);
-			*rho = geo_params[idx] * 3.0f;
-		}
-	}
-	% endif
-
 	v[0] = ${str(sym.ex_velocity('fi', 0, '*rho')).replace('/*', '/ *')};
 	v[1] = ${str(sym.ex_velocity('fi', 1, '*rho')).replace('/*', '/ *')};
 	%if dim == 3:
 		v[2] = ${str(sym.ex_velocity('fi', 2, '*rho')).replace('/*', '/ *')};
+	%endif
+
+	## TODO: Optimize this so that velocity and density are not needlessly calculated
+	## when they are provided as parameters of boundary conditions.
+	%if boundary_type == 'fullbb' or boundary_type == 'halfbb':
+		${get_boundary_params('node_type', 'v[0]', 'v[1]', 'v[2]', '*rho')}
 	%endif
 
 	if (!isWallNode(node_type)) {
@@ -279,48 +287,42 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 		${mrt} = ${val};
 	%endfor
 
-	if (node_type >= GEO_BCV) {
-		// Velocity boundary condition.
-		if (node_type < GEO_BCP) {
-			int idx = (node_type - GEO_BCV) * 2;
-			fm.mx = geo_params[idx];
-			fm.my = geo_params[idx+1];
-		// Pressure boundary condition.
-		} else {
-			int idx = (GEO_BCP-GEO_BCV) * 2 + (node_type - GEO_BCP);
-			fm.rho = geo_params[idx] * 3.0f;
-		}
+	${get_boundary_params('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho')}
+
+	#define mx fm.mx
+	#define my fm.my
+	#define mz fm.mz
+	#define rho fm.rho
+
+	// Calculate equilibrium distributions in moment space.
+	%for i, eq in enumerate(sym.GRID.mrt_equilibrium):
+		%if eq != 0:
+			feq.${sym.GRID.mrt_names[i]} = ${eq};
+		%endif
+	%endfor
+
+	// Relexate the non-conserved moments,
+	%if boundary_type == 'fullbb' or boundary_type == 'halfbb':
+		if (isVelocityOrPressureNode(node_type)) {
+			%for i, coll in enumerate(sym.GRID.mrt_collision):
+				%if coll != 0:
+					fm.${sym.GRID.mrt_names[i]} = feq.${sym.GRID.mrt_names[i]};
+				%endif
+			%endfor
+		} else
+	%endif
+	{
+		%for i, name in enumerate(sym.GRID.mrt_names):
+			%if sym.GRID.mrt_collision[i] != 0:
+				fm.${name} -= ${sym.make_float(sym.GRID.mrt_collision[i])} * (fm.${name} - feq.${name});
+			%endif
+		%endfor
 	}
 
-	%if dim == 2:
-		float h = fm.mx*fm.mx + fm.my*fm.my;
-		feq.en  = -2.0f*fm.rho + 3.0f*h;
-		feq.ens = fm.rho - 3.0f*h;
-		feq.ex  = -fm.mx;
-		feq.ey  = -fm.my;
-		feq.sd  = (fm.mx*fm.mx - fm.my*fm.my);
-		feq.sod = (fm.mx*fm.my);
-
-		float tau7 = 4.0f / (12.0f*visc + 2.0f);
-		float tau4 = 3.0f*(2.0f - tau7) / (3.0f - tau7);
-		float tau8 = 1.0f/((2.0f/tau7 - 1.0f)*0.5f + 0.5f);
-
-		if (node_type == GEO_FLUID || isWallNode(node_type)) {
-			fm.en  -= 1.63f * (fm.en - feq.en);
-			fm.ens -= 1.14f * (fm.ens - feq.ens);
-			fm.ex  -= tau4 * (fm.ex - feq.ex);
-			fm.ey  -= 1.92f * (fm.ey - feq.ey);
-			fm.sd  -= tau7 * (fm.sd - feq.sd);
-			fm.sod -= tau8 * (fm.sod - feq.sod);
-		} else {
-			fm.en  = feq.en;
-			fm.ens = feq.ens;
-			fm.ex  = feq.ex;
-			fm.ey  = feq.ey;
-			fm.sd  = feq.sd;
-			fm.sod = feq.sod;
-		}
-	%endif
+	#undef mx
+	#undef my
+	#undef mz
+	#undef rho
 
 	%for bgk, val in sym.mrt_to_bgk('fi', 'fm'):
 		${bgk} = ${val};
@@ -346,9 +348,7 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 	%endfor
 
 	%if boundary_type == 'fullbb' or boundary_type == 'halfbb':
-		// FIXME: Do the same for pressure nodes.
-		// Eenforce an equlibrium distribution for velocity nodes.
-		if (isVelocityNode(node_type)) {
+		if (isVelocityOrPressureNode(node_type)) {
 			%for idx in sym.GRID.idx_name:
 				fi->${idx} = feq.${idx};
 			%endfor
@@ -521,6 +521,12 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 
 	// macroscopic quantities for the current cell
 	float rho, v[${dim}];
+
+	// In the MRT model, there is no need to calculate the macroscopic
+	// variables unless we want to save them as output.
+	%if model == 'mrt':
+		if (save_macro == 1)
+	%endif
 	getMacro(&fi, type, orientation, &rho, v);
 
 	// only save the macroscopic quantities if requested to do so
