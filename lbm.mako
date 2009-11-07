@@ -107,6 +107,33 @@ ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *t
 	}
 </%def>
 
+<%def name="external_force(node_type, vx, vy, vz, rho=0, momentum=False)">
+	%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
+		if (!isWallNode(${node_type})) {
+			%if momentum:
+				%if ext_accel_x != 0.0:
+					${vx} += ${rho} * ${'%.20f' % (0.5 * ext_accel_x)};
+				%endif
+				%if ext_accel_y != 0.0:
+					${vy} += ${rho} * ${'%.20f' % (0.5 * ext_accel_y)};
+				%endif
+				%if dim == 3 and ext_accel_z != 0.0:
+					${vz} += ${rho} * ${'%.20f' % (0.5 * ext_accel_z)};
+				%endif
+			%else:
+				%if ext_accel_x != 0.0:
+					${vx} += ${'%.20f' % (0.5 * ext_accel_x)};
+				%endif
+				%if ext_accel_y != 0.0:
+					${vy} += ${'%.20f' % (0.5 * ext_accel_y)};
+				%endif
+				%if dim == 3 and ext_accel_z != 0.0:
+					${vz} += ${'%.20f' % (0.5 * ext_accel_z)};
+				%endif
+			%endif
+		}
+	%endif
+</%def>
 
 //
 // Get macroscopic density rho and velocity v given a distribution fi, and
@@ -177,13 +204,7 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 		${get_boundary_params('node_type', 'v[0]', 'v[1]', 'v[2]', '*rho')}
 	%endif
 
-	if (!isWallNode(node_type)) {
-		v[0] += ${'%.20f' % (0.5 * ext_accel_x)};
-		v[1] += ${'%.20f' % (0.5 * ext_accel_y)};
-		%if dim == 3:
-			v[2] += ${'%.20f' % (0.5 * ext_accel_z)};
-		%endif
-	}
+	${external_force('node_type', 'v[0]', 'v[1]', 'v[2]')}
 }
 
 //
@@ -298,6 +319,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	%endfor
 
 	${get_boundary_params('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho', True)}
+	${external_force('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho', momentum=True)}
 
 	#define mx fm.mx
 	#define my fm.my
@@ -333,6 +355,8 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	#undef my
 	#undef mz
 	#undef rho
+
+	${external_force('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho', momentum=True)}
 
 	%for bgk, val in sym.mrt_to_bgk('fi', 'fm'):
 		${bgk} = ${val};
@@ -386,6 +410,10 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 			%endfor
 		}
 	%endif
+
+	#undef vx
+	#undef vy
+	#undef vz
 }
 %endif
 
