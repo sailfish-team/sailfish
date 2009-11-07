@@ -26,6 +26,13 @@ class DxQy(object):
 	# Square of the sound velocity.
 	cssq = Rational(1,3)
 
+	@classmethod
+	def model_supported(cls, model):
+		if model == 'mrt':
+			return hasattr(cls, 'mrt_matrix')
+		else:
+			return True
+
 class D2Q9(DxQy):
 	dim = 2
 
@@ -118,11 +125,13 @@ class D3Q13(DxQy):
 			[(1,2), (1,24), (1,24), (1,24), (1,24), (1,24), (1,24),
 			 (1,24), (1,24), (1,24), (1,24), (1,24), (1,24)])
 
-	mrt_names = ['rho', 'en', 'mx', 'my', 'mz',
+	# TODO: Remove the underscores when MRT support is complete (i.e. after the
+	# equilibrium functions have been defined.
+	__mrt_names = ['rho', 'en', 'mx', 'my', 'mz',
 				 'sd2', 'sd1', 'sod1', 'sod2', 'sod3', 'm3x', 'm3y', 'm3z']
 
 	@classmethod
-	def _init_mrt_basis(cls):
+	def __init_mrt_basis(cls):
 		cls.mrt_basis = map(lambda x: Matrix(x), [
 			[1]*13,
 			[x.dot(x) for x in cls.basis],
@@ -139,7 +148,7 @@ class D3Q13(DxQy):
 			[(x[0]*x[0] - x[1]*x[1])*x[2] for x in cls.basis]])
 
 	@classmethod
-	def _init_mrt_equilibrium(cls):
+	def __init_mrt_equilibrium(cls):
 		cls.mrt_equilibrium = []
 
 
@@ -250,7 +259,10 @@ class D3Q19(DxQy):
 				(1,36), (1,36), (1,36), (1,36), (1,36), (1,36)])
 
 	mrt_names = ['rho', 'en', 'ens', 'mx', 'ex', 'my', 'ey', 'mz', 'ez',
-				 'sd2', 'sd21', 'sd1', 'sd11', 'sod1', 'sod2', 'sod3', 'm3x', 'm3y', 'm3z']
+				 'pww', 'piww', 'pxx', 'pixx', 'pxy', 'pyz', 'pzx', 'm3x', 'm3y', 'm3z']
+
+	mrt_collision = [0.0, 1.19, 1.24, 0.0, 1.2, 0.0, 1.2, 0.0, 1.2,
+				-1, 1.4, -1, 1.4, -1, -1, -1, 1.98, 1.98, 1.98]
 
 	@classmethod
 	def _init_mrt_basis(cls):
@@ -279,6 +291,55 @@ class D3Q19(DxQy):
 	def _init_mrt_equilibrium(cls):
 		cls.mrt_equilibrium = []
 
+		# Name -> index map.
+		n2i = {}
+		for i, name in enumerate(cls.mrt_names):
+			n2i[name] = i
+
+		cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + 3*cls.visc)
+		cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx']]
+		cls.mrt_collision[n2i['pxy']] = cls.mrt_collision[n2i['pxx']]
+		cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxx']]
+		cls.mrt_collision[n2i['pzx']] = cls.mrt_collision[n2i['pxx']]
+
+		vec_rho = cls.mrt_matrix[n2i['rho'],:]
+		vec_mx = cls.mrt_matrix[n2i['mx'],:]
+		vec_my = cls.mrt_matrix[n2i['my'],:]
+
+		# Form of the equilibrium functions follows that from
+		# dHumieres, PhilTranA, 2002.
+		for i, name in enumerate(cls.mrt_names):
+			if cls.mrt_collision[i] == 0:
+				cls.mrt_equilibrium.append(0)
+				continue
+
+			vec_e = cls.mrt_matrix[i,:]
+			if name == 'en':
+				t = -11 * cls.rho + 19/cls.rho * (cls.mx**2 + cls.my**2 + cls.mz**2)
+			elif name == 'ens':
+				t = - Rational(475,63)/cls.rho*(cls.mx**2 + cls.my**2 + cls.mz**2)
+			elif name == 'ex':
+				t = -Rational(2,3)*cls.mx
+			elif name == 'ey':
+				t = -Rational(2,3)*cls.my
+			elif name == 'ez':
+				t = -Rational(2,3)*cls.mz
+			elif name == 'pxx':
+				t = 1/(3*cls.rho) * (2*cls.mx**2 - (cls.my**2 + cls.mz**2))
+			elif name == 'pww':
+				t = 1/cls.rho * (cls.my**2 - cls.mz**2)
+			elif name == 'pxy':
+				t = 1/cls.rho * (cls.mx * cls.my)
+			elif name == 'pyz':
+				t = 1/cls.rho * (cls.my * cls.mz)
+			elif name == 'pzx':
+				t = 1/cls.rho * (cls.mx * cls.mz)
+			elif name == 'm3x' or name == 'm3y' or name == 'm3z' or name == 'pixx' or name == 'piww':
+				t = 0
+
+#			t = poly_factorize(t)
+			t = expand_powers(str(t))
+			cls.mrt_equilibrium.append(t)
 
 
 def bgk_equilibrium(as_string=True):

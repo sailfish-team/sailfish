@@ -515,6 +515,9 @@ class LBMSim(object):
 
 
 	def run(self):
+		if not sym.GRID.model_supported(self.options.model):
+			raise ValueError('The LBM model "%s" is not supported with grid type %s' % (self.options.model, sym.GRID.__name__))
+
 		self._calc_screen_size()
 		self._init_vis()
 		self._init_geo()

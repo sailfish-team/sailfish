@@ -29,6 +29,7 @@ ${dname}\
 	;
 } Dist;
 
+%if model == 'mrt':
 // Distribution in momentum space.
 typedef struct DistM {
 	float \
@@ -40,6 +41,7 @@ ${dname}\
 	%endfor
 	;
 } DistM;
+%endif
 
 <%include file="opencl_compat.mako"/>
 
