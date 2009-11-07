@@ -43,7 +43,7 @@ class D2Q9(DxQy):
 	# The factor 0 is used for conserved moments.
 	# en -- bulk viscosity
 	# sd -- shear viscosity
-	mrt_collision = [0, 1.63, 1.14, 0, 1.9, 0, 1.9, 1.99, 1.99]
+	mrt_collision = [0, 1.63, 1.14, 0, 1.9, 0, 1.9, -1, -1]
 
 	@classmethod
 	def _init_mrt_basis(cls):
@@ -62,13 +62,14 @@ class D2Q9(DxQy):
 		cls.mrt_equilibrium = []
 
 		c1 = -2
-		cls.mrt_collision[7] = 1 / (0.5 + cls.visc * Rational(12, 2-c1))
-		cls.mrt_collision[8] = cls.mrt_collision[7]
 
 		# Name -> index map.
 		n2i = {}
 		for i, name in enumerate(cls.mrt_names):
 			n2i[name] = i
+
+		cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + cls.visc * Rational(12, 2-c1))
+		cls.mrt_collision[n2i['pxy']] = cls.mrt_collision[n2i['pxx']]
 
 		vec_rho = cls.mrt_matrix[n2i['rho'],:]
 		vec_mx = cls.mrt_matrix[n2i['mx'],:]
@@ -155,11 +156,10 @@ class D3Q15(DxQy):
 				(1,72), (1,72), (1,72), (1,72), (1,72), (1,72), (1,72), (1,72)])
 
 	mrt_names = ['rho', 'en', 'ens', 'mx', 'ex', 'my', 'ey', 'mz', 'ez',
-				 'sd2', 'sd1', 'sod1', 'sod2', 'sod3', 'm15']
+				 'pww', 'pxx', 'pxy', 'pyz', 'pzx', 'mxyz']
 
-	mrt_visc = Symbol('mrt_visc')
 	mrt_collision = [0.0, 1.6, 1.2, 0.0, 1.6, 0.0, 1.6, 0.0, 1.6,
-				mrt_visc, mrt_visc, mrt_visc, mrt_visc, mrt_visc, 1.2]
+				-1, -1, -1, -1, -1, 1.2]
 
 	@classmethod
 	def _init_mrt_basis(cls):
@@ -183,6 +183,56 @@ class D3Q15(DxQy):
 	@classmethod
 	def _init_mrt_equilibrium(cls):
 		cls.mrt_equilibrium = []
+
+		# Name -> index map.
+		n2i = {}
+		for i, name in enumerate(cls.mrt_names):
+			n2i[name] = i
+
+		cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + 3*cls.visc)
+		cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx']]
+		cls.mrt_collision[n2i['pxy']] = cls.mrt_collision[n2i['pxx']]
+		cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxx']]
+		cls.mrt_collision[n2i['pzx']] = cls.mrt_collision[n2i['pxx']]
+
+		vec_rho = cls.mrt_matrix[n2i['rho'],:]
+		vec_mx = cls.mrt_matrix[n2i['mx'],:]
+		vec_my = cls.mrt_matrix[n2i['my'],:]
+
+		# Form of the equilibrium functions follows that from
+		# dHumieres, PhilTranA, 2002.
+		for i, name in enumerate(cls.mrt_names):
+			if cls.mrt_collision[i] == 0:
+				cls.mrt_equilibrium.append(0)
+				continue
+
+			vec_e = cls.mrt_matrix[i,:]
+			if name == 'en':
+				t = -cls.rho + 1/cls.rho * (cls.mx**2 + cls.my**2 + cls.mz**2)
+			elif name == 'ens':
+				t = -cls.rho
+			elif name == 'ex':
+				t = -Rational(7,3)*cls.mx
+			elif name == 'ey':
+				t = -Rational(7,3)*cls.my
+			elif name == 'ez':
+				t = -Rational(7,3)*cls.mz
+			elif name == 'pxx':
+				t = 1/(3*cls.rho) * (2*cls.mx**2 - (cls.my**2 + cls.mz**2))
+			elif name == 'pww':
+				t = 1/cls.rho * (cls.my**2 - cls.mz**2)
+			elif name == 'pxy':
+				t = 1/cls.rho * (cls.mx * cls.my)
+			elif name == 'pyz':
+				t = 1/cls.rho * (cls.my * cls.mz)
+			elif name == 'pzx':
+				t = 1/cls.rho * (cls.mx * cls.mz)
+			elif name == 'myz':
+				t = 0
+
+#			t = poly_factorize(t)
+			t = expand_powers(str(t))
+			cls.mrt_equilibrium.append(t)
 
 
 class D3Q19(DxQy):
