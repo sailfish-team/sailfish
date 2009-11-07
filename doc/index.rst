@@ -46,6 +46,8 @@ here is a simple example code to simulate fluid flow in a lid-driven cavity::
     sim = LDCSim(LBMGeoLDC)
     sim.run()
 
+Want to see Sailfish in action?  Check out our `video on YouTube <http://www.youtube.com/watch?v=kx4-VjaJ2eI>`_,
+or better yet, `get the code <http://gitorious.org/sailfish>`_ and see for yourself by running the provided examples.
 
 Contents
 ========
