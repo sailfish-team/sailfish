@@ -133,10 +133,10 @@ class LBMSim(object):
 		# If the size of the window has not been explicitly defined, automatically adjust it
 		# based on the size of the grid,
 		if self.options.scr_w == 0:
-			self.options.scr_w = self.options.lat_w * self.options.scr_scale
+			self.options.scr_w = int(self.options.lat_w * self.options.scr_scale)
 
 		if self.options.scr_h == 0:
-			self.options.scr_h = self.options.lat_h * self.options.scr_scale
+			self.options.scr_h = int(self.options.lat_h * self.options.scr_scale)
 
 	def _init_vis(self):
 		if not self.options.benchmark and not self.options.batch:
