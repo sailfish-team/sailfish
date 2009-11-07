@@ -79,15 +79,23 @@ ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *t
 		break;
 </%def>
 
-<%def name="get_boundary_params(node_type, mx, my, mz, rho)">
+<%def name="get_boundary_params(node_type, mx, my, mz, rho, moments=False)">
 	if (${node_type} >= GEO_BCV) {
 		// Velocity boundary condition.
 		if (${node_type} < GEO_BCP) {
 			int idx = (${node_type} - GEO_BCV) * ${dim};
-			${mx} = geo_params[idx];
-			${my} = geo_params[idx+1];
-			%if dim == 3:
-				${mz} = geo_params[idx+2];
+			%if moments:
+				${mx} = geo_params[idx] * ${rho};
+				${my} = geo_params[idx+1] * ${rho};
+				%if dim == 3:
+					${mz} = geo_params[idx+2] * ${rho};
+				%endif
+			%else:
+				${mx} = geo_params[idx];
+				${my} = geo_params[idx+1];
+				%if dim == 3:
+					${mz} = geo_params[idx+2];
+				%endif
 			%endif
 		// Pressure boundary condition.
 		} else {
@@ -287,7 +295,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 		${mrt} = ${val};
 	%endfor
 
-	${get_boundary_params('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho')}
+	${get_boundary_params('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho', True)}
 
 	#define mx fm.mx
 	#define my fm.my
