@@ -24,6 +24,8 @@ class DxQy(object):
 	visc = Symbol('visc')
 
 	# Square of the sound velocity.
+	# TODO: Before we can ever start using different values of the sound speed,
+	# make sure that the sound speed is not hardcoded in the formulas below.
 	cssq = Rational(1,3)
 
 	@classmethod
@@ -345,8 +347,13 @@ class D3Q19(DxQy):
 def bgk_equilibrium(as_string=True):
 	"""Get expressions for the BGK equilibrium distribution.
 
+	Args:
+	  as_string: if True, this function will return strings, if False,
+	             sympy expressions
+
 	Returns:
-	   a list of strings representing the equilibrium distribution functions
+	  a list of strings or sympy epxressions representing the equilibrium
+	  distribution functions
 	"""
 	out = []
 
@@ -364,6 +371,16 @@ def bgk_equilibrium(as_string=True):
 	return out
 
 def eval_bgk_equilibrium(velocity, rho):
+	"""Get BGK equilibrium distributions for a specific velocity and density.
+
+	Args:
+	  velocity: a n-tuple of velocity components
+	  rho: density
+
+	Returns:
+	  a list of values of the distributions (in the same order as the basis
+	  vectors for the current grid)
+	"""
 	vals = []
 
 	subs={GRID.rho: rho}
@@ -377,6 +394,11 @@ def eval_bgk_equilibrium(velocity, rho):
 	return vals
 
 def bgk_external_force():
+	"""Get expressions for the external body force correction in the BGK model.
+
+	Returns:
+	  a list of sympy expressions (in the same order as the current grid's basis)
+	"""
 	eax = Symbol('eax')
 	eay = Symbol('eay')
 	eaz = Symbol('eaz')
@@ -414,6 +436,14 @@ def bb_swap_pairs():
 	return ret
 
 def ex_rho(distp):
+	"""Express density as a function of the distibutions.
+
+	Args:
+	  distp: name of the pointer to the distribution structure
+
+	Returns:
+	  a sympy expression for the density
+	"""
 	syms = [Symbol('%s->%s' % (distp, x)) for x in GRID.idx_name]
 	ret = 0
 
@@ -423,6 +453,16 @@ def ex_rho(distp):
 	return ret
 
 def ex_velocity(distp, comp, rho):
+	"""Express velocity as a function of the distributions.
+
+	Args:
+	  distp: name of the pointer to the distribution structure
+	  comp: velocity component number: 0, 1 or 2 (for 3D lattices)
+	  rho: name of the density variable
+
+	Returns:
+	  a sympy expression for the velocity in a given direction
+	"""
 	syms = [Symbol('%s->%s' % (distp, x)) for x in GRID.idx_name]
 	srho = Symbol(rho)
 	ret = 0
@@ -604,6 +644,18 @@ def gcd(*terms):
 	return reduce(lambda a,b: _gcd(a,b), terms)
 
 def orthogonalize(*vectors):
+	"""Ortogonalize a set of vectors.
+
+	Given a set of vectors orthogonalize them using the GramSchmidt procedure.
+	The vectors are then simplified (common factors are removed to keep their
+	norm small).
+
+	Args:
+	  vectors: a collection of vectors to orthogonalize
+
+	Returns:
+	  orthogonalized vectors
+	"""
 	ret = []
 	for x in sympy.GramSchmidt(vectors):
 		fact = 1
@@ -657,7 +709,7 @@ def _prepare_grids():
 
 			grid.idx_name.append(name)
 
-			# Find opposite direction.
+			# Find opposite directions.
 			for j, ej in enumerate(grid.basis):
 				if ej == -1 * ei:
 					grid.idx_opposite.append(j)
@@ -671,6 +723,7 @@ def _prepare_grids():
 		#  - _init_mrt_basis computes the moment vectors
 		#  - the moment vectors are orthogonalized using the Gram-Schmidt procedure
 		#  - the othogonal vectors form the transformation matrix
+		#  - the equilibrium expressions are computed and saved
 		if hasattr(grid, '_init_mrt_basis'):
 			grid._init_mrt_basis()
 
@@ -686,6 +739,11 @@ def _prepare_grids():
 			grid._init_mrt_equilibrium()
 
 def use_grid(grid):
+	"""Select the current grid.
+
+	Args:
+	  grid: one of the grid classes listed in sym.KNOWN_GRIDS.
+	"""
 	global GRID, EQ_DIST
 	if grid not in KNOWN_GRIDS:
 		raise ValueError('Unknown grid type "%s"' % grid)
@@ -693,7 +751,7 @@ def use_grid(grid):
 	GRID = grid
 	EQ_DIST = bgk_equilibrium()
 
-KNOWN_GRIDS = [D2Q9, D3Q13, D3Q15, D3Q19]
+KNOWN_GRIDS = (D2Q9, D3Q13, D3Q15, D3Q19)
 
 _prepare_grids()
 use_grid(D2Q9)
