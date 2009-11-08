@@ -5,9 +5,3 @@
   - implement grid refinement
   - add support for streamlines
 
-* D3Qx
-  - implement MRT
-
-* optimization
-  - investigate impact of the order of the distributions in the struct
-    and of their processing in the BGK kernel
