@@ -420,9 +420,15 @@ class LBMSim(object):
 			id = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
 			id.point_data.scalars = self.rho.flatten()
 			id.point_data.scalars.name = 'density'
-			id.point_data.vectors = numpy.c_[self.vx.flatten(), self.vy.flatten(), self.vz.flatten()]
+			if sym.GRID.dim == 3:
+				id.point_data.vectors = numpy.c_[self.vx.flatten(), self.vy.flatten(), self.vz.flatten()]
+			else:
+				id.point_data.vectors = numpy.c_[self.vx.flatten(), self.vy.flatten(), numpy.zeros_like(self.vx).flatten()]
 			id.point_data.vectors.name = 'velocity'
-			id.dimensions = list(reversed(self.rho.shape))
+			if sym.GRID.dim == 3:
+				id.dimensions = list(reversed(self.rho.shape))
+			else:
+				id.dimensions = list(reversed(self.rho.shape)) + [1]
 			w = tvtk.XMLPImageDataWriter(input=id, file_name='%s%05d.xml' % (self.options.output, i))
 			w.write()
 		else:
