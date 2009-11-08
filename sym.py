@@ -490,7 +490,7 @@ def zouhe_velocity(orientation):
 	sym_norm = Symbol('fi->%s' % GRID.idx_name[idx])
 	sym_opp  = Symbol('fi->%s' % GRID.idx_name[oidx])
 
-	val_norm = solve(bgk_equilibrium(as_string=False)[idx][0] - sym_norm -
+	val_norm = sympy.solve(bgk_equilibrium(as_string=False)[idx][0] - sym_norm -
 					  bgk_equilibrium(as_string=False)[oidx][0] + sym_opp, sym_norm)[0]
 
 	ret.append((sym_norm, poly_factorize(val_norm)))
@@ -505,7 +505,7 @@ def zouhe_velocity(orientation):
 	vx2 = vxe.subs({sym_norm: val_norm})
 	vy2 = vye.subs({sym_norm: val_norm})
 
-	for sym, val in solve((vx - vx2, vy - vy2), *remaining).iteritems():
+	for sym, val in sympy.solve((GRID.vx - vx2, GRID.vy - vy2), *remaining).iteritems():
 		ret.append((sym, poly_factorize(val)))
 
 	return ret
@@ -590,6 +590,7 @@ def use_pointers(str):
 	ret = ret.replace('vx', 'v[0]')
 	ret = ret.replace('vy', 'v[1]')
 	ret = ret.replace('vz', 'v[2]')
+	return ret
 
 def make_float(t):
 	return re.sub(r'([0-9]+\.[0-9]*)', r'\1f', str(t))
