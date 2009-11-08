@@ -213,12 +213,19 @@ keys are defined:
 * 2: visualize the y component of the fluid velocity
 * 3: visualize variations in the fluid density
 * 4: visualize the vorticity of the fluid
+* i: toggle visibility of text info about the state of the simulation (MLUPS, iteration etc.)
 * v: toggle visualization of the velocity vector field
 * t: toggle visualization of the fluid tracer particles
 * c: toggle convolution of the visualization with a Gaussian kernel (this has a smoothing effect)
 * r: reset the simulation geometry (this clears any obstacles added interactively)
 * q: quit the simulation
 * s: take a screenshot
+* ,: decrease the max value used for visualization
+* .: increase the max value used for visualization
+
+The *max value* above corresponds to either the maximum velocity or maximum vorticity,
+depending on the current visualization mode.  Changing this value will affect the color
+scale of the visualized field.
 
 Visualization of 3D data
 ^^^^^^^^^^^^^^^^^^^^^^^^

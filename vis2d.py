@@ -88,18 +88,25 @@ class Fluid2DVis(object):
 	def __init__(self, width, height, lat_w, lat_h):
 		self._vismode = 0
 		self._convolve = False
-		self._vscale  = 0.005
 		self._font = pygame.font.SysFont('Liberation Mono', 14)
 		self._screen = pygame.display.set_mode((width, height),
 				pygame.RESIZABLE)
 		self.lat_w = lat_w
 		self.lat_h = lat_h
 
+		self._show_info = True
 		self._tracers = False
 		self._velocity = False
 		self._drawing = False
 		self._paused = False
 		self._draw_type = 1
+		self._reset()
+
+		pygame.key.set_repeat(10,50)
+
+	def _reset(self):
+		self._maxv = 0.000001
+		self._vscale  = 0.005
 
 	def _visualize(self, sim, vx, vy, rho, tx, ty, vismode):
 		height, width = vx.shape
@@ -108,17 +115,21 @@ class Fluid2DVis(object):
 		maxv = numpy.max(numpy.sqrt(vx*vx + vy*vy))
 		ret = []
 
+		# Record the highest velocity seen to this moment.
+		if self._maxv is None or maxv > self._maxv:
+			self._maxv = maxv
+
 		ret.append(('max_v', maxv))
 		ret.append(('rho_avg', numpy.average(rho)))
 
 		b = (sim.geo.map_to_node_type(sim.geo.map) == geo.LBMGeo.NODE_WALL)
 
 		if self._vismode == 0:
-			drw = numpy.sqrt(vx*vx + vy*vy) / maxv
+			drw = numpy.sqrt(vx*vx + vy*vy) / self._maxv
 		elif self._vismode == 1:
-			drw = (vx) / maxv
+			drw = (vx) / self._maxv
 		elif self._vismode == 2:
-			drw = (vy) / maxv
+			drw = (vy) / self._maxv
 		elif self._vismode == 3:
 			mrho = numpy.ma.array(rho, mask=(b))
 			rho_min = numpy.min(mrho)
@@ -200,7 +211,7 @@ class Fluid2DVis(object):
 			elif event.type == pygame.MOUSEMOTION:
 				if self._drawing:
 					self._draw_wall(lbm_sim, event)
-			elif event.type == pygame.KEYUP:
+			elif event.type == pygame.KEYDOWN:
 				if event.key == pygame.K_0:
 					self._vismode = 0
 				elif event.key == pygame.K_1:
@@ -224,6 +235,7 @@ class Fluid2DVis(object):
 				elif event.key == pygame.K_q:
 					sys.exit()
 				elif event.key == pygame.K_r:
+					self._reset()
 					lbm_sim.geo.reset()
 				elif event.key == pygame.K_s:
 					i = 0
@@ -239,6 +251,18 @@ class Fluid2DVis(object):
 
 					pygame.image.save(self._screen, fname)
 					print 'Saved %s.' % fname
+				elif event.key == pygame.K_i:
+					self._show_info = not self._show_info
+				elif event.key == pygame.K_COMMA:
+					if self._vismode == 4:
+						self._vscale /= 1.1
+					else:
+						self._maxv /= 1.1
+				elif event.key == pygame.K_PERIOD:
+					if self._vismode == 4:
+						self._vscale *= 1.1
+					else:
+						self._maxv *= 1.1
 
 	def main(self, lbm_sim):
 		i = 1
@@ -261,15 +285,17 @@ class Fluid2DVis(object):
 				ret = self._visualize(lbm_sim, lbm_sim.vx, lbm_sim.vy,
 						lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y,
 						lbm_sim.options.vismode)
-				self._screen.blit(self._font.render('itr: %dk' % (i / 1000), True, (0, 255, 0)), (12, 12))
-				self._screen.blit(self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0)), (12, 24))
-				self._screen.blit(self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0)), (12, 36))
 
-				y = 48
-				for info in ret:
-					tmp = self._font.render('%s: %.3f' % info, True, (0, 255, 0))
-					self._screen.blit(tmp, (12, y))
-					y += 12
+				if self._show_info:
+					self._screen.blit(self._font.render('itr: %dk' % (i / 1000), True, (0, 255, 0)), (12, 12))
+					self._screen.blit(self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0)), (12, 24))
+					self._screen.blit(self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0)), (12, 36))
+
+					y = 48
+					for info in ret:
+						tmp = self._font.render('%s: %.3f' % info, True, (0, 255, 0))
+						self._screen.blit(tmp, (12, y))
+						y += 12
 
 				pygame.display.flip()
 
