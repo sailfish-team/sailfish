@@ -381,18 +381,20 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 		feq.${idx} = ${feq};
 	%endfor
 
+	%for idx in sym.GRID.idx_name:
+		fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
+	%endfor
+
 	%if boundary_type == 'fullbb' or boundary_type == 'halfbb':
+		// XXX: For some weird reason, putting the above relaxation code inside
+		// the else clause below breaks when double precision is used with CUDA 2.3.
+		// To avoid the problem, run it unconditionally above.
 		if (isVelocityOrPressureNode(node_type)) {
 			%for idx in sym.GRID.idx_name:
 				fi->${idx} = feq.${idx};
 			%endfor
-		} else
+		}
 	%endif
-	{
-		%for idx in sym.GRID.idx_name:
-			fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
-		%endfor
-	}
 
 	%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
 		%if boundary_type == 'fullbb':
