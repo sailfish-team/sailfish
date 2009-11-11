@@ -55,6 +55,10 @@ ${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int idx
 	%endfor
 }
 
+${device_func} inline bool isFluidNode(int type) {
+	return type == ${geo_fluid};
+}
+
 ${device_func} inline bool isWallNode(int type) {
 	return type == ${geo_wall};
 }
@@ -73,6 +77,23 @@ ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *t
 	*type = nodetype >> ${geo_orientation_shift};
 }
 
+<%def name="zouhe_bb(orientation)">
+	case ${orientation}:
+		%for arg, val in sym.zouhe_bb(orientation):
+			${sym.use_pointers(str(arg))} = ${sym.use_pointers(str(val))};
+		%endfor
+		break;
+</%def>
+
+<%def name="zouhe_fixup(orientation)">
+	case ${orientation}:
+		%for arg, val in sym.zouhe_fixup(orientation):
+			${str(arg)} = ${str(val)};
+		%endfor
+		break;
+</%def>
+
+
 <%def name="zouhe_velocity(orientation)">
 	case ${orientation}:
 		%for arg, val in sym.zouhe_velocity(orientation):
@@ -81,28 +102,36 @@ ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *t
 		break;
 </%def>
 
+<%def name="get_boundary_velocity(node_type, mx, my, mz, rho=0, moments=False)">
+	int idx = (${node_type} - GEO_BCV) * ${dim};
+	%if moments:
+		${mx} = geo_params[idx] * ${rho};
+		${my} = geo_params[idx+1] * ${rho};
+		%if dim == 3:
+			${mz} = geo_params[idx+2] * ${rho};
+		%endif
+	%else:
+		${mx} = geo_params[idx];
+		${my} = geo_params[idx+1];
+		%if dim == 3:
+			${mz} = geo_params[idx+2];
+		%endif
+	%endif
+</%def>
+
+<%def name="get_boundary_pressure(node_type, rho)">
+	int idx = (GEO_BCP-GEO_BCV) * ${dim} + (${node_type} - GEO_BCP);
+	${rho} = geo_params[idx] * 3.0f;
+</%def>
+
 <%def name="get_boundary_params(node_type, mx, my, mz, rho, moments=False)">
 	if (${node_type} >= GEO_BCV) {
 		// Velocity boundary condition.
 		if (${node_type} < GEO_BCP) {
-			int idx = (${node_type} - GEO_BCV) * ${dim};
-			%if moments:
-				${mx} = geo_params[idx] * ${rho};
-				${my} = geo_params[idx+1] * ${rho};
-				%if dim == 3:
-					${mz} = geo_params[idx+2] * ${rho};
-				%endif
-			%else:
-				${mx} = geo_params[idx];
-				${my} = geo_params[idx+1];
-				%if dim == 3:
-					${mz} = geo_params[idx+2];
-				%endif
-			%endif
+			${get_boundary_velocity(node_type, mx, my, mz, rho, moments)}
 		// Pressure boundary condition.
 		} else {
-			int idx = (GEO_BCP-GEO_BCV) * ${dim} + (${node_type} - GEO_BCP);
-			${rho} = geo_params[idx] * 3.0f;
+			${get_boundary_pressure(node_type, rho)}
 		}
 	}
 </%def>
@@ -112,28 +141,39 @@ ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *t
 		if (!isWallNode(${node_type})) {
 			%if momentum:
 				%if ext_accel_x != 0.0:
-					${vx} += ${rho} * ${'%.20f' % (0.5 * ext_accel_x)};
+					${vx} += ${rho} * ${'%.20ff' % (0.5 * ext_accel_x)};
 				%endif
 				%if ext_accel_y != 0.0:
-					${vy} += ${rho} * ${'%.20f' % (0.5 * ext_accel_y)};
+					${vy} += ${rho} * ${'%.20ff' % (0.5 * ext_accel_y)};
 				%endif
 				%if dim == 3 and ext_accel_z != 0.0:
-					${vz} += ${rho} * ${'%.20f' % (0.5 * ext_accel_z)};
+					${vz} += ${rho} * ${'%.20ff' % (0.5 * ext_accel_z)};
 				%endif
 			%else:
 				%if ext_accel_x != 0.0:
-					${vx} += ${'%.20f' % (0.5 * ext_accel_x)};
+					${vx} += ${'%.20ff' % (0.5 * ext_accel_x)};
 				%endif
 				%if ext_accel_y != 0.0:
-					${vy} += ${'%.20f' % (0.5 * ext_accel_y)};
+					${vy} += ${'%.20ff' % (0.5 * ext_accel_y)};
 				%endif
 				%if dim == 3 and ext_accel_z != 0.0:
-					${vz} += ${'%.20f' % (0.5 * ext_accel_z)};
+					${vz} += ${'%.20ff' % (0.5 * ext_accel_z)};
 				%endif
 			%endif
 		}
 	%endif
 </%def>
+
+${device_func} inline void bounce_back(Dist *fi)
+{
+	float t;
+
+	%for i in sym.bb_swap_pairs():
+		t = fi->${sym.GRID.idx_name[i]};
+		fi->${sym.GRID.idx_name[i]} = fi->${sym.GRID.idx_name[sym.GRID.idx_opposite[i]]};
+		fi->${sym.GRID.idx_name[sym.GRID.idx_opposite[i]]} = t;
+	%endfor
+}
 
 //
 // Get macroscopic density rho and velocity v given a distribution fi, and
@@ -141,56 +181,6 @@ ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *t
 //
 ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, float *rho, float *v)
 {
-	% if boundary_type == 'zouhe':
-		if (isWallNode(node_type) || isVelocityNode(node_type)) {
-			if (node_type > ${geo_wall}) {
-				int idx = (node_type - GEO_BCV) * 2;
-				v[0] = geo_params[idx];
-				v[1] = geo_params[idx+1];
-			} else {
-				v[0] = 0.0f;
-				v[1] = 0.0f;
-			}
-
-			switch (orientation) {
-			${zouhe_velocity(geo_wall_n)}
-			${zouhe_velocity(geo_wall_s)}
-			${zouhe_velocity(geo_wall_e)}
-			${zouhe_velocity(geo_wall_w)}
-
-			case ${geo_wall_ne}:
-				*rho = (2.0f * (fi->fW + fi->fS + fi->fSW) + fi->fC + fi->fNW + fi->fSE) / (1.0f - 11.0f/12.0f*(v[0] + v[1]));
-				fi->fNE = fi->fSW + 1.0f/12.0f * *rho * (v[0] + v[1]);
-				fi->fE = *rho * (11.0f/12.0f * v[0] - 1.0f/12.0f * v[1]) - fi->fSE + fi->fW + fi->fNW;
-				fi->fN = *rho * (-1.0f/12.0f * v[0] + 11.0f/12.0f * v[1]) -fi->fNW + fi->fS + fi->fSE;
-				break;
-
-			case ${geo_wall_se}:
-				*rho = (2.0f * (fi->fN + fi->fW + fi->fNW) + fi->fC + fi->fSW + fi->fNE) / (1.0f - 11.0f/12.0f*(v[0] - v[1]));
-				fi->fSE = fi->fNW + 1.0f/12.0f * *rho * (v[0] - v[1]);
-				fi->fE = *rho * (11.0f/12.0f * v[0] + 1.0f/12.0f * v[1]) - fi->fNE + fi->fW + fi->fSW;
-				fi->fS = *rho * (-1.0f/12.0f * v[0] - 11.0f/12.0f * v[1]) - fi->fSW + fi->fN + fi->fNE;
-				break;
-
-			case ${geo_wall_nw}:
-				*rho = (2.0f * (fi->fE + fi->fS + fi->fSE) + fi->fC + fi->fSW + fi->fNE) / (1.0f - 11.0f/12.0f*(-v[0] + v[1]));
-				fi->fNW = fi->fSE + 1.0f/12.0f * *rho * (-v[0] + v[1]);
-				fi->fW = *rho * (-11.0f/12.0f * v[0] - 1.0f/12.0f * v[1]) - fi->fSW + fi->fE + fi->fNE;
-				fi->fN = *rho * (1.0f/12.0f * v[0] + 11.0f/12.0f * v[1]) - fi->fNE + fi->fS + fi->fSW;
-				break;
-
-			case ${geo_wall_sw}:
-				*rho = (2.0f * (fi->fE + fi->fN + fi->fNE) + fi->fC + fi->fSE + fi->fNW) / (1.0f + 11.0f/12.0f*(v[0] + v[1]));
-				fi->fSW = fi->fNE + 1.0f/12.0f * *rho * -(v[0] + v[1]);
-				fi->fW = *rho * (-11.0f/12.0f * v[0] + 1.0f/12.0f * v[1]) - fi->fNW + fi->fE + fi->fSE;
-				fi->fS = *rho * (1.0f/12.0f * v[0] - 11.0f/12.0f * v[1]) - fi->fSE + fi->fN + fi->fNW;
-				break;
-			}
-
-			return;
-		}
-	% endif
-
 	*rho = ${sym.ex_rho('fi')};
 	v[0] = ${str(sym.ex_velocity('fi', 0, '*rho')).replace('/*', '/ *')};
 	v[1] = ${str(sym.ex_velocity('fi', 1, '*rho')).replace('/*', '/ *')};
@@ -200,8 +190,62 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 
 	## TODO: Optimize this so that velocity and density are not needlessly calculated
 	## when they are provided as parameters of boundary conditions.
-	%if boundary_type == 'fullbb' or boundary_type == 'halfbb':
-		${get_boundary_params('node_type', 'v[0]', 'v[1]', 'v[2]', '*rho')}
+	${get_boundary_params('node_type', 'v[0]', 'v[1]', 'v[2]', '*rho')}
+
+	%if boundary_type == 'zouhe':
+		if (isWallNode(node_type)) {
+			v[0] = 0.0f;
+			v[1] = 0.0f;
+			%if dim == 3:
+				v[2] = 0.0f;
+			%endif
+		}
+
+		// Bounce-back of the non-equilibrium parts.
+		switch (orientation) {
+			${zouhe_bb(geo_wall_n)}
+			${zouhe_bb(geo_wall_s)}
+			${zouhe_bb(geo_wall_e)}
+			${zouhe_bb(geo_wall_w)}
+			${zouhe_bb(geo_wall_ne)}
+			${zouhe_bb(geo_wall_nw)}
+			${zouhe_bb(geo_wall_se)}
+			${zouhe_bb(geo_wall_sw)}
+			case ${geo_dir_other}:
+				bounce_back(fi);
+				return;
+		}
+
+		float nvx, nvy;
+		%if dim == 3:
+			float nvz;
+		%endif
+
+		// Compute new macroscopic variables.
+		nvx = ${str(sym.ex_velocity('fi', 0, 'nrho', momentum=True)).replace('/*', '/ *')};
+		nvy = ${str(sym.ex_velocity('fi', 1, 'nrho', momentum=True)).replace('/*', '/ *')};
+		%if dim == 3:
+			nvz = ${str(sym.ex_velocity('fi', 2, 'nrho', momentum=True)).replace('/*', '/ *')};
+		%endif
+
+		// Compute momentum difference.
+		nvx = *rho * v[0] - nvx;
+		nvy = *rho * v[1] - nvy;
+		%if dim == 3:
+			nvz = *rho * v[2] - nvz;
+		%endif
+
+		switch (orientation) {
+			${zouhe_fixup(geo_wall_n)}
+			${zouhe_fixup(geo_wall_s)}
+			${zouhe_fixup(geo_wall_e)}
+			${zouhe_fixup(geo_wall_w)}
+			${zouhe_fixup(geo_wall_ne)}
+			${zouhe_fixup(geo_wall_nw)}
+			${zouhe_fixup(geo_wall_se)}
+			${zouhe_fixup(geo_wall_sw)}
+		}
+
 	%endif
 
 	${external_force('node_type', 'v[0]', 'v[1]', 'v[2]')}
@@ -426,17 +470,6 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 		MS_relaxate(&fi, type);
 	% endif
 </%def>
-
-${device_func} inline void bounce_back(Dist *fi)
-{
-	float t;
-
-	%for i in sym.bb_swap_pairs():
-		t = fi->${sym.GRID.idx_name[i]};
-		fi->${sym.GRID.idx_name[i]} = fi->${sym.GRID.idx_name[sym.GRID.idx_opposite[i]]};
-		fi->${sym.GRID.idx_name[sym.GRID.idx_opposite[i]]} = t;
-	%endfor
-}
 
 /*
 FIXME: Temporarily disable this until it is converted into a grid-independent form.

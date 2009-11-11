@@ -452,7 +452,7 @@ def ex_rho(distp):
 
 	return ret
 
-def ex_velocity(distp, comp, rho):
+def ex_velocity(distp, comp, rho, momentum=False):
 	"""Express velocity as a function of the distributions.
 
 	Args:
@@ -470,7 +470,10 @@ def ex_velocity(distp, comp, rho):
 	for i, sym in enumerate(syms):
 		 ret += GRID.basis[i][comp] * sym
 
-	return ret / srho
+	if momentum:
+		return ret
+	else:
+		return ret / srho
 
 def bgk_to_mrt(bgk_dist, mrt_dist):
 	bgk_syms = Matrix([Symbol('%s->%s' % (bgk_dist, x)) for x in GRID.idx_name])
@@ -498,12 +501,83 @@ def _get_known_dists(normal):
 	known = []
 
 	for i, vec in enumerate(GRID.basis):
-		if normal.dot(vec) == 1:
+		if normal.dot(vec) > 0:
 			unknown.append(i)
 		else:
 			known.append(i)
 
 	return known, unknown
+
+def zouhe_bb(orientation):
+	idx = orientation + 1
+	normal = GRID.basis[idx]
+	known, unknown = _get_known_dists(normal)
+	ret = []
+
+	eq = bgk_equilibrium(as_string=False)
+
+	# Bounce-back of the non-equilibrium parts.
+	for i in unknown:
+		oi = GRID.idx_opposite[i]
+		ret.append((Symbol('fi->%s' % GRID.idx_name[i]),
+					Symbol('fi->%s' % GRID.idx_name[oi]) - eq[oi][0] + eq[i][0]))
+
+	for i in range(0, len(ret)):
+		t = poly_factorize(ret[i][1])
+		t = expand_powers(str(t))
+
+		ret[i] = (ret[i][0], t)
+
+	return ret
+
+def zouhe_fixup(orientation):
+	idx = orientation + 1
+	normal = GRID.basis[idx]
+	known, unknown = _get_known_dists(normal)
+
+	unknown_not_normal = set(unknown)
+	unknown_not_normal.remove(idx)
+
+	ret = []
+
+	# Momentum differences.
+	mdiff = [Symbol('nvx'), Symbol('nvy')]
+	if GRID.dim == 3:
+		mdiff.append(Symbol('nvz'))
+		basis = [Matrix([1,0,0]), Matrix([0,1,0]), Matrix([0,0,1])]
+	else:
+		basis = [Matrix([1,0]), Matrix([0,1])]
+
+	# Scale by number of adjustable distributions.
+	for i, md in enumerate(mdiff):
+		if basis[i].dot(normal) != 0:
+			mdiff[i] = 0
+			continue
+
+		cnt = 0
+		for idir in unknown_not_normal:
+			if GRID.basis[idir].dot(basis[i]) != 0:
+				cnt += 1
+
+		ret.append((md, md / cnt))
+
+	# Adjust distributions to conserve momentum in directions other than
+	# the wall normal.
+	for i in unknown_not_normal:
+		val = 0
+		ei = GRID.basis[i]
+		if ei[0] != 0 and mdiff[0] != 0:
+			val += mdiff[0] * ei[0]
+		if ei[1] != 0 and mdiff[1] != 0:
+			val += mdiff[1] * ei[1]
+		if GRID.dim == 3 and ei[2] != 0 and mdiff[2] != 0:
+			val += mdiff[2] * ei[2]
+
+		if val != 0:
+			csym = Symbol('fi->%s' % GRID.idx_name[i])
+			ret.append((csym, csym + val))
+
+	return ret
 
 def zouhe_velocity(orientation):
 	# TODO: Add some code to factor out the common factors in the
