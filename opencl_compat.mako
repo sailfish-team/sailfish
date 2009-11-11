@@ -37,4 +37,5 @@ __device__ int inline get_global_id(int i)
 	}
 }
 
-% endif
+%endif
+

@@ -37,6 +37,7 @@ class DxQy(object):
 
 class D2Q9(DxQy):
 	dim = 2
+	Q = 9
 
 	# Discretized velocities.
 	basis = map(lambda x: Matrix((x,)),
@@ -119,6 +120,8 @@ class D2Q9(DxQy):
 
 class D3Q13(DxQy):
 	dim = 3
+	Q = 13
+
 	basis = map(lambda x: Matrix((x, )),
 				[(0,0,0), (1,1,0), (-1,-1,0), (1,-1,0), (-1,1,0), (1,0,1),
 				 (-1,0,-1), (1,0,-1), (-1,0,1), (0,1,1), (0,-1,-1), (0,1,-1), (0,-1,1)])
@@ -154,9 +157,10 @@ class D3Q13(DxQy):
 		cls.mrt_equilibrium = []
 
 
-
 class D3Q15(DxQy):
 	dim = 3
+	Q = 15
+
 	basis = map(lambda x: Matrix((x, )),
 				[(0,0,0), (1,0,0), (-1,0,0), (0,1,0), (0,-1,0), (0,0,1), (0,0,-1),
 				 (1,1,1), (-1,1,1), (1,-1,1), (-1,-1,1),
@@ -248,6 +252,8 @@ class D3Q15(DxQy):
 
 class D3Q19(DxQy):
 	dim = 3
+	Q = 19
+
 	basis = map(lambda x: Matrix((x, )),
 				[(0,0,0),
 				(1,0,0), (-1,0,0), (0,1,0), (0,-1,0), (0,0,1), (0,0,-1),
@@ -435,7 +441,19 @@ def bb_swap_pairs():
 
 	return ret
 
-def ex_rho(distp, missing_dir=None):
+def fill_missing_dists(distp, missing_dir):
+	syms = [Symbol('%s->%s' % (distp, x)) for x in GRID.idx_name]
+	ret = []
+
+	for i, sym in enumerate(syms):
+		sp = GRID.basis[i].dot(GRID.basis[missing_dir+1])
+
+		if sp < 0:
+			ret.append((syms[GRID.idx_opposite[i]], sym))
+
+	return ret
+
+def ex_rho(distp, missing_dir=None, rho=None):
 	"""Express density as a function of the distibutions.
 
 	Args:
@@ -450,18 +468,12 @@ def ex_rho(distp, missing_dir=None):
 	if missing_dir is None:
 		for sym in syms:
 			ret += sym
-	else:
-		for i, sym in enumerate(syms):
-			sp = GRID.basis[i].dot(GRID.basis[missing_dir+1])
-			if sp < 0:
-				ret += 2 * sym
-			elif sp == 0:
-				ret += sym
+		return ret
 
-		ret /= (GRID.basis[missing_dir+1].dot(GRID.v) + 1)
-	return ret
+	srho = Symbol(rho)
+	return srho / (GRID.basis[missing_dir+1].dot(GRID.v) + 1)
 
-def ex_velocity(distp, comp, rho, momentum=False, missing_dir=None):
+def ex_velocity(distp, comp, rho, momentum=False, missing_dir=None, par_rho=None):
 	"""Express velocity as a function of the distributions.
 
 	Args:
@@ -479,22 +491,26 @@ def ex_velocity(distp, comp, rho, momentum=False, missing_dir=None):
 	if missing_dir is None:
 		for i, sym in enumerate(syms):
 			ret += GRID.basis[i][comp] * sym
-	else:
-		for i, sym in enumerate(syms):
-			sp = GRID.basis[i].dot(GRID.basis[missing_dir+1])
 
-			if sp < 0:
-				ret += 2 * sym
-			elif sp == 0:
-				ret += sym
+		if momentum:
+			return ret
+		else:
+			return ret / srho
 
-		ret -= srho
-		ret *= -GRID.basis[missing_dir+1][comp]
+	prho = Symbol(par_rho)
 
+	for i, sym in enumerate(syms):
+		sp = GRID.basis[i].dot(GRID.basis[missing_dir+1])
+		if sp <= 0:
+			ret = 1
+
+	ret = ret * (srho - prho)
+	ret *= -GRID.basis[missing_dir+1][comp]
 	if momentum:
 		return ret
 	else:
-		return ret / srho
+		return ret / prho
+
 
 def bgk_to_mrt(bgk_dist, mrt_dist):
 	bgk_syms = Matrix([Symbol('%s->%s' % (bgk_dist, x)) for x in GRID.idx_name])
@@ -776,6 +792,9 @@ def _prepare_grids():
 	for grid in KNOWN_GRIDS:
 		if len(grid.basis) != len(grid.weights):
 			raise TypeError('Grid %s is ill-defined: not all BGK weights have been specified.' % grid.__name__)
+
+		if len(grid.basis) != grid.Q:
+			raise TypeError('Grid {0} has an ill-defined Q factor.'.format(grid.__name__))
 
 		if sum(grid.weights) != 1:
 			raise TypeError('BGK weights for grid %s do not sum up to unity.' % grid.__name__)

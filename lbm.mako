@@ -21,6 +21,14 @@ ${const_var} float geo_params[${num_params+1}] = {
 <%include file="opencl_compat.mako"/>
 <%include file="geo_helpers.mako"/>
 
+<%def name="barrier()">
+	%if backend == 'cuda':
+		__syncthreads();
+	%else:
+		barrier(CLK_LOCAL_MEM_FENCE);
+	%endif
+</%def>
+
 <%def name="zouhe_bb(orientation)">
 	case ${orientation}:
 		%for arg, val in sym.zouhe_bb(orientation):
@@ -131,40 +139,51 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 
 	if (isFluidOrWallNode(node_type) || orientation == ${geo_dir_other}) {
 		*rho = ${sym.ex_rho('fi')};
-		v[0] = ${str(sym.ex_velocity('fi', 0, '*rho')).replace('/*', '/ *')};
-		v[1] = ${str(sym.ex_velocity('fi', 1, '*rho')).replace('/*', '/ *')};
-		%if dim == 3:
-			v[2] = ${str(sym.ex_velocity('fi', 2, '*rho')).replace('/*', '/ *')};
-		%endif
+		%for d in range(0, sym.GRID.dim):
+			v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho')).replace('/*', '/ *')};
+		%endfor
 	} else {
 		// We're dealing with a boundary node, for which some of the distributions
-		// might be meaningless.
+		// might be meaningless.  Fill them with the values of the opposite
+		// distributions.
+		switch (orientation) {
+			%for i in range(0, sym.GRID.Q-1):
+				case ${i}: {
+					%for lvalue, rvalue in sym.fill_missing_dists('fi', missing_dir=i):
+						${lvalue} = ${rvalue};
+					%endfor
+					break;
+				}
+			%endfor
+		}
+
+		*rho = ${sym.ex_rho('fi')};
+
 		if (isVelocityNode(node_type)) {
 			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
 			switch (orientation) {
-				%for i in range(0, len(sym.GRID.basis)-1):
+				%for i in range(0, sym.GRID.Q-1):
 					case ${i}:
-					{
-						*rho = ${sym.ex_rho('fi', missing_dir=i)};
+						*rho = ${sym.ex_rho('fi', missing_dir=i, rho='*rho')};
 						break;
-					}
 				%endfor
 			}
 		} else {
-			${get_boundary_pressure('node_type', '*rho')}
+			float par_rho;
+			${get_boundary_pressure('node_type', 'par_rho')}
+
 			switch (orientation) {
-				%for i in range(0, len(sym.GRID.basis)-1):
-					case ${i}:
-					{
-						v[0] = ${str(sym.ex_velocity('fi', 0, '*rho', missing_dir=i)).replace('/*', '/ *')};
-						v[1] = ${str(sym.ex_velocity('fi', 1, '*rho', missing_dir=i)).replace('/*', '/ *')};
-						%if dim == 3:
-							v[2] = ${str(sym.ex_velocity('fi', 2, '*rho', missing_dir=i)).replace('/*', '/ *')};
-						%endif
+				%for i in range(0, sym.GRID.Q-1):
+					case ${i}: {
+						%for d in range(0, sym.GRID.dim):
+							v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho', missing_dir=i, par_rho='par_rho')).replace('/*', '/ *')};
+						%endfor
 						break;
 					 }
 				%endfor
 			}
+
+			*rho = par_rho;
 		}
 	}
 
@@ -219,6 +238,25 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 	%endif
 
 	${external_force('node_type', 'v[0]', 'v[1]', 'v[2]')}
+}
+
+${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orientation, float rho, float *v)
+{
+	%if boundary_type == 'fullbb' or boundary_type == 'halfbb':
+		#define vx v[0]
+		#define vy v[1]
+		#define vz v[2]
+
+		if (isVelocityOrPressureNode(node_type)) {
+			%for feq, idx in sym.bgk_equilibrium():
+				fi->${idx} = ${feq};
+			%endfor
+		}
+
+		#undef vx
+		#undef vy
+		#undef vz
+	%endif
 }
 
 //
@@ -332,7 +370,6 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 		${mrt} = ${val};
 	%endfor
 
-	${get_boundary_params('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho', True)}
 	${external_force('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho', momentum=True)}
 
 	#define mx fm.mx
@@ -399,21 +436,8 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 		fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
 	%endfor
 
-	%if boundary_type == 'fullbb' or boundary_type == 'halfbb':
-		// XXX: For some weird reason, putting the above relaxation code inside
-		// the else clause below breaks when double precision is used with CUDA 2.3.
-		// To avoid the problem, run it unconditionally above.
-		if (isVelocityOrPressureNode(node_type)) {
-			%for idx in sym.GRID.idx_name:
-				fi->${idx} = feq.${idx};
-			%endfor
-		}
-	%endif
-
 	%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
-		%if boundary_type == 'fullbb':
-			if (!isWallNode(node_type))
-		%endif
+		if (!isWallNode(node_type))
 		{
 			// External acceleration.
 			#define eax ${'%.20ff' % ext_accel_x}
@@ -565,12 +589,9 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	// macroscopic quantities for the current cell
 	float rho, v[${dim}];
 
-	// In the MRT model, there is no need to calculate the macroscopic
-	// variables unless we want to save them as output.
-	%if model == 'mrt':
-		if (save_macro == 1)
-	%endif
 	getMacro(&fi, type, orientation, &rho, v);
+	boundaryConditions(&fi, type, orientation, rho, v);
+	${barrier()}
 
 	// only save the macroscopic quantities if requested to do so
 	if (save_macro == 1) {
@@ -583,7 +604,7 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	}
 
 	% if boundary_type == 'fullbb':
-		if (!isWallNode(type)) {
+		if (isFluidNode(type)) {
 			${relaxate()}
 		}
 	% else:
@@ -641,11 +662,7 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	}
 	%endif
 
-% if backend == 'cuda':
-	__syncthreads();
-% else:
-	barrier(CLK_LOCAL_MEM_FENCE);
-% endif
+	${barrier()}
 
 	// Save locally propagated distributions into global memory.
 	// The leftmost thread is not updated in this block
