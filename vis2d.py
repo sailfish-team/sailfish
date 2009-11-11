@@ -112,7 +112,7 @@ class Fluid2DVis(object):
 		height, width = vx.shape
 		srf = pygame.Surface((width, height))
 
-		maxv = numpy.max(numpy.sqrt(vx*vx + vy*vy))
+		maxv = numpy.max(sim.geo.mask_array_by_fluid(numpy.sqrt(vx*vx + vy*vy)))
 		ret = []
 
 		# Record the highest velocity seen to this moment.
