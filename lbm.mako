@@ -19,27 +19,17 @@ ${const_var} float geo_params[${num_params+1}] = {
 0};		// geometry parameters
 
 typedef struct Dist {
-	float \
 	%for i, dname in enumerate(sym.GRID.idx_name):
-${dname}\
-		%if i < len(sym.GRID.idx_name)-1:
-, \
-		%endif
+		float ${dname};
 	%endfor
-	;
 } Dist;
 
 %if model == 'mrt':
 // Distribution in momentum space.
 typedef struct DistM {
-	float \
 	%for i, dname in enumerate(sym.GRID.mrt_names):
-${dname}\
-		%if i < len(sym.GRID.mrt_names)-1:
-, \
-		%endif
+		float ${dname};
 	%endfor
-	;
 } DistM;
 %endif
 
