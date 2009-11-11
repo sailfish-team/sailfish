@@ -11,14 +11,15 @@ def abstract():
 # Boundary conditions
 #
 class LBMBC(object):
-	def __init__(self, name, midgrid=False, local=True):
+	def __init__(self, name, midgrid=False, local=True, wet_walls=False):
 		self.name = name
 		self.midgrid = midgrid
 		self.local = local
+		self.wet_walls = wet_walls
 
 SUPPORTED_BCS = [LBMBC('fullbb', midgrid=True),
 				 LBMBC('halfbb', midgrid=True),
-				 LBMBC('zouhe', midgrid=False)
+				 LBMBC('zouhe', midgrid=False, wet_walls=True)
 				 ]
 BCS_MAP = dict((x.name, x) for x in SUPPORTED_BCS)
 
@@ -174,6 +175,8 @@ class LBMGeo(object):
 			self._update_map()
 
 	def mask_array_by_fluid(self, array):
+		if self.get_bc().wet_walls:
+			return array
 		mask = (self.map_to_node_type(self.map) == self.NODE_WALL)
 		return numpy.ma.array(array, mask=mask)
 
@@ -220,7 +223,7 @@ class LBMGeo(object):
 			dest = tuple([i] + tg)
 			out[dest] = out[addr]
 
-	def velocity_to_dist(self, location, velocity, dist):
+	def velocity_to_dist(self, location, velocity, dist, rho=1.0):
 		"""Set the distributions for a node so that the fluid there has a
 		specific velocity.
 
@@ -231,10 +234,9 @@ class LBMGeo(object):
 		"""
 		if velocity not in self.feq_cache:
 			vals = []
-			eq_rho = 1.0
-			self.feq_cache[velocity] = map(self.float, sym.eval_bgk_equilibrium(velocity, eq_rho))
+			self.feq_cache[(rho, velocity)] = map(self.float, sym.eval_bgk_equilibrium(velocity, rho))
 
-		for i, val in enumerate(self.feq_cache[velocity]):
+		for i, val in enumerate(self.feq_cache[(rho, velocity)]):
 			dist[i][tuple(reversed(location))] = val
 
 	def _postprocess_nodes(self, nodes=None):
