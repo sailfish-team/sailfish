@@ -435,7 +435,7 @@ def bb_swap_pairs():
 
 	return ret
 
-def ex_rho(distp):
+def ex_rho(distp, missing_dir=None):
 	"""Express density as a function of the distibutions.
 
 	Args:
@@ -447,12 +447,21 @@ def ex_rho(distp):
 	syms = [Symbol('%s->%s' % (distp, x)) for x in GRID.idx_name]
 	ret = 0
 
-	for sym in syms:
-		ret += sym
+	if missing_dir is None:
+		for sym in syms:
+			ret += sym
+	else:
+		for i, sym in enumerate(syms):
+			sp = GRID.basis[i].dot(GRID.basis[missing_dir+1])
+			if sp < 0:
+				ret += 2 * sym
+			elif sp == 0:
+				ret += sym
 
+		ret /= (GRID.basis[missing_dir+1].dot(GRID.v) + 1)
 	return ret
 
-def ex_velocity(distp, comp, rho, momentum=False):
+def ex_velocity(distp, comp, rho, momentum=False, missing_dir=None):
 	"""Express velocity as a function of the distributions.
 
 	Args:
@@ -467,8 +476,20 @@ def ex_velocity(distp, comp, rho, momentum=False):
 	srho = Symbol(rho)
 	ret = 0
 
-	for i, sym in enumerate(syms):
-		 ret += GRID.basis[i][comp] * sym
+	if missing_dir is None:
+		for i, sym in enumerate(syms):
+			ret += GRID.basis[i][comp] * sym
+	else:
+		for i, sym in enumerate(syms):
+			sp = GRID.basis[i].dot(GRID.basis[missing_dir+1])
+
+			if sp < 0:
+				ret += 2 * sym
+			elif sp == 0:
+				ret += sym
+
+		ret -= srho
+		ret *= -GRID.basis[missing_dir+1][comp]
 
 	if momentum:
 		return ret

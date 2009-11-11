@@ -63,6 +63,10 @@ ${device_func} inline bool isWallNode(int type) {
 	return type == ${geo_wall};
 }
 
+${device_func} inline bool isFluidOrWallNode(int type) {
+	return type <= ${geo_wall};
+}
+
 // This assumes we're dealing with a wall node.
 ${device_func} inline bool isVelocityNode(int type) {
 	return (type >= ${geo_bcv}) && (type < GEO_BCP);
@@ -70,6 +74,10 @@ ${device_func} inline bool isVelocityNode(int type) {
 
 ${device_func} inline bool isVelocityOrPressureNode(int type) {
 	return (type >= ${geo_bcv});
+}
+
+${device_func} inline bool isPressureNode(int type) {
+	return (type >= ${geo_bcp});
 }
 
 ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *type) {
@@ -181,16 +189,52 @@ ${device_func} inline void bounce_back(Dist *fi)
 //
 ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, float *rho, float *v)
 {
-	*rho = ${sym.ex_rho('fi')};
-	v[0] = ${str(sym.ex_velocity('fi', 0, '*rho')).replace('/*', '/ *')};
-	v[1] = ${str(sym.ex_velocity('fi', 1, '*rho')).replace('/*', '/ *')};
-	%if dim == 3:
-		v[2] = ${str(sym.ex_velocity('fi', 2, '*rho')).replace('/*', '/ *')};
-	%endif
+	#define vx v[0]
+	#define vy v[1]
+	#define vz v[2]
 
-	## TODO: Optimize this so that velocity and density are not needlessly calculated
-	## when they are provided as parameters of boundary conditions.
-	${get_boundary_params('node_type', 'v[0]', 'v[1]', 'v[2]', '*rho')}
+	if (isFluidOrWallNode(node_type) || orientation == ${geo_dir_other}) {
+		*rho = ${sym.ex_rho('fi')};
+		v[0] = ${str(sym.ex_velocity('fi', 0, '*rho')).replace('/*', '/ *')};
+		v[1] = ${str(sym.ex_velocity('fi', 1, '*rho')).replace('/*', '/ *')};
+		%if dim == 3:
+			v[2] = ${str(sym.ex_velocity('fi', 2, '*rho')).replace('/*', '/ *')};
+		%endif
+	} else {
+		// We're dealing with a boundary node, for which some of the distributions
+		// might be meaningless.
+		if (isVelocityNode(node_type)) {
+			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
+			switch (orientation) {
+				%for i in range(0, len(sym.GRID.basis)-1):
+					case ${i}:
+					{
+						*rho = ${sym.ex_rho('fi', missing_dir=i)};
+						break;
+					}
+				%endfor
+			}
+		} else {
+			${get_boundary_pressure('node_type', '*rho')}
+			switch (orientation) {
+				%for i in range(0, len(sym.GRID.basis)-1):
+					case ${i}:
+					{
+						v[0] = ${str(sym.ex_velocity('fi', 0, '*rho', missing_dir=i)).replace('/*', '/ *')};
+						v[1] = ${str(sym.ex_velocity('fi', 1, '*rho', missing_dir=i)).replace('/*', '/ *')};
+						%if dim == 3:
+							v[2] = ${str(sym.ex_velocity('fi', 2, '*rho', missing_dir=i)).replace('/*', '/ *')};
+						%endif
+						break;
+					 }
+				%endfor
+			}
+		}
+	}
+
+	#undef vx
+	#undef vy
+	#undef vz
 
 	%if boundary_type == 'zouhe':
 		if (isWallNode(node_type)) {
