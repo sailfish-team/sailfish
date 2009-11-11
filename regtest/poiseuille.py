@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 sys.path.append('.')
 from lbm_poiseuille import LPoiSim, LBMGeoPoiseuille
-import geo2d
+import geo
 
 MAX_ITERS = 50000
 POINTS = 30
@@ -18,7 +18,7 @@ POINTS = 30
 class LTestPoiSim(LPoiSim):
 	def __init__(self, visc, bc, static=False, lat_w=64, lat_h=64, max_iters=MAX_ITERS):
 		args = ['--test', '--visc=%f' % visc, '--quiet', '--boundary=%s' % bc,
-				'--lat_w=%d' % lat_w, '--lat_h=%d' % lat_h, '--precision=double']
+				'--lat_w=%d' % lat_w, '--lat_h=%d' % lat_h, '--batch']
 		if static:
 			args.append('--static')
 		super(LTestPoiSim, self).__init__(LBMGeoPoiseuille, args)
@@ -31,7 +31,7 @@ class LTestPoiSim(LPoiSim):
 		self.res_maxv = numpy.max(self.geo.mask_array_by_fluid(self.vy))
 		self.th_maxv = max(self.geo.get_velocity_profile())
 
-bcs = geo2d.BCS_MAP.keys()
+bcs = geo.BCS_MAP.keys()
 
 for bc in bcs:
 	xvec = []
