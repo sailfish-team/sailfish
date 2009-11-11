@@ -247,14 +247,9 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 
 		// Bounce-back of the non-equilibrium parts.
 		switch (orientation) {
-			${zouhe_bb(geo_wall_n)}
-			${zouhe_bb(geo_wall_s)}
-			${zouhe_bb(geo_wall_e)}
-			${zouhe_bb(geo_wall_w)}
-			${zouhe_bb(geo_wall_ne)}
-			${zouhe_bb(geo_wall_nw)}
-			${zouhe_bb(geo_wall_se)}
-			${zouhe_bb(geo_wall_sw)}
+			%for i in range(0, len(sym.GRID.basis)-1):
+				${zouhe_bb(i)}
+			%endfor
 			case ${geo_dir_other}:
 				bounce_back(fi);
 				return;
@@ -280,14 +275,9 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 		%endif
 
 		switch (orientation) {
-			${zouhe_fixup(geo_wall_n)}
-			${zouhe_fixup(geo_wall_s)}
-			${zouhe_fixup(geo_wall_e)}
-			${zouhe_fixup(geo_wall_w)}
-			${zouhe_fixup(geo_wall_ne)}
-			${zouhe_fixup(geo_wall_nw)}
-			${zouhe_fixup(geo_wall_se)}
-			${zouhe_fixup(geo_wall_sw)}
+			%for i in range(0, len(sym.GRID.basis)-1):
+				${zouhe_fixup(i)}
+			%endfor
 		}
 
 	%endif
