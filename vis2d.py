@@ -274,19 +274,18 @@ class Fluid2DVis(object):
 			if self._paused:
 				continue
 
+			i = lbm_sim._iter
 			lbm_sim.sim_step(self._tracers)
 
-			if lbm_sim._iter % lbm_sim.options.every == 0:
-				t_now = time.time()
-				avg_mlups, mlups = lbm_sim.get_mlups(t_now - t_prev)
-				t_prev = t_now
+			if i % lbm_sim.options.every == 0 and i:
+				avg_mlups, mlups = lbm_sim.get_mlups(time.time() - t_prev)
 
 				ret = self._visualize(lbm_sim, lbm_sim.vx, lbm_sim.vy,
 						lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y,
 						lbm_sim.options.vismode)
 
 				if self._show_info:
-					self._screen.blit(self._font.render('itr: %dk' % (lbm_sim._iter / 1000), True, (0, 255, 0)), (12, 12))
+					self._screen.blit(self._font.render('itr: %dk' % (i / 1000), True, (0, 255, 0)), (12, 12))
 					self._screen.blit(self._font.render('tim: %.4f' % lbm_sim.time, True, (0, 255, 0)), (12, 24))
 					self._screen.blit(self._font.render('c/a: %.2f / %.2f MLUPS' % (mlups, avg_mlups), True, (0, 255, 0)), (12, 36))
 
