@@ -44,6 +44,14 @@ class LBMSim(object):
 	# The filename base for screenshots.
 	filename = 'lbm_sim'
 
+	@property
+	def time(self):
+		"""Get the current simulation time."""
+		# We take the size of the time step to be proportional to the square
+		# of the discrete space interval, which in turn is
+		# 1/(smallest dimension of the lattice).
+		return self._iter * 1.0/min(self.geo.shape)**2
+
 	def __init__(self, geo_class, misc_options=[], args=sys.argv[1:], defaults=None):
 		parser = OptionParser()
 

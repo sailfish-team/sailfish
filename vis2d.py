@@ -287,8 +287,8 @@ class Fluid2DVis(object):
 
 				if self._show_info:
 					self._screen.blit(self._font.render('itr: %dk' % (lbm_sim._iter / 1000), True, (0, 255, 0)), (12, 12))
-					self._screen.blit(self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0)), (12, 24))
-					self._screen.blit(self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0)), (12, 36))
+					self._screen.blit(self._font.render('tim: %.4f' % lbm_sim.time, True, (0, 255, 0)), (12, 24))
+					self._screen.blit(self._font.render('c/a: %.2f / %.2f MLUPS' % (mlups, avg_mlups), True, (0, 255, 0)), (12, 36))
 
 					y = 48
 					for info in ret:
