@@ -350,6 +350,7 @@ class LBMGeo3D(LBMGeo):
 				'geo_bcp': self.NODE_PRESSURE + len(self._vel_map) - 1,
 				'geo_orientation_mask': self.NODE_ORIENTATION_MASK,
 				'geo_orientation_shift': self.NODE_ORIENTATION_SHIFT,
+				'geo_dir_other': self.NODE_DIR_OTHER,
 				}
 
 	def _postprocess_nodes(self, nodes=None):
