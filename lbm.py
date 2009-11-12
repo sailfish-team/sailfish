@@ -113,6 +113,7 @@ class LBMSim(object):
 			# value and device capabilities.
 			self.block_size = 64
 
+		self._iter = 0
 		self._mlups_calls = 0
 		self._mlups = 0.0
 		self.clear_hooks()
@@ -343,7 +344,7 @@ class LBMSim(object):
 		else:
 			self.kern_grid_size = (self.options.lat_w/self.block_size * self.options.lat_h, self.options.lat_d)
 
-	def sim_step(self, i, tracers=True, get_data=False):
+	def sim_step(self, tracers=True, get_data=False):
 		"""Perform a single step of the simulation.
 
 		Args:
@@ -352,6 +353,7 @@ class LBMSim(object):
 		  get_data: if True, macroscopic variables will be copied from the compute unit
 		    and made available as properties of this class
 		"""
+		i = self._iter
 		kerns = self.kern_map[i & 1]
 
 		if (not self.options.benchmark and i % self.options.every == 0) or get_data:
@@ -371,6 +373,8 @@ class LBMSim(object):
 			self.backend.run_kernel(kerns[0], self.kern_grid_size)
 			if tracers:
 				self.backend.run_kernel(kerns[2], (self.options.tracers,))
+
+		self._iter += 1
 
 	def get_macro_quantities(self, gpu_dist):
 		"""Compute global macroscopic quantities of the fluid directly from the distributions.
@@ -468,8 +472,6 @@ class LBMSim(object):
 				self.h5tbl = self.h5file.createTable(self.h5grp, 'results', desc, 'results')
 
 	def _run_benchmark(self):
-		self.iter = 0
-
 		if self.options.max_iters:
 			cycles = self.options.max_iters
 		else:
@@ -482,13 +484,12 @@ class LBMSim(object):
 		while True:
 			t_prev = time.time()
 
-			for iter in range(0, cycles):
-				self.sim_step(self.iter, tracers=False)
-				self.iter += 1
+			for i in range(0, cycles):
+				self.sim_step(tracers=False)
 
 			self.backend.sync()
 			t_now = time.time()
-			print self.iter,
+			print self._iter,
 			print '%.2f %.2f' % self.get_mlups(t_now - t_prev, cycles)
 
 			if self.options.max_iters:
@@ -497,25 +498,25 @@ class LBMSim(object):
 	def _run_batch(self):
 		assert self.options.max_iters > 0
 
-		for self.iter in range(0, self.options.max_iters):
+		for i in range(0, self.options.max_iters):
 			need_data = False
 
-			if self.iter in self._iter_hooks:
+			if self._iter in self._iter_hooks:
 				need_data = True
 
 			if not need_data:
 				for k in self._iter_hooks_every:
-					if self.iter % k == 0:
+					if self._iter % k == 0:
 						need_data = True
 						break
 
-			self.sim_step(self.iter, tracers=False, get_data=need_data)
+			self.sim_step(tracers=False, get_data=need_data)
 
 			if need_data:
-				for hook in self._iter_hooks.get(self.iter, []):
+				for hook in self._iter_hooks.get(self._iter, []):
 					hook()
 				for k, v in self._iter_hooks_every.iteritems():
-					if self.iter % k == 0:
+					if self._iter % k == 0:
 						for hook in v:
 							hook()
 

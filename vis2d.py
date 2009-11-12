@@ -194,7 +194,7 @@ class Fluid2DVis(object):
 				self._draw_type == 1 and geo.LBMGeo.NODE_WALL or geo.LBMGeo.NODE_FLUID,
 				update=True)
 
-	def _process_events(self, lbm_sim, curr_iter):
+	def _process_events(self, lbm_sim):
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				sys.exit()
@@ -231,7 +231,7 @@ class Fluid2DVis(object):
 				elif event.key == pygame.K_p:
 					self._paused = not self._paused
 					if self._paused:
-						print 'Simulation paused @ iter = %d.' % curr_iter
+						print 'Simulation paused @ iter = %d.' % lbm_sim._iter
 				elif event.key == pygame.K_q:
 					sys.exit()
 				elif event.key == pygame.K_r:
@@ -265,19 +265,18 @@ class Fluid2DVis(object):
 						self._maxv *= 1.1
 
 	def main(self, lbm_sim):
-		i = 1
 		t_prev = time.time()
 		avg_mlups = 0.0
 
 		while 1:
-			self._process_events(lbm_sim, i)
+			self._process_events(lbm_sim)
 
 			if self._paused:
 				continue
 
-			lbm_sim.sim_step(i, self._tracers)
+			lbm_sim.sim_step(self._tracers)
 
-			if i % lbm_sim.options.every == 0:
+			if lbm_sim._iter % lbm_sim.options.every == 0:
 				t_now = time.time()
 				avg_mlups, mlups = lbm_sim.get_mlups(t_now - t_prev)
 				t_prev = t_now
@@ -287,7 +286,7 @@ class Fluid2DVis(object):
 						lbm_sim.options.vismode)
 
 				if self._show_info:
-					self._screen.blit(self._font.render('itr: %dk' % (i / 1000), True, (0, 255, 0)), (12, 12))
+					self._screen.blit(self._font.render('itr: %dk' % (lbm_sim._iter / 1000), True, (0, 255, 0)), (12, 12))
 					self._screen.blit(self._font.render('cur: %.2f MLUPS' % mlups, True, (0, 255, 0)), (12, 24))
 					self._screen.blit(self._font.render('avg: %.2f MLUPS' % avg_mlups, True, (0, 255, 0)), (12, 36))
 
@@ -298,8 +297,5 @@ class Fluid2DVis(object):
 						y += 12
 
 				pygame.display.flip()
-
 				t_prev = time.time()
-
-			i += 1
 
