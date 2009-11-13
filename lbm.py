@@ -155,7 +155,7 @@ class LBMSim(object):
 				self._init_vis_3d()
 
 	def _init_vis_2d(self):
-		self.vis = vis2d.Fluid2DVis(self.options.scr_w, self.options.scr_h,
+		self.vis = vis2d.Fluid2DVis(self, self.options.scr_w, self.options.scr_h,
 									self.options.lat_w, self.options.lat_h)
 
 	def _init_vis_3d(self):
@@ -545,6 +545,6 @@ class LBMSim(object):
 		elif self.options.batch:
 			self._run_batch()
 		else:
-			self.vis.main(self)
+			self.vis.main()
 
 

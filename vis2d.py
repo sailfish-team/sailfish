@@ -85,7 +85,7 @@ vis_map = {
 
 class Fluid2DVis(object):
 
-	def __init__(self, width, height, lat_w, lat_h):
+	def __init__(self, sim, width, height, lat_w, lat_h):
 		self._vismode = 0
 		self._convolve = False
 		self._font = pygame.font.SysFont('Liberation Mono', 14)
@@ -101,6 +101,7 @@ class Fluid2DVis(object):
 		self._paused = False
 		self._draw_type = 1
 		self._reset()
+		self.sim = sim
 
 		pygame.key.set_repeat(10,50)
 
@@ -108,11 +109,27 @@ class Fluid2DVis(object):
 		self._maxv = 0.000001
 		self._vscale  = 0.005
 
-	def _visualize(self, sim, vx, vy, rho, tx, ty, vismode):
-		height, width = vx.shape
+	@property
+	def velocity_norm(self):
+		return self.sim.geo.mask_array_by_fluid(numpy.sqrt(self.sim.vx*self.sim.vx + self.sim.vy*self.sim.vy))
+
+	@property
+	def vx(self):
+		return self.sim.vx
+
+	@property
+	def vy(self):
+		return self.sim.vy
+
+	@property
+	def density(self):
+		return self.sim.rho
+
+	def _visualize(self, tx, ty, vismode):
+		height, width = self.vx.shape
 		srf = pygame.Surface((width, height))
 
-		maxv = numpy.max(sim.geo.mask_array_by_fluid(numpy.sqrt(vx*vx + vy*vy)))
+		maxv = numpy.max(self.velocity_norm)
 		ret = []
 
 		# Record the highest velocity seen to this moment.
@@ -120,24 +137,24 @@ class Fluid2DVis(object):
 			self._maxv = maxv
 
 		ret.append(('max_v', maxv))
-		ret.append(('rho_avg', numpy.average(rho)))
+		ret.append(('rho_avg', numpy.average(self.density)))
 
-		b = (sim.geo.map_to_node_type(sim.geo.map) == geo.LBMGeo.NODE_WALL)
+		b = (self.sim.geo.map_to_node_type(self.sim.geo.map) == geo.LBMGeo.NODE_WALL)
 
 		if self._vismode == 0:
-			drw = numpy.sqrt(vx*vx + vy*vy) / self._maxv
+			drw = self.velocity_norm / self._maxv
 		elif self._vismode == 1:
-			drw = (vx) / self._maxv
+			drw = self.vx / self._maxv
 		elif self._vismode == 2:
-			drw = (vy) / self._maxv
+			drw = self.vy / self._maxv
 		elif self._vismode == 3:
-			mrho = numpy.ma.array(rho, mask=(b))
+			mrho = numpy.ma.array(self.density, mask=(b))
 			rho_min = numpy.min(mrho)
 			rho_max = numpy.max(mrho)
-			drw = ((rho - rho_min) / (rho_max - rho_min))
+			drw = ((self.density - rho_min) / (rho_max - rho_min))
 		elif self._vismode == 4:
-			self.curl_v = (numpy.hstack( (vy[:,1:]-vy[:,:-1],numpy.zeros((height,1))))
-					- numpy.vstack( (vx[1:,:]-vx[:-1,:],numpy.zeros((1,width)))))
+			self.curl_v = (numpy.hstack( (self.vy[:,1:]-self.vy[:,:-1],numpy.zeros((height,1))))
+					- numpy.vstack( (self.vx[1:,:]-self.vx[:-1,:],numpy.zeros((1,width)))))
 			drw = -(self.curl_v) / self._vscale
 			if self._convolve:
 				g = gauss_kernel(2, sizey=2)
@@ -188,13 +205,13 @@ class Fluid2DVis(object):
 		y = self.lat_h-1 - (event.pos[1] * self.lat_h / self._screen.get_height())
 		return min(max(x, 0), self.lat_w-1), min(max(y, 0), self.lat_h-1)
 
-	def _draw_wall(self, lbm_sim, event):
+	def _draw_wall(self, event):
 		x, y = self._get_loc(event)
-		lbm_sim.geo.set_geo((x, y),
+		self.sim.geo.set_geo((x, y),
 				self._draw_type == 1 and geo.LBMGeo.NODE_WALL or geo.LBMGeo.NODE_FLUID,
 				update=True)
 
-	def _process_events(self, lbm_sim):
+	def _process_events(self):
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				sys.exit()
@@ -202,15 +219,15 @@ class Fluid2DVis(object):
 				self._screen = pygame.display.set_mode(event.size, pygame.RESIZABLE)
 			elif event.type == pygame.MOUSEBUTTONUP:
 				self._draw_type = event.button
-				self._draw_wall(lbm_sim, event)
+				self._draw_wall(event)
 				self._drawing = False
 			elif event.type == pygame.MOUSEBUTTONDOWN:
 				self._draw_type = event.button
-				self._draw_wall(lbm_sim, event)
+				self._draw_wall(event)
 				self._drawing = True
 			elif event.type == pygame.MOUSEMOTION:
 				if self._drawing:
-					self._draw_wall(lbm_sim, event)
+					self._draw_wall(event)
 			elif event.type == pygame.KEYDOWN:
 				if event.key == pygame.K_0:
 					self._vismode = 0
@@ -231,21 +248,21 @@ class Fluid2DVis(object):
 				elif event.key == pygame.K_p:
 					self._paused = not self._paused
 					if self._paused:
-						print 'Simulation paused @ iter = %d.' % lbm_sim._iter
+						print 'Simulation paused @ iter = %d.' % self.sim._iter
 				elif event.key == pygame.K_q:
 					sys.exit()
 				elif event.key == pygame.K_r:
 					self._reset()
-					lbm_sim.geo.reset()
+					self.sim.geo.reset()
 				elif event.key == pygame.K_s:
 					i = 0
 
-					while os.path.exists('%s_%05d.png' % (lbm_sim.filename, i)):
+					while os.path.exists('%s_%05d.png' % (self.sim.filename, i)):
 						i += 1
 						if i > 99999:
 							break
 
-					fname = '%s_%05d.png' % (lbm_sim.filename, i)
+					fname = '%s_%05d.png' % (self.sim.filename, i)
 					if os.path.exists(fname):
 						print 'Could not create screenshot.'
 
@@ -264,29 +281,27 @@ class Fluid2DVis(object):
 					else:
 						self._maxv *= 1.1
 
-	def main(self, lbm_sim):
+	def main(self):
 		t_prev = time.time()
 		avg_mlups = 0.0
 
 		while 1:
-			self._process_events(lbm_sim)
+			self._process_events()
 
 			if self._paused:
 				continue
 
-			i = lbm_sim._iter
-			lbm_sim.sim_step(self._tracers)
+			i = self.sim._iter
+			self.sim.sim_step(self._tracers)
 
-			if i % lbm_sim.options.every == 0 and i:
-				avg_mlups, mlups = lbm_sim.get_mlups(time.time() - t_prev)
+			if i % self.sim.options.every == 0 and i:
+				avg_mlups, mlups = self.sim.get_mlups(time.time() - t_prev)
 
-				ret = self._visualize(lbm_sim, lbm_sim.vx, lbm_sim.vy,
-						lbm_sim.rho, lbm_sim.tracer_x, lbm_sim.tracer_y,
-						lbm_sim.options.vismode)
+				ret = self._visualize(self.sim.tracer_x, self.sim.tracer_y, self.sim.options.vismode)
 
 				if self._show_info:
 					self._screen.blit(self._font.render('itr: %dk' % (i / 1000), True, (0, 255, 0)), (12, 12))
-					self._screen.blit(self._font.render('tim: %.4f' % lbm_sim.time, True, (0, 255, 0)), (12, 24))
+					self._screen.blit(self._font.render('tim: %.4f' % self.sim.time, True, (0, 255, 0)), (12, 24))
 					self._screen.blit(self._font.render('c/a: %.2f / %.2f MLUPS' % (mlups, avg_mlups), True, (0, 255, 0)), (12, 36))
 
 					y = 48
