@@ -92,6 +92,7 @@ class LBMSim(object):
 		group.add_option('--every', dest='every', help='update the visualization every N steps', metavar='N', type='int', action='store', default=100)
 		group.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
 		group.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=vis2d.vis_map.keys(), action='store', default='std')
+		group.add_option('--vis3d', dest='vis3d', help='3D visualization engine', type='choice', choices=['mayavi', 'cutplane'], action='store', default='mayavi')
 		parser.add_option_group(group)
 
 		group = OptionGroup(parser, 'Simulation-specific options')
@@ -159,8 +160,11 @@ class LBMSim(object):
 									self.options.lat_w, self.options.lat_h)
 
 	def _init_vis_3d(self):
-		import vis3d
-		self.vis = vis3d.Fluid3DVis()
+		if self.options.vis3d == 'mayavi':
+			import vis3d
+			self.vis = vis3d.Fluid3DVis()
+		else:
+			self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)), self.options.scr_scale)
 
 	def add_iter_hook(self, i, func, every=False):
 		"""Add a hook that will be executed during the simulation.
@@ -534,8 +538,8 @@ class LBMSim(object):
 			raise ValueError('The LBM model "%s" is not supported with grid type %s' % (self.options.model, sym.GRID.__name__))
 
 		self._calc_screen_size()
-		self._init_vis()
 		self._init_geo()
+		self._init_vis()
 		self._init_code()
 		self._init_lbm()
 		self._init_output()

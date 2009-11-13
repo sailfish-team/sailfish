@@ -103,7 +103,7 @@ class Fluid2DVis(object):
 		self._reset()
 		self.sim = sim
 
-		pygame.key.set_repeat(10,50)
+		pygame.key.set_repeat(100,50)
 
 	def _reset(self):
 		self._maxv = 0.000001
@@ -125,6 +125,10 @@ class Fluid2DVis(object):
 	def density(self):
 		return self.sim.rho
 
+	@property
+	def geo_map(self):
+		return self.sim.geo.map
+
 	def _visualize(self, tx, ty, vismode):
 		height, width = self.vx.shape
 		srf = pygame.Surface((width, height))
@@ -139,7 +143,7 @@ class Fluid2DVis(object):
 		ret.append(('max_v', maxv))
 		ret.append(('rho_avg', numpy.average(self.density)))
 
-		b = (self.sim.geo.map_to_node_type(self.sim.geo.map) == geo.LBMGeo.NODE_WALL)
+		b = (self.sim.geo.map_to_node_type(self.geo_map) == geo.LBMGeo.NODE_WALL)
 
 		if self._vismode == 0:
 			drw = self.velocity_norm / self._maxv
@@ -190,15 +194,17 @@ class Fluid2DVis(object):
 
 					pygame.draw.line(self._screen, (255, 0, 0),
 									 (ox, oy),
-									 (ox + vx[height*j/vfsp][width*i/vfsp] * scale,
-									  oy - vy[height*j/vfsp][width*i/vfsp] * scale))
+									 (ox + self.vx[height*j/vfsp][width*i/vfsp] * scale,
+									  oy - self.vy[height*j/vfsp][width*i/vfsp] * scale))
 
+		self._draw_tracers(tx, ty, sw, sh, width, height)
+		return ret
+
+	def _draw_tracers(self, tx, ty, sw, sh, width, height):
 		# Draw the tracer particles
 		if self._tracers:
 			for x, y in zip(tx, ty):
 				pygame.draw.circle(self._screen, (0, 255, 255), (int(x * sw / width), int(sh - y * sh / height)), 2)
-
-		return ret
 
 	def _get_loc(self, event):
 		x = event.pos[0] * self.lat_w / self._screen.get_width()
@@ -210,6 +216,10 @@ class Fluid2DVis(object):
 		self.sim.geo.set_geo((x, y),
 				self._draw_type == 1 and geo.LBMGeo.NODE_WALL or geo.LBMGeo.NODE_FLUID,
 				update=True)
+
+	def _process_misc_event(self, event):
+		"""A function to make it possible to process additional events in subclasses."""
+		pass
 
 	def _process_events(self):
 		for event in pygame.event.get():
@@ -281,6 +291,8 @@ class Fluid2DVis(object):
 					else:
 						self._maxv *= 1.1
 
+			self._process_misc_event(event)
+
 	def main(self):
 		t_prev = time.time()
 		avg_mlups = 0.0
@@ -313,3 +325,83 @@ class Fluid2DVis(object):
 				pygame.display.flip()
 				t_prev = time.time()
 
+class Fluid3DVisCutplane(Fluid2DVis):
+
+	def __init__(self, sim, shape, scr_scale):
+		Fluid2DVis.__init__(self, sim, shape[0] * scr_scale, shape[1] * scr_scale, shape[0], shape[1])
+		self.shape = shape
+		self._scr_scale = scr_scale
+		self._cut_dim = 2
+		self._cut_pos = [self.shape[0] / 2, self.shape[1] / 2, self.shape[2] / 2]
+		self._reset_display()
+
+	@property
+	def _slice_args(self):
+		args = []
+
+		for i in range(0, 3):
+			if i == self._cut_dim:
+				args.append(self._cut_pos[self._cut_dim])
+			else:
+				args.append(slice(None))
+		return args
+
+	@property
+	def velocity_norm(self):
+		# FIXME: This should be masked by fluid.
+		return numpy.sqrt(self.vx*self.vx + self.vy*self.vy + self.vz*self.vz)
+
+	@property
+	def vx(self):
+		return self.sim.velocity[self._dims[0]][self._slice_args]
+
+	@property
+	def vy(self):
+		return self.sim.velocity[self._dims[1]][self._slice_args]
+
+	@property
+	def vz(self):
+		return self.sim.velocity[self._cut_dim][self._slice_args]
+
+	@property
+	def density(self):
+		return self.sim.rho[self._slice_args]
+
+	@property
+	def geo_map(self):
+		return self.sim.geo.map[self._slice_args]
+
+	def _reset_display(self):
+		dims = set([0,1,2])
+		dims.remove(self._cut_dim)
+		dims = sorted(list(dims))
+
+		self._dims = dims
+		self._screen = pygame.display.set_mode((self.shape[dims[0]] * self._scr_scale, self.shape[dims[1]] * self._scr_scale),
+				pygame.RESIZABLE)
+
+	def _process_misc_event(self, event):
+		if event.type == pygame.KEYDOWN:
+			# Select the axis normal to the cutplane.
+			if event.key == pygame.K_x:
+				self._cut_dim = 0
+				self._reset_display()
+			elif event.key == pygame.K_y:
+				self._cut_dim = 1
+				self._reset_display()
+			elif event.key == pygame.K_z:
+				self._cut_dim = 2
+				self._reset_display()
+			# Move the cutplane along the selected axis.
+			elif event.key == pygame.K_QUOTE:
+				if self._cut_pos[self._cut_dim] < self.shape[self._cut_dim]-1:
+					self._cut_pos[self._cut_dim] += 1
+			elif event.key == pygame.K_SEMICOLON:
+				if self._cut_pos[self._cut_dim] > 0:
+					self._cut_pos[self._cut_dim] -= 1
+
+	def _draw_tracers(self, tx, ty, sw, sh, width, height):
+		pass
+
+	def _draw_wall(self, event):
+		pass
