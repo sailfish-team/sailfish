@@ -371,6 +371,21 @@ class Fluid3DVisCutplane(Fluid2DVis):
 	def geo_map(self):
 		return self.sim.geo.map[self._slice_args]
 
+	def _2d_to_3d_loc(self, x, y):
+		"""Translate a location on the currently visible slice into a location in the 3D lattice.
+
+		Args:
+		  x, y: coordinates on the current 2D slice
+
+		Returns:
+		  x, y, z: coordinates in the simulation domain
+		"""
+		loc = [0,0,0]
+		loc[self._cut_dim] = self._cut_pos[self._cut_dim]
+		loc[self._dims[0]] = x
+		loc[self._dims[1]] = y
+		return loc
+
 	def _reset_display(self):
 		dims = set([0,1,2])
 		dims.remove(self._cut_dim)
@@ -379,6 +394,10 @@ class Fluid3DVisCutplane(Fluid2DVis):
 		self._dims = dims
 		self._screen = pygame.display.set_mode((self.shape[dims[0]] * self._scr_scale, self.shape[dims[1]] * self._scr_scale),
 				pygame.RESIZABLE)
+
+		# For compatibility with other functions for 2D.
+		self.lat_w = self.shape[dims[0]]
+		self.lat_h = self.shape[dims[1]]
 
 	def _process_misc_event(self, event):
 		if event.type == pygame.KEYDOWN:
@@ -410,4 +429,8 @@ class Fluid3DVisCutplane(Fluid2DVis):
 		pass
 
 	def _draw_wall(self, event):
-		pass
+		x, y, z = self._2d_to_3d_loc(*self._get_loc(event))
+		self.sim.geo.set_geo((x, y, z),
+				self._draw_type == 1 and geo.LBMGeo.NODE_WALL or geo.LBMGeo.NODE_FLUID,
+				update=True)
+
