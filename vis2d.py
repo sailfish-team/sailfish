@@ -339,7 +339,7 @@ class Fluid3DVisCutplane(Fluid2DVis):
 	def _slice_args(self):
 		args = []
 
-		for i in range(0, 3):
+		for i in range(2, -1, -1):
 			if i == self._cut_dim:
 				args.append(self._cut_pos[self._cut_dim])
 			else:
