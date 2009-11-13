@@ -140,8 +140,8 @@ class Fluid2DVis(object):
 		if self._maxv is None or maxv > self._maxv:
 			self._maxv = maxv
 
-		ret.append(('max_v', maxv))
-		ret.append(('rho_avg', numpy.average(self.density)))
+		ret.append('max_v: %.3f' % maxv)
+		ret.append('rho_avg: %.3f' % numpy.average(self.density))
 
 		b = (self.sim.geo.map_to_node_type(self.geo_map) == geo.LBMGeo.NODE_WALL)
 
@@ -318,7 +318,7 @@ class Fluid2DVis(object):
 
 					y = 48
 					for info in ret:
-						tmp = self._font.render('%s: %.3f' % info, True, (0, 255, 0))
+						tmp = self._font.render(info, True, (0, 255, 0))
 						self._screen.blit(tmp, (12, y))
 						y += 12
 
@@ -399,6 +399,12 @@ class Fluid3DVisCutplane(Fluid2DVis):
 			elif event.key == pygame.K_SEMICOLON:
 				if self._cut_pos[self._cut_dim] > 0:
 					self._cut_pos[self._cut_dim] -= 1
+
+	def _visualize(self, tx, ty, vismode):
+		ret = Fluid2DVis._visualize(self, tx, ty, vismode)
+		dim_names = ('X', 'Y', 'Z')
+		ret.append('cut {0} @ {1}'.format(dim_names[self._cut_dim], self._cut_pos[self._cut_dim]))
+		return ret
 
 	def _draw_tracers(self, tx, ty, sw, sh, width, height):
 		pass
