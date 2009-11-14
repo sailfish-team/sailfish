@@ -392,8 +392,8 @@ class Fluid3DVisCutplane(Fluid2DVis):
 		dims = sorted(list(dims))
 
 		self._dims = dims
-		self._screen = pygame.display.set_mode((self.shape[dims[0]] * self._scr_scale, self.shape[dims[1]] * self._scr_scale),
-				pygame.RESIZABLE)
+		self._screen = pygame.display.set_mode((int(self.shape[dims[0]] * self._scr_scale),
+				int(self.shape[dims[1]] * self._scr_scale)), pygame.RESIZABLE)
 
 		# For compatibility with other functions for 2D.
 		self.lat_w = self.shape[dims[0]]
