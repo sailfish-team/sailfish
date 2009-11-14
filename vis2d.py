@@ -328,7 +328,7 @@ class Fluid2DVis(object):
 class Fluid3DVisCutplane(Fluid2DVis):
 
 	def __init__(self, sim, shape, scr_scale):
-		Fluid2DVis.__init__(self, sim, shape[0] * scr_scale, shape[1] * scr_scale, shape[0], shape[1])
+		Fluid2DVis.__init__(self, sim, int(shape[0] * scr_scale), int(shape[1] * scr_scale), shape[0], shape[1])
 		self.shape = shape
 		self._scr_scale = scr_scale
 		self._cut_dim = 2
