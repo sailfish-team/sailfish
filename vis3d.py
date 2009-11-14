@@ -11,8 +11,9 @@ from enthought.mayavi import mlab
 
 class Fluid3DVis(object):
 
-	def __init__(self):
+	def __init__(self, sim):
 		self._tracers = True
+		self.sim = sim
 
 	def visualize(self):
 		self.sim.sim_step(self._iter, self._tracers)
@@ -25,13 +26,12 @@ class Fluid3DVis(object):
 
 		self._iter += 1
 
-	def main(self, sim):
-		self.sim = sim
+	def main(self):
 		self._iter = 1
-		self.density = mlab.pipeline.scalar_field(sim.rho.transpose())
-		self.vx = mlab.pipeline.scalar_field((sim.vx**2 + sim.vy**2 + sim.vz**2).transpose())
-		self.velocity = mlab.pipeline.vector_field(sim.vx.transpose(), sim.vy.transpose(), sim.vz.transpose())
-		self.trc = mlab.points3d(sim.tracer_x, sim.tracer_y, sim.tracer_z, scale_factor=0.75)
+		self.density = mlab.pipeline.scalar_field(self.sim.rho.transpose())
+		self.vx = mlab.pipeline.scalar_field((self.sim.vx**2 + self.sim.vy**2 + self.sim.vz**2).transpose())
+		self.velocity = mlab.pipeline.vector_field(self.sim.vx.transpose(), self.sim.vy.transpose(), self.sim.vz.transpose())
+		self.trc = mlab.points3d(self.sim.tracer_x, self.sim.tracer_y, self.sim.tracer_z, scale_factor=0.75)
 
 		mlab.pipeline.image_plane_widget(self.vx, plane_orientation='x_axes', slice_index=10)
 		mlab.pipeline.image_plane_widget(self.vx, plane_orientation='y_axes', slice_index=10)

@@ -190,7 +190,7 @@ class LBMSim(object):
 	def _init_vis_3d(self):
 		if self.options.vis3d == 'mayavi':
 			import vis3d
-			self.vis = vis3d.Fluid3DVis()
+			self.vis = vis3d.Fluid3DVis(self)
 		else:
 			self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)), self.options.scr_scale)
 
