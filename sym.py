@@ -130,13 +130,13 @@ class D3Q13(DxQy):
 			[(1,2), (1,24), (1,24), (1,24), (1,24), (1,24), (1,24),
 			 (1,24), (1,24), (1,24), (1,24), (1,24), (1,24)])
 
-	# TODO: Remove the underscores when MRT support is complete (i.e. after the
-	# equilibrium functions have been defined.
-	__mrt_names = ['rho', 'en', 'mx', 'my', 'mz',
-				 'sd2', 'sd1', 'sod1', 'sod2', 'sod3', 'm3x', 'm3y', 'm3z']
+	mrt_names = ['rho', 'en', 'mx', 'my', 'mz',
+				 'pww', 'pxx', 'pxy', 'pyz', 'pzx', 'm3x', 'm3y', 'm3z']
+
+	mrt_collision = [0, 1.0, 0, 0, 0, -1, -1, -1, -1, -1, 1.0, 1.0, 1.0]
 
 	@classmethod
-	def __init_mrt_basis(cls):
+	def _init_mrt_basis(cls):
 		cls.mrt_basis = map(lambda x: Matrix(x), [
 			[1]*13,
 			[x.dot(x) for x in cls.basis],
@@ -153,8 +153,55 @@ class D3Q13(DxQy):
 			[(x[0]*x[0] - x[1]*x[1])*x[2] for x in cls.basis]])
 
 	@classmethod
-	def __init_mrt_equilibrium(cls):
+	def _init_mrt_equilibrium(cls):
 		cls.mrt_equilibrium = []
+
+		# Name -> index map.
+		n2i = {}
+		for i, name in enumerate(cls.mrt_names):
+			n2i[name] = i
+
+		cls.mrt_collision[n2i['pxx']] = 2 / (8 * (cls.visc / cls.cssq) + 1)
+		cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx']]
+		cls.mrt_collision[n2i['pxy']] = 2 / (4 * (cls.visc / cls.cssq) + 1)
+		cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxy']]
+		cls.mrt_collision[n2i['pzx']] = cls.mrt_collision[n2i['pxy']]
+
+		vec_rho = cls.mrt_matrix[n2i['rho'],:]
+		vec_mx = cls.mrt_matrix[n2i['mx'],:]
+		vec_my = cls.mrt_matrix[n2i['my'],:]
+		vec_my = cls.mrt_matrix[n2i['mz'],:]
+
+		# Form of the equilibrium functions follows that from
+		# Tolke, J. and Krafczyk, M. (2008) 'TeraFLOP computing on a
+		# desktop PC with GPUs for 3D CFD', International Journal of Computational Fluid
+		# Dynamics, 22:7, 443 - 456.
+		for i, name in enumerate(cls.mrt_names):
+			if cls.mrt_collision[i] == 0:
+				cls.mrt_equilibrium.append(0)
+				continue
+
+			vec_e = cls.mrt_matrix[i,:]
+
+			if name == 'm3x' or name == 'm3y' or name == 'm3z':
+				t = 0
+			elif name == 'pxy':
+				t = 1/cls.rho * (cls.mx * cls.my)
+			elif name == 'pyz':
+				t = 1/cls.rho * (cls.my * cls.mz)
+			elif name == 'pzx':
+				t = 1/cls.rho * (cls.mx * cls.mz)
+			elif name == 'pxx':
+				# times rho_0 = 1
+				t = 1/cls.rho * (2 * cls.mx**2 - cls.my**2 - cls.mz**2)
+			elif name == 'pww':
+				# times rho_0 = 1
+				t = 1/cls.rho * (cls.my**2 - cls.mz**2)
+			elif name == 'en':
+				t = -11*cls.rho/2 * cls.cssq  + 13/(2 * cls.rho) * (cls.mx**2 + cls.my**2 + cls.mz**2)
+
+			t = expand_powers(str(t))
+			cls.mrt_equilibrium.append(t)
 
 
 class D3Q15(DxQy):
