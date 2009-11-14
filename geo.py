@@ -96,6 +96,10 @@ class LBMGeo(object):
 		# is expensive, so we try to avoid unnecessary recomputations.
 		self.feq_cache = {}
 
+	@property
+	def dx(self):
+		return 1.0/min(self.shape)
+
 	def _define_nodes(self):
 		"""Define the types of all nodes in the simulation domain.
 

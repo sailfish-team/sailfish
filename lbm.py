@@ -50,9 +50,34 @@ class LBMSim(object):
 		# We take the size of the time step to be proportional to the square
 		# of the discrete space interval, which in turn is
 		# 1/(smallest dimension of the lattice).
-		return self._iter * 1.0/min(self.geo.shape)**2
+		return self._iter * self.dt
+
+	@property
+	def dt(self):
+		return self.geo.dx**2
+
+	def get_sim_info(self):
+		"""Get general info about the simulation."""
+		ret = {}
+		ret['grid'] = sym.GRID.__name__
+		ret['size'] = tuple(reversed(self.shape))
+		ret['visc'] = self.options.visc
+		ret['model'] = self.options.model
+		ret['dx'] = self.geo.dx
+		ret['dt'] = self.dt
+		ret['precision'] = self.options.precision
+		ret['boundary'] = self.options.boundary
+
+		if sym.GRID.dim == 2:
+			ret['accel'] = (self.options.accel_x, self.options.accel_y)
+		else:
+			ret['accel'] = (self.options.accel_x, self.options.accel_y, self.options.accel_z)
+
+		return ret
 
 	def __init__(self, geo_class, misc_options=[], args=sys.argv[1:], defaults=None):
+		self._t_start = time.time()
+
 		parser = OptionParser()
 
 		parser.add_option('-q', '--quiet', dest='quiet', help='reduce verbosity', action='store_true', default=False)
@@ -71,6 +96,7 @@ class LBMSim(object):
 		group.add_option('--periodic_z', dest='periodic_z', help='lattice periodic in the Z direction', action='store_true', default=False)
 		group.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
 		group.add_option('--boundary', dest='boundary', help='boundary condition implementation', type='choice', choices=[x.name for x in geo.SUPPORTED_BCS], default='fullbb')
+		group.add_option('-v', '--verbose', dest='verbose', help='print additional info about the simulation', action='store_true', default=False)
 		parser.add_option_group(group)
 
 		group = OptionGroup(parser, 'Run mode settings')
@@ -149,6 +175,8 @@ class LBMSim(object):
 			self.options.scr_h = int(self.options.lat_h * self.options.scr_scale)
 
 	def _init_vis(self):
+		self._timed_print('Initializing visualization engine.')
+
 		if not self.options.benchmark and not self.options.batch:
 			if sym.GRID.dim == 2:
 				self._init_vis_2d()
@@ -190,7 +218,13 @@ class LBMSim(object):
 	def get_dist_size(self):
 		return self.options.lat_w * self.options.lat_h * self.options.lat_d
 
+	def _timed_print(self, info):
+		if self.options.verbose:
+			print '[{0:07.2f}] {1}'.format(time.time() - self._t_start, info)
+
 	def _init_geo(self):
+		self._timed_print('Initializing geometry.')
+
 		# Particle distributions in host memory.
 		if sym.GRID.dim == 2:
 			self.shape = (self.options.lat_h, self.options.lat_w)
@@ -207,6 +241,7 @@ class LBMSim(object):
 		self._init_geo = lambda: True
 
 	def _init_code(self):
+		self._timed_print('Preparing compute device code.')
 		lbm_tmpl = Template(filename='lbm.mako', lookup=TemplateLookup(directories=['.']))
 
 		self.tau = self.get_tau()
@@ -262,6 +297,7 @@ class LBMSim(object):
 		self.mod = self.backend.build(src)
 
 	def _init_lbm(self):
+		self._timed_print('Preparing the initial conditions for the simulation.')
 		# Velocity.
 		self.vx = numpy.zeros(self.shape, self.float)
 		self.vy = numpy.zeros(self.shape, self.float)
@@ -543,6 +579,13 @@ class LBMSim(object):
 		self._init_code()
 		self._init_lbm()
 		self._init_output()
+
+		self._timed_print('Starting the simulation...')
+		self._timed_print('Simulation parameters:')
+
+		if self.options.verbose:
+			for k, v in sorted(self.get_sim_info().iteritems()):
+				print '  {0}: {1}'.format(k, v)
 
 		if self.options.benchmark:
 			self._run_benchmark()
