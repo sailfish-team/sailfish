@@ -242,6 +242,12 @@ class LBMSim(object):
 
 	def _init_code(self):
 		self._timed_print('Preparing compute device code.')
+
+		# Clear all locale settings, we do not want them affecting the
+		# generated code in any way.
+		import locale
+		locale.setlocale(locale.LC_ALL, 'C')
+
 		lbm_tmpl = Template(filename='lbm.mako', lookup=TemplateLookup(directories=['.']))
 
 		self.tau = self.get_tau()
