@@ -73,6 +73,9 @@ class LBMSim(object):
 		else:
 			ret['accel'] = (self.options.accel_x, self.options.accel_y, self.options.accel_z)
 
+		if hasattr(self.geo, 'get_reynolds'):
+			ret['Re'] = self.geo.get_reynolds(self.options.visc)
+
 		return ret
 
 	def __init__(self, geo_class, misc_options=[], args=sys.argv[1:], defaults=None):

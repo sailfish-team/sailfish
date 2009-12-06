@@ -8,7 +8,7 @@ from lbm_poiseuille_3d import LBMGeoPoiseuille, LPoiSim
 class LBMGeoSphere(LBMGeoPoiseuille):
 	"""2D tunnel with a cylinder."""
 
-	maxv = 0.1
+	maxv = 0.09375
 
 	def _define_nodes(self):
 		LBMGeoPoiseuille._define_nodes(self)
@@ -35,11 +35,14 @@ class LBMGeoSphere(LBMGeoPoiseuille):
 					if z**2 + x**2 + y**2 <= (diam**2)/4:
 						self.set_geo((x + x0, y + y0, z + z0), self.NODE_WALL)
 
+	def get_reynolds(self, visc):
+		return int((self.get_width() / 3) * self.maxv/visc)
+
 class LSphereSim(LPoiSim):
 	filename = 'cylinder'
 
 	def __init__(self, geo_class, args=sys.argv[1:]):
-		LPoiSim.__init__(self, geo_class, args, defaults={'lat_d': 48, 'lat_h': 48, 'lat_w': 256, 'test': True, 'visc': 0.001})
+		LPoiSim.__init__(self, geo_class, args, defaults={'lat_d': 48, 'lat_h': 48, 'lat_w': 256, 'test': True, 'visc': 0.005})
 		self.clear_hooks()
 
 if __name__ == '__main__':
