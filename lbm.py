@@ -112,6 +112,8 @@ class LBMSim(object):
 		group.add_option('--use_src', dest='use_src', help='CUDA/OpenCL source to use instead of the automatically generated one', action='store', type='string', default='')
 		group.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
 		group.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat', 'vtk'], default='h5flat')
+		group.add_option('--nosavegeocache', dest='save_geocache', help='do not cache geometry data', action='store_false', default=True)
+		group.add_option('--nogeocache', dest='geocache', help='do not use cached geometry data', action='store_false', default=True)
 		parser.add_option_group(group)
 
 		group = OptionGroup(parser, 'Visualization options')
@@ -237,9 +239,11 @@ class LBMSim(object):
 		self.dist = numpy.zeros([len(sym.GRID.basis)] + list(self.shape), self.float)
 
 		# Simulation geometry.
-		self.geo = self.geo_class(list(reversed(self.shape)), self.options, self.float, self.backend)
+		self.geo = self.geo_class(list(reversed(self.shape)), self.options,
+				self.float, self.backend,
+				self.options.save_geocache, self.options.geocache)
 		self.geo.init_dist(self.dist)
-		self.geo_params = self.float(self.geo.get_params())
+		self.geo_params = self.float(self.geo.params)
 		# HACK: Prevent this method from being called again.
 		self._init_geo = lambda: True
 

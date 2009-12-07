@@ -1,3 +1,6 @@
+import cPickle as pickle
+import os
+import sys
 import numpy
 import sym
 
@@ -82,7 +85,8 @@ class LBMGeo(object):
 		"""
 		return ((node_map & cls.NODE_TYPE_MASK) >> cls.NODE_ORIENTATION_SHIFT)
 
-	def __init__(self, shape, options, float, backend):
+	def __init__(self, shape, options, float, backend, save_cache=True, use_cache=True):
+		self._params = None
 		self.dim = len(shape)
 		self.shape = shape
 		self.options = options
@@ -90,11 +94,27 @@ class LBMGeo(object):
 		self.map = numpy.zeros(shape, numpy.int32)
 		self.gpu_map = backend.alloc_buf(like=self.map)
 		self.float = float
-		self.reset(_get_params=False)
+		self.save_cache = save_cache
+		self.use_cache = use_cache
+		self.reset()
 
 		# Cache for equilibrium distributions.  Sympy numerical evaluation
 		# is expensive, so we try to avoid unnecessary recomputations.
 		self.feq_cache = {}
+
+	def _get_state(self):
+		rdict = {
+			'_vel_map': self._vel_map,
+			'_pressure_map': self._pressure_map,
+			'map': self.map,
+			'_params': self._params,
+		}
+		return rdict
+
+	def _set_state(self, rdict):
+		for k, v in rdict.iteritems():
+			setattr(self, k, v)
+		self._update_map()
 
 	@property
 	def dx(self):
@@ -123,15 +143,30 @@ class LBMGeo(object):
 	def get_defines(self):
 		abstract
 
-	def reset(self, _get_params=True):
+	@property
+	def cache_file(self):
+		return '.sailfish_%s_%d_%s_%s' % (
+				os.path.basename(sys.argv[0]), self.dim,
+				'-'.join(map(str, self.shape)), str(self.float().dtype))
+
+	def reset(self):
 		"""Perform a full reset of the geometry."""
+
+		if self.use_cache and os.path.exists(self.cache_file):
+			with open(self.cache_file, 'r') as f:
+				self._set_state(pickle.load(f))
+			return
+
 		self._vel_map = {}
 		self._pressure_map = {}
 		self.map = numpy.zeros(tuple(reversed(self.shape)), numpy.int32)
 		self._define_nodes()
 		self._postprocess_nodes()
-		if _get_params:
-			self.get_params()
+		a = self.params
+
+		if self.save_cache:
+			with open(self.cache_file, 'w') as f:
+				pickle.dump(self._get_state(), f, pickle.HIGHEST_PROTOCOL)
 
 	def _get_map(self, location):
 		"""Get a node map entry.
@@ -251,7 +286,11 @@ class LBMGeo(object):
 		"""
 		abstract
 
-	def get_params(self):
+	@property
+	def params(self):
+		if self._params is not None:
+			return self._params
+
 		ret = []
 		i = 0
 		for v, pos_list in self._vel_map.iteritems():
@@ -273,6 +312,7 @@ class LBMGeo(object):
 			i += 1
 
 		self._update_map()
+		self._params = ret
 		return ret
 
 	def get_bc(self):
