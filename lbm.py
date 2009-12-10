@@ -475,6 +475,19 @@ class LBMSim(object):
 		self._mlups_calls += 1
 		return (self._mlups, mlups)
 
+	def output_ascii(self, file):
+		if sym.GRID.dim == 3:
+			for x in range(0, self.vx.shape[0]):
+				for y in range(0, self.vx.shape[1]):
+					for z in range(0, self.vx.shape[2]):
+						print >>file, self.rho[x,y,z], self.vx[x,y,z], self.vy[x,y,z], self.vz[x,y,z]
+					print >>file, ''
+		else:
+			for x in range(0, self.vx.shape[0]):
+				for y in range(0, self.vx.shape[1]):
+					print >>file, self.rho[x,y], self.vx[x,y], self.vy[x,y]
+				print >>file, ''
+
 	def _output_data(self, i):
 		if self.options.output_format == 'h5flat':
 			h5t = self.h5file.createGroup(self.h5grp, 'iter%d' % i, 'iteration %d' % i)
