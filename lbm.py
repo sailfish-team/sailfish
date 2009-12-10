@@ -574,10 +574,10 @@ class LBMSim(object):
 			self.sim_step(tracers=False, get_data=need_data)
 
 			if need_data:
-				for hook in self._iter_hooks.get(self._iter, []):
+				for hook in self._iter_hooks.get(self._iter-1, []):
 					hook()
 				for k, v in self._iter_hooks_every.iteritems():
-					if self._iter % k == 0:
+					if (self._iter-1) % k == 0:
 						for hook in v:
 							hook()
 
