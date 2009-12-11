@@ -477,15 +477,24 @@ class LBMSim(object):
 
 	def output_ascii(self, file):
 		if sym.GRID.dim == 3:
-			for x in range(0, self.vx.shape[0]):
-				for y in range(0, self.vx.shape[1]):
-					for z in range(0, self.vx.shape[2]):
-						print >>file, self.rho[x,y,z], self.vx[x,y,z], self.vy[x,y,z], self.vz[x,y,z]
+			rho = self.geo.mask_array_by_fluid(self.rho)
+			vx = self.geo.mask_array_by_fluid(self.vx)
+			vy = self.geo.mask_array_by_fluid(self.vy)
+			vz = self.geo.mask_array_by_fluid(self.vz)
+
+			for z in range(0, vx.shape[0]):
+				for y in range(0, vx.shape[1]):
+					for x in range(0, vx.shape[2]):
+						print >>file, rho[z,y,x], vx[z,y,x], vy[z,y,x], vz[z,y,x]
 					print >>file, ''
 		else:
-			for x in range(0, self.vx.shape[0]):
-				for y in range(0, self.vx.shape[1]):
-					print >>file, self.rho[x,y], self.vx[x,y], self.vy[x,y]
+			rho = self.geo.mask_array_by_fluid(self.rho)
+			vx = self.geo.mask_array_by_fluid(self.vx)
+			vy = self.geo.mask_array_by_fluid(self.vy)
+
+			for y in range(0, vx.shape[0]):
+				for x in range(0, vx.shape[1]):
+					print >>file, rho[y,x], vx[y,x], vy[y,x]
 				print >>file, ''
 
 	def _output_data(self, i):
