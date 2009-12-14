@@ -123,8 +123,8 @@ class D3Q13(DxQy):
 	Q = 13
 
 	basis = map(lambda x: Matrix((x, )),
-				[(0,0,0), (1,1,0), (-1,-1,0), (1,-1,0), (-1,1,0), (1,0,1),
-				 (-1,0,-1), (1,0,-1), (-1,0,1), (0,1,1), (0,-1,-1), (0,1,-1), (0,-1,1)])
+				[(0,0,0), (1,1,0), (1,-1,0), (1,0,1), (1,0,-1), (0,1,1), (0,1,-1),
+				 (-1,-1,0), (-1,1,0), (-1,0,-1), (-1,0,1), (0,-1,-1), (0,-1,1)])
 
 	weights = map(lambda x: Rational(*x),
 			[(1,2), (1,24), (1,24), (1,24), (1,24), (1,24), (1,24),
@@ -133,18 +133,18 @@ class D3Q13(DxQy):
 	mrt_names = ['rho', 'en', 'mx', 'my', 'mz',
 				 'pww', 'pxx', 'pxy', 'pyz', 'pzx', 'm3x', 'm3y', 'm3z']
 
-	mrt_collision = [0, 1.0, 0, 0, 0, -1, -1, -1, -1, -1, 1.0, 1.0, 1.0]
+	mrt_collision = [0, 1.5, 0, 0, 0, -1, -1, -1, -1, -1, 1.8, 1.8, 1.8]
 
 	@classmethod
 	def _init_mrt_basis(cls):
 		cls.mrt_basis = map(lambda x: Matrix(x), [
 			[1]*13,
-			[x.dot(x) for x in cls.basis],
+			[13*x.dot(x)/2 - 12 for x in cls.basis],
 			[x[0] for x in cls.basis],
 			[x[1] for x in cls.basis],
 			[x[2] for x in cls.basis],
 			[x[1]*x[1] - x[2]*x[2] for x in cls.basis],
-			[x[0]*x[0] - x[1]*x[1] for x in cls.basis],
+			[3*x[0]*x[0] - x.dot(x) for x in cls.basis],
 			[x[0]*x[1] for x in cls.basis],
 			[x[1]*x[2] for x in cls.basis],
 			[x[0]*x[2] for x in cls.basis],
@@ -161,9 +161,9 @@ class D3Q13(DxQy):
 		for i, name in enumerate(cls.mrt_names):
 			n2i[name] = i
 
-		cls.mrt_collision[n2i['pxx']] = 2 / (8 * (cls.visc / cls.cssq) + 1)
+		cls.mrt_collision[n2i['pxx']] = 2 / (8 * cls.visc + 1)
 		cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx']]
-		cls.mrt_collision[n2i['pxy']] = 2 / (4 * (cls.visc / cls.cssq) + 1)
+		cls.mrt_collision[n2i['pxy']] = 2 / (4 * cls.visc + 1)
 		cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxy']]
 		cls.mrt_collision[n2i['pzx']] = cls.mrt_collision[n2i['pxy']]
 
@@ -173,9 +173,7 @@ class D3Q13(DxQy):
 		vec_my = cls.mrt_matrix[n2i['mz'],:]
 
 		# Form of the equilibrium functions follows that from
-		# Tolke, J. and Krafczyk, M. (2008) 'TeraFLOP computing on a
-		# desktop PC with GPUs for 3D CFD', International Journal of Computational Fluid
-		# Dynamics, 22:7, 443 - 456.
+		# PhysRevE.63.066702.
 		for i, name in enumerate(cls.mrt_names):
 			if cls.mrt_collision[i] == 0:
 				cls.mrt_equilibrium.append(0)
@@ -198,7 +196,7 @@ class D3Q13(DxQy):
 				# times rho_0 = 1
 				t = 1/cls.rho * (cls.my**2 - cls.mz**2)
 			elif name == 'en':
-				t = -11*cls.rho/2 * cls.cssq  + 13/(2 * cls.rho) * (cls.mx**2 + cls.my**2 + cls.mz**2)
+				t = 3*cls.rho*(13*cls.cssq - 8)/2 + 13/(2 * cls.rho)*(cls.mx**2 + cls.my**2 + cls.mz**2)
 
 			t = expand_powers(str(t))
 			cls.mrt_equilibrium.append(t)
