@@ -281,7 +281,7 @@ Supported models
 The Sailfish solver currently supports the following Lattice-Boltzmann models and grids:
 
 * two-dimensional: D2Q9 (BGK, MRT models)
-* three-dimensional: D3Q13, D3Q15, D3Q19 (BGK, MRT models)
+* three-dimensional: D3Q13 (MRT), D3Q15, D3Q19 (BGK, MRT models)
 
 The Lattice-Boltzmann method is based on solving the following equation:
 
