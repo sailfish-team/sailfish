@@ -20,25 +20,25 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 	maxv = 0.02
 
 	def _define_nodes(self):
-		radiussq = (self.get_width() / 2)**2
+		radiussq = (self.get_width() / 2 - 1)**2
 
 		if self.options.along_z:
 			for z in range(0, self.lat_d):
 				for x in range(0, self.lat_w):
 					for y in range(0, self.lat_h):
-						if (x-self.lat_w/2)**2 + (y-self.lat_h/2)**2 >= radiussq:
+						if (x-(self.lat_w/2-0.5))**2 + (y-(self.lat_h/2-0.5))**2 >= radiussq:
 							self.set_geo((x,y,z), self.NODE_WALL)
 		elif self.options.along_y:
 			for z in range(0, self.lat_d):
 				for x in range(0, self.lat_w):
 					for y in range(0, self.lat_h):
-						if (x-self.lat_w/2)**2 + (z-self.lat_d/2)**2 >= radiussq:
+						if (x-(self.lat_w/2-0.5))**2 + (z-(self.lat_d/2-0.5))**2 >= radiussq:
 							self.set_geo((x,y,z), self.NODE_WALL)
 		else:
 			for z in range(0, self.lat_d):
 				for x in range(0, self.lat_w):
 					for y in range(0, self.lat_h):
-						if (y-self.lat_h/2)**2 + (z-self.lat_d/2)**2 >= radiussq:
+						if (y-(self.lat_h/2-0.5))**2 + (z-(self.lat_d/2-0.5))**2 >= radiussq:
 							self.set_geo((x,y,z), self.NODE_WALL)
 
 	def init_dist(self, dist):
@@ -86,7 +86,7 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 			h = -0.5
 
 		tx = r+h
-		return self.maxv/width**2 * ((width/2.0)**2 - tx**2)
+		return self.maxv/(width/2.0)**2 * ((width/2.0)**2 - tx**2)
 
 	def get_chan_width(self):
 		width = self.get_width() - 1

@@ -271,7 +271,7 @@ class LBMGeo(object):
 		  dist: the distribution array
 		  location: location of the node, a n-tuple
 		"""
-		if velocity not in self.feq_cache:
+		if (rho, velocity) not in self.feq_cache:
 			vals = []
 			self.feq_cache[(rho, velocity)] = map(self.float, sym.eval_bgk_equilibrium(velocity, rho))
 
