@@ -236,13 +236,14 @@ class LBMSim(object):
 		else:
 			self.shape = (self.options.lat_d, self.options.lat_h, self.options.lat_w)
 
-		self.dist = numpy.zeros([len(sym.GRID.basis)] + list(self.shape), self.float)
+		self.dist1 = numpy.zeros([len(sym.GRID.basis)] + list(self.shape), self.float)
 
 		# Simulation geometry.
 		self.geo = self.geo_class(list(reversed(self.shape)), self.options,
 				self.float, self.backend,
 				self.options.save_geocache, self.options.geocache)
-		self.geo.init_dist(self.dist)
+		self.geo.init_dist(self.dist1)
+		self.dist2 = self.dist1.copy()
 		self.geo_params = self.float(self.geo.params)
 		# HACK: Prevent this method from being called again.
 		self._init_geo = lambda: True
@@ -344,8 +345,8 @@ class LBMSim(object):
 			self.gpu_tracer_loc.append(self.gpu_tracer_z)
 
 		# Particle distributions in device memory, A-B access pattern.
-		self.gpu_dist1 = self.backend.alloc_buf(like=self.dist)
-		self.gpu_dist2 = self.backend.alloc_buf(like=self.dist)
+		self.gpu_dist1 = self.backend.alloc_buf(like=self.dist1)
+		self.gpu_dist2 = self.backend.alloc_buf(like=self.dist2)
 
 		# Kernel arguments.
 		args_tracer2 = [self.gpu_dist1, self.geo.gpu_map] + self.gpu_tracer_loc
@@ -437,11 +438,12 @@ class LBMSim(object):
 
 		self._iter += 1
 
-	def get_macro_quantities(self, gpu_dist):
+	def get_macro_quantities(self, gpu_dist, cpu_dist):
 		"""Compute global macroscopic quantities of the fluid directly from the distributions.
 
 		Args:
 		  gpu_dist: a compute unit memory object containing the distributions
+		  cpu_dist: a host array corresponding to gpu_dist
 
 		Returns:
 		  A tuple of momentum, density.  Momentum is a 2- or 3-vector, depending on the
@@ -453,16 +455,16 @@ class LBMSim(object):
 		my = 0.0
 		mz = 0.0
 
-		for i, mval in enumerate(self.dist):
+		for i, mval in enumerate(cpu_dist):
 			mx += sym.GRID.basis[i][0] * numpy.sum(mval)
 			my += sym.GRID.basis[i][1] * numpy.sum(mval)
 			if sym.GRID.dim == 3:
 				mz += sym.GRID>basis[i][2] * numpy.sum(mval)
 
 		if sym.GRID.dim == 3:
-			return (mx, my, mz), numpy.sum(self.dist)
+			return (mx, my, mz), numpy.sum(cpu_dist)
 		else:
-			return (mx, my), numpy.sum(self.dist)
+			return (mx, my), numpy.sum(cpu_dist)
 
 	def get_mlups(self, tdiff, iters=None):
 		if iters is not None:
