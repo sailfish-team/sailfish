@@ -4,6 +4,8 @@ import sys
 import numpy
 import sym
 
+from sympy import Matrix, Rational, Symbol, Poly
+
 # Abstract class implementation, from Peter's Norvig site.
 def abstract():
 	import inspect
@@ -96,6 +98,9 @@ class LBMGeo(object):
 		self.float = float
 		self.save_cache = save_cache
 		self.use_cache = use_cache
+
+		# Map: object_id -> [(location, direction)]
+		self._force_nodes = {}
 		self.reset()
 
 		# Cache for equilibrium distributions.  Sympy numerical evaluation
@@ -108,6 +113,7 @@ class LBMGeo(object):
 			'_pressure_map': self._pressure_map,
 			'map': self.map,
 			'_params': self._params,
+			'_force_nodes': self._force_nodes,
 		}
 		return rdict
 
@@ -145,8 +151,8 @@ class LBMGeo(object):
 
 	@property
 	def cache_file(self):
-		return '.sailfish_%s_%d_%s_%s' % (
-				os.path.basename(sys.argv[0]), self.dim,
+		return '.sailfish_%s_%s_%s_%s' % (
+				os.path.basename(sys.argv[0]), sym.GRID.__name__,
 				'-'.join(map(str, self.shape)), str(self.float().dtype))
 
 	def reset(self):
@@ -320,6 +326,66 @@ class LBMGeo(object):
 
 	def init_dist(self, dist):
 		abstract
+
+	def add_force_object(self, obj_id, location, size):
+		"""Scan the box defined by location and size for nodes and links that cross
+		the fluid-solid interface. This function should be called from _define_nodes().
+
+		Args:
+		  obj_id: object ID (any hashable)
+		  location: n-tuple specifying the top corner of the box to scan
+		  size: n-tuple specifying the dimensions of the box to scan
+		"""
+		def _is_fluid_node(location):
+			return self._get_map(location) == self.NODE_FLUID
+
+		print _is_fluid_node((47, 28, 24))
+		print self._get_map((47, 28, 24))
+
+		if self.dim == 2:
+			for x in range(location[0], location[0] + size[0]):
+				for y in range(location[1], location[1] + size[1]):
+					if not _is_fluid_node((x, y)):
+						continue
+
+					loc = Matrix(((x, y),))
+					for i, vec in enumerate(sym.GRID.basis):
+						if not _is_fluid_node(tuple(loc + vec)):
+							self._force_nodes.setdefault(obj_id, []).append((tuple(loc), i))
+		else:
+			for x in range(location[0], location[0] + size[0]):
+				for y in range(location[1], location[1] + size[1]):
+					for z in range(location[2], location[2] + size[2]):
+						if not _is_fluid_node((x, y, z)):
+							continue
+
+						loc = Matrix(((x, y, z),))
+						for i, vec in enumerate(sym.GRID.basis):
+							if not _is_fluid_node(tuple(loc + vec)):
+								self._force_nodes.setdefault(obj_id, []).append((tuple(loc), i))
+
+	def force(self, obj_id, dist_curr, dist_prev):
+		"""Calculate the force the fluid exerts on a solid object.
+
+		The force is calculated for a time t + \Delta t / 2, given distributions
+		at times t and t + \Delta t.
+
+		Args:
+		  obj_id: object ID
+		  dist_curr: the distribution array for the current time step
+		  dist_prev: the distribution array for the previous time step
+
+		Returns:
+		  force exterted on the selected object (a n-vector)
+		"""
+		force = numpy.float32([0.0] * self.dim)
+
+		for location, dir in self._force_nodes[obj_id]:
+			loc = tuple(reversed(location))
+			force -= (numpy.float32(list(sym.GRID.basis[dir])) *
+					(dist_prev[dir][loc] + dist_curr[sym.GRID.idx_opposite[dir]][loc]))
+		return force
+
 
 class LBMGeo2D(LBMGeo):
 	def __init__(self, shape, *args, **kwargs):
