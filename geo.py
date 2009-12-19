@@ -389,6 +389,12 @@ class LBMGeo2D(LBMGeo):
 		self.lat_w, self.lat_h = shape
 		LBMGeo.__init__(self, shape, *args, **kwargs)
 
+	def _get_map(self, location):
+		return self.map[location[1], location[0]]
+
+	def _set_map(self, location, value):
+		self.map[location[1], location[0]] = value
+
 	def get_defines(self):
 		return {'geo_fluid': self.NODE_FLUID,
 				'geo_wall': self.NODE_WALL,
@@ -450,6 +456,12 @@ class LBMGeo3D(LBMGeo):
 		self.lat_w, self.lat_h, self.lat_d = shape
 		LBMGeo.__init__(self, shape, *args, **kwargs)
 
+	def _get_map(self, location):
+		return self.map[location[2], location[1], location[0]]
+
+	def _set_map(self, location, value):
+		self.map[location[2], location[1], location[0]] = value
+
 	def get_defines(self):
 		return {'geo_fluid': self.NODE_FLUID,
 				'geo_wall': self.NODE_WALL,
@@ -463,15 +475,18 @@ class LBMGeo3D(LBMGeo):
 	def _postprocess_nodes(self, nodes=None):
 		lat_w, lat_h, lat_d = self.shape
 
+		# FIXME: Eventually, we will need to postprocess nodes in 3D grids as well.
 		if nodes is None:
-			nodes_ = ((x, y, z) for x in range(0, lat_w) for y in range(0, lat_h) for z in range(0, lat_d))
+			# Postprocess the whole domain here.
+			orientation = numpy.empty(shape=self.map.shape, dtype=numpy.int32)
+			orientation[:,:,:] = self.NODE_DIR_OTHER
+			self.map = self._encode_node(orientation, self.map)
 		else:
 			nodes_ = nodes
 
-		# FIXME: Eventually, we will need to postprocess nodes in 3D grids as well.
-		for loc in nodes_:
-			cnode_type = self._get_map(loc)
+			for loc in nodes_:
+				cnode_type = self._get_map(loc)
 
-			if cnode_type != self.NODE_FLUID:
-				self._set_map(loc, self._encode_node(self.NODE_DIR_OTHER, cnode_type))
+				if cnode_type != self.NODE_FLUID:
+					self._set_map(loc, self._encode_node(self.NODE_DIR_OTHER, cnode_type))
 
