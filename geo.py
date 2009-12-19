@@ -339,9 +339,6 @@ class LBMGeo(object):
 		def _is_fluid_node(location):
 			return self._get_map(location) == self.NODE_FLUID
 
-		print _is_fluid_node((47, 28, 24))
-		print self._get_map((47, 28, 24))
-
 		if self.dim == 2:
 			for x in range(location[0], location[0] + size[0]):
 				for y in range(location[1], location[1] + size[1]):
