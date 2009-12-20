@@ -15,15 +15,13 @@ class DummyOptions(object):
 
 class TestGeo3D(geo.LBMGeo3D):
 	def _define_nodes(self):
-		for x in range(14, 22):
-			for y in range(15, 23):
-				for z in range(16, 24):
-					self.set_geo((x, y, z), self.NODE_WALL)
+		self.set_geo((14, 15, 16), self.NODE_WALL)
+		self.fill_geo((14, 15, 16), (slice(14, 22), slice(15, 23), slice(16, 24)))
 
-		for y in range(15, 23):
-			for z in range(16, 24):
-				self.set_geo((22, y, z), self.NODE_VELOCITY, (0.1, 0.2, 0.3))
-				self.set_geo((23, y, z), self.NODE_VELOCITY, (0.1, 0.2, 0.0))
+		self.set_geo((22, 15, 16), self.NODE_VELOCITY, (0.1, 0.2, 0.3))
+		self.set_geo((23, 15, 16), self.NODE_VELOCITY, (0.1, 0.2, 0.0))
+		self.fill_geo((22, 15, 16), (22, slice(15, 23), slice(16, 24)))
+		self.fill_geo((23, 15, 16), (23, slice(15, 23), slice(16, 24)))
 
 		self.set_geo((24, 15, 16), self.NODE_PRESSURE, 3.0)
 
@@ -42,6 +40,9 @@ class Test3DNodeProcessing(unittest.TestCase):
 		self.assertEqual(
 				self.geo._decode_node(self.geo._get_map((14, 15, 16))),
 				(self.geo.NODE_DIR_OTHER, self.geo.NODE_WALL))
+		self.assertEqual(
+				self.geo._decode_node(self.geo._get_map((21, 22, 23))),
+				(self.geo.NODE_DIR_OTHER, self.geo.NODE_WALL))
 
 	def testVelocityNodes(self):
 		self.geo._clear_state()
@@ -51,11 +52,13 @@ class Test3DNodeProcessing(unittest.TestCase):
 		self.assertAlmostEqual(self.geo.params[1], 0.2)
 		self.assertAlmostEqual(self.geo.params[2], 0.0)
 		self.assertEqual(self.geo._get_map((23, 15, 16)), self.geo.NODE_VELOCITY)
+		self.assertEqual(self.geo._get_map((23, 22, 23)), self.geo.NODE_VELOCITY)
 
 		self.assertAlmostEqual(self.geo.params[3], 0.1)
 		self.assertAlmostEqual(self.geo.params[4], 0.2)
 		self.assertAlmostEqual(self.geo.params[5], 0.3)
 		self.assertEqual(self.geo._get_map((22, 15, 16)), self.geo.NODE_VELOCITY+1)
+		self.assertEqual(self.geo._get_map((22, 22, 23)), self.geo.NODE_VELOCITY+1)
 
 	def testPressureNodes(self):
 		self.geo._clear_state()

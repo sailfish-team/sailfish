@@ -74,7 +74,7 @@ class LBMGeo(object):
 		return (code & cls.NODE_ORIENTATION_MASK)
 
 	@classmethod
-	def decode_node(cls, code):
+	def _decode_node(cls, code):
 		"""Decode an entry from the map of nodes.
 
 		Args:
@@ -229,18 +229,8 @@ class LBMGeo(object):
 		mask = (self._decode_node_type(self.map) == self.NODE_WALL)
 		return numpy.ma.array(array, mask=mask)
 
-	def fill_dist(self, location, dist, target=None):
-		"""Fill the whole simulation domain with distributions from a specific node.
-
-		Args:
-		  location: location of the node, a n-tuple.  The location can also be a row,
-		    in which case the coordinate spanning the row should be set to slice(None).
-		  dist: the distribution array
-		  target: if not None, a n-tuple representing the area to which the data from
-		    the specified node is to be propagated
-		"""
+	def _prep_array_fill(self, out, location, target):
 		loc = list(reversed(location))
-		out = dist
 
 		if target is None:
 			tg = [slice(None)] * len(location)
@@ -267,7 +257,36 @@ class LBMGeo(object):
 		else:
 			tg = list(reversed(target))
 
+		return out, loc, tg
+
+	def fill_dist(self, location, dist, target=None):
+		"""Fill the whole simulation domain with distributions from a specific node.
+
+		Args:
+		  location: location of the node, a n-tuple.  The location can also be a row,
+		    in which case the coordinate spanning the row should be set to slice(None).
+		  dist: the distribution array
+		  target: if not None, a n-tuple representing the area to which the data from
+		    the specified node is to be propagated
+		"""
+		out, loc, tg = self._prep_array_fill(dist, location, target)
+
 		for i in range(0, len(sym.GRID.basis)):
+			addr = tuple([i] + loc)
+			dest = tuple([i] + tg)
+			out[dest] = out[addr]
+
+	def fill_geo(self, location, target=None):
+		out, loc, tg = self._prep_array_fill(self.map, location, target)
+		loc = tuple(loc)
+		out[tg] = out[loc]
+
+		out, loc, tg = self._prep_array_fill(self._pressure_map, location, target)
+		loc = tuple(loc)
+		out[tg] = out[loc]
+
+		out, loc, tg = self._prep_array_fill(self._velocity_map, location, target)
+		for i in range(0, self.dim):
 			addr = tuple([i] + loc)
 			dest = tuple([i] + tg)
 			out[dest] = out[addr]
