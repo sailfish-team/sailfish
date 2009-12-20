@@ -112,8 +112,8 @@ class LBMSim(object):
 		group.add_option('--use_src', dest='use_src', help='CUDA/OpenCL source to use instead of the automatically generated one', action='store', type='string', default='')
 		group.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
 		group.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat', 'vtk'], default='h5flat')
-		group.add_option('--nosavegeocache', dest='save_geocache', help='do not cache geometry data', action='store_false', default=True)
-		group.add_option('--nogeocache', dest='geocache', help='do not use cached geometry data', action='store_false', default=True)
+		group.add_option('--savegeocache', dest='save_geocache', help='cache geometry data', action='store_true', default=False)
+		group.add_option('--geocache', dest='geocache', help='use cached geometry data', action='store_true', default=False)
 		parser.add_option_group(group)
 
 		group = OptionGroup(parser, 'Visualization options')
