@@ -15,15 +15,19 @@ class DummyOptions(object):
 
 class TestGeo3D(geo.LBMGeo3D):
 	def _define_nodes(self):
+		# Create a box of wall nodes.
 		self.set_geo((14, 15, 16), self.NODE_WALL)
 		self.fill_geo((14, 15, 16), (slice(14, 22), slice(15, 23), slice(16, 24)))
 
+		# Create two flat plates of velocity nodes.
 		self.set_geo((22, 15, 16), self.NODE_VELOCITY, (0.1, 0.2, 0.3))
 		self.set_geo((23, 15, 16), self.NODE_VELOCITY, (0.1, 0.2, 0.0))
 		self.fill_geo((22, 15, 16), (22, slice(15, 23), slice(16, 24)))
 		self.fill_geo((23, 15, 16), (23, slice(15, 23), slice(16, 24)))
 
+		# Create a line of pressure nodes.
 		self.set_geo((24, 15, 16), self.NODE_PRESSURE, 3.0)
+		self.fill_geo((24, 15, 16), (24, slice(15, 23), 16))
 
 class Test3DNodeProcessing(unittest.TestCase):
 	shape = (128, 64, 64)
@@ -66,6 +70,7 @@ class Test3DNodeProcessing(unittest.TestCase):
 
 		self.assertAlmostEqual(self.geo.params[6], 3.0)
 		self.assertEqual(self.geo._get_map((24, 15, 16)), self.geo.NODE_PRESSURE+1)
+		self.assertEqual(self.geo._get_map((24, 22, 16)), self.geo.NODE_PRESSURE+1)
 
 	def testForceObject(self):
 		# TODO
