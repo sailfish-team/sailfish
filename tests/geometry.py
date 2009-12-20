@@ -13,6 +13,7 @@ import backend_dummy
 
 class DummyOptions(object):
 	boundary = 'fullbb'
+	force = False
 
 sym.use_grid(sym.D3Q19)
 
@@ -36,50 +37,33 @@ class TestGeo3D(geo.LBMGeo3D):
 		self.set_geo((100, 10, 10), self.NODE_WALL)
 		self.fill_geo((100, 10, 10), (100, slice(10, 14), slice(10, 14)))
 
-		self.add_force_object('plate', (99, 9, 9), (3, 6, 6))
+		if self.options.force:
+			self.add_force_object('plate', (99, 9, 9), (3, 6, 6))
 
-class Test3DNodeProcessing(unittest.TestCase):
+	def init_dist(self, dist):
+		self.velocity_to_dist((99, 11, 11), (0.1, 0.0, 0.0), dist)
+		self.velocity_to_dist((99, 12, 12), (0.05, 0.0, 0.0), dist)
+		self.velocity_to_dist((99, 13, 13), (0.025, 0.0, 0.0), dist)
+		self.velocity_to_dist((101, 12, 12), (-0.075, 0.0, 0.0), dist)
+
+class Test3DForce(unittest.TestCase):
 	shape = (128, 64, 64)
 
 	def setUp(self):
 		backend = backend_dummy.DummyBackend()
-		self.geo = TestGeo3D(self.shape, options=DummyOptions(), float=numpy.float32, backend=backend,
+		options = DummyOptions()
+		options.force = True
+		self.geo = TestGeo3D(self.shape, options, float=numpy.float32, backend=backend,
 				save_cache=False, use_cache=False)
 
-	def testPostprocess(self):
-		self.geo._clear_state()
-		self.geo._define_nodes()
-		self.geo._postprocess_nodes()
-		self.assertEqual(
-				self.geo._decode_node(self.geo._get_map((14, 15, 16))),
-				(self.geo.NODE_DIR_OTHER, self.geo.NODE_WALL))
-		self.assertEqual(
-				self.geo._decode_node(self.geo._get_map((21, 22, 23))),
-				(self.geo.NODE_DIR_OTHER, self.geo.NODE_WALL))
+	def testForceCalculation(self):
+		shape = list(self.geo.map.shape)
+		dist = numpy.zeros([sym.GRID.Q] + shape, dtype=numpy.float32)
+		self.geo.init_dist(dist)
+		force = self.geo.force('plate', dist, dist)
 
-	def testVelocityNodes(self):
-		self.geo._clear_state()
-		self.geo._define_nodes()
-
-		self.assertAlmostEqual(self.geo.params[0], 0.1)
-		self.assertAlmostEqual(self.geo.params[1], 0.2)
-		self.assertAlmostEqual(self.geo.params[2], 0.0)
-		self.assertEqual(self.geo._get_map((23, 15, 16)), self.geo.NODE_VELOCITY)
-		self.assertEqual(self.geo._get_map((23, 22, 23)), self.geo.NODE_VELOCITY)
-
-		self.assertAlmostEqual(self.geo.params[3], 0.1)
-		self.assertAlmostEqual(self.geo.params[4], 0.2)
-		self.assertAlmostEqual(self.geo.params[5], 0.3)
-		self.assertEqual(self.geo._get_map((22, 15, 16)), self.geo.NODE_VELOCITY+1)
-		self.assertEqual(self.geo._get_map((22, 22, 23)), self.geo.NODE_VELOCITY+1)
-
-	def testPressureNodes(self):
-		self.geo._clear_state()
-		self.geo._define_nodes()
-
-		self.assertAlmostEqual(self.geo.params[6], 3.0)
-		self.assertEqual(self.geo._get_map((24, 15, 16)), self.geo.NODE_PRESSURE+1)
-		self.assertEqual(self.geo._get_map((24, 22, 16)), self.geo.NODE_PRESSURE+1)
+		for i, x in enumerate((-0.56284726, 0.05565972, 0.05565972)):
+			self.assertAlmostEqual(force[i], x)
 
 	def testForceObject(self):
 		b = set(self.geo._force_nodes['plate'])
@@ -152,6 +136,49 @@ class Test3DNodeProcessing(unittest.TestCase):
 			((101, 13, 13), 14), ((101, 13, 14), 14), ((101, 14, 10), 10),
 			((101, 14, 11), 10), ((101, 14, 12), 10), ((101, 14, 13), 10)])
 		self.assertEqual(b, a)
+
+class Test3DNodeProcessing(unittest.TestCase):
+	shape = (128, 64, 64)
+
+	def setUp(self):
+		backend = backend_dummy.DummyBackend()
+		self.geo = TestGeo3D(self.shape, options=DummyOptions(), float=numpy.float32, backend=backend,
+				save_cache=False, use_cache=False)
+
+	def testPostprocess(self):
+		self.geo._clear_state()
+		self.geo._define_nodes()
+		self.geo._postprocess_nodes()
+		self.assertEqual(
+				self.geo._decode_node(self.geo._get_map((14, 15, 16))),
+				(self.geo.NODE_DIR_OTHER, self.geo.NODE_WALL))
+		self.assertEqual(
+				self.geo._decode_node(self.geo._get_map((21, 22, 23))),
+				(self.geo.NODE_DIR_OTHER, self.geo.NODE_WALL))
+
+	def testVelocityNodes(self):
+		self.geo._clear_state()
+		self.geo._define_nodes()
+
+		self.assertAlmostEqual(self.geo.params[0], 0.1)
+		self.assertAlmostEqual(self.geo.params[1], 0.2)
+		self.assertAlmostEqual(self.geo.params[2], 0.0)
+		self.assertEqual(self.geo._get_map((23, 15, 16)), self.geo.NODE_VELOCITY)
+		self.assertEqual(self.geo._get_map((23, 22, 23)), self.geo.NODE_VELOCITY)
+
+		self.assertAlmostEqual(self.geo.params[3], 0.1)
+		self.assertAlmostEqual(self.geo.params[4], 0.2)
+		self.assertAlmostEqual(self.geo.params[5], 0.3)
+		self.assertEqual(self.geo._get_map((22, 15, 16)), self.geo.NODE_VELOCITY+1)
+		self.assertEqual(self.geo._get_map((22, 22, 23)), self.geo.NODE_VELOCITY+1)
+
+	def testPressureNodes(self):
+		self.geo._clear_state()
+		self.geo._define_nodes()
+
+		self.assertAlmostEqual(self.geo.params[6], 3.0)
+		self.assertEqual(self.geo._get_map((24, 15, 16)), self.geo.NODE_PRESSURE+1)
+		self.assertEqual(self.geo._get_map((24, 22, 16)), self.geo.NODE_PRESSURE+1)
 
 if __name__ == '__main__':
     unittest.main()
