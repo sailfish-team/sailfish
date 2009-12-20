@@ -384,6 +384,8 @@ class LBMGeo(object):
 	def init_dist(self, dist):
 		abstract
 
+	# FIXME: This method implicitly assumes that the object can be enclosed in a box
+	# which does not intersect any other objects or boundaries.
 	def add_force_object(self, obj_id, location, size):
 		"""Scan the box defined by location and size for nodes and links that cross
 		the fluid-solid interface. This function should be called from _define_nodes().
@@ -393,6 +395,8 @@ class LBMGeo(object):
 		  location: n-tuple specifying the top corner of the box to scan
 		  size: n-tuple specifying the dimensions of the box to scan
 		"""
+		self._force_nodes[obj_id] = []
+
 		if self.dim == 2:
 			mask = numpy.ones_like(self.map)
 			mask[location[1]:location[1]+size[1],location[0]:location[0]+size[0]] = 0
@@ -404,8 +408,7 @@ class LBMGeo(object):
 				b = numpy.logical_and((self.map == self.NODE_FLUID), (a == self.NODE_WALL))
 				b = numpy.ma.masked_array(b, mask)
 
-				for loc in numpy.transpose(numpy.nonzero(b)):
-					self._force_nodes.setdefault(obj_id, []).append((tuple(reversed(loc)), i))
+				self._force_nodes[obj_id].append(numpy.nonzero(b))
 		else:
 			mask = numpy.ones_like(self.map)
 			mask[location[2]:location[2]+size[2],location[1]:location[1]+size[1],location[0]:location[0]+size[0]] = 0
@@ -418,8 +421,7 @@ class LBMGeo(object):
 				b = numpy.logical_and((self.map == self.NODE_FLUID), (a == self.NODE_WALL))
 				b = numpy.ma.masked_array(b, mask)
 
-				for loc in numpy.transpose(numpy.nonzero(b)):
-					self._force_nodes.setdefault(obj_id, []).append((tuple(reversed(loc)), i))
+				self._force_nodes[obj_id].append(numpy.nonzero(b))
 
 	def force(self, obj_id, dist_curr, dist_prev):
 		"""Calculate the force the fluid exerts on a solid object.
@@ -437,12 +439,10 @@ class LBMGeo(object):
 		"""
 		force = numpy.float32([0.0] * self.dim)
 
-		for location, dir in self._force_nodes[obj_id]:
-			loc = tuple(reversed(location))
-			force -= (numpy.float32(list(sym.GRID.basis[dir])) *
-					(dist_prev[dir][loc] + dist_curr[sym.GRID.idx_opposite[dir]][loc]))
+		for dir, indices in enumerate(self._force_nodes[obj_id]):
+			force -= numpy.float32(list(sym.GRID.basis[dir])) * (
+					numpy.sum(dist_prev[dir][indices]) + numpy.sum(dist_curr[sym.GRID.idx_opposite[dir]][indices]))
 		return force
-
 
 class LBMGeo2D(LBMGeo):
 	def __init__(self, shape, *args, **kwargs):
