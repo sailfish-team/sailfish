@@ -65,10 +65,16 @@ class LBMGeo(object):
 		"""
 		return orientation | (type << cls.NODE_ORIENTATION_SHIFT)
 
-	# FIXME: Split this into two functions, get rid of map_to_node_type
-	# below.
 	@classmethod
-	def _decode_node(cls, code):
+	def _decode_node_type(cls, code):
+		return (code & cls.NODE_TYPE_MASK) >> cls.NODE_ORIENTATION_SHIFT
+
+	@classmethod
+	def _decode_node_orientation(cls, code):
+		return (code & cls.NODE_ORIENTATION_MASK)
+
+	@classmethod
+	def decode_node(cls, code):
 		"""Decode an entry from the map of nodes.
 
 		Args:
@@ -77,17 +83,7 @@ class LBMGeo(object):
 		Returns:
 		  tuple of orientation, type
 		"""
-		return (code & cls.NODE_ORIENTATION_MASK,
-			    (code & cls.NODE_TYPE_MASK) >> cls.NODE_ORIENTATION_SHIFT)
-
-	@classmethod
-	def map_to_node_type(cls, node_map):
-		"""Convert a node map into an array of node types.
-
-		This is used primarily for visualization, where node orientation is
-		irrelevant and only node types matter.
-		"""
-		return ((node_map & cls.NODE_TYPE_MASK) >> cls.NODE_ORIENTATION_SHIFT)
+		return cls._decode_node_orientation(code), cls._decode_node_type(code)
 
 	def __init__(self, shape, options, float, backend, save_cache=True, use_cache=True):
 		self.dim = len(shape)
@@ -230,7 +226,7 @@ class LBMGeo(object):
 	def mask_array_by_fluid(self, array):
 		if self.get_bc().wet_walls:
 			return array
-		mask = (self.map_to_node_type(self.map) == self.NODE_WALL)
+		mask = (self._decode_node_type(self.map) == self.NODE_WALL)
 		return numpy.ma.array(array, mask=mask)
 
 	def fill_dist(self, location, dist, target=None):

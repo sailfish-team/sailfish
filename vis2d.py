@@ -143,7 +143,7 @@ class Fluid2DVis(object):
 		ret.append('max_v: %.3f' % maxv)
 		ret.append('rho_avg: %.3f' % numpy.average(self.density))
 
-		b = (self.sim.geo.map_to_node_type(self.geo_map) == geo.LBMGeo.NODE_WALL)
+		b = (self.sim.geo._decode_node_type(self.geo_map) == geo.LBMGeo.NODE_WALL)
 
 		if self._vismode == 0:
 			drw = self.velocity_norm / self._maxv
