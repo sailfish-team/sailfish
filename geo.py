@@ -65,6 +65,8 @@ class LBMGeo(object):
 		"""
 		return orientation | (type << cls.NODE_ORIENTATION_SHIFT)
 
+	# FIXME: Split this into two functions, get rid of map_to_node_type
+	# below.
 	@classmethod
 	def _decode_node(cls, code):
 		"""Decode an entry from the map of nodes.
@@ -88,7 +90,6 @@ class LBMGeo(object):
 		return ((node_map & cls.NODE_TYPE_MASK) >> cls.NODE_ORIENTATION_SHIFT)
 
 	def __init__(self, shape, options, float, backend, save_cache=True, use_cache=True):
-		self._params = None
 		self.dim = len(shape)
 		self.shape = shape
 		self.options = options
@@ -109,11 +110,10 @@ class LBMGeo(object):
 
 	def _get_state(self):
 		rdict = {
-			'_vel_map': self._vel_map,
-			'_pressure_map': self._pressure_map,
 			'map': self.map,
 			'_params': self._params,
 			'_force_nodes': self._force_nodes,
+			'_num_velocities': self._num_velocities
 		}
 		return rdict
 
@@ -155,6 +155,13 @@ class LBMGeo(object):
 				os.path.basename(sys.argv[0]), sym.GRID.__name__,
 				'-'.join(map(str, self.shape)), str(self.float().dtype))
 
+	def _clear_state(self):
+		self._params = None
+		self.map = numpy.zeros(tuple(reversed(self.shape)), numpy.int32)
+		self._velocity_map = numpy.zeros(shape=([self.dim] + list(self.map.shape)), dtype=self.float)
+		self._pressure_map = numpy.zeros(shape=self.map.shape, dtype=self.float)
+		self._num_velocities = 0
+
 	def reset(self):
 		"""Perform a full reset of the geometry."""
 
@@ -163,9 +170,7 @@ class LBMGeo(object):
 				self._set_state(pickle.load(f))
 			return
 
-		self._vel_map = {}
-		self._pressure_map = {}
-		self.map = numpy.zeros(tuple(reversed(self.shape)), numpy.int32)
+		self._clear_state()
 		self._define_nodes()
 		self._postprocess_nodes()
 		a = self.params
@@ -206,14 +211,17 @@ class LBMGeo(object):
 		"""
 		self._set_map(location, numpy.int32(type))
 
+		rloc = tuple(reversed(location))
+		rloc2 = tuple([slice(None)] + list(rloc))
+
 		if val is not None:
 			if type == self.NODE_VELOCITY:
-				if len(val) == sym.GRID.dim:
-					self._vel_map.setdefault(val, []).append(location)
+				if len(val) == self.dim:
+					self._velocity_map[rloc2] = val
 				else:
 					raise ValueError('Invalid velocity specified.')
 			elif type == self.NODE_PRESSURE:
-				self._pressure_map.setdefault(val, []).append(location)
+				self._pressure_map[rloc] = val
 
 		if update:
 			self._postprocess_nodes(nodes=[location])
@@ -299,22 +307,57 @@ class LBMGeo(object):
 
 		ret = []
 		i = 0
-		for v, pos_list in self._vel_map.iteritems():
-			ret.extend(v)
-			for location in pos_list:
-				orientation, type = self._decode_node(self._get_map(location))
-				self._set_map(location, self._encode_node(orientation, type + i))
 
+
+		if self.dim == 3:
+			v1, i1 = numpy.unique1d(self._velocity_map[0,:,:,:], return_inverse=True)
+			v2, i2 = numpy.unique1d(self._velocity_map[1,:,:,:], return_inverse=True)
+			v3, i3 = numpy.unique1d(self._velocity_map[2,:,:,:], return_inverse=True)
+		else:
+			v1, i1 = numpy.unique1d(self._velocity_map[0,:,:], return_inverse=True)
+			v2, i2 = numpy.unique1d(self._velocity_map[1,:,:], return_inverse=True)
+
+		i1m = numpy.max(i1) + 1
+		i2m = numpy.max(i2) + 1
+		idx = i1 + i1m*i2
+
+		if self.dim == 3:
+			idx += i1m*i3*i2m
+
+		vfin, ifin = numpy.unique1d(idx, return_inverse=True)
+		ifin = ifin.reshape(self._velocity_map.shape[1:])
+
+		for j, v in enumerate(vfin):
+			if j == 0:
+				continue
+
+			at = v / i1m
+			a1 = v % i1m
+			a2 = at % i2m
+			a3 = at / i2m
+
+			midx = (ifin == j)
+			ret.extend((v1[a1], v2[a2]))
+
+			if self.dim == 3:
+				ret.append(v3[a3])
+
+			self.map[midx] = self.map[midx] + i
 			i += 1
 
+		self._num_velocities = i
 		i -= 1
 
-		for p, pos_list in self._pressure_map.iteritems():
-			ret.append(p)
-			for location in pos_list:
-				orientation, type = self._decode_node(self._get_map(location))
-				self._set_map(location, self._encode_node(orientation, type + i))
+		pressure, ifin = numpy.unique1d(self._pressure_map, return_inverse=True)
+		ifin = ifin.reshape(self._pressure_map.shape)
 
+		for j, v in enumerate(pressure):
+			if j == 0:
+				continue
+
+			midx = (ifin == j)
+			ret.append(v)
+			self.map[midx] = self.map[midx] + i
 			i += 1
 
 		self._update_map()
@@ -408,7 +451,7 @@ class LBMGeo2D(LBMGeo):
 				'geo_wall_sw': self.NODE_DIR_SW,
 				'geo_dir_other': self.NODE_DIR_OTHER,
 				'geo_bcv': self.NODE_VELOCITY,
-				'geo_bcp': self.NODE_PRESSURE + len(self._vel_map) - 1,
+				'geo_bcp': self.NODE_PRESSURE + self._num_velocities - 1,
 				'geo_orientation_mask': self.NODE_ORIENTATION_MASK,
 				'geo_orientation_shift': self.NODE_ORIENTATION_SHIFT,
 				}
@@ -466,7 +509,7 @@ class LBMGeo3D(LBMGeo):
 		return {'geo_fluid': self.NODE_FLUID,
 				'geo_wall': self.NODE_WALL,
 				'geo_bcv': self.NODE_VELOCITY,
-				'geo_bcp': self.NODE_PRESSURE + len(self._vel_map) - 1,
+				'geo_bcp': self.NODE_PRESSURE + self._num_velocities - 1,
 				'geo_orientation_mask': self.NODE_ORIENTATION_MASK,
 				'geo_orientation_shift': self.NODE_ORIENTATION_SHIFT,
 				'geo_dir_other': self.NODE_DIR_OTHER,
