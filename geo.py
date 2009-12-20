@@ -323,7 +323,6 @@ class LBMGeo(object):
 		ret = []
 		i = 0
 
-
 		if self.dim == 3:
 			v1, i1 = numpy.unique1d(self._velocity_map[0,:,:,:], return_inverse=True)
 			v2, i2 = numpy.unique1d(self._velocity_map[1,:,:,:], return_inverse=True)
@@ -394,30 +393,33 @@ class LBMGeo(object):
 		  location: n-tuple specifying the top corner of the box to scan
 		  size: n-tuple specifying the dimensions of the box to scan
 		"""
-		def _is_fluid_node(location):
-			return self._get_map(location) == self.NODE_FLUID
-
 		if self.dim == 2:
-			for x in range(location[0], location[0] + size[0]):
-				for y in range(location[1], location[1] + size[1]):
-					if not _is_fluid_node((x, y)):
-						continue
+			mask = numpy.ones_like(self.map)
+			mask[location[1]:location[1]+size[1],location[0]:location[0]+size[0]] = 0
 
-					loc = Matrix(((x, y),))
-					for i, vec in enumerate(sym.GRID.basis):
-						if not _is_fluid_node(tuple(loc + vec)):
-							self._force_nodes.setdefault(obj_id, []).append((tuple(loc), i))
+			for i, vec in enumerate(sym.GRID.basis):
+				a = numpy.roll(self.map, -vec[0], axis=1)
+				a = numpy.roll(a, -vec[1], axis=0)
+
+				b = numpy.logical_and((self.map == self.NODE_FLUID), (a == self.NODE_WALL))
+				b = numpy.ma.masked_array(b, mask)
+
+				for loc in numpy.transpose(numpy.nonzero(b)):
+					self._force_nodes.setdefault(obj_id, []).append((tuple(reversed(loc)), i))
 		else:
-			for x in range(location[0], location[0] + size[0]):
-				for y in range(location[1], location[1] + size[1]):
-					for z in range(location[2], location[2] + size[2]):
-						if not _is_fluid_node((x, y, z)):
-							continue
+			mask = numpy.ones_like(self.map)
+			mask[location[2]:location[2]+size[2],location[1]:location[1]+size[1],location[0]:location[0]+size[0]] = 0
 
-						loc = Matrix(((x, y, z),))
-						for i, vec in enumerate(sym.GRID.basis):
-							if not _is_fluid_node(tuple(loc + vec)):
-								self._force_nodes.setdefault(obj_id, []).append((tuple(loc), i))
+			for i, vec in enumerate(sym.GRID.basis):
+				a = numpy.roll(self.map, -vec[0], axis=2)
+				a = numpy.roll(a, -vec[1], axis=1)
+				a = numpy.roll(a, -vec[2], axis=0)
+
+				b = numpy.logical_and((self.map == self.NODE_FLUID), (a == self.NODE_WALL))
+				b = numpy.ma.masked_array(b, mask)
+
+				for loc in numpy.transpose(numpy.nonzero(b)):
+					self._force_nodes.setdefault(obj_id, []).append((tuple(reversed(loc)), i))
 
 	def force(self, obj_id, dist_curr, dist_prev):
 		"""Calculate the force the fluid exerts on a solid object.
