@@ -23,23 +23,24 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 		radiussq = (self.get_width() / 2 - 1)**2
 
 		if self.options.along_z:
-			for z in range(0, self.lat_d):
-				for x in range(0, self.lat_w):
-					for y in range(0, self.lat_h):
-						if (x-(self.lat_w/2-0.5))**2 + (y-(self.lat_h/2-0.5))**2 >= radiussq:
-							self.set_geo((x,y,z), self.NODE_WALL)
+			for x in range(0, self.lat_w):
+				for y in range(0, self.lat_h):
+					if (x-(self.lat_w/2-0.5))**2 + (y-(self.lat_h/2-0.5))**2 >= radiussq:
+							self.set_geo((x,y,0), self.NODE_WALL)
+			self.fill_geo((slice(None), slice(None), 0))
+
 		elif self.options.along_y:
 			for z in range(0, self.lat_d):
 				for x in range(0, self.lat_w):
-					for y in range(0, self.lat_h):
-						if (x-(self.lat_w/2-0.5))**2 + (z-(self.lat_d/2-0.5))**2 >= radiussq:
-							self.set_geo((x,y,z), self.NODE_WALL)
+					if (x-(self.lat_w/2-0.5))**2 + (z-(self.lat_d/2-0.5))**2 >= radiussq:
+						self.set_geo((x,0,z), self.NODE_WALL)
+			self.fill_geo((slice(None), 0, slice(None)))
 		else:
 			for z in range(0, self.lat_d):
-				for x in range(0, self.lat_w):
-					for y in range(0, self.lat_h):
-						if (y-(self.lat_h/2-0.5))**2 + (z-(self.lat_d/2-0.5))**2 >= radiussq:
-							self.set_geo((x,y,z), self.NODE_WALL)
+				for y in range(0, self.lat_h):
+					if (y-(self.lat_h/2-0.5))**2 + (z-(self.lat_d/2-0.5))**2 >= radiussq:
+						self.set_geo((0,y,z), self.NODE_WALL)
+			self.fill_geo((0, slice(None), slice(None)))
 
 	def init_dist(self, dist):
 		if self.options.static:

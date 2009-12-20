@@ -229,7 +229,7 @@ class LBMGeo(object):
 		mask = (self._decode_node_type(self.map) == self.NODE_WALL)
 		return numpy.ma.array(array, mask=mask)
 
-	def _prep_array_fill(self, out, location, target):
+	def _prep_array_fill(self, out, location, target, shift=0):
 		loc = list(reversed(location))
 
 		if target is None:
@@ -251,8 +251,8 @@ class LBMGeo(object):
 					loc[start] = loc[i]
 					loc[i] = t
 
-					# +1 as the first dimension is for different velocity directions.
-					out = numpy.swapaxes(out, i+1, start+1)
+					# shift = +1 if the first dimension is for different velocity directions.
+					out = numpy.swapaxes(out, i+shift, start+shift)
 					start -= 1
 		else:
 			tg = list(reversed(target))
@@ -269,7 +269,7 @@ class LBMGeo(object):
 		  target: if not None, a n-tuple representing the area to which the data from
 		    the specified node is to be propagated
 		"""
-		out, loc, tg = self._prep_array_fill(dist, location, target)
+		out, loc, tg = self._prep_array_fill(dist, location, target, shift=1)
 
 		for i in range(0, len(sym.GRID.basis)):
 			addr = tuple([i] + loc)
@@ -285,7 +285,7 @@ class LBMGeo(object):
 		loc = tuple(loc)
 		out[tg] = out[loc]
 
-		out, loc, tg = self._prep_array_fill(self._velocity_map, location, target)
+		out, loc, tg = self._prep_array_fill(self._velocity_map, location, target, shift=1)
 		for i in range(0, self.dim):
 			addr = tuple([i] + loc)
 			dest = tuple([i] + tg)
