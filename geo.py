@@ -31,6 +31,8 @@ BCS_MAP = dict((x.name, x) for x in SUPPORTED_BCS)
 class LBMGeo(object):
 	"""Abstract class for the LBM geometry."""
 
+	dim = 0
+
 	NODE_FLUID = 0
 	NODE_WALL = 1
 	NODE_VELOCITY = 2
@@ -86,7 +88,6 @@ class LBMGeo(object):
 		return cls._decode_node_orientation(code), cls._decode_node_type(code)
 
 	def __init__(self, shape, options, float, backend, save_cache=True, use_cache=True):
-		self.dim = len(shape)
 		self.shape = shape
 		self.options = options
 		self.backend = backend
@@ -445,6 +446,9 @@ class LBMGeo(object):
 		return force
 
 class LBMGeo2D(LBMGeo):
+
+	dim = 2
+
 	def __init__(self, shape, *args, **kwargs):
 		self.lat_w, self.lat_h = shape
 		LBMGeo.__init__(self, shape, *args, **kwargs)
@@ -512,6 +516,9 @@ class LBMGeo2D(LBMGeo):
 					self.map[y][x] = self._encode_node(self.NODE_DIR_OTHER, self.map[y][x])
 
 class LBMGeo3D(LBMGeo):
+
+	dim = 3
+
 	def __init__(self, shape, *args, **kwargs):
 		self.lat_w, self.lat_h, self.lat_d = shape
 		LBMGeo.__init__(self, shape, *args, **kwargs)

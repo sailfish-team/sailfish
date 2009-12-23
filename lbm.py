@@ -81,16 +81,22 @@ class LBMSim(object):
 	def __init__(self, geo_class, misc_options=[], args=sys.argv[1:], defaults=None):
 		self._t_start = time.time()
 
+		grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == geo_class.dim]
+		if sym.GRID in grids:
+			default_grid = sym.GRID
+		else:
+			default_grid = grids[0]
+
 		parser = OptionParser()
 
 		parser.add_option('-q', '--quiet', dest='quiet', help='reduce verbosity', action='store_true', default=False)
-
 		group = OptionGroup(parser, 'LB engine settings')
 		group.add_option('--lat_w', dest='lat_w', help='lattice width', type='int', action='store', default=128)
 		group.add_option('--lat_h', dest='lat_h', help='lattice height', type='int', action='store', default=128)
 		group.add_option('--lat_d', dest='lat_d', help='lattice depth', type='int', action='store', default=1)
 		group.add_option('--visc', dest='visc', help='viscosity', type='float', action='store', default=0.01)
 		group.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
+		group.add_option('--grid', dest='grid', help='grid type to use', type='choice', choices=grids, default=default_grid)
 		group.add_option('--accel_x', dest='accel_x', help='y component of the external acceleration', action='store', type='float', default=0.0)
 		group.add_option('--accel_y', dest='accel_y', help='x component of the external acceleration', action='store', type='float', default=0.0)
 		group.add_option('--accel_z', dest='accel_z', help='z component of the external acceleration', action='store', type='float', default=0.0)
@@ -158,6 +164,18 @@ class LBMSim(object):
 		self._mlups = 0.0
 		self.clear_hooks()
 		self.backend = sys.modules[SUPPORTED_BACKENDS[self.options.backend]].backend()
+
+		for x in sym.KNOWN_GRIDS:
+			if x.__name__ == self.options.grid:
+				sym.use_grid(x)
+
+		# If the model has not been explicitly specified by the user, try to automatically
+		# select a working model.
+		if 'model' not in self.options.specified and 'model' not in defaults.keys():
+			for x in [self.options.model, 'mrt', 'bgk']:
+				if sym.GRID.model_supported(x):
+					break
+			self.options.model = x
 
 		if not self.options.quiet:
 			print 'Using the "%s" backend.' % self.options.backend
