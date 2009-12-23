@@ -32,6 +32,9 @@ class DxQy(object):
 	def model_supported(cls, model):
 		if model == 'mrt':
 			return hasattr(cls, 'mrt_matrix')
+		# The D3Q13 grid only supports MRT.
+		elif model == 'bgk':
+			return (cls.Q != 13 or cls.dim != 3)
 		else:
 			return True
 
@@ -133,6 +136,8 @@ class D3Q13(DxQy):
 	mrt_names = ['rho', 'en', 'mx', 'my', 'mz',
 				 'pww', 'pxx', 'pxy', 'pyz', 'pzx', 'm3x', 'm3y', 'm3z']
 
+	# This choice of relaxation rates should make the simulation stable
+	# for viscosities in the range [0.00255, 0.125] and flow speeds up to 0.1.
 	mrt_collision = [0, 1.5, 0, 0, 0, -1, -1, -1, -1, -1, 1.8, 1.8, 1.8]
 
 	@classmethod
