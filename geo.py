@@ -12,30 +12,6 @@ def abstract():
 	caller = inspect.getouterframes(inspect.currentframe())[1][3]
 	raise NotImplementedError('%s must be implemented in subclass' % caller)
 
-#
-# Boundary conditions
-#
-class LBMBC(object):
-	def __init__(self, name, midgrid=False, wet_nodes=False):
-		"""Initialize a boundary condition class.
-
-		Args:
-		  name: a string representing the boundary condition
-		  midgrid: if True, the location of the boundary condition in the real
-			domain between the grid nodes
-		  wet_nodes: if True, the boundary condition nodes represent fluid particles
-		    and undergo standard collisions
-		"""
-		self.name = name
-		self.midgrid = midgrid
-		self.wet_nodes = wet_nodes
-
-SUPPORTED_BCS = [LBMBC('fullbb', midgrid=True),
-				 LBMBC('halfbb', midgrid=True),
-				 LBMBC('zouhe', midgrid=False, wet_nodes=True)
-				 ]
-BCS_MAP = dict((x.name, x) for x in SUPPORTED_BCS)
-
 class LBMGeo(object):
 	"""Abstract class for the LBM geometry."""
 
@@ -47,6 +23,8 @@ class LBMGeo(object):
 	NODE_WALL = 1
 	NODE_VELOCITY = 2
 	NODE_PRESSURE = 3
+
+	NODE_TYPES = [NODE_WALL, NODE_VELOCITY, NODE_PRESSURE]
 
 	# Constants to specify node orientation.  This needs to match the order
 	# in sym.basis.
@@ -235,6 +213,13 @@ class LBMGeo(object):
 			self._update_map()
 
 	def mask_array_by_fluid(self, array):
+		"""Mask an array so that only fluid nodes are active.
+
+		Args:
+		  array: a numpy array of the same dimensionality as the simulation domain.
+		    This will usually be an array containing the macroscopic variables
+			(velocity, density).
+		"""
 		if self.get_bc().wet_nodes:
 			return array
 		mask = (self._decode_node_type(self.map) == self.NODE_WALL)
@@ -303,8 +288,7 @@ class LBMGeo(object):
 			out[dest] = out[addr]
 
 	def velocity_to_dist(self, location, velocity, dist, rho=1.0):
-		"""Set the distributions for a node so that the fluid there has a
-		specific velocity.
+		"""Set the distributions for a node so that the fluid there has a specific velocity.
 
 		Args:
 		  velocity: velocity to set, a n-tuple
@@ -566,4 +550,30 @@ class LBMGeo3D(LBMGeo):
 
 				if cnode_type != self.NODE_FLUID:
 					self._set_map(loc, self._encode_node(self.NODE_DIR_OTHER, cnode_type))
+
+#
+# Boundary conditions
+#
+class LBMBC(object):
+	def __init__(self, name, supported_types=set(LBMGeo.NODE_TYPES), midgrid=False, wet_nodes=False):
+		"""Initialize a boundary condition class.
+
+		Args:
+		  name: a string representing the boundary condition
+		  midgrid: if True, the location of the boundary condition in the real
+			domain between the grid nodes
+		  wet_nodes: if True, the boundary condition nodes represent fluid particles
+		    and undergo standard collisions
+		"""
+		self.name = name
+		self.midgrid = midgrid
+		self.wet_nodes = wet_nodes
+		self.supported_types = supported_types
+
+SUPPORTED_BCS = [LBMBC('fullbb', midgrid=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY])),
+				 LBMBC('equilibrium', midgrid=False, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE])),
+				 LBMBC('halfbb', midgrid=True),
+				 LBMBC('zouhe', midgrid=False, wet_nodes=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE]))
+				 ]
+BCS_MAP = dict((x.name, x) for x in SUPPORTED_BCS)
 
