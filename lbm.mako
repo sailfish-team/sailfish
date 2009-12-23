@@ -143,55 +143,57 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 			v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho')).replace('/*', '/ *')};
 		%endfor
 	} else {
-		// We're dealing with a boundary node, for which some of the distributions
-		// might be meaningless.  Fill them with the values of the opposite
-		// distributions.
-		switch (orientation) {
-			%for i in range(0, sym.GRID.Q-1):
-				case ${i}: {
-					%for lvalue, rvalue in sym.fill_missing_dists('fi', missing_dir=i):
-						${lvalue} = ${rvalue};
-					%endfor
-					break;
-				}
-			%endfor
-		}
-
-		*rho = ${sym.ex_rho('fi')};
-
-		if (isVelocityNode(node_type)) {
-			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
-			switch (orientation) {
-				%for i in range(0, sym.GRID.Q-1):
-					case ${i}:
-						*rho = ${sym.ex_rho('fi', missing_dir=i, rho='*rho')};
-						break;
-				%endfor
-			}
-		} else {
-			float par_rho;
-			${get_boundary_pressure('node_type', 'par_rho')}
-
+		%if bc_pressure != 'fullbb' and bc_velocity != 'fullbb':
+			// We're dealing with a boundary node, for which some of the distributions
+			// might be meaningless.  Fill them with the values of the opposite
+			// distributions.
 			switch (orientation) {
 				%for i in range(0, sym.GRID.Q-1):
 					case ${i}: {
-						%for d in range(0, sym.GRID.dim):
-							v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho', missing_dir=i, par_rho='par_rho')).replace('/*', '/ *')};
+						%for lvalue, rvalue in sym.fill_missing_dists('fi', missing_dir=i):
+							${lvalue} = ${rvalue};
 						%endfor
 						break;
-					 }
+					}
 				%endfor
 			}
 
-			*rho = par_rho;
-		}
+			*rho = ${sym.ex_rho('fi')};
+
+			if (isVelocityNode(node_type)) {
+				${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
+				switch (orientation) {
+					%for i in range(0, sym.GRID.Q-1):
+						case ${i}:
+							*rho = ${sym.ex_rho('fi', missing_dir=i, rho='*rho')};
+							break;
+					%endfor
+				}
+			} else {
+				float par_rho;
+				${get_boundary_pressure('node_type', 'par_rho')}
+
+				switch (orientation) {
+					%for i in range(0, sym.GRID.Q-1):
+						case ${i}: {
+							%for d in range(0, sym.GRID.dim):
+								v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho', missing_dir=i, par_rho='par_rho')).replace('/*', '/ *')};
+							%endfor
+							break;
+						 }
+					%endfor
+				}
+
+				*rho = par_rho;
+			}
+		%endif
 	}
 
 	#undef vx
 	#undef vy
 	#undef vz
 
-	%if boundary_type == 'zouhe':
+	%if bc_wall == 'zouhe' or bc_velocity == 'zouhe' or bc_pressure == 'zouhe':
 		if (isWallNode(node_type)) {
 			v[0] = 0.0f;
 			v[1] = 0.0f;
@@ -234,7 +236,6 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 				${zouhe_fixup(i)}
 			%endfor
 		}
-
 	%endif
 
 	${external_force('node_type', 'v[0]', 'v[1]', 'v[2]')}
@@ -242,21 +243,46 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 
 ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orientation, float rho, float *v)
 {
-	%if boundary_type == 'fullbb' or boundary_type == 'halfbb':
-		#define vx v[0]
-		#define vy v[1]
-		#define vz v[2]
+	%if bc_wall == 'fullbb':
+		if (isWallNode(node_type)) {
+			bounce_back(fi);
+		}
+	%endif
 
-		if (isVelocityOrPressureNode(node_type)) {
+	#define vx v[0]
+	#define vy v[1]
+	#define vz v[2]
+
+	%if bc_velocity == 'fullbb':
+		if (isVelocityNode(node_type)) {
+			bounce_back(fi);
+
+			%for i, ve in enumerate(sym.GRID.basis):
+				fi->${sym.GRID.idx_name[i]} += rho * ${2.0 * sym.GRID.weights[i] * sym.GRID.v.dot(ve) / sym.GRID.cssq};
+			%endfor
+		}
+	%endif
+
+	%if bc_velocity == 'equilibrium':
+		if (isVelocityNode(node_type)) {
 			%for feq, idx in sym.bgk_equilibrium():
 				fi->${idx} = ${feq};
 			%endfor
 		}
-
-		#undef vx
-		#undef vy
-		#undef vz
 	%endif
+
+	%if bc_pressure == 'equilibrium':
+		if (isPressureNode(node_type)) {
+			%for feq, idx in sym.bgk_equilibrium():
+				fi->${idx} = ${feq};
+			%endfor
+		}
+	%endif
+
+
+	#undef vx
+	#undef vy
+	#undef vz
 }
 
 //
@@ -385,7 +411,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	%endfor
 
 	// Relexate the non-conserved moments,
-	%if boundary_type == 'fullbb' or boundary_type == 'halfbb':
+	%if bc_velocity == 'equilibrium' or bc_pressure == 'equilibrium':
 		if (isVelocityOrPressureNode(node_type)) {
 			%for i, coll in enumerate(sym.GRID.mrt_collision):
 				%if coll != 0:
@@ -457,47 +483,35 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 }
 %endif
 
-<%def name="relaxate()">
-	% if model == 'bgk':
+<%def name="_relaxate()">
+	%if model == 'bgk':
 		BGK_relaxate(rho, v, &fi, type);
-	% else:
+	%else:
 		MS_relaxate(&fi, type);
-	% endif
+	%endif
 </%def>
 
-/*
-FIXME: Temporarily disable this until it is converted into a grid-independent form.
-
-${device_func} inline void half_bb(Dist *fi, const int node_type)
-{
-	// TODO: add support for corners
-	switch (node_type) {
-	case GEO_WALL_E:
-		fi->fNE = fi->fSW;
-		fi->fSE = fi->fNW;
-		fi->fE = fi->fW;
-		break;
-
-	case GEO_WALL_W:
-		fi->fNW = fi->fSE;
-		fi->fSW = fi->fNE;
-		fi->fW = fi->fE;
-		break;
-
-	case GEO_WALL_S:
-		fi->fSE = fi->fNW;
-		fi->fSW = fi->fNE;
-		fi->fS = fi->fN;
-		break;
-
-	case GEO_WALL_N:
-		fi->fNE = fi->fSW;
-		fi->fNW = fi->fSE;
-		fi->fN = fi->fS;
-		break;
+## TODO: This could be optimized.
+<%def name="relaxate()">
+	if (isFluidNode(type)) {
+		${_relaxate()}
 	}
-}
-*/
+	%if bc_wall_.wet_nodes:
+		else if (isWallNode(type)) {
+			${_relaxate()}
+		}
+	%endif
+	%if bc_velocity_.wet_nodes:
+		else if (isVelocityNode(type)) {
+			${_relaxate()}
+		}
+	%endif
+	%if bc_pressure_.wet_nodes:
+		else if (isPressureNode(type)) {
+			${_relaxate()}
+		}
+	%endif
+</%def>
 
 <%def name="prop_bnd(dir, effective_dir, i, di, dname, dist_source, offset)">
 	%if di == dim:
@@ -576,16 +590,6 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	int type, orientation;
 	decodeNodeType(map[gi], &orientation, &type);
 
-	% if boundary_type == 'fullbb':
-		if (isWallNode(type)) {
-			bounce_back(&fi);
-		}
-	% elif boundary_type == 'halfbb':
-		if (isWallNode(type)) {
-			half_bb(&fi, type);
-		}
-	% endif
-
 	// macroscopic quantities for the current cell
 	float rho, v[${dim}];
 
@@ -603,13 +607,7 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 		%endif
 	}
 
-	% if boundary_type == 'fullbb':
-		if (isFluidNode(type)) {
-			${relaxate()}
-		}
-	% else:
-		${relaxate()}
-	% endif
+	${relaxate()}
 
 	%for i, dname in enumerate(sym.GRID.idx_name):
 		#define dir_${dname} ${i}

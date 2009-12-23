@@ -73,7 +73,7 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 		ret = []
 		h = 0
 
-		bc = self.get_bc()
+		bc = geo.get_bc(self.options.bc_wall)
 		if bc.midgrid:
 			h = -0.5
 
@@ -85,7 +85,7 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 
 	def get_chan_width(self):
 		width = self.get_width() - 1
-		bc = self.get_bc()
+		bc = geo.get_bc(self.options.bc_wall)
 		if bc.midgrid:
 			return width - 1
 		else:

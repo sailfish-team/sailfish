@@ -66,7 +66,9 @@ class LBMSim(object):
 		ret['dx'] = self.geo.dx
 		ret['dt'] = self.dt
 		ret['precision'] = self.options.precision
-		ret['boundary'] = self.options.boundary
+		ret['bc_wall'] = self.options.bc_wall
+		ret['bc_velocity'] = self.options.bc_velocity
+		ret['bc_pressure'] = self.options.bc_pressure
 
 		if sym.GRID.dim == 2:
 			ret['accel'] = (self.options.accel_x, self.options.accel_y)
@@ -104,7 +106,12 @@ class LBMSim(object):
 		group.add_option('--periodic_y', dest='periodic_y', help='lattice periodic in the Y direction', action='store_true', default=False)
 		group.add_option('--periodic_z', dest='periodic_z', help='lattice periodic in the Z direction', action='store_true', default=False)
 		group.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
-		group.add_option('--boundary', dest='boundary', help='boundary condition implementation', type='choice', choices=[x.name for x in geo.SUPPORTED_BCS], default='fullbb')
+		group.add_option('--bc_wall', dest='bc_wall', help='boundary condition implementation to use for wall nodes', type='choice',
+				choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_WALL in x.supported_types], default='fullbb')
+		group.add_option('--bc_velocity', dest='bc_velocity', help='boundary condition implementation to use for velocity nodes', type='choice',
+				choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_VELOCITY in x.supported_types], default='fullbb')
+		group.add_option('--bc_pressure', dest='bc_pressure', help='boundary condition implementation to use for pressure nodes', type='choice',
+				choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_PRESSURE in x.supported_types], default='equilibrium')
 		group.add_option('-v', '--verbose', dest='verbose', help='print additional info about the simulation', action='store_true', default=False)
 		parser.add_option_group(group)
 
@@ -296,7 +303,14 @@ class LBMSim(object):
 		ctx['visc'] = self.float(self.options.visc)
 		ctx['backend'] = self.options.backend
 		ctx['geo_params'] = self.geo_params
-		ctx['boundary_type'] = self.options.boundary
+		ctx['bc_wall'] = self.options.bc_wall
+		ctx['bc_velocity'] = self.options.bc_velocity
+		ctx['bc_pressure'] = self.options.bc_pressure
+
+		ctx['bc_wall_'] = geo.get_bc(self.options.bc_wall)
+		ctx['bc_velocity_'] = geo.get_bc(self.options.bc_velocity)
+		ctx['bc_pressure_'] = geo.get_bc(self.options.bc_pressure)
+
 		ctx['pbc_offsets'] = [{-1: self.options.lat_w,
 								1: -self.options.lat_w},
 							  {-1: self.options.lat_h*self.options.lat_w,

@@ -220,7 +220,7 @@ class LBMGeo(object):
 		    This will usually be an array containing the macroscopic variables
 			(velocity, density).
 		"""
-		if self.get_bc().wet_nodes:
+		if get_bc(self.options.bc_wall).wet_nodes:
 			return array
 		mask = (self._decode_node_type(self.map) == self.NODE_WALL)
 		return numpy.ma.array(array, mask=mask)
@@ -372,9 +372,6 @@ class LBMGeo(object):
 		self._update_map()
 		self._params = ret
 		return ret
-
-	def get_bc(self):
-		return BCS_MAP[self.options.boundary]
 
 	def init_dist(self, dist):
 		abstract
@@ -570,9 +567,12 @@ class LBMBC(object):
 		self.wet_nodes = wet_nodes
 		self.supported_types = supported_types
 
+def get_bc(type_):
+	return BCS_MAP[type_]
+
+
 SUPPORTED_BCS = [LBMBC('fullbb', midgrid=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY])),
-				 LBMBC('equilibrium', midgrid=False, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE])),
-				 LBMBC('halfbb', midgrid=True),
+				 LBMBC('equilibrium', midgrid=False, supported_types=set([LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE])),
 				 LBMBC('zouhe', midgrid=False, wet_nodes=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE]))
 				 ]
 BCS_MAP = dict((x.name, x) for x in SUPPORTED_BCS)
