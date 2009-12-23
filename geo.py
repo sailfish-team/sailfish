@@ -10,29 +10,39 @@ from sympy import Matrix, Rational, Symbol, Poly
 def abstract():
 	import inspect
 	caller = inspect.getouterframes(inspect.currentframe())[1][3]
-	raise NotImplementedError(caller + ' must be implemented in subclass')
+	raise NotImplementedError('%s must be implemented in subclass' % caller)
 
 #
 # Boundary conditions
 #
 class LBMBC(object):
-	def __init__(self, name, midgrid=False, local=True, wet_walls=False):
+	def __init__(self, name, midgrid=False, wet_nodes=False):
+		"""Initialize a boundary condition class.
+
+		Args:
+		  name: a string representing the boundary condition
+		  midgrid: if True, the location of the boundary condition in the real
+			domain between the grid nodes
+		  wet_nodes: if True, the boundary condition nodes represent fluid particles
+		    and undergo standard collisions
+		"""
 		self.name = name
 		self.midgrid = midgrid
-		self.local = local
-		self.wet_walls = wet_walls
+		self.wet_nodes = wet_nodes
 
 SUPPORTED_BCS = [LBMBC('fullbb', midgrid=True),
 				 LBMBC('halfbb', midgrid=True),
-				 LBMBC('zouhe', midgrid=False, wet_walls=True)
+				 LBMBC('zouhe', midgrid=False, wet_nodes=True)
 				 ]
 BCS_MAP = dict((x.name, x) for x in SUPPORTED_BCS)
 
 class LBMGeo(object):
 	"""Abstract class for the LBM geometry."""
 
+	# Dimensionality, needs to be overridden in child classes.
 	dim = 0
 
+	# Node types.
 	NODE_FLUID = 0
 	NODE_WALL = 1
 	NODE_VELOCITY = 2
@@ -225,7 +235,7 @@ class LBMGeo(object):
 			self._update_map()
 
 	def mask_array_by_fluid(self, array):
-		if self.get_bc().wet_walls:
+		if self.get_bc().wet_nodes:
 			return array
 		mask = (self._decode_node_type(self.map) == self.NODE_WALL)
 		return numpy.ma.array(array, mask=mask)
