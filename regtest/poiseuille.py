@@ -59,7 +59,6 @@ def run_test(bc, drive, precision):
 		print '%f ' % visc,
 
 		iters = int(1000 / visc)
-		iters = 50000
 		xvec.append(visc)
 
 		defaults['bc_wall'] = bc
