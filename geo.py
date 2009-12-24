@@ -157,8 +157,9 @@ class LBMGeo(object):
 
 		self._clear_state()
 		self._define_nodes()
-		self._postprocess_nodes()
 		a = self.params
+		self._postprocess_nodes()
+		self._update_map()
 
 		if self.save_cache:
 			with open(self.cache_file, 'w') as f:
@@ -369,7 +370,6 @@ class LBMGeo(object):
 			self.map[midx] = self.map[midx] + i
 			i += 1
 
-		self._update_map()
 		self._params = ret
 		return ret
 
