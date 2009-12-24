@@ -88,6 +88,19 @@ ${const_var} float geo_params[${num_params+1}] = {
 	}
 </%def>
 
+<%def name="fill_missing_distributions()">
+	switch (orientation) {
+		%for i in range(0, sym.GRID.Q-1):
+			case ${i}: {
+				%for lvalue, rvalue in sym.fill_missing_dists('fi', missing_dir=i):
+					${lvalue} = ${rvalue};
+				%endfor
+				break;
+			}
+		%endfor
+	}
+</%def>
+
 <%def name="external_force(node_type, vx, vy, vz, rho=0, momentum=False)">
 	%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
 		if (!isWallNode(${node_type})) {
@@ -143,25 +156,15 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 			v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho')).replace('/*', '/ *')};
 		%endfor
 	} else {
-		%if bc_pressure != 'fullbb' and bc_velocity != 'fullbb':
-			// We're dealing with a boundary node, for which some of the distributions
-			// might be meaningless.  Fill them with the values of the opposite
-			// distributions.
-			switch (orientation) {
-				%for i in range(0, sym.GRID.Q-1):
-					case ${i}: {
-						%for lvalue, rvalue in sym.fill_missing_dists('fi', missing_dir=i):
-							${lvalue} = ${rvalue};
-						%endfor
-						break;
-					}
-				%endfor
-			}
-
-			*rho = ${sym.ex_rho('fi')};
-
+		// We're dealing with a boundary node, for which some of the distributions
+		// might be meaningless.  Fill them with the values of the opposite
+		// distributions.
+		%if bc_velocity != 'fullbb':
 			if (isVelocityNode(node_type)) {
+				${fill_missing_distributions()}
+				*rho = ${sym.ex_rho('fi')};
 				${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
+
 				switch (orientation) {
 					%for i in range(0, sym.GRID.Q-1):
 						case ${i}:
@@ -169,7 +172,12 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 							break;
 					%endfor
 				}
-			} else {
+			}
+		%endif
+		%if bc_pressure != 'fullbb':
+			if (isPressureNode(node_type)) {
+				${fill_missing_distributions()}
+				*rho = ${sym.ex_rho('fi')};
 				float par_rho;
 				${get_boundary_pressure('node_type', 'par_rho')}
 
