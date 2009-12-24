@@ -1,9 +1,12 @@
 #!/usr/bin/python -u
 
+import os
 import sys
 import numpy
 import math
 import matplotlib
+import optparse
+from optparse import OptionGroup, OptionParser, OptionValueError
 
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
@@ -12,65 +15,70 @@ sys.path.append('.')
 from lbm_poiseuille import LPoiSim, LBMGeoPoiseuille
 import geo
 
-MAX_ITERS = 50000
+MAX_ITERS = 10000
 POINTS = 30
 
 class LTestPoiSim(LPoiSim):
-	def __init__(self, visc, bc, static=False, lat_w=64, lat_h=64, max_iters=MAX_ITERS):
-		args = ['--test', '--visc=%f' % visc, '--quiet', '--boundary=%s' % bc,
-				'--lat_w=%d' % lat_w, '--lat_h=%d' % lat_h, '--batch']
-		if static:
-			args.append('--static')
-		super(LTestPoiSim, self).__init__(LBMGeoPoiseuille, args)
+	def __init__(self, args, defaults):
+		super(LTestPoiSim, self).__init__(LBMGeoPoiseuille, args, defaults)
 		self.clear_hooks()
-		self.options.max_iters = max_iters
 		self.add_iter_hook(self.options.max_iters-1, self.save_output)
 
 	def save_output(self):
-		self.result = numpy.max(self.vy[16,1:self.geo.lat_w-1]) / max(self.geo.get_velocity_profile())
+#		self.result = (numpy.max(self.vy[16,1:self.geo.lat_w-1]) / max(self.geo.get_velocity_profile())) - 1.0
 		self.res_maxv = numpy.max(self.geo.mask_array_by_fluid(self.vy))
 		self.th_maxv = max(self.geo.get_velocity_profile())
+		self.result = self.res_maxv / self.th_maxv - 1.0
 
-bcs = geo.BCS_MAP.keys()
+bcs = [x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_WALL in x.supported_types]
+defaults = {
+		'stationary': True,
+		'batch': True,
+		'quiet': True,
+		'test': True,
+		'lat_w': 64,
+		'lat_h': 64,
+	}
 
-for bc in bcs:
+def run_test(bc, drive, precision):
 	xvec = []
 	yvec = []
-	yvec2 = []
 	prof_sim = []
 	prof_th = []
 
-	f = open('regtest/results/poiseuille-%s.dat' % bc, 'w')
+	basepath = os.path.join('regtest/results/poiseuille', drive, precision)
+
+	if not os.path.exists(basepath):
+		os.makedirs(basepath)
+
+	f = open(os.path.join(basepath, '%s.dat' % bc), 'w')
 
 	print '* Testing "%s" for visc' % bc,
 
 	for visc in numpy.logspace(-3, -1, num=POINTS):
 		print '%f ' % visc,
 
-		sim = LTestPoiSim(visc, bc)
+		iters = int(1000 / visc)
+		iters = 50000
+		xvec.append(visc)
+
+		defaults['bc_wall'] = bc
+		defaults['visc'] = visc
+		defaults['max_iters'] = iters
+		defaults['precision'] = precision
+
+		sim = LTestPoiSim([], defaults)
 		sim.run()
 
-		xvec.append(visc)
 		yvec.append(sim.result)
 
-		sim2 = LTestPoiSim(visc, bc, static=True)
-		sim2.run()
+		prof_sim.append(sim.get_profile())
+		prof_th.append(sim.geo.get_velocity_profile())
 
-		yvec2.append(sim2.result)
-
-		prof_sim.append(sim2.get_profile())
-		prof_th.append(sim2.geo.get_velocity_profile())
-
-		print >>f, visc, sim.result, sim2.result
+		print >>f, visc, sim.result
 
 	print
 
-	f.close()
-
-	plt.clf()
-	plt.cla()
-
-	args = []
 
 	plt.gca().yaxis.grid(True)
 	plt.gca().xaxis.grid(True)
@@ -82,7 +90,17 @@ for bc in bcs:
 		plt.clf()
 		plt.plot(prof_th[i] - prof_sim[i], 'bo-')
 		plt.title('visc = %f' % xvec[i])
-		plt.savefig('regtest/results/poiseuille-%s-profile%d.pdf' % (bc, i), format='pdf')
+		plt.savefig(os.path.join(basepath, '%s-profile%d.pdf' % (bc, i)), format='pdf')
+
+		f2 = open(os.path.join(basepath, '%s-profile%d.dat' % (bc, i)), 'w')
+		for j in range(0, len(prof_sim[i])):
+			print >>f2, prof_sim[i][j], prof_th[i][j]
+		f2.close()
+
+		plt.clf()
+		plt.cla()
+
+	f.close()
 
 	plt.clf()
 	plt.cla()
@@ -93,41 +111,15 @@ for bc in bcs:
 	plt.gca().yaxis.grid(True, which='minor')
 	plt.gca().xaxis.grid(True)
 	plt.gca().xaxis.grid(True, which='minor')
-	plt.ylabel('max velocity / theoretical max velocity')
+	plt.ylabel('max velocity / theoretical max velocity - 1')
 	plt.xlabel('viscosity')
-	plt.savefig('regtest/results/poiseuille-%s.pdf' % bc, format='pdf')
+	plt.savefig(os.path.join(basepath, '%s.pdf' % bc), format='pdf')
 
-	plt.clf()
-	plt.semilogx(xvec, yvec2, 'bo-')
-	plt.title('%d iters' % MAX_ITERS)
-	plt.ylabel('max velocity / theoretical max velocity')
-	plt.xlabel('viscosity')
-	plt.savefig('regtest/results/poiseuille-%s-static.pdf' % bc, format='pdf')
+parser = OptionParser()
+parser.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
+(options, args) = parser.parse_args()
 
-	xvec = []
-	yvec = []
+print 'Running tests for %s precision' % options.precision
 
-	print '  Testing error scaling'
-
-	for lat_w in range(64, 1024, 64):
-		sim = LTestPoiSim(0.005, bc, static=True, lat_w=lat_w, lat_h=32)
-		sim.run()
-
-		rel_err = math.sqrt(numpy.max(
-			numpy.power(sim.vx[16,1:lat_w-1], 2) +
-			numpy.power(sim.vy[16,1:lat_w-1] - sim.geo.get_velocity_profile()[1:lat_w-1], 2))) / LBMGeoPoiseuille.maxv
-
-		xvec.append(1.0/sim.geo.get_chan_width())
-		yvec.append(rel_err)
-
-	f = open('regtest/results/poiseuille-%s-error.dat' % bc, 'w')
-	for x, y in zip(xvec, yvec):
-		print >>f, x, y
-	f.close()
-
-	plt.clf()
-	plt.plot(xvec, yvec, 'bo-')
-	plt.title('Relative error')
-	plt.ylabel('error')
-	plt.xlabel('lattice spacing')
-	plt.savefig('regtest/results/poiseuille-%s-error.pdf' % bc, format='pdf')
+for bc in bcs:
+	run_test(bc, 'force', options.precision)
