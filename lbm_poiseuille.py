@@ -25,7 +25,9 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 				self.set_geo((0, i), self.NODE_WALL)
 				self.set_geo((self.lat_w-1, i), self.NODE_WALL)
 
-		if self.options.pressure:
+		# If the flow is driven by a pressure difference, add pressure boundary conditions
+		# at the ends of the pipe.
+		if self.options.drive == 'pressure':
 			if self.options.horizontal:
 				pressure = self.maxv * (8.0 * self.options.visc) / (self.get_chan_width()**2) * self.lat_w
 
@@ -40,8 +42,9 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 					self.set_geo((i, self.lat_h-1), self.NODE_PRESSURE, (1.0/3.0) - pressure/2.0)
 
 	def init_dist(self, dist):
-		if self.options.static:
-			if self.options.pressure:
+		if self.options.stationary:
+			if self.options.drive == 'pressure':
+				# Start with correct pressure profile.
 				pressure = self.maxv * (8.0 * self.options.visc) / (self.get_chan_width()**2)
 
 				if self.options.horizontal:
@@ -53,6 +56,7 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 						self.velocity_to_dist((0, y), (0.0, 0.0), dist, rho=(1.0 + 3.0 * pressure * (self.lat_h/2.0 - y)))
 						self.fill_dist((0, y), dist, (slice(None), y))
 			else:
+				# Start with correct velocity profile.
 				profile = self.get_velocity_profile()
 
 				if self.options.horizontal:
@@ -64,6 +68,7 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 						self.velocity_to_dist((x, 0), (0.0, profile[x]), dist)
 					self.fill_dist((slice(None), 0), dist)
 		else:
+			# Start with fluid at rest everywhere and no pressure gradients.
 			self.velocity_to_dist((0, 0), (0.0, 0.0), dist)
 			self.fill_dist((0, 0), dist)
 
@@ -106,11 +111,9 @@ class LPoiSim(lbm.LBMSim):
 
 	def __init__(self, geo_class, args=sys.argv[1:], defaults=None):
 		opts = []
-		opts.append(optparse.make_option('--test', dest='test', action='store_true', default=False, help='generate test data'))
 		opts.append(optparse.make_option('--horizontal', dest='horizontal', action='store_true', default=False, help='use horizontal channel'))
-		opts.append(optparse.make_option('--static', dest='static', action='store_true', default=False, help='start with the correct velocity profile in the whole simulation domain'))
-		opts.append(optparse.make_option('--pressure', dest='pressure', action='store_true', default=False, help='use a pressure gradient instead of a body force to drive the flow'))
-
+		opts.append(optparse.make_option('--stationary', dest='stationary', action='store_true', default=False, help='start with the correct velocity profile in the whole simulation domain'))
+		opts.append(optparse.make_option('--drive', dest='drive', type='choice', choices=['force', 'pressure'], default='force'))
 
 		if defaults is not None:
 			defaults_ = defaults
@@ -119,55 +122,20 @@ class LPoiSim(lbm.LBMSim):
 
 		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, args=args, defaults=defaults_)
 
-		if self.options.test or self.options.benchmark:
+		if self.options.drive == 'force':
 			self._init_geo()
-
-			if not self.options.pressure:
-				self.options.periodic_y = not self.options.horizontal
-				self.options.periodic_x = self.options.horizontal
-
-				if self.options.horizontal:
-					self.options.accel_x = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
-					if self.options.test:
-						self.add_iter_hook(self.options.max_iters-1, self.output_profile_horiz)
-				else:
-					self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
-					if self.options.test:
-						self.add_iter_hook(self.options.max_iters-1, self.output_profile_vert)
-
-			if self.options.test:
-				self.add_iter_hook(1000, self.output_pars, every=True)
+			self.options.periodic_y = not self.options.horizontal
+			self.options.periodic_x = self.options.horizontal
+			if self.options.horizontal:
+				self.options.accel_x = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
 			else:
-				self.options.max_iters = 0
+				self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
 
 	def get_profile(self):
 		if self.options.horizontal:
 			return self.vx[:,int(self.options.lat_w/2)]
 		else:
 			return self.vy[int(self.options.lat_h/2),:]
-
-	def output_pars(self):
-		print numpy.max(self.geo.mask_array_by_fluid(self.vx)),	numpy.max(self.geo.mask_array_by_fluid(self.vy)) / 0.02, numpy.average(self.geo.mask_array_by_fluid(self.rho))
-
-	def output_profile_vert(self):
-		print '# Re = %d' % self.geo.get_reynolds(self.options.visc)
-
-		for i, (x, y, z) in enumerate(zip(
-				self.vx[int(self.options.lat_h/2),:],
-				self.vy[int(self.options.lat_h/2),:],
-				self.rho[int(self.options.lat_h/2),:],
-				)):
-			print i, x, y, z
-
-	def output_profile_horiz(self):
-		print '# Re = %d' % self.geo.get_reynolds(self.options.visc)
-
-		for i, (x, y, z) in enumerate(zip(
-				self.vx[:,int(self.options.lat_w/2)],
-				self.vy[:,int(self.options.lat_w/2)],
-				self.rho[:,int(self.options.lat_w/2)],
-				)):
-			print i, x, y, z
 
 if __name__ == '__main__':
 	sim = LPoiSim(LBMGeoPoiseuille)
