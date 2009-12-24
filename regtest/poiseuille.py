@@ -47,9 +47,10 @@ def run_test(bc, drive, precision):
 	prof_th = []
 
 	basepath = os.path.join('regtest/results/poiseuille', drive, precision)
+	profpath = os.path.join(basepath, 'profiles')
 
-	if not os.path.exists(basepath):
-		os.makedirs(basepath)
+	if not os.path.exists(profpath):
+		os.makedirs(profpath)
 
 	f = open(os.path.join(basepath, '%s.dat' % bc), 'w')
 
@@ -89,9 +90,9 @@ def run_test(bc, drive, precision):
 		plt.clf()
 		plt.plot(prof_th[i] - prof_sim[i], 'bo-')
 		plt.title('visc = %f' % xvec[i])
-		plt.savefig(os.path.join(basepath, '%s-profile%d.pdf' % (bc, i)), format='pdf')
+		plt.savefig(os.path.join(profpath, '%s-profile%d.pdf' % (bc, i)), format='pdf')
 
-		f2 = open(os.path.join(basepath, '%s-profile%d.dat' % (bc, i)), 'w')
+		f2 = open(os.path.join(profpath, '%s-profile%d.dat' % (bc, i)), 'w')
 		for j in range(0, len(prof_sim[i])):
 			print >>f2, prof_sim[i][j], prof_th[i][j]
 		f2.close()

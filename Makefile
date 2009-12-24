@@ -2,8 +2,8 @@
 .PHONY: clean regtest
 
 regtest:
-	[ ! -d regtest/results ] && mkdir regtest/results || :
 	python -u regtest/poiseuille.py
+	python -u regtest/poiseuille.py --precision=double
 
 clean:
 	rm -f *.pyc
