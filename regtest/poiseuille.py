@@ -72,7 +72,7 @@ def run_test(bc, drive, precision):
 		yvec.append(sim.result)
 
 		prof_sim.append(sim.get_profile())
-		prof_th.append(sim.geo.get_velocity_profile())
+		prof_th.append(sim.geo.get_velocity_profile(fluid_only=True))
 
 		print >>f, visc, sim.result
 

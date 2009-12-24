@@ -72,7 +72,7 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 			self.velocity_to_dist((0, 0), (0.0, 0.0), dist)
 			self.fill_dist((0, 0), dist)
 
-	def get_velocity_profile(self):
+	def get_velocity_profile(self, fluid_only=False):
 		width = self.get_chan_width()
 		lat_width = self.get_width()
 		ret = []
@@ -85,6 +85,10 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 		for x in range(0, lat_width):
 			tx = x+h
 			ret.append(4.0*self.maxv/width**2 * tx * (width-tx))
+
+		# Remove data corresponding to non-fluid nodes if necessary.
+		if fluid_only and not bc.wet_nodes:
+			return ret[1:-1]
 
 		return ret
 
@@ -132,10 +136,16 @@ class LPoiSim(lbm.LBMSim):
 				self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
 
 	def get_profile(self):
-		if self.options.horizontal:
-			return self.vx[:,int(self.options.lat_w/2)]
+		if geo.get_bc(self.options.bc_wall).wet_nodes:
+			if self.options.horizontal:
+				return self.vx[:,int(self.options.lat_w/2)]
+			else:
+				return self.vy[int(self.options.lat_h/2),:]
 		else:
-			return self.vy[int(self.options.lat_h/2),:]
+			if self.options.horizontal:
+				return self.vx[1:-1,int(self.options.lat_w/2)]
+			else:
+				return self.vy[int(self.options.lat_h/2),1:-1]
 
 if __name__ == '__main__':
 	sim = LPoiSim(LBMGeoPoiseuille)
