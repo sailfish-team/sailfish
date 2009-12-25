@@ -30,7 +30,6 @@ class LTestPoiSim(LPoiSim):
 		self.th_maxv = max(self.geo.get_velocity_profile())
 		self.result = self.res_maxv / self.th_maxv - 1.0
 
-bcs = [x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_WALL in x.supported_types]
 defaults = {
 		'stationary': True,
 		'batch': True,
@@ -62,6 +61,7 @@ def run_test(bc, drive, precision):
 		iters = int(1000 / visc)
 		xvec.append(visc)
 
+		defaults['drive'] = drive
 		defaults['bc_wall'] = bc
 		defaults['visc'] = visc
 		defaults['max_iters'] = iters
@@ -117,9 +117,15 @@ def run_test(bc, drive, precision):
 
 parser = OptionParser()
 parser.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
+parser.add_option('--drive', dest='drive', help='drive', type='choice', choices=['force', 'pressure'], default='force')
 (options, args) = parser.parse_args()
+
+if options.drive == 'force':
+	bcs = [x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_WALL in x.supported_types]
+else:
+	bcs = [x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_PRESSURE in x.supported_types]
 
 print 'Running tests for %s precision' % options.precision
 
 for bc in bcs:
-	run_test(bc, 'force', options.precision)
+	run_test(bc, options.drive, options.precision)
