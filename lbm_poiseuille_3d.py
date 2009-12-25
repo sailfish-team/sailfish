@@ -43,7 +43,7 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 			self.fill_geo((0, slice(None), slice(None)))
 
 	def init_dist(self, dist):
-		if self.options.static:
+		if self.options.stationary:
 
 			radius = self.get_width() / 2.0
 			if self.options.along_z:
@@ -114,10 +114,10 @@ class LPoiSim(lbm.LBMSim):
 
 	def __init__(self, geo_class, args=sys.argv[1:], defaults=None):
 		opts = []
-		opts.append(optparse.make_option('--test', dest='test', action='store_true', default=False, help='generate test data'))
+		opts.append(optparse.make_option('--drive', dest='drive', type='choice', choices=['force'], default='force'))
 		opts.append(optparse.make_option('--along_y', dest='along_y', action='store_true', default=False, help='flow along the Y direction'))
 		opts.append(optparse.make_option('--along_z', dest='along_z', action='store_true', default=False, help='flow along the Z direction'))
-		opts.append(optparse.make_option('--static', dest='static', action='store_true', default=False, help='start with the correct velocity profile in the whole simulation domain'))
+		opts.append(optparse.make_option('--stationary', dest='stationary', action='store_true', default=False, help='start with the correct velocity profile in the whole simulation domain'))
 
 		if defaults is not None:
 			defaults_ = defaults
@@ -126,7 +126,7 @@ class LPoiSim(lbm.LBMSim):
 
 		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, args=args, defaults=defaults_)
 
-		if self.options.test or self.options.benchmark:
+		if self.options.drive == 'force':
 			self._init_geo()
 			accel = geo_class.maxv * (16.0 * self.options.visc) / (self.geo.get_chan_width()**2)
 
