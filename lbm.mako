@@ -419,22 +419,31 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	%endfor
 
 	// Relexate the non-conserved moments,
-	%if bc_velocity == 'equilibrium' or bc_pressure == 'equilibrium':
-		if (isVelocityOrPressureNode(node_type)) {
+	%if bc_velocity == 'equilibrium':
+		if (isVelocityNode(node_type)) {
 			%for i, coll in enumerate(sym.GRID.mrt_collision):
 				%if coll != 0:
 					fm.${sym.GRID.mrt_names[i]} = feq.${sym.GRID.mrt_names[i]};
 				%endif
 			%endfor
-		} else
+		}
 	%endif
-	{
-		%for i, name in enumerate(sym.GRID.mrt_names):
-			%if sym.GRID.mrt_collision[i] != 0:
-				fm.${name} -= ${sym.make_float(sym.GRID.mrt_collision[i])} * (fm.${name} - feq.${name});
-			%endif
-		%endfor
-	}
+
+	%if bc_pressure == 'equilibrium':
+		if (isPressureNode(node_type)) {
+			%for i, coll in enumerate(sym.GRID.mrt_collision):
+				%if coll != 0:
+					fm.${sym.GRID.mrt_names[i]} = feq.${sym.GRID.mrt_names[i]};
+				%endif
+			%endfor
+		}
+	%endif
+
+	%for i, name in enumerate(sym.GRID.mrt_names):
+		%if sym.GRID.mrt_collision[i] != 0:
+			fm.${name} -= ${sym.make_float(sym.GRID.mrt_collision[i])} * (fm.${name} - feq.${name});
+		%endif
+	%endfor
 
 	#undef mx
 	#undef my

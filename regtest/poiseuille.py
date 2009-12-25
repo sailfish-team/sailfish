@@ -79,7 +79,6 @@ def run_test(bc, drive, precision):
 
 	print
 
-
 	plt.gca().yaxis.grid(True)
 	plt.gca().xaxis.grid(True)
 	plt.gca().xaxis.grid(True, which='minor')

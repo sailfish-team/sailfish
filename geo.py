@@ -98,7 +98,8 @@ class LBMGeo(object):
 			'map': self.map,
 			'_params': self._params,
 			'_force_nodes': self._force_nodes,
-			'_num_velocities': self._num_velocities
+			'_num_velocities': self._num_velocities,
+			'_num_pressures': self._num_pressures
 		}
 		return rdict
 
@@ -146,6 +147,15 @@ class LBMGeo(object):
 		self._velocity_map = numpy.zeros(shape=([self.dim] + list(self.map.shape)), dtype=self.float)
 		self._pressure_map = numpy.zeros(shape=self.map.shape, dtype=self.float)
 		self._num_velocities = 0
+		self._num_pressures = 0
+
+	@property
+	def has_pressure_nodes(self):
+		return self._num_pressures > 0
+
+	@property
+	def has_velocity_nodes(self):
+		return self._num_velocities > 0
 
 	def reset(self):
 		"""Perform a full reset of the geometry."""
@@ -370,6 +380,7 @@ class LBMGeo(object):
 			self.map[midx] = self.map[midx] + i
 			i += 1
 
+		self._num_pressures = i - (self._num_velocities+1)
 		self._params = ret
 		return ret
 

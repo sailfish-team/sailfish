@@ -304,8 +304,17 @@ class LBMSim(object):
 		ctx['backend'] = self.options.backend
 		ctx['geo_params'] = self.geo_params
 		ctx['bc_wall'] = self.options.bc_wall
-		ctx['bc_velocity'] = self.options.bc_velocity
-		ctx['bc_pressure'] = self.options.bc_pressure
+
+		if self.geo.has_velocity_nodes:
+			ctx['bc_velocity'] = self.options.bc_velocity
+		else:
+			ctx['bc_velocity'] = None
+
+		if self.geo.has_pressure_nodes:
+			ctx['bc_pressure'] = self.options.bc_pressure
+		else:
+			ctx['bc_pressure'] = None
+
 
 		ctx['bc_wall_'] = geo.get_bc(self.options.bc_wall)
 		ctx['bc_velocity_'] = geo.get_bc(self.options.bc_velocity)
