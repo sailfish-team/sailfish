@@ -20,7 +20,7 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 	maxv = 0.02
 
 	def _define_nodes(self):
-		radiussq = (self.get_width() / 2 - 1)**2
+		radiussq = (self.get_chan_width() / 2.0)**2
 
 		if self.options.along_z:
 			for x in range(0, self.lat_w):
@@ -45,7 +45,8 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 	def init_dist(self, dist):
 		if self.options.stationary:
 			h = -0.5
-			radius = self.get_width() / 2.0
+			radius = self.get_chan_width() / 2.0
+
 			if self.options.along_z:
 				for x in range(0, self.lat_w):
 					for y in range(0, self.lat_h):
@@ -77,6 +78,10 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 			self.velocity_to_dist((0, 0, 0), (0.0, 0.0, 0.0), dist)
 			self.fill_dist((0, 0, 0), dist)
 
+	# Schematic drawing of the simulated system with both on-grid and mid-grid
+	# bondary conditions.
+	#
+	# Columns:
 	# 1st: linear distance from one of the pipe walls
 	# 2nd: radial distance from the axis of the pipe
 	# 3rd: node index
@@ -112,7 +117,6 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 	# fff   4.0  1.5  4		|-----
 	# -		4.5	 2.0		|---
 	# wwww  5.0  2.5  5		|-
-
 
 	def get_velocity_profile(self, fluid_only=False):
 		x = self.lat_w/2
@@ -154,7 +158,7 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 
 class LPoiSim(lbm.LBMSim):
 
-	filename = 'poiseuille'
+	filename = 'poiseuille3d'
 
 	def __init__(self, geo_class, args=sys.argv[1:], defaults=None):
 		opts = []
