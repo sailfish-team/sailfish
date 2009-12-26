@@ -10,18 +10,18 @@ regtest2d_double:
 	python -u regtest/poiseuille.py --dim=2 --model=mrt --precision=double
 
 regtest3d_single:
-	python -u regtest/poiseuille.py --dim=3 --grid=D3Q13 --model=mrt
-	python -u regtest/poiseuille.py --dim=3 --grid=D3Q15
-	python -u regtest/poiseuille.py --dim=3 --grid=D3Q15 --model=mrt
-	python -u regtest/poiseuille.py --dim=3 --grid=D3Q19
-	python -u regtest/poiseuille.py --dim=3 --grid=D3Q19 --model=mrt
+	python -u regtest/poiseuille.py --dim=3 --grid=D3Q13 --model=mrt --bc=fullbb
+	python -u regtest/poiseuille.py --dim=3 --grid=D3Q15 --bc=fullbb
+	python -u regtest/poiseuille.py --dim=3 --grid=D3Q15 --model=mrt --bc=fullbb
+	python -u regtest/poiseuille.py --dim=3 --grid=D3Q19 --bc=fullbb
+	python -u regtest/poiseuille.py --dim=3 --grid=D3Q19 --model=mrt --bc=fullbb
 
 regtest3d_double:
-	python -u regtest/poiseuille.py --dim=3 --grid=D3Q13 --model=mrt --precision=double
-	python -u regtest/poiseuille.py --dim=3 --grid=D3Q15 --precision=double
-	python -u regtest/poiseuille.py --dim=3 --grid=D3Q15 --model=mrt --precision=double
-	python -u regtest/poiseuille.py --dim=3 --grid=D3Q19 --precision=double
-	python -u regtest/poiseuille.py --dim=3 --grid=D3Q19 --model=mrt --precision=double
+	python -u regtest/poiseuille.py --dim=3 --grid=D3Q13 --model=mrt --precision=double --bc=fullbb
+	python -u regtest/poiseuille.py --dim=3 --grid=D3Q15 --precision=double --bc=fullbb
+	python -u regtest/poiseuille.py --dim=3 --grid=D3Q15 --model=mrt --precision=double --bc=fullbb
+	python -u regtest/poiseuille.py --dim=3 --grid=D3Q19 --precision=double --bc=fullbb
+	python -u regtest/poiseuille.py --dim=3 --grid=D3Q19 --model=mrt --precision=double --bc=fullbb
 
 clean:
 	rm -f *.pyc
