@@ -44,50 +44,94 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 
 	def init_dist(self, dist):
 		if self.options.stationary:
-
+			h = -0.5
 			radius = self.get_width() / 2.0
 			if self.options.along_z:
 				for x in range(0, self.lat_w):
 					for y in range(0, self.lat_h):
-						rc = math.sqrt((x-self.lat_w/2)**2 + (y-self.lat_h/2)**2)
+						rc = math.sqrt((x-self.lat_w/2.0-h)**2 + (y-self.lat_h/2.0-h)**2)
 						if rc > radius:
 							self.velocity_to_dist((x, y, 0), (0.0, 0.0, 0.0), dist)
 						else:
-							self.velocity_to_dist((x, y, 0), (0.0, 0.0, self.get_velocity_profile(rc)), dist)
+							self.velocity_to_dist((x, y, 0), (0.0, 0.0, self.get_velocity(rc)), dist)
 				self.fill_dist((slice(None), slice(None), 0), dist)
 			elif self.options.along_y:
 				for x in range(0, self.lat_w):
 					for z in range(0, self.lat_d):
-						rc = math.sqrt((x-self.lat_w/2)**2 + (z-self.lat_d/2)**2)
+						rc = math.sqrt((x-self.lat_w/2.0-h)**2 + (z-self.lat_d/2.0-h)**2)
 						if rc > radius:
 							self.velocity_to_dist((x, 0, z), (0.0, 0.0, 0.0), dist)
 						else:
-							self.velocity_to_dist((x, 0, z), (0.0, self.get_velocity_profile(rc), 0.0), dist)
+							self.velocity_to_dist((x, 0, z), (0.0, self.get_velocity(rc), 0.0), dist)
 				self.fill_dist((slice(None), 0, slice(None)), dist)
 			else:
 				for z in range(0, self.lat_d):
 					for y in range(0, self.lat_h):
-						rc = math.sqrt((z-self.lat_d/2)**2 + (y-self.lat_h/2)**2)
+						rc = math.sqrt((z-self.lat_d/2.0-h)**2 + (y-self.lat_h/2.0-h)**2)
 						if rc > radius:
 							self.velocity_to_dist((0, y, z), (0.0, 0.0, 0.0), dist)
 						else:
-							self.velocity_to_dist((0, y, z), (self.get_velocity_profile(rc), 0.0, 0.0), dist)
+							self.velocity_to_dist((0, y, z), (self.get_velocity(rc), 0.0, 0.0), dist)
 				self.fill_dist((0, slice(None), slice(None)), dist)
 		else:
 			self.velocity_to_dist((0, 0, 0), (0.0, 0.0, 0.0), dist)
 			self.fill_dist((0, 0, 0), dist)
 
-	def get_velocity_profile(self, r):
+	# 1st: linear distance from one of the pipe walls
+	# 2nd: radial distance from the axis of the pipe
+	# 3rd: node index
+	#
+	# width: 6
+	#
+	# Midgrid BC:
+	# chan_width: 4
+	#
+	# wwww -0.5  2.5  0     -
+	# -		0    2.0		|-
+	# fff   0.5  1.5  1		|----
+	# -		1    1.0		|-----
+	# fff   1.5  0.5  2		|------
+	# -		2	 0.0		|------*
+	# fff   2.5  0.5  3		|------
+	# -		3	 1.0		|-----
+	# fff   3.5  1.5  4		|----
+	# -		4    2.0		|-
+	# wwww  4.5  2.5  5     -
+	#
+	# On-grid BC:
+	# chan_width: 5
+	#
+	# wwww  0.0  2.5  0		|-
+	# -		0.5	 2.0		|---
+	# fff   1.0  1.5  1		|-----
+	# -		1.5	 1.0		|------
+	# fff   2.0  0.5  2		|-------
+	# -		2.5	 0.0		|-------*
+	# fff   3.0  0.5  3		|-------
+	# -		3.5	 1.0		|------
+	# fff   4.0  1.5  4		|-----
+	# -		4.5	 2.0		|---
+	# wwww  5.0  2.5  5		|-
+
+
+	def get_velocity_profile(self, fluid_only=False):
+		x = self.lat_w/2
+		if fluid_only:
+			zvals = range(1, self.lat_d-1)
+		else:
+			zvals = range(0, self.lat_d)
+
+		ret = []
+
+		for z in zvals:
+			rc = math.sqrt((x-self.lat_w/2.0+0.5)**2 + (z-self.lat_d/2.0+0.5)**2)
+			ret.append(self.get_velocity(rc))
+
+		return ret
+
+	def get_velocity(self, r):
 		width = self.get_chan_width()
-		lat_width = self.get_width()
-		h = 0
-
-		bc = geo.get_bc(self.options.bc_wall)
-		if bc.midgrid:
-			h = -0.5
-
-		tx = r+h
-		return self.maxv/(width/2.0)**2 * ((width/2.0)**2 - tx**2)
+		return self.maxv/(width/2.0)**2 * ((width/2.0)**2 - r**2)
 
 	def get_chan_width(self):
 		width = self.get_width() - 1
@@ -139,6 +183,14 @@ class LPoiSim(lbm.LBMSim):
 			else:
 				self.options.periodic_x = True
 				self.options.accel_x = accel
+
+	def get_profile(self):
+		# NOTE: This only works for the 'along_y' option.
+		if geo.get_bc(self.options.bc_wall).wet_nodes:
+			return self.vy[:,int(self.options.lat_h/2),int(self.options.lat_w/2)]
+		else:
+			return self.vy[1:-1,int(self.options.lat_h/2),int(self.options.lat_w/2)]
+
 
 
 if __name__ == '__main__':
