@@ -13,9 +13,10 @@ import matplotlib.pyplot as plt
 
 sys.path.append('.')
 import geo
+import sym
 
 MAX_ITERS = 10000
-POINTS = 10
+POINTS = 30
 
 defaults = {
 		'stationary': True,
@@ -25,10 +26,10 @@ defaults = {
 		'lat_h': 64,
 	}
 
-def run_test(bc, drive, precision, name):
+def run_test(bc, drive, precision, model, grid, name):
 	xvec = []
 	yvec = []
-	basepath = os.path.join('regtest/results', name, drive, precision)
+	basepath = os.path.join('regtest/results', name, grid, model, drive, precision)
 	profpath = os.path.join(basepath, 'profiles')
 
 	if not os.path.exists(profpath):
@@ -36,6 +37,8 @@ def run_test(bc, drive, precision, name):
 
 	f = open(os.path.join(basepath, '%s.dat' % bc), 'w')
 
+	defaults['grid'] = grid
+	defaults['model'] = model
 	defaults['drive'] = drive
 	defaults['bc_wall'] = bc
 	if drive == 'pressure':
@@ -55,7 +58,6 @@ def run_test(bc, drive, precision, name):
 		defaults['max_iters'] = iters
 
 		sim = LTestPoiSim([], defaults)
-		prof_th = sim.geo.get_velocity_profile(fluid_only=True)
 		sim.run()
 
 		yvec.append(sim.result)
@@ -94,7 +96,6 @@ def run_test(bc, drive, precision, name):
 	plt.cla()
 
 	plt.semilogx(xvec, yvec, 'bo-')
-	plt.title('%d iters' % MAX_ITERS)
 	plt.gca().yaxis.grid(True)
 	plt.gca().yaxis.grid(True, which='minor')
 	plt.gca().xaxis.grid(True)
@@ -106,6 +107,8 @@ def run_test(bc, drive, precision, name):
 parser = OptionParser()
 parser.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
 parser.add_option('--drive', dest='drive', help='drive', type='choice', choices=['force', 'pressure'], default='force')
+parser.add_option('--model', dest='model', help='model', type='choice', choices=['mrt', 'bgk'], default='bgk')
+parser.add_option('--grid', dest='grid', help='grid', type='string', default='')
 parser.add_option('--dim', dest='dim', help='dimensionality', type='choice', choices=['2','3'], default='2')
 parser.add_option('--bc', dest='bc', help='boundary conditions to test (comma separated', type='string', default='')
 (options, args) = parser.parse_args()
@@ -120,6 +123,11 @@ else:
 	defaults['along_x'] = False
 	defaults['lat_d'] = 64
 	name = 'poiseuille3d'
+
+if options.grid:
+	grid = options.grid
+else:
+	grid = sym.GRID.__name__
 
 if options.drive == 'force':
 	geo_type = geo.LBMGeo.NODE_WALL
@@ -149,4 +157,4 @@ class LTestPoiSim(LPoiSim):
 print 'Running tests for %s, %s' % (options.precision, options.drive)
 
 for bc in bcs:
-	run_test(bc, options.drive, options.precision, name)
+	run_test(bc, options.drive, options.precision, options.model, grid, name)
