@@ -136,7 +136,7 @@ class LBMSim(object):
 		group.add_option('--every', dest='every', help='update the visualization every N steps', metavar='N', type='int', action='store', default=100)
 		group.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
 		group.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=vis2d.vis_map.keys(), action='store', default='std')
-		group.add_option('--vis3d', dest='vis3d', help='3D visualization engine', type='choice', choices=['mayavi', 'cutplane'], action='store', default='mayavi')
+		group.add_option('--vis3d', dest='vis3d', help='3D visualization engine', type='choice', choices=['mayavi', 'cutplane'], action='store', default='cutplane')
 		parser.add_option_group(group)
 
 		group = OptionGroup(parser, 'Simulation-specific options')
