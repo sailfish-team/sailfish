@@ -1,0 +1,3 @@
+Known bugs / unfinished code
+----------------------------
+* Zou-He and equilibrium BCs are broken for 3D due to lack of node direction detection.
