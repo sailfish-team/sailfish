@@ -27,11 +27,11 @@ def cd_theoretical(diam_ratio, re):
 	"""
 	cd = 24.0 / re * (1.0 + 0.15 * re**0.687)
 
-	if re < 50 and diam_ratio < 0.6:
+	if re <= 50 and diam_ratio <= 0.6:
 		K = (1.0 - 0.75857 * diam_ratio**5) / (1.0 - 2.1050*diam_ratio + 2.00865*diam_ratio**3 - 1.7068*diam_ratio**5 + 0.72603*diam_ratio**6)
 		return cd + 24.0 / re * (K - 1.0)
 
-	if re > 100 and re < 800:
+	if re >= 100 and re <= 800:
 		return cd * 1.0 / (1.0 - 1.6*diam_ratio**1.6)
 
 	return None
@@ -42,6 +42,8 @@ def sphere_diam(width, bc):
 	if bc.midgrid:
 		w -= 1
 
+#	w -= (w%4)
+
 	return w/2.0
 
 class LBMGeoSphere(geo.LBMGeo3D):
@@ -51,7 +53,7 @@ class LBMGeoSphere(geo.LBMGeo3D):
 	def _define_nodes(self):
 		radiussq = ((self.chan_diam)/2)**2
 		diam = sphere_diam(self.width, geo.get_bc(self.options.bc_velocity))
-		x0 = 2.4*diam
+		x0 = int(2.4*diam)
 		y0 = (self.lat_h - 1) / 2.0
 		z0 = (self.lat_d - 1) / 2.0
 		h = 0.0
@@ -114,7 +116,7 @@ class LBMGeoSphere(geo.LBMGeo3D):
 		self.fill_dist((0, 0, 0), dist)
 
 	def get_reynolds(self, visc):
-		re = int(self.sphere_diam * self.maxv/visc)
+		re = round(self.sphere_diam * self.maxv/visc)
 		if re == 0:
 			return 1
 		else:
@@ -133,26 +135,37 @@ class LBMGeoSphere(geo.LBMGeo3D):
 		if bc.midgrid:
 			 w -= 1
 
+#		w -= (w%4)
+
 		return w
 
 class LSphereSim(lbm.LBMSim):
 	filename = 'sphere3d'
 
-	def __init__(self, geo_class, args=sys.argv[1:]):
+	def __init__(self, geo_class, defaults={}, args=sys.argv[1:]):
 		opts = []
 		opts.append(optparse.make_option('--re', dest='re', type='int', help='Reynolds number', default=100))
-		defaults = {'lat_d': 128,
+		defaults_ = {'lat_d': 128,
 			'lat_h': 128,
 			'lat_w': 512,
 			'max_iters': 320000,
-			'model': 'mrt'}
+			'model': 'mrt',
+			'every': 1000}
+		defaults_.update(defaults)
 
-		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, args=args, defaults=defaults)
+		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, args=args, defaults=defaults_)
+
+		diam = sphere_diam(self.options.lat_h, geo.get_bc(self.options.bc_velocity))
+
+		# If the diameter here is odd, the channel width is even and we will end up
+		# with a sphere of an even diameter so that the system can be symmetric.
+		if diam % 2:
+			diam -= 1.0
 
 		# maxv / visc
-		ratio = self.options.re / sphere_diam(self.options.lat_h, geo.get_bc(self.options.bc_velocity))
+		ratio = self.options.re / diam
 
-		visc = 0.5
+		visc = 0.12
 		maxv = ratio * visc
 
 		# Try to keep the viscosity as high as possible to make sure the computed force
@@ -166,19 +179,28 @@ class LSphereSim(lbm.LBMSim):
 			geo_class.maxv = maxv
 			self.options.visc = visc
 
-		print '# maxv = %s' % geo_class.maxv
+		if self.options.verbose:
+			self._timed_print('# maxv = %s' % geo_class.maxv)
 
 		self.add_iter_hook(self.options.every, self.print_force, every=True)
-		self.add_iter_hook(5, self.print_theoretical_drag)
+
+		if self.options.verbose:
+			self.add_iter_hook(5, self.print_theoretical_drag)
+
+		self.coeffs = []
 
 	def drag_coeff(self, force):
 		return math.sqrt(force[0]*force[0]) * 8.0 / (math.pi *
 				self.geo.maxv**2 * self.geo.sphere_diam**2)
 
+	def drag_theo(self):
+		return cd_theoretical(self.geo.sphere_diam / self.geo.chan_diam,
+				self.geo.get_reynolds(self.options.visc))
+
 	def print_theoretical_drag(self):
-		print '# sphere diam / chan diam: %s / %s' % (self.geo.sphere_diam, self.geo.chan_diam)
-		print '# drag coeff th: %s' % cd_theoretical(self.geo.sphere_diam / self.geo.chan_diam, self.geo.get_reynolds(self.options.visc))
-		print '# re = %s' % (self.geo.sphere_diam * self.geo.maxv/self.options.visc)
+		self._timed_print('# sphere diam / chan diam: %s / %s' % (self.geo.sphere_diam, self.geo.chan_diam))
+		self._timed_print('# drag coeff th: %s' % self.drag_theo())
+		self._timed_print('# re = %s' % (self.geo.sphere_diam * self.geo.maxv/self.options.visc))
 
 	def print_force(self):
 		self.backend.from_buf(self.gpu_dist1)
@@ -191,8 +213,14 @@ class LSphereSim(lbm.LBMSim):
 			prev = self.dist2
 			curr = self.dist1
 
-		force = self.geo.force('sphere', curr, prev)
-		print self.drag_coeff(force)
+		self.force = self.geo.force('sphere', curr, prev)
+		coeff = self.drag_coeff(self.force)
+
+		self.coeffs.append(coeff)
+		self.coeffs = self.coeffs[-10:]
+
+		if self.options.verbose:
+			self._timed_print(coeff)
 
 if __name__ == '__main__':
 	sim = LSphereSim(LBMGeoSphere)
