@@ -1,7 +1,38 @@
-* D2Q9
-  - validate the code against at least 3 standard CFD testcases
-  - make the CFD testcases automated (regtests)
-  - implement the single-grid access pattern (50% space saving)
-  - implement grid refinement
-  - add support for streamlines
+* TASKS
+
+- Regularized boundary conditions for 2D and 3D.
+
+- Incompressible LBM model.
+
+- BC node direction detection in 3D.
+  Add node direction detection for 3D geometries, thus fixing the
+  BC and equilibrium boundary conditions in 3D.
+
+- Add unit tests for 2D geometry.
+  The unit tests currently only cover the 3D geometry.  Add similar
+  tests for 2D.
+
+- Implement the single-grid access pattern.
+  Instead of alternating between two distinct grids, the LBM can be
+  implemented so that only a single grid is used (at an increased
+  computational cost of the kernel).  Implement and test this access
+  pattern for all grids.
+
+- Use the Poiseuille geometry to test velocity BCs.
+  By transforming the standard force-driven test case into a moving
+  frame of reference, the test case can be redefined so that wall
+  nodes are replaced by velocity boundary conditions.  Implement this
+  for the 2D and 3D test cases and add this to the Poiseuille regtest.
+
+- Add a Taylor-Green testcase.
+  See e.g. the D3Q13 PRE paper for more info about this test case.
+
+- Add multi-GPU support / domain decomposition.
+  Make it possible to automatically/manually divide the simulation
+  domain into subdomains which are simulated on separate GPUs.
+
+- Implement grid refinement.
+  Make it possible to define regions of the simulation domain which are
+  to be simulated at a higher spatial and temporal resolution.
+
 
