@@ -459,7 +459,7 @@ class LBMSim(object):
 		i = self._iter
 		kerns = self.kern_map[i & 1]
 
-		if (not self.options.benchmark and i % self.options.every == 0) or get_data:
+		if (not self.options.benchmark and not self.options.batch and i % self.options.every == 0) or get_data:
 			self.backend.run_kernel(kerns[1], self.kern_grid_size)
 			if tracers:
 				self.backend.run_kernel(kerns[2], (self.options.tracers,))
