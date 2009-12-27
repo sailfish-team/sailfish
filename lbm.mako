@@ -140,6 +140,54 @@ ${device_func} inline void bounce_back(Dist *fi)
 	%endfor
 }
 
+${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
+{
+	*rho = ${sym.ex_rho('fi')};
+	%for d in range(0, sym.GRID.dim):
+		v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho')).replace('/*', '/ *')};
+	%endfor
+}
+
+%if bc_wall == 'zouhe' or bc_velocity == 'zouhe' or bc_pressure == 'zouhe':
+${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
+{
+	// Bounce-back of the non-equilibrium parts.
+	switch (orientation) {
+		%for i in range(0, len(sym.GRID.basis)-1):
+			${zouhe_bb(i)}
+		%endfor
+		case ${geo_dir_other}:
+			bounce_back(fi);
+			return;
+	}
+
+	float nvx, nvy;
+	%if dim == 3:
+		float nvz;
+	%endif
+
+	// Compute new macroscopic variables.
+	nvx = ${str(sym.ex_velocity('fi', 0, 'nrho', momentum=True)).replace('/*', '/ *')};
+	nvy = ${str(sym.ex_velocity('fi', 1, 'nrho', momentum=True)).replace('/*', '/ *')};
+	%if dim == 3:
+		nvz = ${str(sym.ex_velocity('fi', 2, 'nrho', momentum=True)).replace('/*', '/ *')};
+	%endif
+
+	// Compute momentum difference.
+	nvx = *rho * v[0] - nvx;
+	nvy = *rho * v[1] - nvy;
+	%if dim == 3:
+		nvz = *rho * v[2] - nvz;
+	%endif
+
+	switch (orientation) {
+		%for i in range(0, len(sym.GRID.basis)-1):
+			${zouhe_fixup(i)}
+		%endfor
+	}
+}
+%endif
+
 //
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
@@ -151,49 +199,47 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 	#define vz v[2]
 
 	if (isFluidOrWallNode(node_type) || orientation == ${geo_dir_other}) {
-		*rho = ${sym.ex_rho('fi')};
-		%for d in range(0, sym.GRID.dim):
-			v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho')).replace('/*', '/ *')};
-		%endfor
-	} else {
+		compute_macro_quant(fi, rho, v);
+	} else if (isVelocityNode(node_type)) {
 		// We're dealing with a boundary node, for which some of the distributions
 		// might be meaningless.  Fill them with the values of the opposite
 		// distributions.
-		%if bc_velocity != 'fullbb':
-			if (isVelocityNode(node_type)) {
-				${fill_missing_distributions()}
-				*rho = ${sym.ex_rho('fi')};
-				${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
+		%if bc_velocity != 'fullbb' and bc_velocity != None:
+			${fill_missing_distributions()}
+			*rho = ${sym.ex_rho('fi')};
+			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
 
-				switch (orientation) {
-					%for i in range(0, sym.GRID.Q-1):
-						case ${i}:
-							*rho = ${sym.ex_rho('fi', missing_dir=i, rho='*rho')};
-							break;
-					%endfor
-				}
+			switch (orientation) {
+				%for i in range(0, sym.GRID.Q-1):
+					case ${i}:
+						*rho = ${sym.ex_rho('fi', missing_dir=i, rho='*rho')};
+						break;
+				%endfor
 			}
+		%else:
+			compute_macro_quant(fi, rho, v);
 		%endif
-		%if bc_pressure != 'fullbb':
-			if (isPressureNode(node_type)) {
-				${fill_missing_distributions()}
-				*rho = ${sym.ex_rho('fi')};
-				float par_rho;
-				${get_boundary_pressure('node_type', 'par_rho')}
+	} else if (isPressureNode(node_type)) {
+		%if bc_pressure != 'fullbb' and bc_pressure != None:
+			${fill_missing_distributions()}
+			*rho = ${sym.ex_rho('fi')};
+			float par_rho;
+			${get_boundary_pressure('node_type', 'par_rho')}
 
-				switch (orientation) {
-					%for i in range(0, sym.GRID.Q-1):
-						case ${i}: {
-							%for d in range(0, sym.GRID.dim):
-								v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho', missing_dir=i, par_rho='par_rho')).replace('/*', '/ *')};
-							%endfor
-							break;
-						 }
-					%endfor
-				}
-
-				*rho = par_rho;
+			switch (orientation) {
+				%for i in range(0, sym.GRID.Q-1):
+					case ${i}: {
+						%for d in range(0, sym.GRID.dim):
+							v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho', missing_dir=i, par_rho='par_rho')).replace('/*', '/ *')};
+						%endfor
+						break;
+					 }
+				%endfor
 			}
+
+			*rho = par_rho;
+		%else:
+			compute_macro_quant(fi, rho, v);
 		%endif
 	}
 
@@ -201,55 +247,33 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 	#undef vy
 	#undef vz
 
-	%if bc_wall == 'zouhe' or bc_velocity == 'zouhe' or bc_pressure == 'zouhe':
+	%if bc_wall == 'zouhe':
 		if (isWallNode(node_type)) {
 			v[0] = 0.0f;
 			v[1] = 0.0f;
 			%if dim == 3:
 				v[2] = 0.0f;
 			%endif
+			zouhe_bb(fi, orientation, rho, v);
 		}
+	%endif
 
-		// Bounce-back of the non-equilibrium parts.
-		switch (orientation) {
-			%for i in range(0, len(sym.GRID.basis)-1):
-				${zouhe_bb(i)}
-			%endfor
-			case ${geo_dir_other}:
-				bounce_back(fi);
-				return;
+	%if bc_velocity == 'zouhe':
+		if (isVelocityNode(node_type)) {
+			zouhe_bb(fi, orientation, rho, v);
 		}
+	%endif
 
-		float nvx, nvy;
-		%if dim == 3:
-			float nvz;
-		%endif
-
-		// Compute new macroscopic variables.
-		nvx = ${str(sym.ex_velocity('fi', 0, 'nrho', momentum=True)).replace('/*', '/ *')};
-		nvy = ${str(sym.ex_velocity('fi', 1, 'nrho', momentum=True)).replace('/*', '/ *')};
-		%if dim == 3:
-			nvz = ${str(sym.ex_velocity('fi', 2, 'nrho', momentum=True)).replace('/*', '/ *')};
-		%endif
-
-		// Compute momentum difference.
-		nvx = *rho * v[0] - nvx;
-		nvy = *rho * v[1] - nvy;
-		%if dim == 3:
-			nvz = *rho * v[2] - nvz;
-		%endif
-
-		switch (orientation) {
-			%for i in range(0, len(sym.GRID.basis)-1):
-				${zouhe_fixup(i)}
-			%endfor
+	%if bc_pressure == 'zouhe':
+		if (isPressureNode(node_type)) {
+			zouhe_bb(fi, orientation, rho, v);
 		}
 	%endif
 
 	${external_force('node_type', 'v[0]', 'v[1]', 'v[2]')}
 }
 
-${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orientation, float rho, float *v)
+${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orientation, float *rho, float *v)
 {
 	%if bc_wall == 'fullbb':
 		if (isWallNode(node_type)) {
@@ -264,10 +288,12 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 	%if bc_velocity == 'fullbb':
 		if (isVelocityNode(node_type)) {
 			bounce_back(fi);
-
+			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
 			%for i, ve in enumerate(sym.GRID.basis):
-				fi->${sym.GRID.idx_name[i]} += rho * ${2.0 * sym.GRID.weights[i] * sym.GRID.v.dot(ve) / sym.GRID.cssq};
+				// * *rho for compressible
+				fi->${sym.GRID.idx_name[i]} += 1.0f * ${sym.make_float(2.0 * sym.GRID.weights[i] * sym.GRID.v.dot(ve) / sym.GRID.cssq)};
 			%endfor
+			*rho = ${sym.ex_rho('fi')};
 		}
 	%endif
 
@@ -286,7 +312,6 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 			%endfor
 		}
 	%endif
-
 
 	#undef vx
 	#undef vy
@@ -611,7 +636,7 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	float rho, v[${dim}];
 
 	getMacro(&fi, type, orientation, &rho, v);
-	boundaryConditions(&fi, type, orientation, rho, v);
+	boundaryConditions(&fi, type, orientation, &rho, v);
 	${barrier()}
 
 	// only save the macroscopic quantities if requested to do so
