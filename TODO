@@ -1,5 +1,11 @@
 * TASKS
 
+- Bring the README up-to-date.
+  Update the README with:
+  - installation instructions for Ubuntu
+  - info about website, mailing list, code repository
+  - more accurate description of the project
+
 - Regularized boundary conditions for 2D and 3D.
 
 - Incompressible LBM model.
