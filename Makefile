@@ -3,11 +3,15 @@
 
 regtest2d_single:
 	python -u regtest/poiseuille.py --dim=2
+	python -u regtest/poiseuille.py --dim=2 --drive=pressure
 	python -u regtest/poiseuille.py --dim=2 --model=mrt
+	python -u regtest/poiseuille.py --dim=2 --model=mrt --drive=pressure
 
 regtest2d_double:
 	python -u regtest/poiseuille.py --dim=2 --precision=double
+	python -u regtest/poiseuille.py --dim=2 --precision=double --drive=pressure
 	python -u regtest/poiseuille.py --dim=2 --model=mrt --precision=double
+	python -u regtest/poiseuille.py --dim=2 --model=mrt --precision=double --drive=pressure
 
 regtest3d_single:
 	python -u regtest/poiseuille.py --dim=3 --grid=D3Q13 --model=mrt --bc=fullbb
