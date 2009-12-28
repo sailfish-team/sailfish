@@ -57,7 +57,14 @@ Contents
 .. toctree::
    :maxdepth: 2
 
-   main
+   intro
+   installation
+   tutorial
+   simulations
+   results
+   models
+   testcases
+   about
 
 Indices and tables
 ==================
