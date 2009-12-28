@@ -126,7 +126,7 @@ basic settings you might want to play with when starting to work with Sailfish a
   specified iterations.  Batch mode requires specifying the ``max_iters`` option.
 * ``--max_iters=N``: the number of iterations the simulation is to be run for in batch mode.
 
-The ``--save_src`` is particularly useful if you want to learn the basic structure of the
+The ``--save_src`` option is particularly useful if you want to learn the basic structure of the
 kernel code.  The ``lbm.mako`` file, which contains the actual code, can be difficult to
 understand at first, as it mixes three languages: Python, the Mako template language and
 CUDA C.  To avoid its complexity, you might want to save the generated compute device code
