@@ -65,6 +65,24 @@ Tests:
 
 * matplotlib
 
+Gentoo installation instructions
+--------------------------------
+
+To install the required packages on a Gentoo system::
+
+  emerge numpy scipy pytables mayavi matplotlib mako pygame pycuda sympy
+
+Ubuntu installation instructions
+--------------------------------
+
+To install the required packages on an Ubuntu system::
+
+  apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-tables python-scipy python-mako
+
+There are currently no (recent enough) packages for sympy and pycuda/pyopencl avaiable for
+Ubuntu, so these have to be installed manually from a checked-out upstream code repository of
+these projects or a snapshot tarball.
+
 Tutorial
 ========
 
