@@ -448,9 +448,15 @@ Boundary conditions
 
 Bounce-back
 -----------
+TODO
+
+Equilibrium
+-----------
+TODO
 
 Zou-He
 ------
+TODO
 
 Test cases
 ==========
