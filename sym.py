@@ -717,7 +717,7 @@ def get_prop_dists(dir):
 
 	for i, ei in enumerate(GRID.basis):
 		if ei[0] == dir and i > 0:
-			ret.append((i, GRID.idx_name[i]))
+			ret.append(i)
 
 	return ret
 

@@ -555,7 +555,7 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 	%endif
 </%def>
 
-<%def name="prop_bnd(effective_dir, i, di, dname, dist_source, offset)">
+<%def name="prop_bnd(effective_dir, i, di, local, offset)">
 ## Generate the propagation code for a specific base direction.
 ##
 ## This is a generic function which should work for any dimensionality and grid
@@ -563,21 +563,16 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 ##
 ## Args:
 ##   effective_dir: X propagation direction (1 for East, -1 for West)
-##   dist_source: 'prop_global' if propagating from global device memory,
-##		'prop_local' if propagating from shared memory local to the kernel
 ##   offset: target offset in the distribution array
 ##   i: index of the base vector along which to propagate
 ##   di: dimension index
-##   dname: name of the base vector along which to propagate
 
 	## This is the final dimension, generate the actual propagation code.
 	%if di == dim:
 		%if dim == 2:
-			set_odist(gi+rel(${effective_dir}, ${sym.GRID.basis[i][1]}, 0)+${offset},
-				${dname}, ${dist_source}(${dname}));
+			${set_odist(i, effective_dir, sym.GRID.basis[i][1], 0, offset, local)}
 		%else:
-			set_odist(gi+rel(${effective_dir}, ${sym.GRID.basis[i][1]}, ${sym.GRID.basis[i][2]})+${offset},
-				${dname}, ${dist_source}(${dname}));
+			${set_odist(i, effective_dir, sym.GRID.basis[i][1], sym.GRID.basis[i][2], offset, local)}
 		%endif
 	## Make a recursive call to prop_bnd to process the remaining dimensions.
 	## The recursive calls are done to generate checks for out-of-domain
@@ -590,18 +585,18 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 			if (${loc_names[di]} > 0) { \
 		%endif
 			## Recursive call for the next dimension.
-			${prop_bnd(effective_dir, i, di+1, dname, dist_source, offset)}
+			${prop_bnd(effective_dir, i, di+1, local, offset)}
 		%if sym.GRID.basis[i][di] != 0:
 			} \
 		%endif
 
 		## In case we are about to propagate outside of the simulation domain,
 		## check for periodic boundary conditions for the current dimension.
-		## If they are enable, update the offset by a value precomputed in 
+		## If they are enabled, update the offset by a value precomputed in
 		## pbc_offsets and proceed to the following dimension.
 		%if periodicity[di] and sym.GRID.basis[i][di] != 0:
 			else {
-				${prop_bnd(effective_dir, i, di+1, dname, dist_source, offset+pbc_offsets[di][int(sym.GRID.basis[i][di])])}
+				${prop_bnd(effective_dir, i, di+1, local, offset+pbc_offsets[di][int(sym.GRID.basis[i][di])])}
 			}
 		%endif
 	%endif
@@ -616,13 +611,28 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 ## Args:
 ##   dir: X propagation direction (1 for East, -1 for West, 0 for orthogonal to X axis)
 ##
-	%for i, dname in sym.get_prop_dists(dir):
+	%for i in sym.get_prop_dists(dir):
 		%if dist_source == 'prop_local':
-			${prop_bnd(0, i, 1, dname, dist_source, offset)}
+			${prop_bnd(0, i, 1, True, offset)}
 		%else:
-			${prop_bnd(dir, i, 1, dname, dist_source, offset)}
+			${prop_bnd(dir, i, 1, False, offset)}
 		%endif
 	%endfor
+</%def>
+
+<%def name="set_odist(idir, xoff, yoff, zoff, offset, local)">
+<%
+	def rel_offset(x, y, z):
+		if sym.GRID.dim == 2:
+			return x + y * lat_w
+		else:
+			return x + lat_w * (y + lat_h*z)
+%>
+	%if local:
+		dist_out[gi + ${dist_size*idir + rel_offset(xoff, yoff, zoff) + offset}] = prop_${sym.GRID.idx_name[idir]}[lx];
+	%else:
+		dist_out[gi + ${dist_size*idir + rel_offset(xoff, yoff, zoff) + offset}] = fi.${sym.GRID.idx_name[idir]};
+	%endif
 </%def>
 
 ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} float *dist_in,
@@ -655,11 +665,11 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	%endif
 
 	// shared variables for in-block propagation
-	%for i, dir in sym.get_prop_dists(1):
-		${shared_var} float prop_${dir}[BLOCK_SIZE];
+	%for i in sym.get_prop_dists(1):
+		${shared_var} float prop_${sym.GRID.idx_name[i]}[BLOCK_SIZE];
 	%endfor
-	%for i ,dir in sym.get_prop_dists(-1):
-		${shared_var} float prop_${dir}[BLOCK_SIZE];
+	%for i in sym.get_prop_dists(-1):
+		${shared_var} float prop_${sym.GRID.idx_name[i]}[BLOCK_SIZE];
 	%endfor
 
 	// cache the distributions in local variables
@@ -688,29 +698,13 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 
 	${relaxate()}
 
-	%for i, dname in enumerate(sym.GRID.idx_name):
-		#define dir_${dname} ${i}
-	%endfor
-
-	#define dir_idx(idx) dir_##idx
-	#define set_odist(idx, dir, val) dist_out[DIST_SIZE*dir_idx(dir) + idx] = val
-
-	#define prop_global(dir) fi.dir
-	#define prop_local(dir) prop_##dir[lx]
-
-	%if dim == 2:
-		#define rel(x,y,z) ((x) + ${lat_w}*(y))
-	%else:
-		#define rel(x,y,z) ((x) + ${lat_w}*(y) + ${lat_w*lat_h}*(z))
-	%endif
-
 	// update the 0-th direction distribution
-	set_odist(gi, fC, fi.fC);
+	dist_out[gi] = fi.fC;
 
 	// E propagation in shared memory
 	if (lx < ${block_size-1}) {
-		%for i, dir in sym.get_prop_dists(1):
-			prop_${dir}[lx+1] = fi.${dir};
+		%for i in sym.get_prop_dists(1):
+			prop_${sym.GRID.idx_name[i]}[lx+1] = fi.${sym.GRID.idx_name[i]};
 		%endfor
 	// E propagation in global memory (at right block boundary)
 	} else if (gx < ${lat_w-1}) {
@@ -725,8 +719,8 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 
 	// W propagation in shared memory
 	if (lx > 0) {
-		%for i, dir in sym.get_prop_dists(-1):
-			prop_${dir}[lx-1] = fi.${dir};
+		%for i in sym.get_prop_dists(-1):
+			prop_${sym.GRID.idx_name[i]}[lx-1] = fi.${sym.GRID.idx_name[i]};
 		%endfor
 	// W propagation in global memory (at left block boundary)
 	} else if (gx > 0) {
