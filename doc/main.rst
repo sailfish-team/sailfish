@@ -398,6 +398,12 @@ Visualization of 3D data
 3D data visualization is provided via the mayavi package.  This visualization is
 not interactive at this time.
 
+3D data can also be visualized in *cutplane* mode, using the pygame-based interface.
+To select this mode, use the ``--vis3d=cutplane`` command line option.  Only cutplanes
+perpendicular to a domain axis are currently supported.  The ``x``, ``y`` and ``z`` keys
+can be used to select the cutplane.  The ``;`` and ``'`` keys can be used to move
+the cutplane along the selected axis.  Tracer particles are not supported in the cutplane mode.
+
 Supported models
 ================
 
