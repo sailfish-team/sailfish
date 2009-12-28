@@ -711,16 +711,12 @@ def zouhe_velocity(orientation):
 
 	return ret
 
-def get_prop_dists(dir, res=1):
+def get_prop_dists(dir):
+	"""Compute a list of base vectors with a specific value of the X component (`dir`)."""
 	ret = []
 
-	if GRID.dim == 2:
-		vdir = Matrix(((dir,0),))
-	else:
-		vdir = Matrix(((dir,0,0),))
-
 	for i, ei in enumerate(GRID.basis):
-		if ei.dot(vdir) == res and i > 0:
+		if ei[0] == dir and i > 0:
 			ret.append((i, GRID.idx_name[i]))
 
 	return ret
