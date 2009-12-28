@@ -1,62 +1,25 @@
-1. Purpose of the project.
---------------------------
-This repository currently contains the results of my experiments with
-running Lattice Boltzmann solvers on the GPU.  The code isn't necessarily
-optimal or even correct in all cases.  It currently provides an
-interesting toy to play with and a practical illustration of the
-implementation of the LBM using CUDA.  It is my hope that at some
-point the project will be advanced enough to be used in some
-practical applications.
+1. About the project
+--------------------
+Sailfish is an Open Source project.  Its code is licensed under the terms of
+the LGPL v3.
 
-Patches and other contributions are welcome.  If you plan to extend
-this code with a non-trivial feature, please contact me before you
-start implementing it, as I sometimes change the structure and
-organization of the existing code (there, I warned you -- this is
-all still experimental, remember?)
+The source code is hosted in a git repository at http://gitorious.org/sailfish
+To get a recent copy, run:
 
-If you want to help out, have a look at the TODO -- it should provide
-a good starting point and give you some ideas about what remains
-to be done.
+ $ git clone git://gitorious.org/sailfish/sailfish.git
+
+If you have any questions, patches, suggestions etc. feel free to send a
+message to the project mailing list:
+
+http://groups.google.com/group/sailfish-cfd
 
 
-2. Running the examples.
-------------------------
-Requirements:
- - pygame-1.8.1
- - numpy
- - sympy-0.6.5
- - mako-0.2.5
-   - for the CUDA backend: pycuda-0.92, nvidia-drivers, nvidia-cuda-toolkit
-   - for the OpenCL backend: pyopencl, any OpenCL implementation
- - matplotlib (for regtests)
- - pytables-2.1.1 (for saving to HDF files)
+2. Running the examples
+-----------------------
+No installation is necessary, but there are several required Python modules
+that need to be installed on the host system in order for Sailfish to work.
+For a full list of these modules and their installation instructions, please
+refer to the Sailfish manual at:
 
-No installation is necessary, just run any of the executable .py files.
-Use the --help command line option to learn about parameters adjustable
-from the command line.
+http://dev.gentoo.org/~spock/projects/cuda/sailfish/doc/
 
-Currently supported visualization modes: rgb1, std, hsv.
-Currently supported LB models: bgk, mrt.
-
-Keyboard control during the simulation:
-- 0: visualize absolute fluid velocity
-- 1: visualize absolute x component of fluid velocity
-- 2: visualize absolute y component of fluid velocity
-- 3: visualize the fluid density
-- v: toggle the visualization of the velocity vector field
-- t: toggle the visualization of the fluid tracer particles
-- r: reset the simulation geometry
-- q: quit the program
-- s: take a screenshot
-
-During the simulation, you can also use the mouse to place obstacles
-anywhere in the simulation domain.
-
-3. Misc info.
--------------
-This code is licensed on the terms of the LGPL3.
-
-If you have any questions, comments or patches to contribute, feel
-free to contact me at:
-
-Michal Januszewski <spock@gentoo.org>
