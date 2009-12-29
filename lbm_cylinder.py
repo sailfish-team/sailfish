@@ -10,8 +10,8 @@ class LBMGeoCylinder(LBMGeoPoiseuille):
 
 	maxv = 0.1
 
-	def _define_nodes(self):
-		LBMGeoPoiseuille._define_nodes(self)
+	def define_nodes(self):
+		LBMGeoPoiseuille.define_nodes(self)
 
 		if self.options.horizontal:
 			diam = self.lat_h / 3

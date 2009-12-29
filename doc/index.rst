@@ -25,7 +25,7 @@ here is a simple example code to simulate fluid flow in a lid-driven cavity::
     class LBMGeoLDC(geo.LBMGeo2D):
         max_v = 0.1
 
-        def _define_nodes(self):
+        def define_nodes(self):
             for i in range(0, self.lat_w):
                 self.set_geo((i, 0), self.NODE_WALL)
                 self.set_geo((i, self.lat_h-1), self.NODE_VELOCITY, (self.max_v, 0.0))

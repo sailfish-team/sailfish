@@ -46,12 +46,10 @@ class LBMGeo(object):
 	def _encode_node(cls, orientation, type):
 		"""Encode a node entry for the map of nodes.
 
-		Args:
-		  orientation: node orientation
-		  type: node type
+		:param orientation: node orientation
+		:param type: node type
 
-		Returns:
-		  node code
+		:rtype: node code
 		"""
 		return orientation | (type << cls.NODE_ORIENTATION_SHIFT)
 
@@ -67,11 +65,9 @@ class LBMGeo(object):
 	def _decode_node(cls, code):
 		"""Decode an entry from the map of nodes.
 
-		Args:
-		  code: node code from the map
+		:param code: node code from the map
 
-		Returns:
-		  tuple of orientation, type
+		:rtype: tuple of orientation, type
 		"""
 		return cls._decode_node_orientation(code), cls._decode_node_type(code)
 
@@ -110,13 +106,17 @@ class LBMGeo(object):
 
 	@property
 	def dx(self):
+		"""Lattice spacing in simulation units."""
 		return 1.0/min(self.shape)
 
-	def _define_nodes(self):
+	def define_nodes(self):
 		"""Define the types of all nodes in the simulation domain.
 
 		Subclasses need to override this method to specify the geometry to be used
 		in the simulation.
+
+		Use :meth:`set_geo` and :meth:`fill_geo` to set the type of nodes.  By default,
+		all nodes are set as fluid nodes.
 		"""
 		abstract
 
@@ -129,7 +129,7 @@ class LBMGeo(object):
 		abstract
 
 	def get_reynolds(self, viscosity):
-		"""Return the Reynolds number for this geometry."""
+		"""Get the Reynolds number for this geometry."""
 		abstract
 
 	def get_defines(self):
@@ -166,7 +166,7 @@ class LBMGeo(object):
 			return
 
 		self._clear_state()
-		self._define_nodes()
+		self.define_nodes()
 		a = self.params
 		self._postprocess_nodes()
 		self._update_map()
@@ -178,17 +178,15 @@ class LBMGeo(object):
 	def _get_map(self, location):
 		"""Get a node map entry.
 
-		Args:
-		  location: a tuple specifying the node location
+		:param location: a tuple specifying the node location
 		"""
 		return self.map[tuple(reversed(location))]
 
 	def _set_map(self, location, value):
 		"""Set a node map entry.
 
-		Args:
-		  location: a tuple specifying the node location
-		  value: the node code as returned by _encode_node()
+		:param location: a tuple specifying the node location
+		:param value: the node code as returned by _encode_node()
 		"""
 		self.map[tuple(reversed(location))] = value
 
@@ -199,11 +197,10 @@ class LBMGeo(object):
 	def set_geo(self, location, type, val=None, update=False):
 		"""Set the type of a grid node.
 
-		Args:
-		  location: location of the node
-		  type: type of the node, one of the NODE_* constants
-		  val: optional argument for the node, e.g. the value of velocity or pressure
-		  update: whether to automatically update the geometry for the simulation
+		:param location: location of the node
+		:param type: type of the node, one of the NODE_* constants
+		:param val: optional argument for the node, e.g. the value of velocity or pressure
+		:param update: whether to automatically update the geometry for the simulation
 		"""
 		self._set_map(location, numpy.int32(type))
 
@@ -226,10 +223,8 @@ class LBMGeo(object):
 	def mask_array_by_fluid(self, array):
 		"""Mask an array so that only fluid nodes are active.
 
-		Args:
-		  array: a numpy array of the same dimensionality as the simulation domain.
-		    This will usually be an array containing the macroscopic variables
-			(velocity, density).
+		:param array: a numpy array of the same dimensionality as the simulation domain.
+		  This will usually be an array containing the macroscopic variables (velocity, density).
 		"""
 		if get_bc(self.options.bc_wall).wet_nodes:
 			return array
@@ -267,13 +262,12 @@ class LBMGeo(object):
 		return out, loc, tg
 
 	def fill_dist(self, location, dist, target=None):
-		"""Fill the whole simulation domain with distributions from a specific node.
+		"""Fill (a part of) the simulation domain with distributions from a specific node(s).
 
-		Args:
-		  location: location of the node, a n-tuple.  The location can also be a row,
+		:param location: location of the node, a n-tuple.  The location can also be a row,
 		    in which case the coordinate spanning the row should be set to slice(None).
-		  dist: the distribution array
-		  target: if not None, a n-tuple representing the area to which the data from
+		:param dist: the distribution array
+		:param target: if not None, a n-tuple representing the area to which the data from
 		    the specified node is to be propagated
 		"""
 		out, loc, tg = self._prep_array_fill(dist, location, target, shift=1)
@@ -284,6 +278,10 @@ class LBMGeo(object):
 			out[dest] = out[addr]
 
 	def fill_geo(self, location, target=None):
+		"""Fill (a part of) the simulation domain with boundary conditions from a specific node(s).
+
+		See :meth:`fill_dist` for a description of the parameters."""
+
 		out, loc, tg = self._prep_array_fill(self.map, location, target)
 		loc = tuple(loc)
 		out[tg] = out[loc]
@@ -301,10 +299,12 @@ class LBMGeo(object):
 	def velocity_to_dist(self, location, velocity, dist, rho=1.0):
 		"""Set the distributions for a node so that the fluid there has a specific velocity.
 
-		Args:
-		  velocity: velocity to set, a n-tuple
-		  dist: the distribution array
-		  location: location of the node, a n-tuple
+		This function is used to set the initial conditions for the simulation.
+
+		:param location: location of the node, a n-tuple
+		:param velocity: velocity to set, a n-tuple
+		:param dist: the distribution array
+		:param rho: the density to use for the node
 		"""
 		if (rho, velocity) not in self.feq_cache:
 			vals = []
@@ -316,8 +316,7 @@ class LBMGeo(object):
 	def _postprocess_nodes(self, nodes=None):
 		"""Detect types of wall nodes and mark them appropriately.
 
-		Args:
-		  nodes: optional iterable of locations to postprocess
+		:param nodes: optional iterable of locations to postprocess
 		"""
 		abstract
 
@@ -384,19 +383,15 @@ class LBMGeo(object):
 		self._params = ret
 		return ret
 
-	def init_dist(self, dist):
-		abstract
-
 	# FIXME: This method implicitly assumes that the object can be enclosed in a box
 	# which does not intersect any other objects or boundaries.
 	def add_force_object(self, obj_id, location, size):
 		"""Scan the box defined by location and size for nodes and links that cross
-		the fluid-solid interface. This function should be called from _define_nodes().
+		the fluid-solid interface. This function should be called from :meth:`define_nodes`.
 
-		Args:
-		  obj_id: object ID (any hashable)
-		  location: n-tuple specifying the top corner of the box to scan
-		  size: n-tuple specifying the dimensions of the box to scan
+		:param obj_id: object ID (any hashable)
+		:param location: n-tuple specifying the top corner of the box to scan
+		:param size: n-tuple specifying the dimensions of the box to scan
 		"""
 		self._force_nodes[obj_id] = []
 
@@ -442,20 +437,18 @@ class LBMGeo(object):
 		at time t.
 
 		To illustrate how the force is calculated, consider the following simplified
-		case of momemntum transfer across the boundary (|):
+		case of momemntum transfer across the boundary (|)::
 
-		t = 0    <-y-- S --x->  |  <-a-- F -b-->
-		t = 1    <-a'- S --z->  |  <-c-- F -x'->
+		  t = 0    <-y-- S --x->  |  <-a-- F -b-->
+		  t = 1    <-a'- S --z->  |  <-c-- F -x'->
 
 		Primes denote quantities after relaxation.  The amount of momentum transferred
 		from the fluid node (F) to the solid node (S) is equal to a' - x'.
 
-		Args:
-		  obj_id: object ID
-		  dist: the distribution array for the current time step
+		:param obj_id: object ID
+		:param dist: the distribution array for the current time step
 
-		Returns:
-		  force exterted on the selected object (a n-vector)
+		:rtype: force exterted on the selected object (a n-vector)
 		"""
 		force = numpy.float64([0.0] * self.dim)
 
@@ -581,14 +574,13 @@ class LBMGeo3D(LBMGeo):
 # Boundary conditions
 #
 class LBMBC(object):
+	"""Generic boundary condition class."""
 	def __init__(self, name, supported_types=set(LBMGeo.NODE_TYPES), midgrid=False, wet_nodes=False):
-		"""Initialize a boundary condition class.
-
-		Args:
-		  name: a string representing the boundary condition
-		  midgrid: if True, the location of the boundary condition in the real
+		"""
+		:param name: a string representing the boundary condition
+		:param midgrid: if ``True``, the location of the boundary condition in the real
 			domain between the grid nodes
-		  wet_nodes: if True, the boundary condition nodes represent fluid particles
+		:param wet_nodes: if ``True``, the boundary condition nodes represent fluid particles
 		    and undergo standard collisions
 		"""
 		self.name = name

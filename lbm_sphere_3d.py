@@ -10,8 +10,8 @@ class LBMGeoSphere(LBMGeoPoiseuille):
 
 	maxv = 0.09375
 
-	def _define_nodes(self):
-		LBMGeoPoiseuille._define_nodes(self)
+	def define_nodes(self):
+		LBMGeoPoiseuille.define_nodes(self)
 
 		diam = self.get_width() / 3
 

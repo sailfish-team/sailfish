@@ -19,7 +19,7 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 
 	maxv = 0.02
 
-	def _define_nodes(self):
+	def define_nodes(self):
 		radiussq = (self.get_chan_width() / 2.0)**2
 
 		if self.options.along_z:

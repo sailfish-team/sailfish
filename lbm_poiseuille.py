@@ -15,7 +15,7 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 
 	maxv = 0.02
 
-	def _define_nodes(self):
+	def define_nodes(self):
 		if self.options.horizontal:
 			for i in range(0, self.lat_w):
 				self.set_geo((i, 0), self.NODE_WALL)

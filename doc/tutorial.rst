@@ -36,9 +36,9 @@ Python ``optparse`` module).  The ``__init__`` method takes a single argument by
 That class needs to be derived from either ``geo.LBMGeo2D`` or ``geo.LBMGeo3D``, depending
 on the dimensionality of the problem at hand.  In our present case, we will
 use the former one.  The derived geometry class needs to define at least the following
-two methods: ``_define_nodes`` and ``init_dist``.
+two methods: ``define_nodes`` and ``init_dist``.
 
-``_define_nodes`` is used to set the type of each node in the simulation domain.  The
+``define_nodes`` is used to set the type of each node in the simulation domain.  The
 size of the simulation domain is already known when the geometry class is instantiated
 and can be accessed via its attributes ``lat_w`` (size along the X axis), ``lat_h``
 (size along the Y axis) and ``lat_d`` (size along the Z axis, for 2D simulations always
@@ -60,7 +60,7 @@ our function as follows::
 
     class LBMGeoLDC(geo.LBMGeo2D):
         max_v = 0.1
-        def _define_nodes(self):
+        def define_nodes(self):
             for i in range(0, self.lat_w):
                 self.set_geo((i, 0), self.NODE_WALL)
                 self.set_geo((i, self.lat_h-1), self.NODE_VELOCITY, (self.max_v, 0.0))

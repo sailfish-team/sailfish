@@ -50,7 +50,7 @@ class LBMGeoSphere(geo.LBMGeo3D):
 	"""3D pipe with a spherical obstacle in the middle.  Flow in the X direction."""
 	maxv = 0.01
 
-	def _define_nodes(self):
+	def define_nodes(self):
 		radiussq = ((self.chan_diam)/2)**2
 		diam = sphere_diam(self.width, geo.get_bc(self.options.bc_velocity))
 		x0 = int(2.4*diam)
