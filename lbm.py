@@ -72,13 +72,11 @@ class LBMSim(object):
 
 	def __init__(self, geo_class, options=[], args=None, defaults=None):
 		"""
-		Args:
-
-		* *geo_class*: geometry class to use for the simulation
-		* *options*: an iterable of ``optparse.Option`` instances representing additional
+		:param geo_class: geometry class to use for the simulation
+		:param options: iterable of ``optparse.Option`` instances representing additional
 		  options accepted by this simulation
-		* *args*: command line arguments
-		* *defaults*: a dictionary specifying the default values for any simulation options.
+		:param args: command line arguments
+		:param defaults: a dictionary specifying the default values for any simulation options.
 		  These take precedence over the default values specified in ``optparse.Option`` objects.
 		"""
 		self._t_start = time.time()
@@ -228,12 +226,9 @@ class LBMSim(object):
 		for loc in self.gpu_tracer_loc:
 			self.backend.from_buf(loc)
 
-	def get_sim_info(self):
-		"""Get general info about the simulation.
-
-		Returns:
-		  a dictionary of simulation settings
-		"""
+	@property
+	def sim_info(self):
+		"""A dictionary of simulation settings."""
 		ret = {}
 		ret['grid'] = sym.GRID.__name__
 		ret['size'] = tuple(reversed(self.shape))
@@ -291,11 +286,9 @@ class LBMSim(object):
 	def add_iter_hook(self, i, func, every=False):
 		"""Add a hook that will be executed during the simulation.
 
-		Args:
-
-		* *i*: number of the time step after which the hook is to be run
-		* *func*: a callable representing the hook
-		* *every*: if True, the hook will be executed every *i* steps
+		:param i: number of the time step after which the hook is to be run
+		:param func: callable representing the hook
+		:param every: if ``True``, the hook will be executed every *i* steps
 		"""
 		if every:
 			self.iter__hooks_every.setdefault(i, []).append(func)
@@ -515,11 +508,8 @@ class LBMSim(object):
 	def sim_step(self, tracers=True, get_data=False):
 		"""Perform a single step of the simulation.
 
-		Args:
-
-		* *i*: current timestep
-		* *tracers*: if True, the position of tracer particles will be updated
-		* *get_data*: if True, macroscopic variables will be copied from the compute unit
+		:param tracers: if ``True``, the position of tracer particles will be updated
+		:param get_data: if ``True``, macroscopic variables will be copied from the compute unit
 		  and made available as properties of this class
 		"""
 		i = self.iter_
@@ -701,7 +691,7 @@ class LBMSim(object):
 		self._timed_print('Simulation parameters:')
 
 		if self.options.verbose:
-			for k, v in sorted(self.get_sim_info().iteritems()):
+			for k, v in sorted(self.sim_info.iteritems()):
 				print '  {0}: {1}'.format(k, v)
 
 		if self.options.benchmark:
