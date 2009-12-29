@@ -64,6 +64,7 @@ Contents
    results
    models
    testcases
+   api
    about
 
 Indices and tables

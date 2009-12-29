@@ -17,6 +17,7 @@ import sys, os
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.append(os.path.abspath('.'))
+sys.path.append(os.path.abspath('..'))
 
 # -- General configuration -----------------------------------------------------
 
@@ -192,3 +193,5 @@ latex_documents = [
 
 # If false, no module index is generated.
 #latex_use_modindex = True
+
+autoclass_content = 'both'
