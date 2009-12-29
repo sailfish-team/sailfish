@@ -153,7 +153,7 @@ class LSphereSim(lbm.LBMSim):
 			'every': 1000}
 		defaults_.update(defaults)
 
-		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, args=args, defaults=defaults_)
+		lbm.LBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
 		diam = sphere_diam(self.options.lat_h, geo.get_bc(self.options.bc_velocity))
 

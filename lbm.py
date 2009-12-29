@@ -40,13 +40,14 @@ def _convert_to_double(src):
 	return re.sub('([0-9]+\.[0-9]*)f', '\\1', src.replace('float', 'double'))
 
 class LBMSim(object):
+	"""Base class for LBM simulations. Descendant classes should be declared for specific simulations."""
 
-	# The filename base for screenshots.
+	#: The filename base for screenshots.
 	filename = 'lbm_sim'
 
 	@property
 	def time(self):
-		"""Get the current simulation time."""
+		"""The current simulation time in LB units."""
 		# We take the size of the time step to be proportional to the square
 		# of the discrete space interval, which in turn is
 		# 1/(smallest dimension of the lattice).
@@ -57,7 +58,11 @@ class LBMSim(object):
 		return self.geo.dx**2
 
 	def get_sim_info(self):
-		"""Get general info about the simulation."""
+		"""Get general info about the simulation.
+
+		Returns:
+		  a dictionary of simulation settings
+		"""
 		ret = {}
 		ret['grid'] = sym.GRID.__name__
 		ret['size'] = tuple(reversed(self.shape))
@@ -80,8 +85,21 @@ class LBMSim(object):
 
 		return ret
 
-	def __init__(self, geo_class, misc_options=[], args=sys.argv[1:], defaults=None):
+	def __init__(self, geo_class, options=[], args=None, defaults=None):
+		"""
+		Args:
+
+		* *geo_class*: geometry class to use for the simulation
+		* *options*: an iterable of ``optparse.Option`` instances representing additional
+		  options accepted by this simulation
+		* *args*: command line arguments
+		* *defaults*: a dictionary specifying the default values for any simulation options.
+		  These take precedence over the default values specified in ``optparse.Option`` objects.
+		"""
 		self._t_start = time.time()
+
+		if args is None:
+			args = sys.argv[1:]
 
 		grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == geo_class.dim]
 		if sym.GRID in grids:
@@ -140,7 +158,7 @@ class LBMSim(object):
 		parser.add_option_group(group)
 
 		group = OptionGroup(parser, 'Simulation-specific options')
-		for option in misc_options:
+		for option in options:
 			group.add_option(option)
 
 		parser.add_option_group(group)
@@ -178,7 +196,7 @@ class LBMSim(object):
 
 		# If the model has not been explicitly specified by the user, try to automatically
 		# select a working model.
-		if 'model' not in self.options.specified and 'model' not in defaults.keys():
+		if 'model' not in self.options.specified and defaults is not None and 'model' not in defaults.keys():
 			for x in [self.options.model, 'mrt', 'bgk']:
 				if sym.GRID.model_supported(x):
 					break
@@ -671,5 +689,4 @@ class LBMSim(object):
 			self._run_batch()
 		else:
 			self.vis.main()
-
 

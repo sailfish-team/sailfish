@@ -172,7 +172,7 @@ class LPoiSim(lbm.LBMSim):
 		else:
 			defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_w': 64, 'lat_h': 64, 'lat_d': 64}
 
-		lbm.LBMSim.__init__(self, geo_class, misc_options=opts, args=args, defaults=defaults_)
+		lbm.LBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
 		if self.options.drive == 'force':
 			self._init_geo()
