@@ -203,14 +203,8 @@ class LSphereSim(lbm.LBMSim):
 		self._timed_print('# re = %s' % (self.geo.sphere_diam * self.geo.maxv/self.options.visc))
 
 	def print_force(self):
-		if self._iter & 1:
-			self.backend.from_buf(self.gpu_dist2)
-			curr = self.dist2
-		else:
-			self.backend.from_buf(self.gpu_dist1)
-			curr = self.dist1
-
-		self.force = self.geo.force('sphere', curr)
+		self.hostsync_dist()
+		self.force = self.geo.force('sphere', self.dist)
 		coeff = self.drag_coeff(self.force)
 
 		# Keep the last ten drag coefficients (for averaging in the regtest).

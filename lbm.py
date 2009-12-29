@@ -47,43 +47,28 @@ class LBMSim(object):
 
 	@property
 	def time(self):
-		"""The current simulation time in LB units."""
+		"""The current simulation time in simulation units."""
 		# We take the size of the time step to be proportional to the square
 		# of the discrete space interval, which in turn is
 		# 1/(smallest dimension of the lattice).
-		return self._iter * self.dt
+		return self.iter_ * self.dt
 
 	@property
 	def dt(self):
+		"""Size of the time step in simulation units."""
 		return self.geo.dx**2
 
-	def get_sim_info(self):
-		"""Get general info about the simulation.
+	@property
+	def dist(self):
+		"""The current distributions array.
 
-		Returns:
-		  a dictionary of simulation settings
+		.. warning:: use :meth:`hostsync_dist` before accessing this property
 		"""
-		ret = {}
-		ret['grid'] = sym.GRID.__name__
-		ret['size'] = tuple(reversed(self.shape))
-		ret['visc'] = self.options.visc
-		ret['model'] = self.options.model
-		ret['dx'] = self.geo.dx
-		ret['dt'] = self.dt
-		ret['precision'] = self.options.precision
-		ret['bc_wall'] = self.options.bc_wall
-		ret['bc_velocity'] = self.options.bc_velocity
-		ret['bc_pressure'] = self.options.bc_pressure
-
-		if sym.GRID.dim == 2:
-			ret['accel'] = (self.options.accel_x, self.options.accel_y)
+		if self.iter_ & 1:
+			return self.dist2
 		else:
-			ret['accel'] = (self.options.accel_x, self.options.accel_y, self.options.accel_z)
-
-		if hasattr(self.geo, 'get_reynolds'):
-			ret['Re'] = self.geo.get_reynolds(self.options.visc)
-
-		return ret
+			return self.dist1
+		return curr
 
 	def __init__(self, geo_class, options=[], args=None, defaults=None):
 		"""
@@ -184,7 +169,7 @@ class LBMSim(object):
 			# value and device capabilities.
 			self.block_size = 64
 
-		self._iter = 0
+		self.iter_ = 0
 		self._mlups_calls = 0
 		self._mlups = 0.0
 		self.clear_hooks()
@@ -209,6 +194,67 @@ class LBMSim(object):
 			self.float = numpy.float32
 		else:
 			self.float = numpy.float64
+
+	def hostsync_dist(self):
+		"""Copy the current distributions from the compute unit to the host.
+
+		The distributions are then available in :attr:`dist`.
+		"""
+		if self.iter_ & 1:
+			self.backend.from_buf(self.gpu_dist2)
+		else:
+			self.backend.from_buf(self.gpu_dist1)
+
+	def hostsync_velocity(self):
+		"""Copy the current velocity field from the compute unit to the host.
+
+		The velocity field is then availble in :attr:`vx`, :attr:`vy` and :attr:`vz`.
+		"""
+		for vel in self.gpu_velocity:
+			self.backend.from_buf(vel)
+
+	def hostsync_density(self):
+		"""Copy the current density field from the compute unit to the host.
+
+		The density field is then available in :attr:`rho`.
+		"""
+		self.backend.from_buf(self.gpu_rho)
+
+	def hostsync_tracers(self):
+		"""Copy the tracer positions from the compute unit to the host.
+
+		The distributions are then available in :attr:`tracer_x`, :attr:`tracer_y` and :attr:`tracer_z`.
+		"""
+		for loc in self.gpu_tracer_loc:
+			self.backend.from_buf(loc)
+
+	def get_sim_info(self):
+		"""Get general info about the simulation.
+
+		Returns:
+		  a dictionary of simulation settings
+		"""
+		ret = {}
+		ret['grid'] = sym.GRID.__name__
+		ret['size'] = tuple(reversed(self.shape))
+		ret['visc'] = self.options.visc
+		ret['model'] = self.options.model
+		ret['dx'] = self.geo.dx
+		ret['dt'] = self.dt
+		ret['precision'] = self.options.precision
+		ret['bc_wall'] = self.options.bc_wall
+		ret['bc_velocity'] = self.options.bc_velocity
+		ret['bc_pressure'] = self.options.bc_pressure
+
+		if sym.GRID.dim == 2:
+			ret['accel'] = (self.options.accel_x, self.options.accel_y)
+		else:
+			ret['accel'] = (self.options.accel_x, self.options.accel_y, self.options.accel_z)
+
+		if hasattr(self.geo, 'get_reynolds'):
+			ret['Re'] = self.geo.get_reynolds(self.options.visc)
+
+		return ret
 
 	def _is_double_precision(self):
 		return self.options.precision == 'double'
@@ -246,19 +292,20 @@ class LBMSim(object):
 		"""Add a hook that will be executed during the simulation.
 
 		Args:
-		  i: number of the time step after which the hook is to be run
-		  func: a callable representing the hook
-		  every: if True, the hook will be executed every i steps
+
+		* *i*: number of the time step after which the hook is to be run
+		* *func*: a callable representing the hook
+		* *every*: if True, the hook will be executed every *i* steps
 		"""
 		if every:
-			self._iter_hooks_every.setdefault(i, []).append(func)
+			self.iter__hooks_every.setdefault(i, []).append(func)
 		else:
-			self._iter_hooks.setdefault(i, []).append(func)
+			self.iter__hooks.setdefault(i, []).append(func)
 
 	def clear_hooks(self):
 		"""Remove all hooks."""
-		self._iter_hooks = {}
-		self._iter_hooks_every = {}
+		self.iter__hooks = {}
+		self.iter__hooks_every = {}
 
 	def get_tau(self):
 		return self.float((6.0 * self.options.visc + 1.0)/2.0)
@@ -469,24 +516,22 @@ class LBMSim(object):
 		"""Perform a single step of the simulation.
 
 		Args:
-		  i: current timestep
-		  tracers: if True, the position of tracer particles will be updated
-		  get_data: if True, macroscopic variables will be copied from the compute unit
-		    and made available as properties of this class
+
+		* *i*: current timestep
+		* *tracers*: if True, the position of tracer particles will be updated
+		* *get_data*: if True, macroscopic variables will be copied from the compute unit
+		  and made available as properties of this class
 		"""
-		i = self._iter
+		i = self.iter_
 		kerns = self.kern_map[i & 1]
 
 		if (not self.options.benchmark and not self.options.batch and i % self.options.every == 0) or get_data:
 			self.backend.run_kernel(kerns[1], self.kern_grid_size)
 			if tracers:
 				self.backend.run_kernel(kerns[2], (self.options.tracers,))
-				for loc in self.gpu_tracer_loc:
-					self.backend.from_buf(loc)
-
-			for vel in self.gpu_velocity:
-				self.backend.from_buf(vel)
-			self.backend.from_buf(self.gpu_rho)
+				self.hostsync_tracers()
+			self.hostsync_velocity()
+			self.hostsync_density()
 
 			if self.options.output:
 				self._output_data(i)
@@ -495,35 +540,7 @@ class LBMSim(object):
 			if tracers:
 				self.backend.run_kernel(kerns[2], (self.options.tracers,))
 
-		self._iter += 1
-
-	def get_macro_quantities(self, gpu_dist, cpu_dist):
-		"""Compute global macroscopic quantities of the fluid directly from the distributions.
-
-		Args:
-		  gpu_dist: a compute unit memory object containing the distributions
-		  cpu_dist: a host array corresponding to gpu_dist
-
-		Returns:
-		  A tuple of momentum, density.  Momentum is a 2- or 3-vector, depending on the
-		  dimensionality of the grid used in the simulation.
-		"""
-		self.backend.from_buf(gpu_dist)
-
-		mx = 0.0
-		my = 0.0
-		mz = 0.0
-
-		for i, mval in enumerate(cpu_dist):
-			mx += sym.GRID.basis[i][0] * numpy.sum(mval)
-			my += sym.GRID.basis[i][1] * numpy.sum(mval)
-			if sym.GRID.dim == 3:
-				mz += sym.GRID>basis[i][2] * numpy.sum(mval)
-
-		if sym.GRID.dim == 3:
-			return (mx, my, mz), numpy.sum(cpu_dist)
-		else:
-			return (mx, my), numpy.sum(cpu_dist)
+		self.iter_ += 1
 
 	def get_mlups(self, tdiff, iters=None):
 		if iters is not None:
@@ -633,7 +650,7 @@ class LBMSim(object):
 
 			self.backend.sync()
 			t_now = time.time()
-			print self._iter,
+			print self.iter_,
 			print '%.2f %.2f' % self.get_mlups(t_now - t_prev, cycles)
 
 			if self.options.max_iters:
@@ -645,27 +662,31 @@ class LBMSim(object):
 		for i in range(0, self.options.max_iters):
 			need_data = False
 
-			if self._iter in self._iter_hooks:
+			if self.iter_ in self.iter__hooks:
 				need_data = True
 
 			if not need_data:
-				for k in self._iter_hooks_every:
-					if self._iter % k == 0:
+				for k in self.iter__hooks_every:
+					if self.iter_ % k == 0:
 						need_data = True
 						break
 
 			self.sim_step(tracers=False, get_data=need_data)
 
 			if need_data:
-				for hook in self._iter_hooks.get(self._iter-1, []):
+				for hook in self.iter__hooks.get(self.iter_-1, []):
 					hook()
-				for k, v in self._iter_hooks_every.iteritems():
-					if (self._iter-1) % k == 0:
+				for k, v in self.iter__hooks_every.iteritems():
+					if (self.iter_-1) % k == 0:
 						for hook in v:
 							hook()
 
 
 	def run(self):
+		"""Run the simulation.
+
+		This automatically handles any options related to visualization and the benchmark and batch modes.
+		"""
 		if not sym.GRID.model_supported(self.options.model):
 			raise ValueError('The LBM model "%s" is not supported with grid type %s' % (self.options.model, sym.GRID.__name__))
 
