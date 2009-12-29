@@ -411,7 +411,10 @@ class LBMGeo(object):
 				b = numpy.logical_and((self.map == self.NODE_FLUID), (a == self.NODE_WALL))
 				b = numpy.ma.masked_array(b, mask)
 
-				self._force_nodes[obj_id].append(numpy.nonzero(b))
+				c = numpy.roll(b, vec[0], axis=1)
+				c = numpy.roll(c, vec[1], axis=0)
+
+				self._force_nodes[obj_id].append((numpy.nonzero(b), numpy.nonzero(c)))
 		else:
 			mask = numpy.ones_like(self.map)
 			mask[location[2]:location[2]+size[2],location[1]:location[1]+size[1],location[0]:location[0]+size[0]] = 0
@@ -424,27 +427,42 @@ class LBMGeo(object):
 				b = numpy.logical_and((self.map == self.NODE_FLUID), (a == self.NODE_WALL))
 				b = numpy.ma.masked_array(b, mask)
 
-				self._force_nodes[obj_id].append(numpy.nonzero(b))
+				c = numpy.roll(b, vec[0], axis=2)
+				c = numpy.roll(c, vec[1], axis=1)
+				c = numpy.roll(c, vec[2], axis=0)
 
-	def force(self, obj_id, dist_curr, dist_prev):
+				# For each diretion, save a map of source (fluid, b array) nodes and
+				# target (solid, c array) nodes.
+				self._force_nodes[obj_id].append((numpy.nonzero(b), numpy.nonzero(c)))
+
+	def force(self, obj_id, dist):
 		"""Calculate the force the fluid exerts on a solid object.
 
-		The force is calculated for a time t + \Delta t / 2, given distributions
-		at times t and t + \Delta t.
+		The force is calculated for a time t - \Delta t / 2, given distributions
+		at time t.
+
+		To illustrate how the force is calculated, consider the following simplified
+		case of momemntum transfer across the boundary (|):
+
+		t = 0    <-y-- S --x->  |  <-a-- F -b-->
+		t = 1    <-a'- S --z->  |  <-c-- F -x'->
+
+		Primes denote quantities after relaxation.  The amount of momentum transferred
+		from the fluid node (F) to the solid node (S) is equal to a' - x'.
 
 		Args:
 		  obj_id: object ID
-		  dist_curr: the distribution array for the current time step
-		  dist_prev: the distribution array for the previous time step
+		  dist: the distribution array for the current time step
 
 		Returns:
 		  force exterted on the selected object (a n-vector)
 		"""
-		force = numpy.float32([0.0] * self.dim)
+		force = numpy.float64([0.0] * self.dim)
 
-		for dir, indices in enumerate(self._force_nodes[obj_id]):
-			force -= numpy.float32(list(sym.GRID.basis[dir])) * (
-					numpy.sum(dist_prev[dir][indices]) + numpy.sum(dist_curr[sym.GRID.idx_opposite[dir]][indices]))
+		for dir, (fluid_map, solid_map) in enumerate(self._force_nodes[obj_id]):
+			force += numpy.float64(list(sym.GRID.basis[dir])) * (
+					numpy.sum(dist[dir][solid_map]) +
+					numpy.sum(dist[sym.GRID.idx_opposite[dir]][fluid_map]))
 		return force
 
 class LBMGeo2D(LBMGeo):

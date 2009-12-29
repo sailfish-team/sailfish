@@ -66,8 +66,8 @@ def run_test(precision, model, grid, name):
 	plt.clf()
 	plt.cla()
 
-	plt.semilogx(xvec, yvec, 'bo-')
-	plt.semilogx(xvec, yvec2, 'ro-')
+	plt.loglog(xvec, yvec, 'bo-')
+	plt.loglog(xvec, yvec2, 'ro-')
 	plt.gca().yaxis.grid(True)
 	plt.gca().yaxis.grid(True, which='minor')
 	plt.gca().xaxis.grid(True)
