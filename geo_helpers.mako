@@ -1,9 +1,5 @@
-<%!
-    import sym
-%>
-
 typedef struct Dist {
-	%for i, dname in enumerate(sym.GRID.idx_name):
+	%for i, dname in enumerate(grid.idx_name):
 		float ${dname};
 	%endfor
 } Dist;
@@ -11,7 +7,7 @@ typedef struct Dist {
 %if model == 'mrt':
 // Distribution in momentum space.
 typedef struct DistM {
-	%for i, dname in enumerate(sym.GRID.mrt_names):
+	%for i, dname in enumerate(grid.mrt_names):
 		float ${dname};
 	%endfor
 } DistM;
@@ -22,7 +18,7 @@ typedef struct DistM {
 //
 ${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int idx)
 {
-	%for i, dname in enumerate(sym.GRID.idx_name):
+	%for i, dname in enumerate(grid.idx_name):
 		dout->${dname} = din[idx + DIST_SIZE*${i}];
 	%endfor
 }

@@ -31,7 +31,7 @@ ${const_var} float geo_params[${num_params+1}] = {
 
 <%def name="zouhe_bb(orientation)">
 	case ${orientation}:
-		%for arg, val in sym.zouhe_bb(orientation):
+		%for arg, val in sym.zouhe_bb(grid, orientation):
 			${sym.use_pointers(str(arg))} = ${sym.use_pointers(str(val))};
 		%endfor
 		break;
@@ -39,7 +39,7 @@ ${const_var} float geo_params[${num_params+1}] = {
 
 <%def name="zouhe_fixup(orientation)">
 	case ${orientation}:
-		%for arg, val in sym.zouhe_fixup(orientation):
+		%for arg, val in sym.zouhe_fixup(grid, orientation):
 			${str(arg)} = ${str(val)};
 		%endfor
 		break;
@@ -48,7 +48,7 @@ ${const_var} float geo_params[${num_params+1}] = {
 
 <%def name="zouhe_velocity(orientation)">
 	case ${orientation}:
-		%for arg, val in sym.zouhe_velocity(orientation):
+		%for arg, val in sym.zouhe_velocity(grid, orientation):
 			${sym.use_pointers(str(arg))} = ${sym.use_pointers(str(val))};
 		%endfor
 		break;
@@ -90,9 +90,9 @@ ${const_var} float geo_params[${num_params+1}] = {
 
 <%def name="fill_missing_distributions()">
 	switch (orientation) {
-		%for i in range(0, sym.GRID.Q-1):
+		%for i in range(0, grid.Q-1):
 			case ${i}: {
-				%for lvalue, rvalue in sym.fill_missing_dists('fi', missing_dir=i):
+				%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
 					${lvalue} = ${rvalue};
 				%endfor
 				break;
@@ -133,18 +133,18 @@ ${device_func} inline void bounce_back(Dist *fi)
 {
 	float t;
 
-	%for i in sym.bb_swap_pairs():
-		t = fi->${sym.GRID.idx_name[i]};
-		fi->${sym.GRID.idx_name[i]} = fi->${sym.GRID.idx_name[sym.GRID.idx_opposite[i]]};
-		fi->${sym.GRID.idx_name[sym.GRID.idx_opposite[i]]} = t;
+	%for i in sym.bb_swap_pairs(grid):
+		t = fi->${grid.idx_name[i]};
+		fi->${grid.idx_name[i]} = fi->${grid.idx_name[grid.idx_opposite[i]]};
+		fi->${grid.idx_name[grid.idx_opposite[i]]} = t;
 	%endfor
 }
 
 ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 {
-	*rho = ${sym.ex_rho('fi')};
-	%for d in range(0, sym.GRID.dim):
-		v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho')).replace('/*', '/ *')};
+	*rho = ${sym.ex_rho(grid, 'fi')};
+	%for d in range(0, grid.dim):
+		v[${d}] = ${str(sym.ex_velocity(grid, 'fi', d, '*rho')).replace('/*', '/ *')};
 	%endfor
 }
 
@@ -153,7 +153,7 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
 {
 	// Bounce-back of the non-equilibrium parts.
 	switch (orientation) {
-		%for i in range(0, len(sym.GRID.basis)-1):
+		%for i in range(0, len(grid.basis)-1):
 			${zouhe_bb(i)}
 		%endfor
 		case ${geo_dir_other}:
@@ -167,10 +167,10 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
 	%endif
 
 	// Compute new macroscopic variables.
-	nvx = ${str(sym.ex_velocity('fi', 0, 'nrho', momentum=True)).replace('/*', '/ *')};
-	nvy = ${str(sym.ex_velocity('fi', 1, 'nrho', momentum=True)).replace('/*', '/ *')};
+	nvx = ${str(sym.ex_velocity(grid, 'fi', 0, 'nrho', momentum=True)).replace('/*', '/ *')};
+	nvy = ${str(sym.ex_velocity(grid, 'fi', 1, 'nrho', momentum=True)).replace('/*', '/ *')};
 	%if dim == 3:
-		nvz = ${str(sym.ex_velocity('fi', 2, 'nrho', momentum=True)).replace('/*', '/ *')};
+		nvz = ${str(sym.ex_velocity(grid, 'fi', 2, 'nrho', momentum=True)).replace('/*', '/ *')};
 	%endif
 
 	// Compute momentum difference.
@@ -181,7 +181,7 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
 	%endif
 
 	switch (orientation) {
-		%for i in range(0, len(sym.GRID.basis)-1):
+		%for i in range(0, len(grid.basis)-1):
 			${zouhe_fixup(i)}
 		%endfor
 	}
@@ -206,13 +206,13 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 		// distributions.
 		%if bc_velocity != 'fullbb' and bc_velocity != None:
 			${fill_missing_distributions()}
-			*rho = ${sym.ex_rho('fi')};
+			*rho = ${sym.ex_rho(grid, 'fi')};
 			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
 
 			switch (orientation) {
-				%for i in range(0, sym.GRID.Q-1):
+				%for i in range(0, grid.Q-1):
 					case ${i}:
-						*rho = ${sym.ex_rho('fi', missing_dir=i, rho='*rho')};
+						*rho = ${sym.ex_rho(grid, 'fi', missing_dir=i, rho='*rho')};
 						break;
 				%endfor
 			}
@@ -222,15 +222,15 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 	} else if (isPressureNode(node_type)) {
 		%if bc_pressure != 'fullbb' and bc_pressure != None:
 			${fill_missing_distributions()}
-			*rho = ${sym.ex_rho('fi')};
+			*rho = ${sym.ex_rho(grid, 'fi')};
 			float par_rho;
 			${get_boundary_pressure('node_type', 'par_rho')}
 
 			switch (orientation) {
-				%for i in range(0, sym.GRID.Q-1):
+				%for i in range(0, grid.Q-1):
 					case ${i}: {
-						%for d in range(0, sym.GRID.dim):
-							v[${d}] = ${str(sym.ex_velocity('fi', d, '*rho', missing_dir=i, par_rho='par_rho')).replace('/*', '/ *')};
+						%for d in range(0, grid.dim):
+							v[${d}] = ${str(sym.ex_velocity(grid, 'fi', d, '*rho', missing_dir=i, par_rho='par_rho')).replace('/*', '/ *')};
 						%endfor
 						break;
 					 }
@@ -289,17 +289,17 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 		if (isVelocityNode(node_type)) {
 			bounce_back(fi);
 			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
-			%for i, ve in enumerate(sym.GRID.basis):
+			%for i, ve in enumerate(grid.basis):
 				// * *rho for compressible
-				fi->${sym.GRID.idx_name[i]} += 1.0f * ${sym.make_float(2.0 * sym.GRID.weights[i] * sym.GRID.v.dot(ve) / sym.GRID.cssq)};
+				fi->${grid.idx_name[i]} += 1.0f * ${sym.make_float(2.0 * grid.weights[i] * grid.v.dot(ve) / grid.cssq)};
 			%endfor
-			*rho = ${sym.ex_rho('fi')};
+			*rho = ${sym.ex_rho(grid, 'fi')};
 		}
 	%endif
 
 	%if bc_velocity == 'equilibrium':
 		if (isVelocityNode(node_type)) {
-			%for feq, idx in sym.bgk_equilibrium():
+			%for feq, idx in sym.bgk_equilibrium(grid):
 				fi->${idx} = ${feq};
 			%endfor
 		}
@@ -307,7 +307,7 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 
 	%if bc_pressure == 'equilibrium':
 		if (isPressureNode(node_type)) {
-			%for feq, idx in sym.bgk_equilibrium():
+			%for feq, idx in sym.bgk_equilibrium(grid):
 				fi->${idx} = ${feq};
 			%endfor
 		}
@@ -377,7 +377,7 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 ## To avoid the performance loss, we temporarily inline getDist manually.
 	// getDist(&fc, dist, idx);
 
-	%for i, dname in enumerate(sym.GRID.idx_name):
+	%for i, dname in enumerate(grid.idx_name):
 		fc.${dname} = dist[idx + DIST_SIZE*${i}];
 	%endfor
 
@@ -425,7 +425,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 {
 	DistM fm, feq;
 
-	%for mrt, val in sym.bgk_to_mrt('fi', 'fm'):
+	%for mrt, val in sym.bgk_to_mrt(grid, 'fi', 'fm'):
 		${mrt} = ${val};
 	%endfor
 
@@ -437,18 +437,18 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	#define rho fm.rho
 
 	// Calculate equilibrium distributions in moment space.
-	%for i, eq in enumerate(sym.GRID.mrt_equilibrium):
+	%for i, eq in enumerate(grid.mrt_equilibrium):
 		%if eq != 0:
-			feq.${sym.GRID.mrt_names[i]} = ${eq};
+			feq.${grid.mrt_names[i]} = ${eq};
 		%endif
 	%endfor
 
 	// Relexate the non-conserved moments,
 	%if bc_velocity == 'equilibrium':
 		if (isVelocityNode(node_type)) {
-			%for i, coll in enumerate(sym.GRID.mrt_collision):
+			%for i, coll in enumerate(grid.mrt_collision):
 				%if coll != 0:
-					fm.${sym.GRID.mrt_names[i]} = feq.${sym.GRID.mrt_names[i]};
+					fm.${grid.mrt_names[i]} = feq.${grid.mrt_names[i]};
 				%endif
 			%endfor
 		}
@@ -456,17 +456,17 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 
 	%if bc_pressure == 'equilibrium':
 		if (isPressureNode(node_type)) {
-			%for i, coll in enumerate(sym.GRID.mrt_collision):
+			%for i, coll in enumerate(grid.mrt_collision):
 				%if coll != 0:
-					fm.${sym.GRID.mrt_names[i]} = feq.${sym.GRID.mrt_names[i]};
+					fm.${grid.mrt_names[i]} = feq.${grid.mrt_names[i]};
 				%endif
 			%endfor
 		}
 	%endif
 
-	%for i, name in enumerate(sym.GRID.mrt_names):
-		%if sym.GRID.mrt_collision[i] != 0:
-			fm.${name} -= ${sym.make_float(sym.GRID.mrt_collision[i])} * (fm.${name} - feq.${name});
+	%for i, name in enumerate(grid.mrt_names):
+		%if grid.mrt_collision[i] != 0:
+			fm.${name} -= ${sym.make_float(grid.mrt_collision[i])} * (fm.${name} - feq.${name});
 		%endif
 	%endfor
 
@@ -477,7 +477,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 
 	${external_force('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho', momentum=True)}
 
-	%for bgk, val in sym.mrt_to_bgk('fi', 'fm'):
+	%for bgk, val in sym.mrt_to_bgk(grid, 'fi', 'fm'):
 		${bgk} = ${val};
 	%endfor
 }
@@ -496,11 +496,11 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 	#define vy v[1]
 	#define vz v[2]
 
-	%for feq, idx in sym.bgk_equilibrium():
+	%for feq, idx in sym.bgk_equilibrium(grid):
 		feq.${idx} = ${feq};
 	%endfor
 
-	%for idx in sym.GRID.idx_name:
+	%for idx in grid.idx_name:
 		fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
 	%endfor
 
@@ -513,7 +513,7 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 			#define eaz ${'%.20ff' % ext_accel_z}
 			float pref = ${sym.bgk_external_force_pref()};
 
-			%for val, idx in sym.bgk_external_force():
+			%for val, idx in sym.bgk_external_force(grid):
 				fi->${idx} += ${val};
 			%endfor
 		}
@@ -570,23 +570,23 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 	## This is the final dimension, generate the actual propagation code.
 	%if di == dim:
 		%if dim == 2:
-			${set_odist(i, effective_dir, sym.GRID.basis[i][1], 0, offset, local)}
+			${set_odist(i, effective_dir, grid.basis[i][1], 0, offset, local)}
 		%else:
-			${set_odist(i, effective_dir, sym.GRID.basis[i][1], sym.GRID.basis[i][2], offset, local)}
+			${set_odist(i, effective_dir, grid.basis[i][1], grid.basis[i][2], offset, local)}
 		%endif
 	## Make a recursive call to prop_bnd to process the remaining dimensions.
 	## The recursive calls are done to generate checks for out-of-domain
 	## propagation.
 	%else:
 		## Make sure we're not propagating outside of the simulation domain.
-		%if sym.GRID.basis[i][di] > 0:
+		%if grid.basis[i][di] > 0:
 			if (${loc_names[di]} < ${bnd_limits[di]-1}) { \
-		%elif sym.GRID.basis[i][di] < 0:
+		%elif grid.basis[i][di] < 0:
 			if (${loc_names[di]} > 0) { \
 		%endif
 			## Recursive call for the next dimension.
 			${prop_bnd(effective_dir, i, di+1, local, offset)}
-		%if sym.GRID.basis[i][di] != 0:
+		%if grid.basis[i][di] != 0:
 			} \
 		%endif
 
@@ -594,9 +594,9 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 		## check for periodic boundary conditions for the current dimension.
 		## If they are enabled, update the offset by a value precomputed in
 		## pbc_offsets and proceed to the following dimension.
-		%if periodicity[di] and sym.GRID.basis[i][di] != 0:
+		%if periodicity[di] and grid.basis[i][di] != 0:
 			else {
-				${prop_bnd(effective_dir, i, di+1, local, offset+pbc_offsets[di][int(sym.GRID.basis[i][di])])}
+				${prop_bnd(effective_dir, i, di+1, local, offset+pbc_offsets[di][int(grid.basis[i][di])])}
 			}
 		%endif
 	%endif
@@ -611,7 +611,7 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 ## Args:
 ##   dir: X propagation direction (1 for East, -1 for West, 0 for orthogonal to X axis)
 ##
-	%for i in sym.get_prop_dists(dir):
+	%for i in sym.get_prop_dists(grid, dir):
 		%if dist_source == 'prop_local':
 			${prop_bnd(0, i, 1, True, offset)}
 		%else:
@@ -623,15 +623,15 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 <%def name="set_odist(idir, xoff, yoff, zoff, offset, local)">
 <%
 	def rel_offset(x, y, z):
-		if sym.GRID.dim == 2:
+		if grid.dim == 2:
 			return x + y * lat_w
 		else:
 			return x + lat_w * (y + lat_h*z)
 %>
 	%if local:
-		dist_out[gi + ${dist_size*idir + rel_offset(xoff, yoff, zoff) + offset}] = prop_${sym.GRID.idx_name[idir]}[lx];
+		dist_out[gi + ${dist_size*idir + rel_offset(xoff, yoff, zoff) + offset}] = prop_${grid.idx_name[idir]}[lx];
 	%else:
-		dist_out[gi + ${dist_size*idir + rel_offset(xoff, yoff, zoff) + offset}] = fi.${sym.GRID.idx_name[idir]};
+		dist_out[gi + ${dist_size*idir + rel_offset(xoff, yoff, zoff) + offset}] = fi.${grid.idx_name[idir]};
 	%endif
 </%def>
 
@@ -665,11 +665,11 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	%endif
 
 	// shared variables for in-block propagation
-	%for i in sym.get_prop_dists(1):
-		${shared_var} float prop_${sym.GRID.idx_name[i]}[BLOCK_SIZE];
+	%for i in sym.get_prop_dists(grid, 1):
+		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
 	%endfor
-	%for i in sym.get_prop_dists(-1):
-		${shared_var} float prop_${sym.GRID.idx_name[i]}[BLOCK_SIZE];
+	%for i in sym.get_prop_dists(grid, -1):
+		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
 	%endfor
 
 	// cache the distributions in local variables
@@ -703,8 +703,8 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 
 	// E propagation in shared memory
 	if (lx < ${block_size-1}) {
-		%for i in sym.get_prop_dists(1):
-			prop_${sym.GRID.idx_name[i]}[lx+1] = fi.${sym.GRID.idx_name[i]};
+		%for i in sym.get_prop_dists(grid, 1):
+			prop_${grid.idx_name[i]}[lx+1] = fi.${grid.idx_name[i]};
 		%endfor
 	// E propagation in global memory (at right block boundary)
 	} else if (gx < ${lat_w-1}) {
@@ -719,8 +719,8 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 
 	// W propagation in shared memory
 	if (lx > 0) {
-		%for i in sym.get_prop_dists(-1):
-			prop_${sym.GRID.idx_name[i]}[lx-1] = fi.${sym.GRID.idx_name[i]};
+		%for i in sym.get_prop_dists(grid, -1):
+			prop_${grid.idx_name[i]}[lx-1] = fi.${grid.idx_name[i]};
 		%endfor
 	// W propagation in global memory (at left block boundary)
 	} else if (gx > 0) {

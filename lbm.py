@@ -85,10 +85,7 @@ class LBMSim(object):
 			args = sys.argv[1:]
 
 		grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == geo_class.dim]
-		if sym.GRID in grids:
-			default_grid = sym.GRID
-		else:
-			default_grid = grids[0]
+		default_grid = grids[0]
 
 		parser = OptionParser()
 
@@ -175,13 +172,14 @@ class LBMSim(object):
 
 		for x in sym.KNOWN_GRIDS:
 			if x.__name__ == self.options.grid:
-				sym.use_grid(x)
+				self.grid = x
+				break
 
 		# If the model has not been explicitly specified by the user, try to automatically
 		# select a working model.
 		if 'model' not in self.options.specified and defaults is not None and 'model' not in defaults.keys():
 			for x in [self.options.model, 'mrt', 'bgk']:
-				if sym.GRID.model_supported(x):
+				if self.grid.model_supported(x):
 					break
 			self.options.model = x
 
@@ -230,7 +228,7 @@ class LBMSim(object):
 	def sim_info(self):
 		"""A dictionary of simulation settings."""
 		ret = {}
-		ret['grid'] = sym.GRID.__name__
+		ret['grid'] = self.grid.__name__
 		ret['size'] = tuple(reversed(self.shape))
 		ret['visc'] = self.options.visc
 		ret['model'] = self.options.model
@@ -241,7 +239,7 @@ class LBMSim(object):
 		ret['bc_velocity'] = self.options.bc_velocity
 		ret['bc_pressure'] = self.options.bc_pressure
 
-		if sym.GRID.dim == 2:
+		if self.grid.dim == 2:
 			ret['accel'] = (self.options.accel_x, self.options.accel_y)
 		else:
 			ret['accel'] = (self.options.accel_x, self.options.accel_y, self.options.accel_z)
@@ -267,9 +265,9 @@ class LBMSim(object):
 		self._timed_print('Initializing visualization engine.')
 
 		if not self.options.benchmark and not self.options.batch:
-			if sym.GRID.dim == 2:
+			if self.grid.dim == 2:
 				self._init_vis_2d()
-			elif sym.GRID.dim == 3:
+			elif self.grid.dim == 3:
 				self._init_vis_3d()
 
 	def _init_vis_2d(self):
@@ -314,16 +312,16 @@ class LBMSim(object):
 		self._timed_print('Initializing geometry.')
 
 		# Particle distributions in host memory.
-		if sym.GRID.dim == 2:
+		if self.grid.dim == 2:
 			self.shape = (self.options.lat_h, self.options.lat_w)
 		else:
 			self.shape = (self.options.lat_d, self.options.lat_h, self.options.lat_w)
 
-		self.dist1 = numpy.zeros([len(sym.GRID.basis)] + list(self.shape), self.float)
+		self.dist1 = numpy.zeros([len(self.grid.basis)] + list(self.shape), self.float)
 
 		# Simulation geometry.
 		self.geo = self.geo_class(list(reversed(self.shape)), self.options,
-				self.float, self.backend,
+				self.float, self.backend, self,
 				self.options.save_geocache, self.options.geocache)
 		self.geo.init_dist(self.dist1)
 		self.dist2 = self.dist1.copy()
@@ -343,7 +341,8 @@ class LBMSim(object):
 
 		self.tau = self.get_tau()
 		ctx = {}
-		ctx['dim'] = sym.GRID.dim
+		ctx['grid'] = self.grid
+		ctx['dim'] = self.grid.dim
 		ctx['block_size'] = self.block_size
 		ctx['lat_h'] = self.options.lat_h
 		ctx['lat_w'] = self.options.lat_w
@@ -419,7 +418,7 @@ class LBMSim(object):
 		self.gpu_vy = self.backend.alloc_buf(like=self.vy)
 		self.gpu_velocity = [self.gpu_vx, self.gpu_vy]
 
-		if sym.GRID.dim == 3:
+		if self.grid.dim == 3:
 			self.vz = numpy.zeros(self.shape, self.float)
 			self.gpu_vz = self.backend.alloc_buf(like=self.vz)
 			self.velocity.append(self.vz)
@@ -437,7 +436,7 @@ class LBMSim(object):
 		self.gpu_tracer_y = self.backend.alloc_buf(like=self.tracer_y)
 		self.gpu_tracer_loc = [self.gpu_tracer_x, self.gpu_tracer_y]
 
-		if sym.GRID.dim == 3:
+		if self.grid.dim == 3:
 			self.tracer_z = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_d
 			self.gpu_tracer_z = self.backend.alloc_buf(like=self.tracer_z)
 			self.tracer_loc.append(self.tracer_z)
@@ -458,7 +457,7 @@ class LBMSim(object):
 		args1v = [self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, self.gpu_rho] + self.gpu_velocity + [numpy.uint32(1)]
 		args2v = [self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho] + self.gpu_velocity + [numpy.uint32(1)]
 
-		if sym.GRID.dim == 2:
+		if self.grid.dim == 2:
 			k_block_size = (self.block_size, 1)
 		else:
 			k_block_size = (self.block_size, 1, 1)
@@ -500,7 +499,7 @@ class LBMSim(object):
 			1: (kern_cnp2, kern_cnp2s, kern_trac2),
 		}
 
-		if sym.GRID.dim == 2:
+		if self.grid.dim == 2:
 			self.kern_grid_size = (self.options.lat_w/self.block_size, self.options.lat_h)
 		else:
 			self.kern_grid_size = (self.options.lat_w/self.block_size * self.options.lat_h, self.options.lat_d)
@@ -544,7 +543,7 @@ class LBMSim(object):
 		return (self._mlups, mlups)
 
 	def output_ascii(self, file):
-		if sym.GRID.dim == 3:
+		if self.grid.dim == 3:
 			rho = self.geo.mask_array_by_fluid(self.rho)
 			vx = self.geo.mask_array_by_fluid(self.vx)
 			vy = self.geo.mask_array_by_fluid(self.vy)
@@ -575,12 +574,12 @@ class LBMSim(object):
 			id = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
 			id.point_data.scalars = self.rho.flatten()
 			id.point_data.scalars.name = 'density'
-			if sym.GRID.dim == 3:
+			if self.grid.dim == 3:
 				id.point_data.vectors = numpy.c_[self.vx.flatten(), self.vy.flatten(), self.vz.flatten()]
 			else:
 				id.point_data.vectors = numpy.c_[self.vx.flatten(), self.vy.flatten(), numpy.zeros_like(self.vx).flatten()]
 			id.point_data.vectors.name = 'velocity'
-			if sym.GRID.dim == 3:
+			if self.grid.dim == 3:
 				id.dimensions = list(reversed(self.rho.shape))
 			else:
 				id.dimensions = list(reversed(self.rho.shape)) + [1]
@@ -591,7 +590,7 @@ class LBMSim(object):
 			record['iter'] = i
 			record['vx'] = self.vx
 			record['vy'] = self.vy
-			if sym.GRID.dim == 3:
+			if self.grid.dim == 3:
 				record['vz'] = self.vz
 			record['rho'] = self.rho
 			record.append()
@@ -617,7 +616,7 @@ class LBMSim(object):
 					'rho': tables.Float32Col(pos=4, shape=self.rho.shape)
 				}
 
-				if sym.GRID.dim == 3:
+				if self.grid.dim == 3:
 					desc['vz'] = tables.Float32Col(pos=2, shape=self.vz.shape)
 
 				self.h5tbl = self.h5file.createTable(self.h5grp, 'results', desc, 'results')
@@ -677,8 +676,8 @@ class LBMSim(object):
 
 		This automatically handles any options related to visualization and the benchmark and batch modes.
 		"""
-		if not sym.GRID.model_supported(self.options.model):
-			raise ValueError('The LBM model "%s" is not supported with grid type %s' % (self.options.model, sym.GRID.__name__))
+		if not self.grid.model_supported(self.options.model):
+			raise ValueError('The LBM model "%s" is not supported with grid type %s' % (self.options.model, self.grid.__name__))
 
 		self._calc_screen_size()
 		self._init_geo()

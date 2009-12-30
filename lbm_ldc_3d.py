@@ -7,10 +7,6 @@ import geo
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
 
-import sym
-
-sym.use_grid(sym.D3Q13)
-
 class LBMGeoLDC(geo.LBMGeo3D):
 	"""Lid-driven cavity geometry."""
 
@@ -50,7 +46,7 @@ class LDCSim(lbm.LBMSim):
 
 	def __init__(self, geo_class):
 		opts = []
-		defaults={'lat_d': 64, 'lat_h': 64, 'lat_w': 64}
+		defaults={'lat_d': 64, 'lat_h': 64, 'lat_w': 64, 'grid': 'D3Q13'}
 		lbm.LBMSim.__init__(self, geo_class, options=opts, defaults=defaults)
 
 sim = LDCSim(LBMGeoLDC)

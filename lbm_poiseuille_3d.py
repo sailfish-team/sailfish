@@ -10,10 +10,6 @@ import geo
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
 
-import sym
-
-sym.use_grid(sym.D3Q13)
-
 class LBMGeoPoiseuille(geo.LBMGeo3D):
 	"""3D Poiseuille geometry."""
 
@@ -167,10 +163,9 @@ class LPoiSim(lbm.LBMSim):
 		opts.append(optparse.make_option('--along_z', dest='along_z', action='store_true', default=False, help='flow along the Z direction'))
 		opts.append(optparse.make_option('--stationary', dest='stationary', action='store_true', default=False, help='start with the correct velocity profile in the whole simulation domain'))
 
+		defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_w': 64, 'lat_h': 64, 'lat_d': 64, 'grid': 'D3Q13'}
 		if defaults is not None:
-			defaults_ = defaults
-		else:
-			defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_w': 64, 'lat_h': 64, 'lat_d': 64}
+			defaults_.update(defaults)
 
 		lbm.LBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 

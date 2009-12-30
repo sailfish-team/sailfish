@@ -2,9 +2,8 @@ import cPickle as pickle
 import os
 import sys
 import numpy
-import sym
 
-from sympy import Matrix, Rational, Symbol, Poly
+import sym
 
 # Abstract class implementation, from Peter's Norvig site.
 def abstract():
@@ -71,7 +70,8 @@ class LBMGeo(object):
 		"""
 		return cls._decode_node_orientation(code), cls._decode_node_type(code)
 
-	def __init__(self, shape, options, float, backend, save_cache=True, use_cache=True):
+	def __init__(self, shape, options, float, backend, sim, save_cache=True, use_cache=True):
+		self.sim = sim
 		self.shape = shape
 		self.options = options
 		self.backend = backend
@@ -138,7 +138,7 @@ class LBMGeo(object):
 	@property
 	def cache_file(self):
 		return '.sailfish_%s_%s_%s_%s' % (
-				os.path.basename(sys.argv[0]), sym.GRID.__name__,
+				os.path.basename(sys.argv[0]), self.sim.grid.__name__,
 				'-'.join(map(str, self.shape)), str(self.float().dtype))
 
 	def _clear_state(self):
@@ -272,7 +272,7 @@ class LBMGeo(object):
 		"""
 		out, loc, tg = self._prep_array_fill(dist, location, target, shift=1)
 
-		for i in range(0, len(sym.GRID.basis)):
+		for i in range(0, len(self.sim.grid.basis)):
 			addr = tuple([i] + loc)
 			dest = tuple([i] + tg)
 			out[dest] = out[addr]
@@ -308,7 +308,7 @@ class LBMGeo(object):
 		"""
 		if (rho, velocity) not in self.feq_cache:
 			vals = []
-			self.feq_cache[(rho, velocity)] = map(self.float, sym.eval_bgk_equilibrium(velocity, rho))
+			self.feq_cache[(rho, velocity)] = map(self.float, sym.eval_bgk_equilibrium(self.sim.grid, velocity, rho))
 
 		for i, val in enumerate(self.feq_cache[(rho, velocity)]):
 			dist[i][tuple(reversed(location))] = val
@@ -399,7 +399,7 @@ class LBMGeo(object):
 			mask = numpy.ones_like(self.map)
 			mask[location[1]:location[1]+size[1],location[0]:location[0]+size[0]] = 0
 
-			for i, vec in enumerate(sym.GRID.basis):
+			for i, vec in enumerate(self.sim.grid.basis):
 				a = numpy.roll(self.map, -vec[0], axis=1)
 				a = numpy.roll(a, -vec[1], axis=0)
 
@@ -414,7 +414,7 @@ class LBMGeo(object):
 			mask = numpy.ones_like(self.map)
 			mask[location[2]:location[2]+size[2],location[1]:location[1]+size[1],location[0]:location[0]+size[0]] = 0
 
-			for i, vec in enumerate(sym.GRID.basis):
+			for i, vec in enumerate(self.sim.grid.basis):
 				a = numpy.roll(self.map, -vec[0], axis=2)
 				a = numpy.roll(a, -vec[1], axis=1)
 				a = numpy.roll(a, -vec[2], axis=0)
@@ -453,9 +453,9 @@ class LBMGeo(object):
 		force = numpy.float64([0.0] * self.dim)
 
 		for dir, (fluid_map, solid_map) in enumerate(self._force_nodes[obj_id]):
-			force += numpy.float64(list(sym.GRID.basis[dir])) * (
+			force += numpy.float64(list(self.sim.grid.basis[dir])) * (
 					numpy.sum(dist[dir][solid_map]) +
-					numpy.sum(dist[sym.GRID.idx_opposite[dir]][fluid_map]))
+					numpy.sum(dist[self.sim.grid.idx_opposite[dir]][fluid_map]))
 		return force
 
 class LBMGeo2D(LBMGeo):

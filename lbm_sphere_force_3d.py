@@ -6,12 +6,9 @@ import math
 import numpy
 
 import lbm
-import sym
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
-
-sym.use_grid(sym.D3Q13)
 
 def cd_theoretical(diam_ratio, re):
 	"""Return the theoretical value of drag coefficient.
@@ -150,7 +147,8 @@ class LSphereSim(lbm.LBMSim):
 			'lat_w': 512,
 			'max_iters': 320000,
 			'model': 'mrt',
-			'every': 1000}
+			'every': 1000,
+			'grid': 'D3Q13'}
 		defaults_.update(defaults)
 
 		lbm.LBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)

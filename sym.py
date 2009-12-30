@@ -4,8 +4,6 @@ import sympy
 from sympy import Matrix, Rational, Symbol, Poly
 import re
 
-#set_main(sys.modules[__name__])
-
 #
 # Classes for different grid types.
 #
@@ -400,7 +398,7 @@ class D3Q19(DxQy):
 			cls.mrt_equilibrium.append(t)
 
 
-def bgk_equilibrium(as_string=True):
+def bgk_equilibrium(grid, as_string=True):
 	"""Get expressions for the BGK equilibrium distribution.
 
 	Args:
@@ -413,20 +411,20 @@ def bgk_equilibrium(as_string=True):
 	"""
 	out = []
 
-	for i, ei in enumerate(GRID.basis):
-		t = (GRID.rho * GRID.weights[i] *
+	for i, ei in enumerate(grid.basis):
+		t = (grid.rho * grid.weights[i] *
 					(1 + poly_factorize(
-						3*ei.dot(GRID.v) +
-						Rational(9, 2) * (ei.dot(GRID.v))**2 -
-						Rational(3, 2) * GRID.v.dot(GRID.v))))
+						3*ei.dot(grid.v) +
+						Rational(9, 2) * (ei.dot(grid.v))**2 -
+						Rational(3, 2) * grid.v.dot(grid.v))))
 		if as_string:
 			t = expand_powers(str(t))
 
-		out.append((t, GRID.idx_name[i]))
+		out.append((t, grid.idx_name[i]))
 
 	return out
 
-def eval_bgk_equilibrium(velocity, rho):
+def eval_bgk_equilibrium(grid, velocity, rho):
 	"""Get BGK equilibrium distributions for a specific velocity and density.
 
 	Args:
@@ -439,17 +437,17 @@ def eval_bgk_equilibrium(velocity, rho):
 	"""
 	vals = []
 
-	subs={GRID.rho: rho}
+	subs={grid.rho: rho}
 
 	for i, v in enumerate(velocity):
-		subs[GRID.v[i]] = v
+		subs[grid.v[i]] = v
 
-	for i, (eqd, idx) in enumerate(EQ_DIST):
+	for eqd, idx in grid.eq_dist:
 		vals.append(sympy.N(eqd, subs=subs))
 
 	return vals
 
-def bgk_external_force():
+def bgk_external_force(grid):
 	"""Get expressions for the external body force correction in the BGK model.
 
 	Returns:
@@ -460,17 +458,17 @@ def bgk_external_force():
 	eaz = Symbol('eaz')
 	pref = Symbol('pref')
 
-	if GRID.dim == 2:
+	if grid.dim == 2:
 		ea = Matrix(([eax, eay],))
 	else:
 		ea = Matrix(([eax, eay, eaz],))
 
 	ret = []
 
-	for i, ei in enumerate(GRID.basis):
-		t = expand_powers(str(pref * GRID.weights[i] *
-			poly_factorize( (ei - GRID.v + ei.dot(GRID.v)*ei*3).dot(ea) )))
-		ret.append((t, GRID.idx_name[i]))
+	for i, ei in enumerate(grid.basis):
+		t = expand_powers(str(pref * grid.weights[i] *
+			poly_factorize( (ei - grid.v + ei.dot(grid.v)*ei*3).dot(ea) )))
+		ret.append((t, grid.idx_name[i]))
 
 	return ret
 
@@ -478,11 +476,11 @@ def bgk_external_force_pref():
 	# This includes a factor of c_s^2.
 	return 'rho * (3.0f - 3.0f/(2.0f * tau))'
 
-def bb_swap_pairs():
+def bb_swap_pairs(grid):
 	"""Get a set of indices which have to be swapped for a full bounce-back."""
 	ret = set()
 
-	for i, j in enumerate(GRID.idx_opposite):
+	for i, j in enumerate(grid.idx_opposite):
 		# Nothing to swap with.
 		if i == j:
 			continue
@@ -491,19 +489,19 @@ def bb_swap_pairs():
 
 	return ret
 
-def fill_missing_dists(distp, missing_dir):
-	syms = [Symbol('%s->%s' % (distp, x)) for x in GRID.idx_name]
+def fill_missing_dists(grid, distp, missing_dir):
+	syms = [Symbol('%s->%s' % (distp, x)) for x in grid.idx_name]
 	ret = []
 
 	for i, sym in enumerate(syms):
-		sp = GRID.basis[i].dot(GRID.basis[missing_dir+1])
+		sp = grid.basis[i].dot(grid.basis[missing_dir+1])
 
 		if sp < 0:
-			ret.append((syms[GRID.idx_opposite[i]], sym))
+			ret.append((syms[grid.idx_opposite[i]], sym))
 
 	return ret
 
-def ex_rho(distp, missing_dir=None, rho=None):
+def ex_rho(grid, distp, missing_dir=None, rho=None):
 	"""Express density as a function of the distibutions.
 
 	Args:
@@ -512,7 +510,7 @@ def ex_rho(distp, missing_dir=None, rho=None):
 	Returns:
 	  a sympy expression for the density
 	"""
-	syms = [Symbol('%s->%s' % (distp, x)) for x in GRID.idx_name]
+	syms = [Symbol('%s->%s' % (distp, x)) for x in grid.idx_name]
 	ret = 0
 
 	if missing_dir is None:
@@ -521,9 +519,9 @@ def ex_rho(distp, missing_dir=None, rho=None):
 		return ret
 
 	srho = Symbol(rho)
-	return srho / (GRID.basis[missing_dir+1].dot(GRID.v) + 1)
+	return srho / (grid.basis[missing_dir+1].dot(grid.v) + 1)
 
-def ex_velocity(distp, comp, rho, momentum=False, missing_dir=None, par_rho=None):
+def ex_velocity(grid, distp, comp, rho, momentum=False, missing_dir=None, par_rho=None):
 	"""Express velocity as a function of the distributions.
 
 	Args:
@@ -534,13 +532,13 @@ def ex_velocity(distp, comp, rho, momentum=False, missing_dir=None, par_rho=None
 	Returns:
 	  a sympy expression for the velocity in a given direction
 	"""
-	syms = [Symbol('%s->%s' % (distp, x)) for x in GRID.idx_name]
+	syms = [Symbol('%s->%s' % (distp, x)) for x in grid.idx_name]
 	srho = Symbol(rho)
 	ret = 0
 
 	if missing_dir is None:
 		for i, sym in enumerate(syms):
-			ret += GRID.basis[i][comp] * sym
+			ret += grid.basis[i][comp] * sym
 
 		if momentum:
 			return ret
@@ -550,44 +548,44 @@ def ex_velocity(distp, comp, rho, momentum=False, missing_dir=None, par_rho=None
 	prho = Symbol(par_rho)
 
 	for i, sym in enumerate(syms):
-		sp = GRID.basis[i].dot(GRID.basis[missing_dir+1])
+		sp = grid.basis[i].dot(grid.basis[missing_dir+1])
 		if sp <= 0:
 			ret = 1
 
 	ret = ret * (srho - prho)
-	ret *= -GRID.basis[missing_dir+1][comp]
+	ret *= -grid.basis[missing_dir+1][comp]
 	if momentum:
 		return ret
 	else:
 		return ret / prho
 
 
-def bgk_to_mrt(bgk_dist, mrt_dist):
-	bgk_syms = Matrix([Symbol('%s->%s' % (bgk_dist, x)) for x in GRID.idx_name])
-	mrt_syms = [Symbol('%s.%s' % (mrt_dist, x)) for x in GRID.mrt_names]
+def bgk_to_mrt(grid, bgk_dist, mrt_dist):
+	bgk_syms = Matrix([Symbol('%s->%s' % (bgk_dist, x)) for x in grid.idx_name])
+	mrt_syms = [Symbol('%s.%s' % (mrt_dist, x)) for x in grid.mrt_names]
 
 	ret = []
 
-	for i, rhs in enumerate(GRID.mrt_matrix * bgk_syms):
+	for i, rhs in enumerate(grid.mrt_matrix * bgk_syms):
 		ret.append((mrt_syms[i], rhs))
 
 	return ret
 
-def mrt_to_bgk(bgk_dist, mrt_dist):
-	bgk_syms = [Symbol('%s->%s' % (bgk_dist, x)) for x in GRID.idx_name]
-	mrt_syms = Matrix([Symbol('%s.%s' % (mrt_dist, x)) for x in GRID.mrt_names])
+def mrt_to_bgk(grid, bgk_dist, mrt_dist):
+	bgk_syms = [Symbol('%s->%s' % (bgk_dist, x)) for x in grid.idx_name]
+	mrt_syms = Matrix([Symbol('%s.%s' % (mrt_dist, x)) for x in grid.mrt_names])
 
 	ret = []
 
-	for i, rhs in enumerate(GRID.mrt_matrix.inv() * mrt_syms):
+	for i, rhs in enumerate(grid.mrt_matrix.inv() * mrt_syms):
 		ret.append((bgk_syms[i], rhs))
 	return ret
 
-def _get_known_dists(normal):
+def _get_known_dists(grid, normal):
 	unknown = []
 	known = []
 
-	for i, vec in enumerate(GRID.basis):
+	for i, vec in enumerate(grid.basis):
 		if normal.dot(vec) > 0:
 			unknown.append(i)
 		else:
@@ -595,9 +593,9 @@ def _get_known_dists(normal):
 
 	return known, unknown
 
-def zouhe_bb(orientation):
+def zouhe_bb(grid, orientation):
 	idx = orientation + 1
-	normal = GRID.basis[idx]
+	normal = grid.basis[idx]
 	known, unknown = _get_known_dists(normal)
 	ret = []
 
@@ -605,9 +603,9 @@ def zouhe_bb(orientation):
 
 	# Bounce-back of the non-equilibrium parts.
 	for i in unknown:
-		oi = GRID.idx_opposite[i]
-		ret.append((Symbol('fi->%s' % GRID.idx_name[i]),
-					Symbol('fi->%s' % GRID.idx_name[oi]) - eq[oi][0] + eq[i][0]))
+		oi = grid.idx_opposite[i]
+		ret.append((Symbol('fi->%s' % grid.idx_name[i]),
+					Symbol('fi->%s' % grid.idx_name[oi]) - eq[oi][0] + eq[i][0]))
 
 	for i in range(0, len(ret)):
 		t = poly_factorize(ret[i][1])
@@ -617,9 +615,9 @@ def zouhe_bb(orientation):
 
 	return ret
 
-def zouhe_fixup(orientation):
+def zouhe_fixup(grid, orientation):
 	idx = orientation + 1
-	normal = GRID.basis[idx]
+	normal = grid.basis[idx]
 	known, unknown = _get_known_dists(normal)
 
 	unknown_not_normal = set(unknown)
@@ -629,7 +627,7 @@ def zouhe_fixup(orientation):
 
 	# Momentum differences.
 	mdiff = [Symbol('nvx'), Symbol('nvy')]
-	if GRID.dim == 3:
+	if grid.dim == 3:
 		mdiff.append(Symbol('nvz'))
 		basis = [Matrix([1,0,0]), Matrix([0,1,0]), Matrix([0,0,1])]
 	else:
@@ -643,7 +641,7 @@ def zouhe_fixup(orientation):
 
 		cnt = 0
 		for idir in unknown_not_normal:
-			if GRID.basis[idir].dot(basis[i]) != 0:
+			if grid.basis[idir].dot(basis[i]) != 0:
 				cnt += 1
 
 		ret.append((md, md / cnt))
@@ -652,44 +650,44 @@ def zouhe_fixup(orientation):
 	# the wall normal.
 	for i in unknown_not_normal:
 		val = 0
-		ei = GRID.basis[i]
+		ei = grid.basis[i]
 		if ei[0] != 0 and mdiff[0] != 0:
 			val += mdiff[0] * ei[0]
 		if ei[1] != 0 and mdiff[1] != 0:
 			val += mdiff[1] * ei[1]
-		if GRID.dim == 3 and ei[2] != 0 and mdiff[2] != 0:
+		if grid.dim == 3 and ei[2] != 0 and mdiff[2] != 0:
 			val += mdiff[2] * ei[2]
 
 		if val != 0:
-			csym = Symbol('fi->%s' % GRID.idx_name[i])
+			csym = Symbol('fi->%s' % grid.idx_name[i])
 			ret.append((csym, csym + val))
 
 	return ret
 
-def zouhe_velocity(orientation):
+def zouhe_velocity(grid, orientation):
 	# TODO: Add some code to factor out the common factors in the
 	# expressions returned by this function.
 	idx = orientation + 1
-	normal = GRID.basis[idx]
+	normal = grid.basis[idx]
 	known, unknown = _get_known_dists(normal)
 
 	# First, compute an expression for the density.
 	vrho = 0
 	for didx in known:
-		if GRID.basis[didx].dot(normal) == -1:
-			vrho += 2 * Symbol('fi->%s' % GRID.idx_name[didx])
+		if grid.basis[didx].dot(normal) == -1:
+			vrho += 2 * Symbol('fi->%s' % grid.idx_name[didx])
 		else:
-			vrho += Symbol('fi->%s' % GRID.idx_name[didx])
-	vrho /= (1 - GRID.v.dot(normal))
+			vrho += Symbol('fi->%s' % grid.idx_name[didx])
+	vrho /= (1 - grid.v.dot(normal))
 
 	ret = []
 	ret.append((Symbol('rho'), vrho))
 
 	# Bounce-back of the non-equilibrium part of the distributions
 	# in the direction of the normal vector.
-	oidx = GRID.idx_opposite[idx]
-	sym_norm = Symbol('fi->%s' % GRID.idx_name[idx])
-	sym_opp  = Symbol('fi->%s' % GRID.idx_name[oidx])
+	oidx = grid.idx_opposite[idx]
+	sym_norm = Symbol('fi->%s' % grid.idx_name[idx])
+	sym_opp  = Symbol('fi->%s' % grid.idx_name[oidx])
 
 	val_norm = sympy.solve(bgk_equilibrium(as_string=False)[idx][0] - sym_norm -
 					  bgk_equilibrium(as_string=False)[oidx][0] + sym_opp, sym_norm)[0]
@@ -697,7 +695,7 @@ def zouhe_velocity(orientation):
 	ret.append((sym_norm, poly_factorize(val_norm)))
 
 	# Compute expressions for the remaining distributions.
-	remaining = [Symbol('fi->%s' % GRID.idx_name[x]) for x in unknown if x != idx]
+	remaining = [Symbol('fi->%s' % grid.idx_name[x]) for x in unknown if x != idx]
 
 	vxe = ex_velocity('fi', 0, 'rho')
 	vye = ex_velocity('fi', 1, 'rho')
@@ -706,16 +704,16 @@ def zouhe_velocity(orientation):
 	vx2 = vxe.subs({sym_norm: val_norm})
 	vy2 = vye.subs({sym_norm: val_norm})
 
-	for sym, val in sympy.solve((GRID.vx - vx2, GRID.vy - vy2), *remaining).iteritems():
+	for sym, val in sympy.solve((grid.vx - vx2, grid.vy - vy2), *remaining).iteritems():
 		ret.append((sym, poly_factorize(val)))
 
 	return ret
 
-def get_prop_dists(dir):
+def get_prop_dists(grid, dir):
 	"""Compute a list of base vectors with a specific value of the X component (`dir`)."""
 	ret = []
 
-	for i, ei in enumerate(GRID.basis):
+	for i, ei in enumerate(grid.basis):
 		if ei[0] == dir and i > 0:
 			ret.append(i)
 
@@ -877,6 +875,8 @@ def _prepare_grids():
 			else:
 				raise TypeError('Opposite vector for %s not found.' % ei)
 
+		grid.eq_dist = bgk_equilibrium(grid, False)
+
 		# If MRT is supported for the current grid, compute the transformation
 		# matrix from the velocity space to moment space.  The procedure is as
 		# follows:
@@ -898,20 +898,6 @@ def _prepare_grids():
 			grid.mrt_matrix = Matrix([x.transpose().tolist()[0] for x in orthogonalize(*grid.mrt_basis)])
 			grid._init_mrt_equilibrium()
 
-def use_grid(grid):
-	"""Select the current grid.
-
-	Args:
-	  grid: one of the grid classes listed in sym.KNOWN_GRIDS.
-	"""
-	global GRID, EQ_DIST
-	if grid not in KNOWN_GRIDS:
-		raise ValueError('Unknown grid type "%s"' % grid)
-
-	GRID = grid
-	EQ_DIST = bgk_equilibrium()
-
 KNOWN_GRIDS = (D2Q9, D3Q13, D3Q15, D3Q19)
 
 _prepare_grids()
-use_grid(D2Q9)
