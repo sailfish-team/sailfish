@@ -258,7 +258,7 @@ class Fluid2DVis(object):
 				elif event.key == pygame.K_p:
 					self._paused = not self._paused
 					if self._paused:
-						print 'Simulation paused @ iter = %d.' % self.sim._iter
+						print 'Simulation paused @ iter = %d.' % self.sim.iter_
 				elif event.key == pygame.K_q:
 					sys.exit()
 				elif event.key == pygame.K_r:
@@ -303,7 +303,7 @@ class Fluid2DVis(object):
 			if self._paused:
 				continue
 
-			i = self.sim._iter
+			i = self.sim.iter_
 			self.sim.sim_step(self._tracers)
 
 			if i % self.sim.options.every == 0 and i:
