@@ -285,13 +285,15 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 	#define vy v[1]
 	#define vz v[2]
 
+	// Incompressible model.
+	#define rho0 1.0f
+
 	%if bc_velocity == 'fullbb':
 		if (isVelocityNode(node_type)) {
 			bounce_back(fi);
 			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
 			%for i, ve in enumerate(grid.basis):
-				// * *rho for compressible
-				fi->${grid.idx_name[i]} += 1.0f * ${sym.make_float(2.0 * grid.weights[i] * grid.v.dot(ve) / grid.cssq)};
+				fi->${grid.idx_name[i]} += rho0 * ${sym.make_float(2.0 * grid.weights[i] * grid.v.dot(ve) / grid.cssq)};
 			%endfor
 			*rho = ${sym.ex_rho(grid, 'fi')};
 		}
@@ -435,6 +437,9 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	#define my fm.my
 	#define mz fm.mz
 	#define rho fm.rho
+
+	// Incompressible model.
+	#define rho0 1.0f
 
 	// Calculate equilibrium distributions in moment space.
 	%for i, eq in enumerate(grid.mrt_equilibrium):

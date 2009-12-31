@@ -21,6 +21,11 @@ class DxQy(object):
 	mz = Symbol('mz')
 	visc = Symbol('visc')
 
+	# For incompressible models, this symbol is replaced with the average
+	# density, usually 1.0.  For compressible models, it is the same as
+	# the density rho.
+	rho0 = Symbol('rho0')
+
 	# Square of the sound velocity.
 	# TODO: Before we can ever start using different values of the sound speed,
 	# make sure that the sound speed is not hardcoded in the formulas below.
@@ -187,19 +192,17 @@ class D3Q13(DxQy):
 			if name == 'm3x' or name == 'm3y' or name == 'm3z':
 				t = 0
 			elif name == 'pxy':
-				t = 1/cls.rho * (cls.mx * cls.my)
+				t = 1/cls.rho0 * (cls.mx * cls.my)
 			elif name == 'pyz':
-				t = 1/cls.rho * (cls.my * cls.mz)
+				t = 1/cls.rho0 * (cls.my * cls.mz)
 			elif name == 'pzx':
-				t = 1/cls.rho * (cls.mx * cls.mz)
+				t = 1/cls.rho0 * (cls.mx * cls.mz)
 			elif name == 'pxx':
-				# times rho_0 = 1
-				t = 1/cls.rho * (2 * cls.mx**2 - cls.my**2 - cls.mz**2)
+				t = 1/cls.rho0 * (2 * cls.mx**2 - cls.my**2 - cls.mz**2)
 			elif name == 'pww':
-				# times rho_0 = 1
-				t = 1/cls.rho * (cls.my**2 - cls.mz**2)
+				t = 1/cls.rho0 * (cls.my**2 - cls.mz**2)
 			elif name == 'en':
-				t = 3*cls.rho*(13*cls.cssq - 8)/2 + 13/(2 * cls.rho)*(cls.mx**2 + cls.my**2 + cls.mz**2)
+				t = 3*cls.rho*(13*cls.cssq - 8)/2 + 13/(2 * cls.rho0)*(cls.mx**2 + cls.my**2 + cls.mz**2)
 
 			t = expand_powers(str(t))
 			cls.mrt_equilibrium.append(t)
@@ -271,7 +274,7 @@ class D3Q15(DxQy):
 
 			vec_e = cls.mrt_matrix[i,:]
 			if name == 'en':
-				t = -cls.rho + 1/cls.rho * (cls.mx**2 + cls.my**2 + cls.mz**2)
+				t = -cls.rho + 1/cls.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2)
 			elif name == 'ens':
 				t = -cls.rho
 			elif name == 'ex':
@@ -281,15 +284,15 @@ class D3Q15(DxQy):
 			elif name == 'ez':
 				t = -Rational(7,3)*cls.mz
 			elif name == 'pxx':
-				t = 1/(3*cls.rho) * (2*cls.mx**2 - (cls.my**2 + cls.mz**2))
+				t = 1/(cls.rho0) * (2*cls.mx**2 - (cls.my**2 + cls.mz**2))
 			elif name == 'pww':
-				t = 1/cls.rho * (cls.my**2 - cls.mz**2)
+				t = 1/cls.rho0 * (cls.my**2 - cls.mz**2)
 			elif name == 'pxy':
-				t = 1/cls.rho * (cls.mx * cls.my)
+				t = 1/cls.rho0 * (cls.mx * cls.my)
 			elif name == 'pyz':
-				t = 1/cls.rho * (cls.my * cls.mz)
+				t = 1/cls.rho0 * (cls.my * cls.mz)
 			elif name == 'pzx':
-				t = 1/cls.rho * (cls.mx * cls.mz)
+				t = 1/cls.rho0 * (cls.mx * cls.mz)
 			elif name == 'myz':
 				t = 0
 
@@ -317,7 +320,7 @@ class D3Q19(DxQy):
 	mrt_names = ['rho', 'en', 'ens', 'mx', 'ex', 'my', 'ey', 'mz', 'ez',
 				 'pww', 'piww', 'pxx', 'pixx', 'pxy', 'pyz', 'pzx', 'm3x', 'm3y', 'm3z']
 
-	mrt_collision = [0.0, 1.19, 1.24, 0.0, 1.2, 0.0, 1.2, 0.0, 1.2,
+	mrt_collision = [0.0, 1.19, 1.4, 0.0, 1.2, 0.0, 1.2, 0.0, 1.2,
 				-1, 1.4, -1, 1.4, -1, -1, -1, 1.98, 1.98, 1.98]
 
 	@classmethod
@@ -371,9 +374,9 @@ class D3Q19(DxQy):
 
 			vec_e = cls.mrt_matrix[i,:]
 			if name == 'en':
-				t = -11 * cls.rho + 19/cls.rho * (cls.mx**2 + cls.my**2 + cls.mz**2)
+				t = -11 * cls.rho + 19/cls.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2)
 			elif name == 'ens':
-				t = - Rational(475,63)/cls.rho*(cls.mx**2 + cls.my**2 + cls.mz**2)
+				t = - Rational(475,63)/cls.rho0*(cls.mx**2 + cls.my**2 + cls.mz**2)
 			elif name == 'ex':
 				t = -Rational(2,3)*cls.mx
 			elif name == 'ey':
@@ -381,15 +384,15 @@ class D3Q19(DxQy):
 			elif name == 'ez':
 				t = -Rational(2,3)*cls.mz
 			elif name == 'pxx':
-				t = 1/(3*cls.rho) * (2*cls.mx**2 - (cls.my**2 + cls.mz**2))
+				t = 1/cls.rho0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2))
 			elif name == 'pww':
-				t = 1/cls.rho * (cls.my**2 - cls.mz**2)
+				t = 1/cls.rho0 * (cls.my**2 - cls.mz**2)
 			elif name == 'pxy':
-				t = 1/cls.rho * (cls.mx * cls.my)
+				t = 1/cls.rho0 * (cls.mx * cls.my)
 			elif name == 'pyz':
-				t = 1/cls.rho * (cls.my * cls.mz)
+				t = 1/cls.rho0 * (cls.my * cls.mz)
 			elif name == 'pzx':
-				t = 1/cls.rho * (cls.mx * cls.mz)
+				t = 1/cls.rho0 * (cls.mx * cls.mz)
 			elif name == 'm3x' or name == 'm3y' or name == 'm3z' or name == 'pixx' or name == 'piww':
 				t = 0
 
