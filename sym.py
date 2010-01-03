@@ -732,7 +732,7 @@ def expand_powers(t):
 	return re.sub('([a-z]+)\*\*2', '\\1*\\1', t)
 
 def use_pointers(str):
-	ret = str.replace('rho', ' *rho')
+	ret = re.sub(r'([^_a-z0-9A-Z]|^)rho', r'\1(*rho)', str)
 	ret = ret.replace('vx', 'v[0]')
 	ret = ret.replace('vy', 'v[1]')
 	ret = ret.replace('vz', 'v[2]')
