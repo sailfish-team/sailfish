@@ -438,7 +438,6 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	#define mx fm.mx
 	#define my fm.my
 	#define mz fm.mz
-	#define rho fm.rho
 
 	// Calculate equilibrium distributions in moment space.
 	%for i, eq in enumerate(grid.mrt_equilibrium):
@@ -477,7 +476,6 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	#undef mx
 	#undef my
 	#undef mz
-	#undef rho
 
 	${external_force('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho', momentum=True)}
 

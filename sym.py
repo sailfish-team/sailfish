@@ -786,15 +786,18 @@ def make_float(t):
 def cexpr(grid, incompressible, pointers, ex, rho):
 	"""Convert a SymPy expression into a string containing valid C code."""
 
+	t = ex
+
 	if type(rho) is str:
 		rho = Symbol(rho)
+		t = t.subs(grid.rho, rho)
 	if rho is None:
 		rho = grid.rho
 
 	if incompressible:
-		t = ex.subs(grid.rho0, 1)
+		t = t.subs(grid.rho0, 1)
 	else:
-		t = ex.subs(grid.rho0, rho)
+		t = t.subs(grid.rho0, rho)
 
 	t = str(t)
 	t = expand_powers(t)
