@@ -20,61 +20,61 @@ from lbm_sphere_force_3d import LSphereSim, LBMGeoSphere
 MAX_ITERS = 50000
 
 defaults = {
-		'batch': True,
-		'verbose': True,
-		'max_iters': MAX_ITERS,
-	}
+        'batch': True,
+        'verbose': True,
+        'max_iters': MAX_ITERS,
+    }
 
 def run_test(precision, model, grid, name):
-	xvec = []
-	yvec = []
-	yvec2 = []
-	basepath = os.path.join('regtest/results', name, grid, model, precision)
+    xvec = []
+    yvec = []
+    yvec2 = []
+    basepath = os.path.join('regtest/results', name, grid, model, precision)
 
-	if not os.path.exists(basepath):
-		os.makedirs(basepath)
+    if not os.path.exists(basepath):
+        os.makedirs(basepath)
 
-	bc = 'fullbb'
+    bc = 'fullbb'
 
-	f = open(os.path.join(basepath, '%s.dat' % bc), 'w')
+    f = open(os.path.join(basepath, '%s.dat' % bc), 'w')
 
-	defaults['grid'] = grid
-	defaults['model'] = model
-	defaults['bc_wall'] = bc
-	defaults['precision'] = precision
+    defaults['grid'] = grid
+    defaults['model'] = model
+    defaults['bc_wall'] = bc
+    defaults['precision'] = precision
 
-	for re in [1, 10, 50, 100, 200, 300, 400]:
-		defaults['re'] = re
-		print 'Testing for Re = %d' % re
+    for re in [1, 10, 50, 100, 200, 300, 400]:
+        defaults['re'] = re
+        print 'Testing for Re = %d' % re
 
-		sim = LSphereSim(LBMGeoSphere, defaults)
-		sim.run()
+        sim = LSphereSim(LBMGeoSphere, defaults)
+        sim.run()
 
-		dc = math.fsum(sim.coeffs)/len(sim.coeffs)
-		dct = sim.drag_theo()
+        dc = math.fsum(sim.coeffs)/len(sim.coeffs)
+        dct = sim.drag_theo()
 
-		xvec.append(re)
-		yvec.append(dc)
-		yvec2.append(dct)
+        xvec.append(re)
+        yvec.append(dc)
+        yvec2.append(dct)
 
-		print >>f, dc, dct
+        print >>f, dc, dct
 
-	print
+    print
 
-	f.close()
+    f.close()
 
-	plt.clf()
-	plt.cla()
+    plt.clf()
+    plt.cla()
 
-	plt.loglog(xvec, yvec, 'bo-')
-	plt.loglog(xvec, yvec2, 'ro-')
-	plt.gca().yaxis.grid(True)
-	plt.gca().yaxis.grid(True, which='minor')
-	plt.gca().xaxis.grid(True)
-	plt.gca().xaxis.grid(True, which='minor')
-	plt.ylabel('c_d')
-	plt.xlabel('Re')
-	plt.savefig(os.path.join(basepath, '%s.pdf' % bc), format='pdf')
+    plt.loglog(xvec, yvec, 'bo-')
+    plt.loglog(xvec, yvec2, 'ro-')
+    plt.gca().yaxis.grid(True)
+    plt.gca().yaxis.grid(True, which='minor')
+    plt.gca().xaxis.grid(True)
+    plt.gca().xaxis.grid(True, which='minor')
+    plt.ylabel('c_d')
+    plt.xlabel('Re')
+    plt.savefig(os.path.join(basepath, '%s.pdf' % bc), format='pdf')
 
 parser = OptionParser()
 parser.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
@@ -85,9 +85,9 @@ parser.add_option('--grid', dest='grid', help='grid', type='string', default='')
 geo_type = geo.LBMGeo3D.NODE_VELOCITY
 
 if options.grid:
-	grid = options.grid
+    grid = options.grid
 else:
-	grid = sym.GRID.__name__
+    grid = sym.GRID.__name__
 
 print 'Running tests for %s' % (options.precision)
 

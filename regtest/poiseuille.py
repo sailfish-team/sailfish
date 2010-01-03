@@ -19,90 +19,90 @@ MAX_ITERS = 10000
 POINTS = 30
 
 defaults = {
-		'stationary': True,
-		'batch': True,
-		'quiet': True,
-		'lat_w': 64,
-		'lat_h': 64,
-	}
+        'stationary': True,
+        'batch': True,
+        'quiet': True,
+        'lat_w': 64,
+        'lat_h': 64,
+    }
 
 def run_test(bc, drive, precision, model, grid, name):
-	xvec = []
-	yvec = []
-	basepath = os.path.join('regtest/results', name, grid, model, drive, precision)
-	profpath = os.path.join(basepath, 'profiles')
+    xvec = []
+    yvec = []
+    basepath = os.path.join('regtest/results', name, grid, model, drive, precision)
+    profpath = os.path.join(basepath, 'profiles')
 
-	if not os.path.exists(profpath):
-		os.makedirs(profpath)
+    if not os.path.exists(profpath):
+        os.makedirs(profpath)
 
-	f = open(os.path.join(basepath, '%s.dat' % bc), 'w')
+    f = open(os.path.join(basepath, '%s.dat' % bc), 'w')
 
-	defaults['grid'] = grid
-	defaults['model'] = model
-	defaults['drive'] = drive
-	defaults['bc_wall'] = bc
-	if drive == 'pressure':
-		defaults['bc_pressure'] = bc
-	defaults['precision'] = precision
+    defaults['grid'] = grid
+    defaults['model'] = model
+    defaults['drive'] = drive
+    defaults['bc_wall'] = bc
+    if drive == 'pressure':
+        defaults['bc_pressure'] = bc
+    defaults['precision'] = precision
 
-	print '* Testing "%s" for visc' % bc,
-	i = 0
+    print '* Testing "%s" for visc' % bc,
+    i = 0
 
-	for visc in numpy.logspace(-3, -1, num=POINTS):
-		print '%f ' % visc,
+    for visc in numpy.logspace(-3, -1, num=POINTS):
+        print '%f ' % visc,
 
-		iters = int(1000 / visc)
-		xvec.append(visc)
+        iters = int(1000 / visc)
+        xvec.append(visc)
 
-		defaults['visc'] = visc
-		defaults['max_iters'] = iters
+        defaults['visc'] = visc
+        defaults['max_iters'] = iters
 
-		sim = LTestPoiSim([], defaults)
-		sim.run()
+        sim = LTestPoiSim([], defaults)
+        sim.run()
 
-		yvec.append(sim.result)
+        yvec.append(sim.result)
 
-		prof_sim = sim.get_profile()
-		prof_th = sim.geo.get_velocity_profile(fluid_only=True)
+        prof_sim = sim.get_profile()
+        prof_th = sim.geo.get_velocity_profile(fluid_only=True)
 
-		print >>f, visc, sim.result
+        print >>f, visc, sim.result
 
-		plt.gca().yaxis.grid(True)
-		plt.gca().xaxis.grid(True)
-		plt.gca().xaxis.grid(True, which='minor')
-		plt.gca().yaxis.grid(True, which='minor')
-		plt.gca().set_xbound(0, len(prof_sim)-1)
+        plt.gca().yaxis.grid(True)
+        plt.gca().xaxis.grid(True)
+        plt.gca().xaxis.grid(True, which='minor')
+        plt.gca().yaxis.grid(True, which='minor')
+        plt.gca().set_xbound(0, len(prof_sim)-1)
 
-		f2 = open(os.path.join(profpath, '%s-profile%d.dat' % (bc, i)), 'w')
-		for j in range(0, len(prof_sim)):
-			print >>f2, prof_sim[j], prof_th[j]
-		f2.close()
+        f2 = open(os.path.join(profpath, '%s-profile%d.dat' % (bc, i)), 'w')
+        for j in range(0, len(prof_sim)):
+            print >>f2, prof_sim[j], prof_th[j]
+        f2.close()
 
-		plt.clf()
-		plt.plot(prof_th - prof_sim, 'bo-')
-		plt.title('visc = %f' % xvec[i])
-		plt.savefig(os.path.join(profpath, '%s-profile%d.pdf' % (bc, i)), format='pdf')
+        plt.clf()
+        plt.plot(prof_th - prof_sim, 'bo-')
+        plt.title('visc = %f' % xvec[i])
+        plt.savefig(os.path.join(profpath, '%s-profile%d.pdf' % (bc, i)), format='pdf')
 
-		plt.clf()
-		plt.cla()
+        plt.clf()
+        plt.cla()
 
-		i += 1
+        i += 1
 
-	print
+    print
 
-	f.close()
+    f.close()
 
-	plt.clf()
-	plt.cla()
+    plt.clf()
+    plt.cla()
 
-	plt.semilogx(xvec, yvec, 'bo-')
-	plt.gca().yaxis.grid(True)
-	plt.gca().yaxis.grid(True, which='minor')
-	plt.gca().xaxis.grid(True)
-	plt.gca().xaxis.grid(True, which='minor')
-	plt.ylabel('max velocity / theoretical max velocity - 1')
-	plt.xlabel('viscosity')
-	plt.savefig(os.path.join(basepath, '%s.pdf' % bc), format='pdf')
+    plt.semilogx(xvec, yvec, 'bo-')
+    plt.gca().yaxis.grid(True)
+    plt.gca().yaxis.grid(True, which='minor')
+    plt.gca().xaxis.grid(True)
+    plt.gca().xaxis.grid(True, which='minor')
+    plt.ylabel('max velocity / theoretical max velocity - 1')
+    plt.xlabel('viscosity')
+    plt.savefig(os.path.join(basepath, '%s.pdf' % bc), format='pdf')
 
 parser = OptionParser()
 parser.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
@@ -114,47 +114,47 @@ parser.add_option('--bc', dest='bc', help='boundary conditions to test (comma se
 (options, args) = parser.parse_args()
 
 if options.dim == '2':
-	from lbm_poiseuille import LPoiSim, LBMGeoPoiseuille
-	name = 'poiseuille'
+    from lbm_poiseuille import LPoiSim, LBMGeoPoiseuille
+    name = 'poiseuille'
 else:
-	from lbm_poiseuille_3d import LPoiSim, LBMGeoPoiseuille
-	defaults['along_y'] = True
-	defaults['along_z'] = False
-	defaults['along_x'] = False
-	defaults['lat_d'] = 64
-	name = 'poiseuille3d'
+    from lbm_poiseuille_3d import LPoiSim, LBMGeoPoiseuille
+    defaults['along_y'] = True
+    defaults['along_z'] = False
+    defaults['along_x'] = False
+    defaults['lat_d'] = 64
+    name = 'poiseuille3d'
 
 if options.grid:
-	grid = options.grid
+    grid = options.grid
 else:
-	grid = sym.GRID.__name__
+    grid = sym.GRID.__name__
 
 if options.drive == 'force':
-	geo_type = geo.LBMGeo.NODE_WALL
+    geo_type = geo.LBMGeo.NODE_WALL
 else:
-	geo_type = geo.LBMGeo.NODE_PRESSURE
+    geo_type = geo.LBMGeo.NODE_PRESSURE
 
 if options.bc:
-	bcs = filter(lambda x: geo_type in geo.get_bc(x).supported_types, options.bc.split(','))
+    bcs = filter(lambda x: geo_type in geo.get_bc(x).supported_types, options.bc.split(','))
 else:
-	bcs = [x.name for x in geo.SUPPORTED_BCS if geo_type in x.supported_types]
+    bcs = [x.name for x in geo.SUPPORTED_BCS if geo_type in x.supported_types]
 
 class LTestPoiSim(LPoiSim):
-	def __init__(self, args, defaults):
-		super(LTestPoiSim, self).__init__(LBMGeoPoiseuille, args, defaults)
-		self.clear_hooks()
-		self.add_iter_hook(self.options.max_iters-1, self.save_output)
+    def __init__(self, args, defaults):
+        super(LTestPoiSim, self).__init__(LBMGeoPoiseuille, args, defaults)
+        self.clear_hooks()
+        self.add_iter_hook(self.options.max_iters-1, self.save_output)
 
-	def save_output(self):
-#		self.result = (numpy.max(self.vy[16,1:self.geo.lat_w-1]) / max(self.geo.get_velocity_profile())) - 1.0
-		self.res_maxv = numpy.max(self.geo.mask_array_by_fluid(self.vy))
-		self.th_maxv = max(self.geo.get_velocity_profile())
+    def save_output(self):
+#       self.result = (numpy.max(self.vy[16,1:self.geo.lat_w-1]) / max(self.geo.get_velocity_profile())) - 1.0
+        self.res_maxv = numpy.max(self.geo.mask_array_by_fluid(self.vy))
+        self.th_maxv = max(self.geo.get_velocity_profile())
 
-		print self.res_maxv, self.geo.get_velocity_profile()
+        print self.res_maxv, self.geo.get_velocity_profile()
 
-		self.result = self.res_maxv / self.th_maxv - 1.0
+        self.result = self.res_maxv / self.th_maxv - 1.0
 
 print 'Running tests for %s, %s' % (options.precision, options.drive)
 
 for bc in bcs:
-	run_test(bc, options.drive, options.precision, options.model, grid, name)
+    run_test(bc, options.drive, options.precision, options.model, grid, name)
