@@ -1,5 +1,6 @@
 import math
 import numpy
+import os
 import sys
 import time
 import geo
@@ -44,6 +45,9 @@ class LBMSim(object):
 
 	#: The filename base for screenshots.
 	filename = 'lbm_sim'
+
+	#: The command to use to automatically format the compute unit source code.
+	format_cmd = r"indent -linux -sob -l120 {file} ; sed -i -e '/^$/{{N; s/\n\([\t ]*}}\)$/\1/}}' -e '/{{$/{{N; s/{{\n$/{{/}}' {file}"
 
 	@property
 	def time(self):
@@ -122,6 +126,7 @@ class LBMSim(object):
 		group.add_option('--nobatch', dest='batch', help='run in interactive mode', action='store_false')
 		group.add_option('--save_src', dest='save_src', help='file to save the CUDA/OpenCL source code to', action='store', type='string', default='')
 		group.add_option('--use_src', dest='use_src', help='CUDA/OpenCL source to use instead of the automatically generated one', action='store', type='string', default='')
+		group.add_option('--noformat_src', dest='format_src', help='do not format the generated source code', action='store_false', default=True)
 		group.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
 		group.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat', 'vtk'], default='h5flat')
 		group.add_option('--savegeocache', dest='save_geocache', help='cache geometry data', action='store_true', default=False)
@@ -402,6 +407,9 @@ class LBMSim(object):
 		if self.options.save_src:
 			with open(self.options.save_src, 'w') as fsrc:
 				print >>fsrc, src
+
+			if self.options.format_src:
+				os.system(self.format_cmd.format(file=self.options.save_src))
 
 		# If external source code was requested, ignore the code that we have
 		# just generated above.
