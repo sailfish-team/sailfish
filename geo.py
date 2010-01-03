@@ -308,7 +308,8 @@ class LBMGeo(object):
 		"""
 		if (rho, velocity) not in self.feq_cache:
 			vals = []
-			self.feq_cache[(rho, velocity)] = map(self.float, sym.eval_bgk_equilibrium(self.sim.grid, velocity, rho))
+			self.feq_cache[(rho, velocity)] = map(self.float,
+					sym.eval_bgk_equilibrium(self.sim.grid, self.options.incompressible, velocity, rho))
 
 		for i, val in enumerate(self.feq_cache[(rho, velocity)]):
 			dist[i][tuple(reversed(location))] = val

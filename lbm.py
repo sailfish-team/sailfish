@@ -96,6 +96,7 @@ class LBMSim(object):
 		group.add_option('--lat_d', dest='lat_d', help='lattice depth', type='int', action='store', default=1)
 		group.add_option('--visc', dest='visc', help='viscosity', type='float', action='store', default=0.01)
 		group.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
+		group.add_option('--incompressible', dest='incompressible', help='whether to use the incompressible model of Luo and He', action='store_true', default=False)
 		group.add_option('--grid', dest='grid', help='grid type to use', type='choice', choices=grids, default=default_grid)
 		group.add_option('--accel_x', dest='accel_x', help='y component of the external acceleration', action='store', type='float', default=0.0)
 		group.add_option('--accel_y', dest='accel_y', help='x component of the external acceleration', action='store', type='float', default=0.0)
@@ -133,7 +134,7 @@ class LBMSim(object):
 		group.add_option('--scr_scale', dest='scr_scale', help='screen scale', type='float', action='store', default=3.0)
 		group.add_option('--every', dest='every', help='update the visualization every N steps', metavar='N', type='int', action='store', default=100)
 		group.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
-		group.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=vis2d.vis_map.keys(), action='store', default='std')
+		group.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=vis2d.vis_map.keys(), action='store', default='rgb1')
 		group.add_option('--vis3d', dest='vis3d', help='3D visualization engine', type='choice', choices=['mayavi', 'cutplane'], action='store', default='cutplane')
 		parser.add_option_group(group)
 
@@ -232,6 +233,7 @@ class LBMSim(object):
 		ret['size'] = tuple(reversed(self.shape))
 		ret['visc'] = self.options.visc
 		ret['model'] = self.options.model
+		ret['incompressible'] = self.options.incompressible
 		ret['dx'] = self.geo.dx
 		ret['dt'] = self.dt
 		ret['precision'] = self.options.precision
@@ -337,7 +339,7 @@ class LBMSim(object):
 		import locale
 		locale.setlocale(locale.LC_ALL, 'C')
 
-		lbm_tmpl = Template(filename='lbm.mako', lookup=TemplateLookup(directories=['.']))
+		lbm_tmpl = Template(filename='lbm.mako', lookup=TemplateLookup(directories=['.']), module_directory='/tmp/sailfish_modules')
 
 		self.tau = self.get_tau()
 		ctx = {}
@@ -349,6 +351,7 @@ class LBMSim(object):
 		ctx['lat_d'] = self.options.lat_d
 		ctx['num_params'] = len(self.geo_params)
 		ctx['model'] = self.options.model
+		ctx['incompressible'] = self.options.incompressible
 		ctx['periodic_x'] = int(self.options.periodic_x)
 		ctx['periodic_y'] = int(self.options.periodic_y)
 		ctx['periodic_z'] = int(self.options.periodic_z)

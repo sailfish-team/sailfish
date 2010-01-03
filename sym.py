@@ -24,6 +24,10 @@ class DxQy(object):
 	# For incompressible models, this symbol is replaced with the average
 	# density, usually 1.0.  For compressible models, it is the same as
 	# the density rho.
+	#
+	# The incompressible model is described in:
+	#   X. He, L.-S. Luo, Lattice Boltzmann model for the incompressible Navier-Stokes
+	#   equation, J. Stat. Phys. 88 (1997) 927-944
 	rho0 = Symbol('rho0')
 
 	# Square of the sound velocity.
@@ -121,7 +125,6 @@ class D2Q9(DxQy):
 						(math.sqrt(vec_mx.dot(vec_mx) * vec_my.dot(vec_my)) * cls.mx * cls.my))
 
 			t = poly_factorize(t)
-			t = expand_powers(str(t))
 			cls.mrt_equilibrium.append(t)
 
 class D3Q13(DxQy):
@@ -204,7 +207,6 @@ class D3Q13(DxQy):
 			elif name == 'en':
 				t = 3*cls.rho*(13*cls.cssq - 8)/2 + 13/(2 * cls.rho0)*(cls.mx**2 + cls.my**2 + cls.mz**2)
 
-			t = expand_powers(str(t))
 			cls.mrt_equilibrium.append(t)
 
 
@@ -297,7 +299,6 @@ class D3Q15(DxQy):
 				t = 0
 
 #			t = poly_factorize(t)
-			t = expand_powers(str(t))
 			cls.mrt_equilibrium.append(t)
 
 
@@ -397,16 +398,10 @@ class D3Q19(DxQy):
 				t = 0
 
 #			t = poly_factorize(t)
-			t = expand_powers(str(t))
 			cls.mrt_equilibrium.append(t)
 
-
-def bgk_equilibrium(grid, as_string=True):
+def bgk_equilibrium(grid):
 	"""Get expressions for the BGK equilibrium distribution.
-
-	Args:
-	  as_string: if True, this function will return strings, if False,
-	             sympy expressions
 
 	Returns:
 	  a list of strings or sympy epxressions representing the equilibrium
@@ -415,19 +410,17 @@ def bgk_equilibrium(grid, as_string=True):
 	out = []
 
 	for i, ei in enumerate(grid.basis):
-		t = (grid.rho * grid.weights[i] *
-					(1 + poly_factorize(
+		t = (grid.weights[i] * (
+					(grid.rho + grid.rho0 * poly_factorize(
 						3*ei.dot(grid.v) +
 						Rational(9, 2) * (ei.dot(grid.v))**2 -
-						Rational(3, 2) * grid.v.dot(grid.v))))
-		if as_string:
-			t = expand_powers(str(t))
+						Rational(3, 2) * grid.v.dot(grid.v)))))
 
 		out.append((t, grid.idx_name[i]))
 
 	return out
 
-def eval_bgk_equilibrium(grid, velocity, rho):
+def eval_bgk_equilibrium(grid, incompressible, velocity, rho):
 	"""Get BGK equilibrium distributions for a specific velocity and density.
 
 	Args:
@@ -441,6 +434,11 @@ def eval_bgk_equilibrium(grid, velocity, rho):
 	vals = []
 
 	subs={grid.rho: rho}
+
+	if incompressible:
+		subs[grid.rho0] = 1
+	else:
+		subs[grid.rho0] = rho
 
 	for i, v in enumerate(velocity):
 		subs[grid.v[i]] = v
@@ -469,8 +467,7 @@ def bgk_external_force(grid):
 	ret = []
 
 	for i, ei in enumerate(grid.basis):
-		t = expand_powers(str(pref * grid.weights[i] *
-			poly_factorize( (ei - grid.v + ei.dot(grid.v)*ei*3).dot(ea) )))
+		t = pref * grid.weights[i] * poly_factorize( (ei - grid.v + ei.dot(grid.v)*ei*3).dot(ea))
 		ret.append((t, grid.idx_name[i]))
 
 	return ret
@@ -504,7 +501,7 @@ def fill_missing_dists(grid, distp, missing_dir):
 
 	return ret
 
-def ex_rho(grid, distp, missing_dir=None, rho=None):
+def ex_rho(grid, distp, missing_dir=None):
 	"""Express density as a function of the distibutions.
 
 	Args:
@@ -521,47 +518,41 @@ def ex_rho(grid, distp, missing_dir=None, rho=None):
 			ret += sym
 		return ret
 
-	srho = Symbol(rho)
-	return srho / (grid.basis[missing_dir+1].dot(grid.v) + 1)
+	return grid.rho / (grid.basis[missing_dir+1].dot(grid.v) + 1)
 
-def ex_velocity(grid, distp, comp, rho, momentum=False, missing_dir=None, par_rho=None):
+def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=None):
 	"""Express velocity as a function of the distributions.
 
 	Args:
 	  distp: name of the pointer to the distribution structure
 	  comp: velocity component number: 0, 1 or 2 (for 3D lattices)
-	  rho: name of the density variable
 
 	Returns:
 	  a sympy expression for the velocity in a given direction
 	"""
 	syms = [Symbol('%s->%s' % (distp, x)) for x in grid.idx_name]
-	srho = Symbol(rho)
 	ret = 0
 
 	if missing_dir is None:
 		for i, sym in enumerate(syms):
 			ret += grid.basis[i][comp] * sym
 
-		if momentum:
-			return ret
-		else:
-			return ret / srho
-
-	prho = Symbol(par_rho)
-
-	for i, sym in enumerate(syms):
-		sp = grid.basis[i].dot(grid.basis[missing_dir+1])
-		if sp <= 0:
-			ret = 1
-
-	ret = ret * (srho - prho)
-	ret *= -grid.basis[missing_dir+1][comp]
-	if momentum:
-		return ret
+		if not momentum:
+			ret = ret / grid.rho0
 	else:
-		return ret / prho
+		prho = Symbol(par_rho)
 
+		for i, sym in enumerate(syms):
+			sp = grid.basis[i].dot(grid.basis[missing_dir+1])
+			if sp <= 0:
+				ret = 1
+
+		ret = ret * (grid.rho0 - prho)
+		ret *= -grid.basis[missing_dir+1][comp]
+		if not momentum:
+			ret = ret / prho
+
+	return ret
 
 def bgk_to_mrt(grid, bgk_dist, mrt_dist):
 	bgk_syms = Matrix([Symbol('%s->%s' % (bgk_dist, x)) for x in grid.idx_name])
@@ -599,10 +590,10 @@ def _get_known_dists(grid, normal):
 def zouhe_bb(grid, orientation):
 	idx = orientation + 1
 	normal = grid.basis[idx]
-	known, unknown = _get_known_dists(normal)
+	known, unknown = _get_known_dists(grid, normal)
 	ret = []
 
-	eq = bgk_equilibrium(as_string=False)
+	eq = bgk_equilibrium(grid)
 
 	# Bounce-back of the non-equilibrium parts.
 	for i in unknown:
@@ -612,7 +603,6 @@ def zouhe_bb(grid, orientation):
 
 	for i in range(0, len(ret)):
 		t = poly_factorize(ret[i][1])
-		t = expand_powers(str(t))
 
 		ret[i] = (ret[i][0], t)
 
@@ -621,7 +611,7 @@ def zouhe_bb(grid, orientation):
 def zouhe_fixup(grid, orientation):
 	idx = orientation + 1
 	normal = grid.basis[idx]
-	known, unknown = _get_known_dists(normal)
+	known, unknown = _get_known_dists(grid, normal)
 
 	unknown_not_normal = set(unknown)
 	unknown_not_normal.remove(idx)
@@ -667,12 +657,12 @@ def zouhe_fixup(grid, orientation):
 
 	return ret
 
-def zouhe_velocity(grid, orientation):
+def zouhe_velocity(grid, orientation, incompressible):
 	# TODO: Add some code to factor out the common factors in the
 	# expressions returned by this function.
 	idx = orientation + 1
 	normal = grid.basis[idx]
-	known, unknown = _get_known_dists(normal)
+	known, unknown = _get_known_dists(grid, normal)
 
 	# First, compute an expression for the density.
 	vrho = 0
@@ -684,7 +674,7 @@ def zouhe_velocity(grid, orientation):
 	vrho /= (1 - grid.v.dot(normal))
 
 	ret = []
-	ret.append((Symbol('rho'), vrho))
+	ret.append((grid.rho, vrho))
 
 	# Bounce-back of the non-equilibrium part of the distributions
 	# in the direction of the normal vector.
@@ -692,16 +682,16 @@ def zouhe_velocity(grid, orientation):
 	sym_norm = Symbol('fi->%s' % grid.idx_name[idx])
 	sym_opp  = Symbol('fi->%s' % grid.idx_name[oidx])
 
-	val_norm = sympy.solve(bgk_equilibrium(as_string=False)[idx][0] - sym_norm -
-					  bgk_equilibrium(as_string=False)[oidx][0] + sym_opp, sym_norm)[0]
+	val_norm = sympy.solve(bgk_equilibrium(grid)[idx][0] - sym_norm -
+					  bgk_equilibrium(grid)[oidx][0] + sym_opp, sym_norm)[0]
 
 	ret.append((sym_norm, poly_factorize(val_norm)))
 
 	# Compute expressions for the remaining distributions.
 	remaining = [Symbol('fi->%s' % grid.idx_name[x]) for x in unknown if x != idx]
 
-	vxe = ex_velocity('fi', 0, 'rho')
-	vye = ex_velocity('fi', 1, 'rho')
+	vxe = ex_velocity('fi', 0, incompressible, 'rho')
+	vye = ex_velocity('fi', 1, incompressible, 'rho')
 
 	# Substitute the distribution calculated from the bounce-back procedure above.
 	vx2 = vxe.subs({sym_norm: val_norm})
@@ -793,6 +783,26 @@ def use_pointers(str):
 def make_float(t):
 	return re.sub(r'([0-9]+\.[0-9]*)', r'\1f', str(t))
 
+def cexpr(grid, incompressible, pointers, ex, rho):
+	"""Convert a SymPy expression into a string containing valid C code."""
+
+	if type(rho) is str:
+		rho = Symbol(rho)
+	if rho is None:
+		rho = grid.rho
+
+	if incompressible:
+		t = ex.subs(grid.rho0, 1)
+	else:
+		t = ex.subs(grid.rho0, rho)
+
+	t = str(t)
+	t = expand_powers(t)
+	if pointers:
+		t = use_pointers(t)
+	t = make_float(t)
+	return t
+
 def _gcd(a,b):
 	while b:
 		a, b = b, a % b
@@ -878,7 +888,7 @@ def _prepare_grids():
 			else:
 				raise TypeError('Opposite vector for %s not found.' % ei)
 
-		grid.eq_dist = bgk_equilibrium(grid, False)
+		grid.eq_dist = bgk_equilibrium(grid)
 
 		# If MRT is supported for the current grid, compute the transformation
 		# matrix from the velocity space to moment space.  The procedure is as

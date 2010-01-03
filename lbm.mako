@@ -32,7 +32,7 @@ ${const_var} float geo_params[${num_params+1}] = {
 <%def name="zouhe_bb(orientation)">
 	case ${orientation}:
 		%for arg, val in sym.zouhe_bb(grid, orientation):
-			${sym.use_pointers(str(arg))} = ${sym.use_pointers(str(val))};
+			${cex(arg, pointers=True)} = ${cex(val, pointers=True)};
 		%endfor
 		break;
 </%def>
@@ -40,7 +40,7 @@ ${const_var} float geo_params[${num_params+1}] = {
 <%def name="zouhe_fixup(orientation)">
 	case ${orientation}:
 		%for arg, val in sym.zouhe_fixup(grid, orientation):
-			${str(arg)} = ${str(val)};
+			${str(arg)} = ${cex(val)};
 		%endfor
 		break;
 </%def>
@@ -49,7 +49,7 @@ ${const_var} float geo_params[${num_params+1}] = {
 <%def name="zouhe_velocity(orientation)">
 	case ${orientation}:
 		%for arg, val in sym.zouhe_velocity(grid, orientation):
-			${sym.use_pointers(str(arg))} = ${sym.use_pointers(str(val))};
+			${cex(arg, pointers=True)} = ${cex(val, pointers=True)};
 		%endfor
 		break;
 </%def>
@@ -129,6 +129,10 @@ ${const_var} float geo_params[${num_params+1}] = {
 	%endif
 </%def>
 
+<%def name="cex(ex, pointers=False, rho=None)">
+${sym.cexpr(grid, incompressible, pointers, ex, rho)}
+</%def>
+
 ${device_func} inline void bounce_back(Dist *fi)
 {
 	float t;
@@ -144,7 +148,7 @@ ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 {
 	*rho = ${sym.ex_rho(grid, 'fi')};
 	%for d in range(0, grid.dim):
-		v[${d}] = ${str(sym.ex_velocity(grid, 'fi', d, '*rho')).replace('/*', '/ *')};
+		v[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d), pointers=True)};
 	%endfor
 }
 
@@ -167,10 +171,10 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
 	%endif
 
 	// Compute new macroscopic variables.
-	nvx = ${str(sym.ex_velocity(grid, 'fi', 0, 'nrho', momentum=True)).replace('/*', '/ *')};
-	nvy = ${str(sym.ex_velocity(grid, 'fi', 1, 'nrho', momentum=True)).replace('/*', '/ *')};
+	nvx = ${cex(sym.ex_velocity(grid, 'fi', 0, momentum=True))};
+	nvy = ${cex(sym.ex_velocity(grid, 'fi', 1, momentum=True))};
 	%if dim == 3:
-		nvz = ${str(sym.ex_velocity(grid, 'fi', 2, 'nrho', momentum=True)).replace('/*', '/ *')};
+		nvz = ${cex(sym.ex_velocity(grid, 'fi', 2, momentum=True))};
 	%endif
 
 	// Compute momentum difference.
@@ -212,7 +216,7 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 			switch (orientation) {
 				%for i in range(0, grid.Q-1):
 					case ${i}:
-						*rho = ${sym.ex_rho(grid, 'fi', missing_dir=i, rho='*rho')};
+						*rho = ${cex(sym.ex_rho(grid, 'fi', missing_dir=i), pointers=True)};
 						break;
 				%endfor
 			}
@@ -230,7 +234,7 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 				%for i in range(0, grid.Q-1):
 					case ${i}: {
 						%for d in range(0, grid.dim):
-							v[${d}] = ${str(sym.ex_velocity(grid, 'fi', d, '*rho', missing_dir=i, par_rho='par_rho')).replace('/*', '/ *')};
+							v[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, missing_dir=i, par_rho='par_rho'), pointer=True)};
 						%endfor
 						break;
 					 }
@@ -285,15 +289,13 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 	#define vy v[1]
 	#define vz v[2]
 
-	// Incompressible model.
-	#define rho0 1.0f
-
 	%if bc_velocity == 'fullbb':
 		if (isVelocityNode(node_type)) {
 			bounce_back(fi);
 			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
 			%for i, ve in enumerate(grid.basis):
-				fi->${grid.idx_name[i]} += rho0 * ${sym.make_float(2.0 * grid.weights[i] * grid.v.dot(ve) / grid.cssq)};
+				fi->${grid.idx_name[i]} += ${cex(
+					grid.rho0 * 2 * grid.weights[i] * grid.v.dot(ve) / grid.cssq, pointers=True)};
 			%endfor
 			*rho = ${sym.ex_rho(grid, 'fi')};
 		}
@@ -302,7 +304,7 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 	%if bc_velocity == 'equilibrium':
 		if (isVelocityNode(node_type)) {
 			%for feq, idx in sym.bgk_equilibrium(grid):
-				fi->${idx} = ${feq};
+				fi->${idx} = ${cex(feq, pointers=True)};
 			%endfor
 		}
 	%endif
@@ -310,7 +312,7 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 	%if bc_pressure == 'equilibrium':
 		if (isPressureNode(node_type)) {
 			%for feq, idx in sym.bgk_equilibrium(grid):
-				fi->${idx} = ${feq};
+				fi->${idx} = ${cex(feq, pointers=True)};
 			%endfor
 		}
 	%endif
@@ -438,13 +440,10 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	#define mz fm.mz
 	#define rho fm.rho
 
-	// Incompressible model.
-	#define rho0 1.0f
-
 	// Calculate equilibrium distributions in moment space.
 	%for i, eq in enumerate(grid.mrt_equilibrium):
 		%if eq != 0:
-			feq.${grid.mrt_names[i]} = ${eq};
+			feq.${grid.mrt_names[i]} = ${cex(eq, rho='fm.rho')};
 		%endif
 	%endfor
 
@@ -502,7 +501,7 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 	#define vz v[2]
 
 	%for feq, idx in sym.bgk_equilibrium(grid):
-		feq.${idx} = ${feq};
+		feq.${idx} = ${cex(feq)};
 	%endfor
 
 	%for idx in grid.idx_name:
@@ -519,7 +518,7 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 			float pref = ${sym.bgk_external_force_pref()};
 
 			%for val, idx in sym.bgk_external_force(grid):
-				fi->${idx} += ${val};
+				fi->${idx} += ${cex(val)};
 			%endfor
 		}
 	%endif
