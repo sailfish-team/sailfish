@@ -45,15 +45,6 @@ ${const_var} float geo_params[${num_params+1}] = {
 		break;
 </%def>
 
-
-<%def name="zouhe_velocity(orientation)">
-	case ${orientation}:
-		%for arg, val in sym.zouhe_velocity(grid, orientation):
-			${cex(arg, pointers=True)} = ${cex(val, pointers=True)};
-		%endfor
-		break;
-</%def>
-
 <%def name="get_boundary_velocity(node_type, mx, my, mz, rho=0, moments=False)">
 	int idx = (${node_type} - GEO_BCV) * ${dim};
 	%if moments:

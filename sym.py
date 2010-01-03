@@ -657,50 +657,6 @@ def zouhe_fixup(grid, orientation):
 
 	return ret
 
-def zouhe_velocity(grid, orientation, incompressible):
-	# TODO: Add some code to factor out the common factors in the
-	# expressions returned by this function.
-	idx = orientation + 1
-	normal = grid.basis[idx]
-	known, unknown = _get_known_dists(grid, normal)
-
-	# First, compute an expression for the density.
-	vrho = 0
-	for didx in known:
-		if grid.basis[didx].dot(normal) == -1:
-			vrho += 2 * Symbol('fi->%s' % grid.idx_name[didx])
-		else:
-			vrho += Symbol('fi->%s' % grid.idx_name[didx])
-	vrho /= (1 - grid.v.dot(normal))
-
-	ret = []
-	ret.append((grid.rho, vrho))
-
-	# Bounce-back of the non-equilibrium part of the distributions
-	# in the direction of the normal vector.
-	oidx = grid.idx_opposite[idx]
-	sym_norm = Symbol('fi->%s' % grid.idx_name[idx])
-	sym_opp  = Symbol('fi->%s' % grid.idx_name[oidx])
-
-	val_norm = sympy.solve(bgk_equilibrium(grid)[idx][0] - sym_norm -
-					  bgk_equilibrium(grid)[oidx][0] + sym_opp, sym_norm)[0]
-
-	ret.append((sym_norm, poly_factorize(val_norm)))
-
-	# Compute expressions for the remaining distributions.
-	remaining = [Symbol('fi->%s' % grid.idx_name[x]) for x in unknown if x != idx]
-
-	vxe = ex_velocity('fi', 0, incompressible, 'rho')
-	vye = ex_velocity('fi', 1, incompressible, 'rho')
-
-	# Substitute the distribution calculated from the bounce-back procedure above.
-	vx2 = vxe.subs({sym_norm: val_norm})
-	vy2 = vye.subs({sym_norm: val_norm})
-
-	for sym, val in sympy.solve((grid.vx - vx2, grid.vy - vy2), *remaining).iteritems():
-		ret.append((sym, poly_factorize(val)))
-
-	return ret
 
 def get_prop_dists(grid, dir):
 	"""Compute a list of base vectors with a specific value of the X component (`dir`)."""
