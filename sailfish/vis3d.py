@@ -1,11 +1,12 @@
 import math
 import numpy
 import pygame
-import geo
 import os
 import sys
 import time
-import sym
+
+from sailfish import geo
+from sailfish import sym
 
 from enthought.mayavi import mlab
 

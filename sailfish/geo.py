@@ -3,7 +3,7 @@ import os
 import sys
 import numpy
 
-import sym
+from sailfish import sym
 
 # Abstract class implementation, from Peter's Norvig site.
 def abstract():

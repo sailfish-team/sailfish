@@ -4,8 +4,8 @@ import os
 import pwd
 import sys
 import time
-import geo
-import vis2d
+from sailfish import geo
+from sailfish import vis2d
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
@@ -13,19 +13,20 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 from mako.template import Template
 from mako.lookup import TemplateLookup
 
-import sym
+from sailfish import sym
 
 SUPPORTED_BACKENDS = {'cuda': 'backend_cuda', 'opencl': 'backend_opencl'}
 
 for backend in SUPPORTED_BACKENDS.values():
     try:
-        __import__(backend)
+        __import__('sailfish', fromlist=[backend])
     except ImportError:
         pass
 
 def get_backends():
     """Get a list of available backends."""
-    return sorted([k for k, v in SUPPORTED_BACKENDS.iteritems() if v in sys.modules])
+    return sorted([k for k, v in SUPPORTED_BACKENDS.iteritems()
+        if ('sailfish.%s' % v) in sys.modules])
 
 class Values(optparse.Values):
     def __init__(self, *args):
@@ -175,7 +176,7 @@ class LBMSim(object):
         self._mlups_calls = 0
         self._mlups = 0.0
         self.clear_hooks()
-        self.backend = sys.modules[SUPPORTED_BACKENDS[self.options.backend]].backend()
+        self.backend = sys.modules['sailfish.%s' % SUPPORTED_BACKENDS[self.options.backend]].backend()
 
         for x in sym.KNOWN_GRIDS:
             if x.__name__ == self.options.grid:
@@ -347,7 +348,7 @@ class LBMSim(object):
 
         lookup = TemplateLookup(directories=sys.path,
                 module_directory='/tmp/sailfish_modules-%s' % (pwd.getpwuid(os.getuid())[0]))
-        lbm_tmpl = lookup.get_template('lbm.mako')
+        lbm_tmpl = lookup.get_template('sailfish/lbm.mako')
 
         self.tau = self.get_tau()
         ctx = {}

@@ -1,5 +1,5 @@
 <%!
-    import sym
+    from sailfish import sym
 %>
 
 #define BLOCK_SIZE ${block_size}

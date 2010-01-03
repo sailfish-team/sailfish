@@ -1,8 +1,8 @@
 #!/usr/bin/python -u
 
 import sys
-import geo
 
+from sailfish import geo
 from lbm_poiseuille import LBMGeoPoiseuille, LPoiSim
 
 class LBMGeoCylinder(LBMGeoPoiseuille):

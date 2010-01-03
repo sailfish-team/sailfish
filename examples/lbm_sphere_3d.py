@@ -1,8 +1,7 @@
 #!/usr/bin/python -u
 
 import sys
-import geo
-
+from sailfish import geo
 from lbm_poiseuille_3d import LBMGeoPoiseuille, LPoiSim
 
 class LBMGeoSphere(LBMGeoPoiseuille):

@@ -1,11 +1,11 @@
 #!/usr/bin/python -u
 
 import sys
-import geo
 import math
 import numpy
 
-import lbm
+from sailfish import geo
+from sailfish import lbm
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError

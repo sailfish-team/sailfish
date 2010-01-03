@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
 import numpy
-import lbm
-import geo
+from sailfish import lbm
+from sailfish import geo
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
