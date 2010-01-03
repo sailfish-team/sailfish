@@ -110,11 +110,11 @@ class LBMSim(object):
 		group.add_option('--periodic_z', dest='periodic_z', help='lattice periodic in the Z direction', action='store_true', default=False)
 		group.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
 		group.add_option('--bc_wall', dest='bc_wall', help='boundary condition implementation to use for wall nodes', type='choice',
-				choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_WALL in x.supported_types], default='fullbb')
+				choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_WALL in x.supported_types and x.supports_dim(geo_class.dim)], default='fullbb')
 		group.add_option('--bc_velocity', dest='bc_velocity', help='boundary condition implementation to use for velocity nodes', type='choice',
-				choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_VELOCITY in x.supported_types], default='fullbb')
+				choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_VELOCITY in x.supported_types and x.supports_dim(geo_class.dim)], default='fullbb')
 		group.add_option('--bc_pressure', dest='bc_pressure', help='boundary condition implementation to use for pressure nodes', type='choice',
-				choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_PRESSURE in x.supported_types], default='equilibrium')
+				choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_PRESSURE in x.supported_types and x.supports_dim(geo_class.dim)], default='equilibrium')
 		group.add_option('-v', '--verbose', dest='verbose', help='print additional info about the simulation', action='store_true', default=False)
 		parser.add_option_group(group)
 

@@ -576,7 +576,7 @@ class LBMGeo3D(LBMGeo):
 #
 class LBMBC(object):
 	"""Generic boundary condition class."""
-	def __init__(self, name, supported_types=set(LBMGeo.NODE_TYPES), midgrid=False, wet_nodes=False):
+	def __init__(self, name, supported_types=set(LBMGeo.NODE_TYPES), dims=set([2,3]), midgrid=False, wet_nodes=False):
 		"""
 		:param name: a string representing the boundary condition
 		:param midgrid: if ``True``, the location of the boundary condition in the real
@@ -588,14 +588,18 @@ class LBMBC(object):
 		self.midgrid = midgrid
 		self.wet_nodes = wet_nodes
 		self.supported_types = supported_types
+		self.supported_dims = dims
+
+	def supports_dim(self, dim):
+		return dim in self.supported_dims
 
 def get_bc(type_):
 	return BCS_MAP[type_]
 
-
 SUPPORTED_BCS = [LBMBC('fullbb', midgrid=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY])),
 				 LBMBC('equilibrium', midgrid=False, supported_types=set([LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE])),
-				 LBMBC('zouhe', midgrid=False, wet_nodes=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE]))
+				 LBMBC('zouhe', midgrid=False, wet_nodes=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE]), dims=set([2]))
 				 ]
+
 BCS_MAP = dict((x.name, x) for x in SUPPORTED_BCS)
 
