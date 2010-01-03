@@ -81,7 +81,6 @@ class LBMGeo(object):
 		self.save_cache = save_cache
 		self.use_cache = use_cache
 
-		# Map: object_id -> [(location, direction)]
 		self._force_nodes = {}
 		self.reset()
 

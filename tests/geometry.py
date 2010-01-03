@@ -7,18 +7,17 @@ import numpy
 sys.path.append('.')
 sys.path.append('..')
 
+import lbm
 import geo
-import sym
 import backend_dummy
 
 class DummyOptions(object):
 	boundary = 'fullbb'
 	force = False
-
-sym.use_grid(sym.D3Q19)
+	incompressible = False
 
 class TestGeo3D(geo.LBMGeo3D):
-	def _define_nodes(self):
+	def define_nodes(self):
 		# Create a box of wall nodes.
 		self.set_geo((14, 15, 16), self.NODE_WALL)
 		self.fill_geo((14, 15, 16), (slice(14, 22), slice(15, 23), slice(16, 24)))
@@ -53,16 +52,17 @@ class Test3DForce(unittest.TestCase):
 		backend = backend_dummy.DummyBackend()
 		options = DummyOptions()
 		options.force = True
+		self.sim = lbm.LBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True})
 		self.geo = TestGeo3D(self.shape, options, float=numpy.float32, backend=backend,
-				save_cache=False, use_cache=False)
+				sim=self.sim, save_cache=False, use_cache=False)
 
 	def testForceCalculation(self):
 		shape = list(self.geo.map.shape)
-		dist = numpy.zeros([sym.GRID.Q] + shape, dtype=numpy.float32)
+		dist = numpy.zeros([self.sim.grid.Q] + shape, dtype=numpy.float32)
 		self.geo.init_dist(dist)
-		force = self.geo.force('plate', dist, dist)
+		force = self.geo.force('plate', dist)
 
-		for i, x in enumerate((-0.56284726, 0.05565972, 0.05565972)):
+		for i, x in enumerate((0.23559029, -0.02574653, -0.02574653)):
 			self.assertAlmostEqual(force[i], x, places=4)
 
 	def testForceObject(self):
@@ -116,21 +116,23 @@ class Test3DForce(unittest.TestCase):
 			 numpy.array([14, 14, 14, 11, 12, 13, 14]),
 			 numpy.array([100, 100, 100, 100, 100, 100, 100]))]
 
-		for i in range(1, sym.GRID.Q):
+		for i in range(1, self.sim.grid.Q):
 			for j in range(0, 3):
-				self.assertTrue(numpy.all(self.geo._force_nodes['plate'][i][j] == a[i][j]))
+				self.assertTrue(numpy.all(self.geo._force_nodes['plate'][i][0][j] == a[i][j]))
 
 class Test3DNodeProcessing(unittest.TestCase):
 	shape = (128, 64, 64)
 
 	def setUp(self):
 		backend = backend_dummy.DummyBackend()
-		self.geo = TestGeo3D(self.shape, options=DummyOptions(), float=numpy.float32, backend=backend,
+		self.sim = lbm.LBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True})
+		self.geo = TestGeo3D(self.shape, options=DummyOptions(), float=numpy.float32,
+				backend=backend, sim=self.sim,
 				save_cache=False, use_cache=False)
 
 	def testPostprocess(self):
 		self.geo._clear_state()
-		self.geo._define_nodes()
+		self.geo.define_nodes()
 		self.geo._postprocess_nodes()
 		self.assertEqual(
 				self.geo._decode_node(self.geo._get_map((14, 15, 16))),
@@ -141,7 +143,7 @@ class Test3DNodeProcessing(unittest.TestCase):
 
 	def testVelocityNodes(self):
 		self.geo._clear_state()
-		self.geo._define_nodes()
+		self.geo.define_nodes()
 
 		self.assertAlmostEqual(self.geo.params[0], 0.1)
 		self.assertAlmostEqual(self.geo.params[1], 0.2)
@@ -157,7 +159,7 @@ class Test3DNodeProcessing(unittest.TestCase):
 
 	def testPressureNodes(self):
 		self.geo._clear_state()
-		self.geo._define_nodes()
+		self.geo.define_nodes()
 
 		self.assertAlmostEqual(self.geo.params[6], 3.0)
 		self.assertEqual(self.geo._get_map((24, 15, 16)), self.geo.NODE_PRESSURE+1)
