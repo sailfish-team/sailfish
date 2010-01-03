@@ -2,8 +2,6 @@
 
 - Regularized boundary conditions for 2D and 3D.
 
-- Incompressible LBM model.
-
 - Automated LDC regtest.
   Add a new regtest to automatically run the Lid-Driven Cavity example,
   and generate plots comparing the results to data from the literature
