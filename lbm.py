@@ -345,7 +345,9 @@ class LBMSim(object):
         import locale
         locale.setlocale(locale.LC_ALL, 'C')
 
-        lbm_tmpl = Template(filename='lbm.mako', lookup=TemplateLookup(directories=['.']), module_directory='/tmp/sailfish_modules-%s' % (pwd.getpwuid(os.getuid())[0]))
+        lookup = TemplateLookup(directories=sys.path,
+                module_directory='/tmp/sailfish_modules-%s' % (pwd.getpwuid(os.getuid())[0]))
+        lbm_tmpl = lookup.get_template('lbm.mako')
 
         self.tau = self.get_tau()
         ctx = {}
