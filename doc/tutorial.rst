@@ -12,8 +12,7 @@ In order to build a Sailfish simulation, we will create a new Python script.
 In this script, we will need to import the ``lbm`` and ``geo`` Sailfish
 modules::
 
-    import lbm
-    import geo
+    from sailfish import lbm, geo
 
 The ``lbm`` module contains a class which will drive our simulation, and the ``geo``
 module contains classes used to describe the geometry of the simulaton.  We will start

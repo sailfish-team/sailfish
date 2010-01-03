@@ -19,8 +19,8 @@ especially Graphics Processing Units.
 To illustrate how easy it is to create simulations using the Sailfish package,
 here is a simple example code to simulate fluid flow in a lid-driven cavity::
 
-    import lbm
-    import geo
+    from sailfish import lbm
+    from sailfish import geo
 
     class LBMGeoLDC(geo.LBMGeo2D):
         max_v = 0.1
