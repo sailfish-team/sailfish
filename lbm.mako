@@ -225,7 +225,7 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 				%for i in range(0, grid.Q-1):
 					case ${i}: {
 						%for d in range(0, grid.dim):
-							v[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, missing_dir=i, par_rho='par_rho'), pointer=True)};
+							v[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, missing_dir=i, par_rho='par_rho'), pointers=True)};
 						%endfor
 						break;
 					 }

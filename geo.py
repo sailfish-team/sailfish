@@ -380,7 +380,7 @@ class LBMGeo(object):
 			self.map[midx] = self.map[midx] + i
 			i += 1
 
-		self._num_pressures = i - (self._num_velocities+1)
+		self._num_pressures = i + 1 - self._num_velocities
 		self._params = ret
 		return ret
 
