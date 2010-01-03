@@ -1,6 +1,7 @@
 import math
 import numpy
 import os
+import pwd
 import sys
 import time
 import geo
@@ -344,7 +345,7 @@ class LBMSim(object):
 		import locale
 		locale.setlocale(locale.LC_ALL, 'C')
 
-		lbm_tmpl = Template(filename='lbm.mako', lookup=TemplateLookup(directories=['.']), module_directory='/tmp/sailfish_modules')
+		lbm_tmpl = Template(filename='lbm.mako', lookup=TemplateLookup(directories=['.']), module_directory='/tmp/sailfish_modules-%s' % (pwd.getpwuid(os.getuid())[0]))
 
 		self.tau = self.get_tau()
 		ctx = {}
