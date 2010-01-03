@@ -7,9 +7,7 @@ import numpy
 sys.path.append('.')
 sys.path.append('..')
 
-import lbm
-import geo
-import backend_dummy
+from sailfish import lbm, geo, backend_dummy
 
 class DummyOptions(object):
     boundary = 'fullbb'

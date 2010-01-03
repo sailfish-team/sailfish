@@ -28,7 +28,7 @@ regtest3d_double:
 	python -u regtest/poiseuille.py --dim=3 --grid=D3Q19 --model=mrt --precision=double --bc=fullbb
 
 clean:
-	rm -f *.pyc
+	rm -f sailfish/*.pyc
 	rm -rf regtest/results
 
 
