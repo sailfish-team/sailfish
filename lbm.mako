@@ -189,17 +189,27 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
 //
 ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, float *rho, float *v)
 {
-	#define vx v[0]
-	#define vy v[1]
-	#define vz v[2]
-
 	if (isFluidOrWallNode(node_type) || orientation == ${geo_dir_other}) {
 		compute_macro_quant(fi, rho, v);
+		if (isWallNode(node_type)) {
+			v[0] = 0.0f;
+			v[1] = 0.0f;
+			%if dim == 3:
+				v[2] = 0.0f;
+			%endif
+			%if bc_wall == 'zouhe':
+				zouhe_bb(fi, orientation, rho, v);
+			%endif
+		}
 	} else if (isVelocityNode(node_type)) {
+		%if bc_velocity == 'zouhe':
+			*rho = ${sym.ex_rho(grid, 'fi')};
+			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
+			zouhe_bb(fi, orientation, rho, v);
 		// We're dealing with a boundary node, for which some of the distributions
 		// might be meaningless.  Fill them with the values of the opposite
 		// distributions.
-		%if bc_velocity != 'fullbb' and bc_velocity != None:
+		%elif bc_velocity == 'equilibrium':
 			${fill_missing_distributions()}
 			*rho = ${sym.ex_rho(grid, 'fi')};
 			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
@@ -215,7 +225,7 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 			compute_macro_quant(fi, rho, v);
 		%endif
 	} else if (isPressureNode(node_type)) {
-		%if bc_pressure != 'fullbb' and bc_pressure != None:
+		%if bc_pressure == 'zouhe' or bc_pressure == 'equilibrium':
 			${fill_missing_distributions()}
 			*rho = ${sym.ex_rho(grid, 'fi')};
 			float par_rho;
@@ -232,38 +242,15 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 				%endfor
 			}
 
+			%if bc_pressure == 'zouhe':
+				zouhe_bb(fi, orientation, &par_rho, v);
+				compute_macro_quant(fi, rho, v);
+			%endif
 			*rho = par_rho;
 		%else:
 			compute_macro_quant(fi, rho, v);
 		%endif
 	}
-
-	#undef vx
-	#undef vy
-	#undef vz
-
-	%if bc_wall == 'zouhe':
-		if (isWallNode(node_type)) {
-			v[0] = 0.0f;
-			v[1] = 0.0f;
-			%if dim == 3:
-				v[2] = 0.0f;
-			%endif
-			zouhe_bb(fi, orientation, rho, v);
-		}
-	%endif
-
-	%if bc_velocity == 'zouhe':
-		if (isVelocityNode(node_type)) {
-			zouhe_bb(fi, orientation, rho, v);
-		}
-	%endif
-
-	%if bc_pressure == 'zouhe':
-		if (isPressureNode(node_type)) {
-			zouhe_bb(fi, orientation, rho, v);
-		}
-	%endif
 
 	${external_force('node_type', 'v[0]', 'v[1]', 'v[2]')}
 }
@@ -275,10 +262,6 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 			bounce_back(fi);
 		}
 	%endif
-
-	#define vx v[0]
-	#define vy v[1]
-	#define vz v[2]
 
 	%if bc_velocity == 'fullbb':
 		if (isVelocityNode(node_type)) {
@@ -307,10 +290,6 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 			%endfor
 		}
 	%endif
-
-	#undef vx
-	#undef vy
-	#undef vz
 }
 
 //
