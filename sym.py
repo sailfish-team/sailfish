@@ -587,7 +587,7 @@ def _get_known_dists(grid, normal):
 
 	return known, unknown
 
-def zouhe_bb(grid, orientation):
+def noneq_bb(grid, orientation):
 	idx = orientation + 1
 	normal = grid.basis[idx]
 	known, unknown = _get_known_dists(grid, normal)
@@ -619,18 +619,20 @@ def zouhe_fixup(grid, orientation):
 	ret = []
 
 	# Momentum differences.
-	mdiff = [Symbol('nvx'), Symbol('nvy')]
-	if grid.dim == 3:
-		mdiff.append(Symbol('nvz'))
-		basis = [Matrix([1,0,0]), Matrix([0,1,0]), Matrix([0,0,1])]
-	else:
+	mdiff = [Symbol('nvx'), Symbol('nvy'), Symbol('nvz')]
+
+	if grid.dim == 2:
 		basis = [Matrix([1,0]), Matrix([0,1])]
+	else:
+		basis = [Matrix([1,0,0]), Matrix([0,1,0]), Matrix([0,0,1])]
 
 	# Scale by number of adjustable distributions.
-	for i, md in enumerate(mdiff):
+	for i in range(0, grid.dim):
 		if basis[i].dot(normal) != 0:
 			mdiff[i] = 0
 			continue
+
+		md = mdiff[i]
 
 		cnt = 0
 		for idir in unknown_not_normal:

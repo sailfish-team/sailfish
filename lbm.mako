@@ -29,9 +29,9 @@ ${const_var} float geo_params[${num_params+1}] = {
 	%endif
 </%def>
 
-<%def name="zouhe_bb(orientation)">
+<%def name="noneq_bb(orientation)">
 	case ${orientation}:
-		%for arg, val in sym.zouhe_bb(grid, orientation):
+		%for arg, val in sym.noneq_bb(grid, orientation):
 			${cex(arg, pointers=True)} = ${cex(val, pointers=True)};
 		%endfor
 		break;
@@ -149,7 +149,7 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
 	// Bounce-back of the non-equilibrium parts.
 	switch (orientation) {
 		%for i in range(0, len(grid.basis)-1):
-			${zouhe_bb(i)}
+			${noneq_bb(i)}
 		%endfor
 		case ${geo_dir_other}:
 			bounce_back(fi);
