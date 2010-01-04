@@ -1,4 +1,3 @@
-import cPickle as pickle
 import os
 import sys
 import numpy
@@ -70,7 +69,7 @@ class LBMGeo(object):
         """
         return cls._decode_node_orientation(code), cls._decode_node_type(code)
 
-    def __init__(self, shape, options, float, backend, sim, save_cache=True, use_cache=True):
+    def __init__(self, shape, options, float, backend, sim):
         self.sim = sim
         self.shape = shape
         self.options = options
@@ -78,8 +77,6 @@ class LBMGeo(object):
         self.map = numpy.zeros(shape, numpy.int32)
         self.gpu_map = backend.alloc_buf(like=self.map)
         self.float = float
-        self.save_cache = save_cache
-        self.use_cache = use_cache
 
         self._force_nodes = {}
         self.reset()
@@ -87,21 +84,6 @@ class LBMGeo(object):
         # Cache for equilibrium distributions.  Sympy numerical evaluation
         # is expensive, so we try to avoid unnecessary recomputations.
         self.feq_cache = {}
-
-    def _get_state(self):
-        rdict = {
-            'map': self.map,
-            '_params': self._params,
-            '_force_nodes': self._force_nodes,
-            '_num_velocities': self._num_velocities,
-            '_num_pressures': self._num_pressures
-        }
-        return rdict
-
-    def _set_state(self, rdict):
-        for k, v in rdict.iteritems():
-            setattr(self, k, v)
-        self._update_map()
 
     @property
     def dx(self):
@@ -134,12 +116,6 @@ class LBMGeo(object):
     def get_defines(self):
         abstract
 
-    @property
-    def cache_file(self):
-        return '.sailfish_%s_%s_%s_%s' % (
-                os.path.basename(sys.argv[0]), self.sim.grid.__name__,
-                '-'.join(map(str, self.shape)), str(self.float().dtype))
-
     def _clear_state(self):
         self._params = None
         self.map = numpy.zeros(tuple(reversed(self.shape)), numpy.int32)
@@ -159,20 +135,11 @@ class LBMGeo(object):
     def reset(self):
         """Perform a full reset of the geometry."""
 
-        if self.use_cache and os.path.exists(self.cache_file):
-            with open(self.cache_file, 'r') as f:
-                self._set_state(pickle.load(f))
-            return
-
         self._clear_state()
         self.define_nodes()
         a = self.params
         self._postprocess_nodes()
         self._update_map()
-
-        if self.save_cache:
-            with open(self.cache_file, 'w') as f:
-                pickle.dump(self._get_state(), f, pickle.HIGHEST_PROTOCOL)
 
     def _get_map(self, location):
         """Get a node map entry.

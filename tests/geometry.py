@@ -52,7 +52,7 @@ class Test3DForce(unittest.TestCase):
         options.force = True
         self.sim = lbm.LBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True})
         self.geo = TestGeo3D(self.shape, options, float=numpy.float32, backend=backend,
-                sim=self.sim, save_cache=False, use_cache=False)
+                sim=self.sim)
 
     def testForceCalculation(self):
         shape = list(self.geo.map.shape)
@@ -125,8 +125,7 @@ class Test3DNodeProcessing(unittest.TestCase):
         backend = backend_dummy.DummyBackend()
         self.sim = lbm.LBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True})
         self.geo = TestGeo3D(self.shape, options=DummyOptions(), float=numpy.float32,
-                backend=backend, sim=self.sim,
-                save_cache=False, use_cache=False)
+                backend=backend, sim=self.sim)
 
     def testPostprocess(self):
         self.geo._clear_state()
