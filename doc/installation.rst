@@ -42,9 +42,25 @@ Ubuntu installation instructions
 To install the required packages on an Ubuntu system::
 
   apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-tables python-scipy python-mako
+  apt-get install git-core python-setuptools libboost-dev
+  git clone git://git.sympy.org/sympy.git
+  git clone http://git.tiker.net/trees/pytools.git
+  git clone http://git.tiker.net/trees/pycuda.git
+  cd pytools
+  python setup.py build
+  python setup.py install
+  cd ../sympy
+  python setup.py build
+  python setup.py install
+  cd ../pycuda
+  /configure.py --boost-python-libname=boost_python-mt-py26 --boost-thread-libname=boost_thread-mt --cuda-root=/usr/local/cuda
+  python setup.py build
+  python setup.py install
 
-There are currently no (recent enough) packages for sympy and pycuda/pyopencl avaiable for
+There are currently no (recent enough) packages for sympy and pycuda/pyopencl available for
 Ubuntu, so these have to be installed manually from a checked-out upstream code repository of
 these projects or a snapshot tarball.
 
-
+The example listed above assumes that you want to use the CUDA backend.  Before installing pycuda,
+please make sure the NVIDIA CUDA Toolkit is installed in ``/usr/local/cuda``.  You can get the
+necessary files at http://nvidia.com/cuda.
