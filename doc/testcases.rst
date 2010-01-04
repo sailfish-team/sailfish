@@ -100,5 +100,6 @@ This example is interesting, because it makes it possible to calculate the drag 
 exerted on the sphere by the fluid.  The value of the drag coefficient can then be compared
 with an approximate theoretical prediction or with experimental data.  In order to see the
 computed drag coefficient, run the example in the batch mode with verbose output (``./lbm_sphere_force_3d.py --batch -v``).
+You can also select different Reynolds numbers using the ``--re=N`` command line option.
 
 This example is also used as a part of the automated regression test in ``regtest/drag_coefficient.py``.
