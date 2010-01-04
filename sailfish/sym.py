@@ -403,9 +403,9 @@ class D3Q19(DxQy):
 def bgk_equilibrium(grid):
     """Get expressions for the BGK equilibrium distribution.
 
-    Returns:
-      a list of strings or sympy epxressions representing the equilibrium
-      distribution functions
+    :param grid: the grid class to be used
+
+    :rtype: list of sympy epxressions representing the equilibrium distribution functions
     """
     out = []
 
@@ -423,12 +423,12 @@ def bgk_equilibrium(grid):
 def eval_bgk_equilibrium(grid, incompressible, velocity, rho):
     """Get BGK equilibrium distributions for a specific velocity and density.
 
-    Args:
-      velocity: a n-tuple of velocity components
-      rho: density
+    :param grid: the grid class to be used
+    :param incompressible: if ``True``, use the incompressible model
+    :param velocity: a n-tuple of velocity components
+    :param rho: density
 
-    Returns:
-      a list of values of the distributions (in the same order as the basis
+    :rtype: list of values of the distributions (in the same order as the basis
       vectors for the current grid)
     """
     vals = []
@@ -451,8 +451,9 @@ def eval_bgk_equilibrium(grid, incompressible, velocity, rho):
 def bgk_external_force(grid):
     """Get expressions for the external body force correction in the BGK model.
 
-    Returns:
-      a list of sympy expressions (in the same order as the current grid's basis)
+    :param grid: the grid class to be used
+
+    :rtype: list of sympy expressions (in the same order as the current grid's basis)
     """
     eax = Symbol('eax')
     eay = Symbol('eay')
@@ -504,11 +505,9 @@ def fill_missing_dists(grid, distp, missing_dir):
 def ex_rho(grid, distp, missing_dir=None):
     """Express density as a function of the distibutions.
 
-    Args:
-      distp: name of the pointer to the distribution structure
+    :param distp: name of the pointer to the distribution structure
 
-    Returns:
-      a sympy expression for the density
+    :rtype: sympy expression for the density
     """
     syms = [Symbol('%s->%s' % (distp, x)) for x in grid.idx_name]
     ret = 0
@@ -523,12 +522,10 @@ def ex_rho(grid, distp, missing_dir=None):
 def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=None):
     """Express velocity as a function of the distributions.
 
-    Args:
-      distp: name of the pointer to the distribution structure
-      comp: velocity component number: 0, 1 or 2 (for 3D lattices)
+    :param distp: name of the pointer to the distribution structure
+    :param comp: velocity component number: 0, 1 or 2 (for 3D lattices)
 
-    Returns:
-      a sympy expression for the velocity in a given direction
+    :rtype: sympy expression for the velocity in a given direction
     """
     syms = [Symbol('%s->%s' % (distp, x)) for x in grid.idx_name]
     ret = 0
@@ -742,7 +739,18 @@ def make_float(t):
     return re.sub(r'([0-9]+\.[0-9]*)', r'\1f', str(t))
 
 def cexpr(grid, incompressible, pointers, ex, rho):
-    """Convert a SymPy expression into a string containing valid C code."""
+    """Convert a SymPy expression into a string containing valid C code.
+
+    :param grid: the grid class
+    :param incompressible: if ``True``, use the incompressible model
+    :param pointers: if ``True``, macroscopic variables (density and velocities)
+        will be converted to pointers in the output
+    :param ex: the sympy expression to convert
+    :param rho: density symbol (sympy Symbol, string).  If ``None`` the
+        standard rho symbol for the grid will be used.
+
+    :rtype: string representing the C code
+    """
 
     t = ex
 
@@ -779,11 +787,9 @@ def orthogonalize(*vectors):
     The vectors are then simplified (common factors are removed to keep their
     norm small).
 
-    Args:
-      vectors: a collection of vectors to orthogonalize
+    :param vectors: a collection of vectors to orthogonalize
 
-    Returns:
-      orthogonalized vectors
+    :rtype: orthogonalized vectors
     """
     ret = []
     for x in sympy.GramSchmidt(vectors):
