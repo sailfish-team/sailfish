@@ -31,7 +31,9 @@ class LCylinderSim(LPoiSim):
     filename = 'cylinder'
 
     def __init__(self, geo_class, args=sys.argv[1:]):
-        LPoiSim.__init__(self, geo_class, args, defaults={'lat_nx': 192, 'lat_ny': 48, 'test': True, 'visc': 0.001, 'horizontal': True})
+        LPoiSim.__init__(self, geo_class, args, defaults={'lat_nx': 192,
+            'lat_ny': 48, 'test': True, 'visc': 0.001, 'horizontal': True,
+            'verbose': True, 'vismode': '2col'})
         self.clear_hooks()
 
 if __name__ == '__main__':

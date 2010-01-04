@@ -122,7 +122,8 @@ class LPoiSim(lbm.LBMSim):
         if defaults is not None:
             defaults_ = defaults
         else:
-            defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_nx': 64, 'lat_ny': 64}
+            defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_nx': 64,
+                    'lat_ny': 64, 'verbose': True}
 
         lbm.LBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 

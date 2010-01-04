@@ -41,7 +41,9 @@ class LSphereSim(LPoiSim):
     filename = 'cylinder'
 
     def __init__(self, geo_class, args=sys.argv[1:]):
-        LPoiSim.__init__(self, geo_class, args, defaults={'lat_nz': 48, 'lat_ny': 48, 'lat_nx': 256, 'test': True, 'visc': 0.005})
+        LPoiSim.__init__(self, geo_class, args, defaults={'lat_nz': 48,
+            'lat_ny': 48, 'lat_nx': 256, 'test': True, 'visc': 0.005, 'verbose':
+            True})
         self.clear_hooks()
 
 if __name__ == '__main__':

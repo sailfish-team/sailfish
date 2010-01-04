@@ -149,7 +149,8 @@ class LSphereSim(lbm.LBMSim):
             'model': 'mrt',
             'every': 100,
             'incompressible': True,
-            'grid': 'D3Q13'}
+            'grid': 'D3Q13',
+            'verbose': True}
         defaults_.update(defaults)
 
         lbm.LBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)

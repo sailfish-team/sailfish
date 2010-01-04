@@ -44,7 +44,7 @@ class LDCSim(lbm.LBMSim):
         opts.append(optparse.make_option('--test_re1000', dest='test_re1000', action='store_true', default=False, help='generate test data for Re=1000'))
 
         lbm.LBMSim.__init__(self, geo_class, options=opts,
-                defaults={'bc_velocity': 'equilibrium'})
+                defaults={'bc_velocity': 'equilibrium', 'verbose': True})
 
         if self.options.test_re100:
             self.options.batch = True

@@ -163,7 +163,8 @@ class LPoiSim(lbm.LBMSim):
         opts.append(optparse.make_option('--along_z', dest='along_z', action='store_true', default=False, help='flow along the Z direction'))
         opts.append(optparse.make_option('--stationary', dest='stationary', action='store_true', default=False, help='start with the correct velocity profile in the whole simulation domain'))
 
-        defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_nx': 64, 'lat_ny': 64, 'lat_nz': 64, 'grid': 'D3Q13'}
+        defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_nx': 64, 'lat_ny':
+                64, 'lat_nz': 64, 'grid': 'D3Q13', 'verbose': True}
         if defaults is not None:
             defaults_.update(defaults)
 
