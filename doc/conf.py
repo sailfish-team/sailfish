@@ -18,6 +18,7 @@ import sys, os
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.append(os.path.abspath('.'))
 sys.path.append(os.path.abspath('..'))
+sys.path.append(os.path.abspath('../sailfish'))
 
 # -- General configuration -----------------------------------------------------
 
@@ -39,7 +40,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Sailfish'
-copyright = u'2009, Michał Januszewski'
+copyright = u'2009-2010, Michał Januszewski'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
