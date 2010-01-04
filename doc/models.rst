@@ -28,7 +28,7 @@ by the chosen grid), :math:`t` is the current time step, :math:`\vec{x_i}` is th
 position of the :math:`i`-th node in the grid, and :math:`\Omega_i` is the collision
 operator.
 
-TODO
+TODO: Add more info about the LBM.
 
 Single relaxation time (BGK)
 ----------------------------
@@ -41,12 +41,12 @@ of the collision operator:
 where :math:`\tau` is the relaxation time and :math:`f^{(eq)}` is the equilibrium
 distribution, defined as a function of macroscopic variables at a node.
 
-TODO
+TODO: Add more info about the BGK approximation and its limitations.
 
 Multiple relaxation times (MRT)
 -------------------------------
 
-TODO
+TODO: Add info about the MRT model.
 
 Boundary conditions
 ===================
