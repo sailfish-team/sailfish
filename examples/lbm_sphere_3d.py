@@ -16,17 +16,17 @@ class LBMGeoSphere(LBMGeoPoiseuille):
 
         if self.options.along_z:
             z0 = 2*diam
-            x0 = self.lat_w / 2
-            y0 = self.lat_h / 2
+            x0 = self.lat_nx / 2
+            y0 = self.lat_ny / 2
 
         elif self.options.along_y:
             y0 = 2*diam
-            x0 = self.lat_w / 2
-            z0 = self.lat_d / 2
+            x0 = self.lat_nx / 2
+            z0 = self.lat_nz / 2
         else:
             x0 = 2*diam
-            y0 = self.lat_h / 2
-            z0 = self.lat_d / 2
+            y0 = self.lat_ny / 2
+            z0 = self.lat_nz / 2
 
         for z in range(-diam/2, diam/2+1):
             for x in range(-diam/2, diam/2+1):
@@ -41,7 +41,7 @@ class LSphereSim(LPoiSim):
     filename = 'cylinder'
 
     def __init__(self, geo_class, args=sys.argv[1:]):
-        LPoiSim.__init__(self, geo_class, args, defaults={'lat_d': 48, 'lat_h': 48, 'lat_w': 256, 'test': True, 'visc': 0.005})
+        LPoiSim.__init__(self, geo_class, args, defaults={'lat_nz': 48, 'lat_ny': 48, 'lat_nx': 256, 'test': True, 'visc': 0.005})
         self.clear_hooks()
 
 if __name__ == '__main__':

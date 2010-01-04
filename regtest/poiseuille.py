@@ -22,8 +22,8 @@ defaults = {
         'stationary': True,
         'batch': True,
         'quiet': True,
-        'lat_w': 64,
-        'lat_h': 64,
+        'lat_nx': 64,
+        'lat_ny': 64,
     }
 
 def run_test(bc, drive, precision, model, grid, name):
@@ -121,7 +121,7 @@ else:
     defaults['along_y'] = True
     defaults['along_z'] = False
     defaults['along_x'] = False
-    defaults['lat_d'] = 64
+    defaults['lat_nz'] = 64
     name = 'poiseuille3d'
 
 if options.grid:
@@ -146,7 +146,7 @@ class LTestPoiSim(LPoiSim):
         self.add_iter_hook(self.options.max_iters-1, self.save_output)
 
     def save_output(self):
-#       self.result = (numpy.max(self.vy[16,1:self.geo.lat_w-1]) / max(self.geo.get_velocity_profile())) - 1.0
+#       self.result = (numpy.max(self.vy[16,1:self.geo.lat_nx-1]) / max(self.geo.get_velocity_profile())) - 1.0
         self.res_maxv = numpy.max(self.geo.mask_array_by_fluid(self.vy))
         self.th_maxv = max(self.geo.get_velocity_profile())
 

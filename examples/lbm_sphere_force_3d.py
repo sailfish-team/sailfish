@@ -51,8 +51,8 @@ class LBMGeoSphere(geo.LBMGeo3D):
         radiussq = ((self.chan_diam)/2)**2
         diam = sphere_diam(self.width, geo.get_bc(self.options.bc_velocity))
         x0 = int(2.4*diam)
-        y0 = (self.lat_h - 1) / 2.0
-        z0 = (self.lat_d - 1) / 2.0
+        y0 = (self.lat_ny - 1) / 2.0
+        z0 = (self.lat_nz - 1) / 2.0
         h = 0.0
 
         bc = geo.get_bc(self.options.bc_velocity)
@@ -61,8 +61,8 @@ class LBMGeoSphere(geo.LBMGeo3D):
             z0 -= 0.5
             y0 -= 0.5
 
-        for z in range(0, self.lat_d):
-            for y in range(0, self.lat_h):
+        for z in range(0, self.lat_nz):
+            for y in range(0, self.lat_ny):
                 if (y0 - (y + h))**2 + (z0 - (z + h))**2 >= radiussq:
 #                   self.set_geo((0,y,z), self.NODE_WALL)
                     self.set_geo((0,y,z), self.NODE_VELOCITY, (self.maxv, 0.0, 0.0))
@@ -121,7 +121,7 @@ class LBMGeoSphere(geo.LBMGeo3D):
 
     @property
     def width(self):
-        return min(self.lat_h, self.lat_d)
+        return min(self.lat_ny, self.lat_nz)
 
     @property
     def chan_diam(self):
@@ -142,9 +142,9 @@ class LSphereSim(lbm.LBMSim):
     def __init__(self, geo_class, defaults={}, args=sys.argv[1:]):
         opts = []
         opts.append(optparse.make_option('--re', dest='re', type='int', help='Reynolds number', default=100))
-        defaults_ = {'lat_d': 128,
-            'lat_h': 128,
-            'lat_w': 512,
+        defaults_ = {'lat_nz': 128,
+            'lat_ny': 128,
+            'lat_nx': 512,
             'max_iters': 320000,
             'model': 'mrt',
             'every': 100,
@@ -157,7 +157,7 @@ class LSphereSim(lbm.LBMSim):
         if self.options.batch:
             self.options.every = 1000
 
-        diam = sphere_diam(self.options.lat_h, geo.get_bc(self.options.bc_velocity))
+        diam = sphere_diam(self.options.lat_ny, geo.get_bc(self.options.bc_velocity))
 
         # If the diameter here is odd, the channel width is even and we will end up
         # with a sphere of an even diameter so that the system can be symmetric.

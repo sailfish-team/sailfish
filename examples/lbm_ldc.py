@@ -16,23 +16,23 @@ class LBMGeoLDC(geo.LBMGeo2D):
     def define_nodes(self):
         """Initialize the simulation for the lid-driven cavity geometry."""
         # bottom/top
-        for i in range(0, self.lat_w):
+        for i in range(0, self.lat_nx):
             self.set_geo((i, 0), self.NODE_WALL)
-            self.set_geo((i, self.lat_h-1), self.NODE_VELOCITY, (self.max_v, 0.0))
+            self.set_geo((i, self.lat_ny-1), self.NODE_VELOCITY, (self.max_v, 0.0))
         # left/right
-        for i in range(0, self.lat_h):
+        for i in range(0, self.lat_ny):
             self.set_geo((0, i), self.NODE_WALL)
-            self.set_geo((self.lat_w-1, i), self.NODE_WALL)
+            self.set_geo((self.lat_nx-1, i), self.NODE_WALL)
 
     def init_dist(self, dist):
         self.velocity_to_dist((0,0), (0.0, 0.0), dist)
         self.fill_dist((0,0), dist)
 
-        for i in range(0, self.lat_w):
-            self.velocity_to_dist((i, self.lat_h-1), (self.max_v, 0.0), dist)
+        for i in range(0, self.lat_nx):
+            self.velocity_to_dist((i, self.lat_ny-1), (self.max_v, 0.0), dist)
 
     def get_reynolds(self, viscosity):
-        return int((self.lat_w-1) * self.max_v/viscosity)
+        return int((self.lat_nx-1) * self.max_v/viscosity)
 
 class LDCSim(lbm.LBMSim):
 
@@ -49,14 +49,14 @@ class LDCSim(lbm.LBMSim):
         if self.options.test_re100:
             self.options.batch = True
             self.options.max_iters = 50000
-            self.options.lat_w = 128
-            self.options.lat_h = 128
+            self.options.lat_nx = 128
+            self.options.lat_ny = 128
             self.options.visc = 0.127
         elif self.options.test_re1000:
             self.options.batch = True
             self.options.max_iters = 50000
-            self.options.lat_w = 128
-            self.options.lat_h = 128
+            self.options.lat_nx = 128
+            self.options.lat_ny = 128
             self.options.visc = 0.0127
 
 
@@ -65,9 +65,9 @@ class LDCSim(lbm.LBMSim):
     def output_profile(self):
         print '# Re = %d' % self.geo.get_reynolds(self.options.visc)
 
-        for i, (x, y) in enumerate(zip(self.vx[:,int(self.options.lat_w/2)] / self.geo_class.max_v,
-                                        self.vy[int(self.options.lat_h/2),:] / self.geo_class.max_v)):
-            print float(i) / self.options.lat_h, x, y
+        for i, (x, y) in enumerate(zip(self.vx[:,int(self.options.lat_nx/2)] / self.geo_class.max_v,
+                                        self.vy[int(self.options.lat_ny/2),:] / self.geo_class.max_v)):
+            print float(i) / self.options.lat_ny, x, y
 
 
 sim = LDCSim(LBMGeoLDC)

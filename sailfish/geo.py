@@ -463,7 +463,7 @@ class LBMGeo2D(LBMGeo):
     dim = 2
 
     def __init__(self, shape, *args, **kwargs):
-        self.lat_w, self.lat_h = shape
+        self.lat_nx, self.lat_ny = shape
         LBMGeo.__init__(self, shape, *args, **kwargs)
 
     def _get_map(self, location):
@@ -491,10 +491,10 @@ class LBMGeo2D(LBMGeo):
                 }
 
     def _postprocess_nodes(self, nodes=None):
-        lat_w, lat_h = self.shape
+        lat_nx, lat_ny = self.shape
 
         if nodes is None:
-            nodes_ = ((x, y) for x in range(0, lat_w) for y in range(0, lat_h))
+            nodes_ = ((x, y) for x in range(0, lat_nx) for y in range(0, lat_ny))
         else:
             nodes_ = nodes
 
@@ -502,10 +502,10 @@ class LBMGeo2D(LBMGeo):
             if self.map[y][x] != self.NODE_FLUID:
                 # If the bool corresponding to a specific direction is True, the
                 # distributions in this direction are undefined.
-                north = y < lat_h-1 and self.map[y+1][x] == self.NODE_FLUID
+                north = y < lat_ny-1 and self.map[y+1][x] == self.NODE_FLUID
                 south = y > 0 and self.map[y-1][x] == self.NODE_FLUID
                 west  = x > 0 and self.map[y][x-1] == self.NODE_FLUID
-                east  = x < lat_w-1 and self.map[y][x+1] == self.NODE_FLUID
+                east  = x < lat_nx-1 and self.map[y][x+1] == self.NODE_FLUID
 
                 # Walls aligned with the grid.
                 if north and not west and not east:
@@ -519,11 +519,11 @@ class LBMGeo2D(LBMGeo):
                 # Corners.
                 elif y > 0 and x > 0 and self.map[y-1][x-1] == self.NODE_FLUID:
                     self.map[y][x] = self._encode_node(self.NODE_DIR_SW, self.map[y][x])
-                elif y > 0 and x < lat_w-1 and self.map[y-1][x+1] == self.NODE_FLUID:
+                elif y > 0 and x < lat_nx-1 and self.map[y-1][x+1] == self.NODE_FLUID:
                     self.map[y][x] = self._encode_node(self.NODE_DIR_SE, self.map[y][x])
-                elif y < lat_h-1 and x > 0 and self.map[y+1][x-1] == self.NODE_FLUID:
+                elif y < lat_ny-1 and x > 0 and self.map[y+1][x-1] == self.NODE_FLUID:
                     self.map[y][x] = self._encode_node(self.NODE_DIR_NW, self.map[y][x])
-                elif y < lat_h-1 and x < lat_w-1 and self.map[y+1][x+1] == self.NODE_FLUID:
+                elif y < lat_ny-1 and x < lat_nx-1 and self.map[y+1][x+1] == self.NODE_FLUID:
                     self.map[y][x] = self._encode_node(self.NODE_DIR_NE, self.map[y][x])
                 else:
                     self.map[y][x] = self._encode_node(self.NODE_DIR_OTHER, self.map[y][x])
@@ -533,7 +533,7 @@ class LBMGeo3D(LBMGeo):
     dim = 3
 
     def __init__(self, shape, *args, **kwargs):
-        self.lat_w, self.lat_h, self.lat_d = shape
+        self.lat_nx, self.lat_ny, self.lat_nz = shape
         LBMGeo.__init__(self, shape, *args, **kwargs)
 
     def _get_map(self, location):
@@ -553,7 +553,7 @@ class LBMGeo3D(LBMGeo):
                 }
 
     def _postprocess_nodes(self, nodes=None):
-        lat_w, lat_h, lat_d = self.shape
+        lat_nx, lat_ny, lat_nz = self.shape
 
         # FIXME: Eventually, we will need to postprocess nodes in 3D grids as well.
         if nodes is None:

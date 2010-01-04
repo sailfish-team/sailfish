@@ -87,14 +87,14 @@ vis_map = {
 
 class Fluid2DVis(object):
 
-    def __init__(self, sim, width, height, lat_w, lat_h):
+    def __init__(self, sim, width, height, lat_nx, lat_ny):
         self._vismode = 0
         self._convolve = False
         self._font = pygame.font.SysFont('Liberation Mono', 14)
         self._screen = pygame.display.set_mode((width, height),
                 pygame.RESIZABLE)
-        self.lat_w = lat_w
-        self.lat_h = lat_h
+        self.lat_nx = lat_nx
+        self.lat_ny = lat_ny
 
         self._show_info = True
         self._tracers = False
@@ -209,9 +209,9 @@ class Fluid2DVis(object):
                 pygame.draw.circle(self._screen, (0, 255, 255), (int(x * sw / width), int(sh - y * sh / height)), 2)
 
     def _get_loc(self, event):
-        x = event.pos[0] * self.lat_w / self._screen.get_width()
-        y = self.lat_h-1 - (event.pos[1] * self.lat_h / self._screen.get_height())
-        return min(max(x, 0), self.lat_w-1), min(max(y, 0), self.lat_h-1)
+        x = event.pos[0] * self.lat_nx / self._screen.get_width()
+        y = self.lat_ny-1 - (event.pos[1] * self.lat_ny / self._screen.get_height())
+        return min(max(x, 0), self.lat_nx-1), min(max(y, 0), self.lat_ny-1)
 
     def _draw_wall(self, event):
         x, y = self._get_loc(event)
@@ -398,8 +398,8 @@ class Fluid3DVisCutplane(Fluid2DVis):
                 int(self.shape[dims[1]] * self._scr_scale)), pygame.RESIZABLE)
 
         # For compatibility with other functions for 2D.
-        self.lat_w = self.shape[dims[0]]
-        self.lat_h = self.shape[dims[1]]
+        self.lat_nx = self.shape[dims[0]]
+        self.lat_ny = self.shape[dims[1]]
 
     def _process_misc_event(self, event):
         if event.type == pygame.KEYDOWN:

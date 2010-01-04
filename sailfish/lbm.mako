@@ -320,8 +320,8 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 		if (iz < 0)
 			iz  = 0;
 
-		if (iz > ${lat_d-1})
-			iz = ${lat_d-1};
+		if (iz > ${lat_nz-1})
+			iz = ${lat_nz-1};
 	%endif
 
 	// Sanity checks.
@@ -331,16 +331,16 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 	if (ix < 0)
 		ix = 0;
 
-	if (ix > ${lat_w-1})
-		ix = ${lat_w-1};
+	if (ix > ${lat_nx-1})
+		ix = ${lat_nx-1};
 
-	if (iy > ${lat_h-1})
-		iy = ${lat_h-1};
+	if (iy > ${lat_ny-1})
+		iy = ${lat_ny-1};
 
 	%if dim == 2:
-		int idx = ix + ${lat_w}*iy;
+		int idx = ix + ${lat_nx}*iy;
 	%else:
-		int idx = ix + ${lat_w}*iy + ${lat_w*lat_h}*iz;
+		int idx = ix + ${lat_nx}*iy + ${lat_nx*lat_ny}*iz;
 	%endif
 
 	Dist fc;
@@ -366,24 +366,24 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 	%endif
 
 	// Periodic boundary conditions.
-	if (cx > ${lat_w})
+	if (cx > ${lat_nx})
 		cx = 0.0f;
 
-	if (cy > ${lat_h})
+	if (cy > ${lat_ny})
 		cy = 0.0f;
 
 	if (cx < 0.0f)
-		cx = (float)${lat_w};
+		cx = (float)${lat_nx};
 
 	if (cy < 0.0f)
-		cy = (float)${lat_h};
+		cy = (float)${lat_ny};
 
 	%if dim == 3:
-		if (cz > ${lat_d})
+		if (cz > ${lat_nz})
 			cz = 0.0f;
 
 		if (cz < 0.0f)
-			cz = (float)(${lat_d});
+			cz = (float)(${lat_nz});
 
 		z[gi] = cz;
 	%endif
@@ -596,9 +596,9 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 <%
 	def rel_offset(x, y, z):
 		if grid.dim == 2:
-			return x + y * lat_w
+			return x + y * lat_nx
 		else:
-			return x + lat_w * (y + lat_h*z)
+			return x + lat_nx * (y + lat_ny*z)
 %>
 	%if local:
 		dist_out[gi + ${dist_size*idir + rel_offset(xoff, yoff, zoff) + offset}] = prop_${grid.idx_name[idir]}[lx];
@@ -619,7 +619,7 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 	%if dim == 2:
 		int gx = get_global_id(0);
 		int gy = get_group_id(1);
-		int gi = gx + ${lat_w}*gy;
+		int gi = gx + ${lat_nx}*gy;
 	%else:
 		// This is a workaround for the limitations of current CUDA devices.
 		// We would like the grid to be 3 dimensional, but only 2 dimensions
@@ -630,10 +630,10 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 		//
 		// This works fine, as x is relatively small, since:
 		//   x = x_sim / block_size.
-		int gx = get_global_id(0) % ${lat_w};
-		int gy = get_global_id(0) / ${lat_w};
+		int gx = get_global_id(0) % ${lat_nx};
+		int gy = get_global_id(0) / ${lat_nx};
 		int gz = get_global_id(1);
-		int gi = gx + gy*${lat_w} + ${lat_w*lat_h}*gz;
+		int gi = gx + gy*${lat_nx} + ${lat_nx*lat_ny}*gz;
 	%endif
 
 	// shared variables for in-block propagation
@@ -679,7 +679,7 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 			prop_${grid.idx_name[i]}[lx+1] = fi.${grid.idx_name[i]};
 		%endfor
 	// E propagation in global memory (at right block boundary)
-	} else if (gx < ${lat_w-1}) {
+	} else if (gx < ${lat_nx-1}) {
 		${prop_block_bnd(1, 'prop_global')}
 	}
 	%if periodic_x:

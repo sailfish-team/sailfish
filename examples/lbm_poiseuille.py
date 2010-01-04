@@ -17,29 +17,29 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 
     def define_nodes(self):
         if self.options.horizontal:
-            for i in range(0, self.lat_w):
+            for i in range(0, self.lat_nx):
                 self.set_geo((i, 0), self.NODE_WALL)
-                self.set_geo((i, self.lat_h-1), self.NODE_WALL)
+                self.set_geo((i, self.lat_ny-1), self.NODE_WALL)
         else:
-            for i in range(0, self.lat_h):
+            for i in range(0, self.lat_ny):
                 self.set_geo((0, i), self.NODE_WALL)
-                self.set_geo((self.lat_w-1, i), self.NODE_WALL)
+                self.set_geo((self.lat_nx-1, i), self.NODE_WALL)
 
         # If the flow is driven by a pressure difference, add pressure boundary conditions
         # at the ends of the pipe.
         if self.options.drive == 'pressure':
             if self.options.horizontal:
-                pressure = self.maxv * (8.0 * self.options.visc) / (self.get_chan_width()**2) * self.lat_w
+                pressure = self.maxv * (8.0 * self.options.visc) / (self.get_chan_width()**2) * self.lat_nx
 
-                for i in range(1, self.lat_h-1):
+                for i in range(1, self.lat_ny-1):
                     self.set_geo((0, i), self.NODE_PRESSURE, (1.0/3.0) - pressure/2.0)
-                    self.set_geo((self.lat_w-1, i), self.NODE_PRESSURE, (1.0/3.0) + pressure/2.0)
+                    self.set_geo((self.lat_nx-1, i), self.NODE_PRESSURE, (1.0/3.0) + pressure/2.0)
             else:
-                pressure = self.maxv * (8.0 * self.options.visc) / (self.get_chan_width()**2) * self.lat_h
+                pressure = self.maxv * (8.0 * self.options.visc) / (self.get_chan_width()**2) * self.lat_ny
 
-                for i in range(1, self.lat_w-1):
+                for i in range(1, self.lat_nx-1):
                     self.set_geo((i, 0), self.NODE_PRESSURE, (1.0/3.0) + pressure/2.0)
-                    self.set_geo((i, self.lat_h-1), self.NODE_PRESSURE, (1.0/3.0) - pressure/2.0)
+                    self.set_geo((i, self.lat_ny-1), self.NODE_PRESSURE, (1.0/3.0) - pressure/2.0)
 
     def init_dist(self, dist):
         if self.options.stationary:
@@ -48,23 +48,23 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
                 pressure = self.maxv * (8.0 * self.options.visc) / (self.get_chan_width()**2)
 
                 if self.options.horizontal:
-                    for x in range(0, self.lat_w):
-                        self.velocity_to_dist((x, 0), (0.0, 0.0), dist, rho=(1.0 + 3.0 * pressure * (self.lat_w/2.0 - x)))
+                    for x in range(0, self.lat_nx):
+                        self.velocity_to_dist((x, 0), (0.0, 0.0), dist, rho=(1.0 + 3.0 * pressure * (self.lat_nx/2.0 - x)))
                         self.fill_dist((x, 0), dist, (x, slice(None)))
                 else:
-                    for y in range(0, self.lat_h):
-                        self.velocity_to_dist((0, y), (0.0, 0.0), dist, rho=(1.0 + 3.0 * pressure * (self.lat_h/2.0 - y)))
+                    for y in range(0, self.lat_ny):
+                        self.velocity_to_dist((0, y), (0.0, 0.0), dist, rho=(1.0 + 3.0 * pressure * (self.lat_ny/2.0 - y)))
                         self.fill_dist((0, y), dist, (slice(None), y))
             else:
                 # Start with correct velocity profile.
                 profile = self.get_velocity_profile()
 
                 if self.options.horizontal:
-                    for y in range(0, self.lat_h):
+                    for y in range(0, self.lat_ny):
                         self.velocity_to_dist((0, y), (profile[y], 0.0), dist)
                     self.fill_dist((0, slice(None)), dist)
                 else:
-                    for x in range(0, self.lat_w):
+                    for x in range(0, self.lat_nx):
                         self.velocity_to_dist((x, 0), (0.0, profile[x]), dist)
                     self.fill_dist((slice(None), 0), dist)
         else:
@@ -74,7 +74,7 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 
     def get_velocity_profile(self, fluid_only=False):
         width = self.get_chan_width()
-        lat_width = self.get_width()
+        lat_nxidth = self.get_width()
         ret = []
         h = 0
 
@@ -82,7 +82,7 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
         if bc.midgrid:
             h = -0.5
 
-        for x in range(0, lat_width):
+        for x in range(0, lat_nxidth):
             tx = x+h
             ret.append(4.0*self.maxv/width**2 * tx * (width-tx))
 
@@ -102,9 +102,9 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
 
     def get_width(self):
         if self.options.horizontal:
-            return self.lat_h
+            return self.lat_ny
         else:
-            return self.lat_w
+            return self.lat_nx
 
     def get_reynolds(self, viscosity):
         return int(self.get_width() * self.maxv/viscosity)
@@ -122,7 +122,7 @@ class LPoiSim(lbm.LBMSim):
         if defaults is not None:
             defaults_ = defaults
         else:
-            defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_w': 64, 'lat_h': 64}
+            defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_nx': 64, 'lat_ny': 64}
 
         lbm.LBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
@@ -138,14 +138,14 @@ class LPoiSim(lbm.LBMSim):
     def get_profile(self):
         if geo.get_bc(self.options.bc_wall).wet_nodes:
             if self.options.horizontal:
-                return self.vx[:,int(self.options.lat_w/2)]
+                return self.vx[:,int(self.options.lat_nx/2)]
             else:
-                return self.vy[int(self.options.lat_h/2),:]
+                return self.vy[int(self.options.lat_ny/2),:]
         else:
             if self.options.horizontal:
-                return self.vx[1:-1,int(self.options.lat_w/2)]
+                return self.vx[1:-1,int(self.options.lat_nx/2)]
             else:
-                return self.vy[int(self.options.lat_h/2),1:-1]
+                return self.vy[int(self.options.lat_ny/2),1:-1]
 
 if __name__ == '__main__':
     sim = LPoiSim(LBMGeoPoiseuille)

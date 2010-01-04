@@ -26,19 +26,19 @@ here is a simple example code to simulate fluid flow in a lid-driven cavity::
         max_v = 0.1
 
         def define_nodes(self):
-            for i in range(0, self.lat_w):
+            for i in range(0, self.lat_nx):
                 self.set_geo((i, 0), self.NODE_WALL)
-                self.set_geo((i, self.lat_h-1), self.NODE_VELOCITY, (self.max_v, 0.0))
-            for i in range(0, self.lat_h):
+                self.set_geo((i, self.lat_ny-1), self.NODE_VELOCITY, (self.max_v, 0.0))
+            for i in range(0, self.lat_ny):
                 self.set_geo((0, i), self.NODE_WALL)
-                self.set_geo((self.lat_w-1, i), self.NODE_WALL)
+                self.set_geo((self.lat_nx-1, i), self.NODE_WALL)
 
         def init_dist(self, dist):
             self.velocity_to_dist((0,0), (0.0, 0.0), dist)
             self.fill_dist((0,0), dist)
 
-            for i in range(0, self.lat_w):
-                self.velocity_to_dist((i, self.lat_h-1), (self.max_v, 0.0), dist)
+            for i in range(0, self.lat_nx):
+                self.velocity_to_dist((i, self.lat_ny-1), (self.max_v, 0.0), dist)
 
     class LDCSim(lbm.LBMSim):
         pass

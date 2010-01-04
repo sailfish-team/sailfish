@@ -19,22 +19,22 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
         radiussq = (self.get_chan_width() / 2.0)**2
 
         if self.options.along_z:
-            for x in range(0, self.lat_w):
-                for y in range(0, self.lat_h):
-                    if (x-(self.lat_w/2-0.5))**2 + (y-(self.lat_h/2-0.5))**2 >= radiussq:
+            for x in range(0, self.lat_nx):
+                for y in range(0, self.lat_ny):
+                    if (x-(self.lat_nx/2-0.5))**2 + (y-(self.lat_ny/2-0.5))**2 >= radiussq:
                             self.set_geo((x,y,0), self.NODE_WALL)
             self.fill_geo((slice(None), slice(None), 0))
 
         elif self.options.along_y:
-            for z in range(0, self.lat_d):
-                for x in range(0, self.lat_w):
-                    if (x-(self.lat_w/2-0.5))**2 + (z-(self.lat_d/2-0.5))**2 >= radiussq:
+            for z in range(0, self.lat_nz):
+                for x in range(0, self.lat_nx):
+                    if (x-(self.lat_nx/2-0.5))**2 + (z-(self.lat_nz/2-0.5))**2 >= radiussq:
                         self.set_geo((x,0,z), self.NODE_WALL)
             self.fill_geo((slice(None), 0, slice(None)))
         else:
-            for z in range(0, self.lat_d):
-                for y in range(0, self.lat_h):
-                    if (y-(self.lat_h/2-0.5))**2 + (z-(self.lat_d/2-0.5))**2 >= radiussq:
+            for z in range(0, self.lat_nz):
+                for y in range(0, self.lat_ny):
+                    if (y-(self.lat_ny/2-0.5))**2 + (z-(self.lat_nz/2-0.5))**2 >= radiussq:
                         self.set_geo((0,y,z), self.NODE_WALL)
             self.fill_geo((0, slice(None), slice(None)))
 
@@ -44,27 +44,27 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
             radius = self.get_chan_width() / 2.0
 
             if self.options.along_z:
-                for x in range(0, self.lat_w):
-                    for y in range(0, self.lat_h):
-                        rc = math.sqrt((x-self.lat_w/2.0-h)**2 + (y-self.lat_h/2.0-h)**2)
+                for x in range(0, self.lat_nx):
+                    for y in range(0, self.lat_ny):
+                        rc = math.sqrt((x-self.lat_nx/2.0-h)**2 + (y-self.lat_ny/2.0-h)**2)
                         if rc > radius:
                             self.velocity_to_dist((x, y, 0), (0.0, 0.0, 0.0), dist)
                         else:
                             self.velocity_to_dist((x, y, 0), (0.0, 0.0, self.get_velocity(rc)), dist)
                 self.fill_dist((slice(None), slice(None), 0), dist)
             elif self.options.along_y:
-                for x in range(0, self.lat_w):
-                    for z in range(0, self.lat_d):
-                        rc = math.sqrt((x-self.lat_w/2.0-h)**2 + (z-self.lat_d/2.0-h)**2)
+                for x in range(0, self.lat_nx):
+                    for z in range(0, self.lat_nz):
+                        rc = math.sqrt((x-self.lat_nx/2.0-h)**2 + (z-self.lat_nz/2.0-h)**2)
                         if rc > radius:
                             self.velocity_to_dist((x, 0, z), (0.0, 0.0, 0.0), dist)
                         else:
                             self.velocity_to_dist((x, 0, z), (0.0, self.get_velocity(rc), 0.0), dist)
                 self.fill_dist((slice(None), 0, slice(None)), dist)
             else:
-                for z in range(0, self.lat_d):
-                    for y in range(0, self.lat_h):
-                        rc = math.sqrt((z-self.lat_d/2.0-h)**2 + (y-self.lat_h/2.0-h)**2)
+                for z in range(0, self.lat_nz):
+                    for y in range(0, self.lat_ny):
+                        rc = math.sqrt((z-self.lat_nz/2.0-h)**2 + (y-self.lat_ny/2.0-h)**2)
                         if rc > radius:
                             self.velocity_to_dist((0, y, z), (0.0, 0.0, 0.0), dist)
                         else:
@@ -115,16 +115,16 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
     # wwww  5.0  2.5  5     |-
 
     def get_velocity_profile(self, fluid_only=False):
-        x = self.lat_w/2
+        x = self.lat_nx/2
         if fluid_only:
-            zvals = range(1, self.lat_d-1)
+            zvals = range(1, self.lat_nz-1)
         else:
-            zvals = range(0, self.lat_d)
+            zvals = range(0, self.lat_nz)
 
         ret = []
 
         for z in zvals:
-            rc = math.sqrt((x-self.lat_w/2.0+0.5)**2 + (z-self.lat_d/2.0+0.5)**2)
+            rc = math.sqrt((x-self.lat_nx/2.0+0.5)**2 + (z-self.lat_nz/2.0+0.5)**2)
             ret.append(self.get_velocity(rc))
 
         return ret
@@ -143,11 +143,11 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 
     def get_width(self):
         if self.options.along_z:
-            return min(self.lat_w, self.lat_h)
+            return min(self.lat_nx, self.lat_ny)
         elif self.options.along_y:
-            return min(self.lat_w, self.lat_d)
+            return min(self.lat_nx, self.lat_nz)
         else:
-            return min(self.lat_h, self.lat_d)
+            return min(self.lat_ny, self.lat_nz)
 
     def get_reynolds(self, viscosity):
         return int(self.get_width() * self.maxv/viscosity)
@@ -163,7 +163,7 @@ class LPoiSim(lbm.LBMSim):
         opts.append(optparse.make_option('--along_z', dest='along_z', action='store_true', default=False, help='flow along the Z direction'))
         opts.append(optparse.make_option('--stationary', dest='stationary', action='store_true', default=False, help='start with the correct velocity profile in the whole simulation domain'))
 
-        defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_w': 64, 'lat_h': 64, 'lat_d': 64, 'grid': 'D3Q13'}
+        defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_nx': 64, 'lat_ny': 64, 'lat_nz': 64, 'grid': 'D3Q13'}
         if defaults is not None:
             defaults_.update(defaults)
 
@@ -186,9 +186,9 @@ class LPoiSim(lbm.LBMSim):
     def get_profile(self):
         # NOTE: This only works for the 'along_y' option.
         if geo.get_bc(self.options.bc_wall).wet_nodes:
-            return self.vy[:,int(self.options.lat_h/2),int(self.options.lat_w/2)]
+            return self.vy[:,int(self.options.lat_ny/2),int(self.options.lat_nx/2)]
         else:
-            return self.vy[1:-1,int(self.options.lat_h/2),int(self.options.lat_w/2)]
+            return self.vy[1:-1,int(self.options.lat_ny/2),int(self.options.lat_nx/2)]
 
 
 

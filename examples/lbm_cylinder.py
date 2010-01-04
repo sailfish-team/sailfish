@@ -14,13 +14,13 @@ class LBMGeoCylinder(LBMGeoPoiseuille):
         LBMGeoPoiseuille.define_nodes(self)
 
         if self.options.horizontal:
-            diam = self.lat_h / 3
+            diam = self.lat_ny / 3
             x0 = 2*diam
-            y0 = self.lat_h / 2
+            y0 = self.lat_ny / 2
         else:
-            diam = self.lat_w / 3
-            x0 = self.lat_w / 2
-            y0 = self.lat_h - 2*diam
+            diam = self.lat_nx / 3
+            x0 = self.lat_nx / 2
+            y0 = self.lat_ny - 2*diam
 
         for x in range(-diam/2, diam/2+1):
             for y in range(-diam/2, diam/2+1):
@@ -31,7 +31,7 @@ class LCylinderSim(LPoiSim):
     filename = 'cylinder'
 
     def __init__(self, geo_class, args=sys.argv[1:]):
-        LPoiSim.__init__(self, geo_class, args, defaults={'lat_w': 192, 'lat_h': 48, 'test': True, 'visc': 0.001, 'horizontal': True})
+        LPoiSim.__init__(self, geo_class, args, defaults={'lat_nx': 192, 'lat_ny': 48, 'test': True, 'visc': 0.001, 'horizontal': True})
         self.clear_hooks()
 
 if __name__ == '__main__':

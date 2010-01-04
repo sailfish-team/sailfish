@@ -97,9 +97,9 @@ class LBMSim(object):
 
         parser.add_option('-q', '--quiet', dest='quiet', help='reduce verbosity', action='store_true', default=False)
         group = OptionGroup(parser, 'LB engine settings')
-        group.add_option('--lat_w', dest='lat_w', help='lattice width', type='int', action='store', default=128)
-        group.add_option('--lat_h', dest='lat_h', help='lattice height', type='int', action='store', default=128)
-        group.add_option('--lat_d', dest='lat_d', help='lattice depth', type='int', action='store', default=1)
+        group.add_option('--lat_nx', dest='lat_nx', help='lattice width', type='int', action='store', default=128)
+        group.add_option('--lat_ny', dest='lat_ny', help='lattice height', type='int', action='store', default=128)
+        group.add_option('--lat_nz', dest='lat_nz', help='lattice depth', type='int', action='store', default=1)
         group.add_option('--visc', dest='visc', help='viscosity', type='float', action='store', default=0.01)
         group.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
         group.add_option('--incompressible', dest='incompressible', help='whether to use the incompressible model of Luo and He', action='store_true', default=False)
@@ -165,10 +165,10 @@ class LBMSim(object):
 
         # Adjust workgroup size if necessary to ensure that we will be able to
         # successfully execute the main LBM kernel.
-        if self.options.lat_w < 64:
-            self.block_size = self.options.lat_w
+        if self.options.lat_nx < 64:
+            self.block_size = self.options.lat_nx
         else:
-            # TODO: This should be dynamically adjusted based on both the lat_w
+            # TODO: This should be dynamically adjusted based on both the lat_nx
             # value and device capabilities.
             self.block_size = 64
 
@@ -265,10 +265,10 @@ class LBMSim(object):
         # If the size of the window has not been explicitly defined, automatically adjust it
         # based on the size of the grid,
         if self.options.scr_w == 0:
-            self.options.scr_w = int(self.options.lat_w * self.options.scr_scale)
+            self.options.scr_w = int(self.options.lat_nx * self.options.scr_scale)
 
         if self.options.scr_h == 0:
-            self.options.scr_h = int(self.options.lat_h * self.options.scr_scale)
+            self.options.scr_h = int(self.options.lat_ny * self.options.scr_scale)
 
     def _init_vis(self):
         self._timed_print('Initializing visualization engine.')
@@ -281,7 +281,7 @@ class LBMSim(object):
 
     def _init_vis_2d(self):
         self.vis = vis2d.Fluid2DVis(self, self.options.scr_w, self.options.scr_h,
-                                    self.options.lat_w, self.options.lat_h)
+                                    self.options.lat_nx, self.options.lat_ny)
 
     def _init_vis_3d(self):
         if self.options.vis3d == 'mayavi':
@@ -311,7 +311,7 @@ class LBMSim(object):
         return self.float((6.0 * self.options.visc + 1.0)/2.0)
 
     def get_dist_size(self):
-        return self.options.lat_w * self.options.lat_h * self.options.lat_d
+        return self.options.lat_nx * self.options.lat_ny * self.options.lat_nz
 
     def _timed_print(self, info):
         if self.options.verbose:
@@ -322,9 +322,9 @@ class LBMSim(object):
 
         # Particle distributions in host memory.
         if self.grid.dim == 2:
-            self.shape = (self.options.lat_h, self.options.lat_w)
+            self.shape = (self.options.lat_ny, self.options.lat_nx)
         else:
-            self.shape = (self.options.lat_d, self.options.lat_h, self.options.lat_w)
+            self.shape = (self.options.lat_nz, self.options.lat_ny, self.options.lat_nx)
 
         self.dist1 = numpy.zeros([len(self.grid.basis)] + list(self.shape), self.float)
 
@@ -355,9 +355,9 @@ class LBMSim(object):
         ctx['grid'] = self.grid
         ctx['dim'] = self.grid.dim
         ctx['block_size'] = self.block_size
-        ctx['lat_h'] = self.options.lat_h
-        ctx['lat_w'] = self.options.lat_w
-        ctx['lat_d'] = self.options.lat_d
+        ctx['lat_ny'] = self.options.lat_ny
+        ctx['lat_nx'] = self.options.lat_nx
+        ctx['lat_nz'] = self.options.lat_nz
         ctx['num_params'] = len(self.geo_params)
         ctx['model'] = self.options.model
         ctx['incompressible'] = self.options.incompressible
@@ -389,13 +389,13 @@ class LBMSim(object):
         ctx['bc_velocity_'] = geo.get_bc(self.options.bc_velocity)
         ctx['bc_pressure_'] = geo.get_bc(self.options.bc_pressure)
 
-        ctx['pbc_offsets'] = [{-1: self.options.lat_w,
-                                1: -self.options.lat_w},
-                              {-1: self.options.lat_h*self.options.lat_w,
-                                1: -self.options.lat_h*self.options.lat_w},
-                              {-1: self.options.lat_d*self.options.lat_h*self.options.lat_w,
-                                1: -self.options.lat_d*self.options.lat_h*self.options.lat_w}]
-        ctx['bnd_limits'] = [self.options.lat_w, self.options.lat_h, self.options.lat_d]
+        ctx['pbc_offsets'] = [{-1: self.options.lat_nx,
+                                1: -self.options.lat_nx},
+                              {-1: self.options.lat_ny*self.options.lat_nx,
+                                1: -self.options.lat_ny*self.options.lat_nx},
+                              {-1: self.options.lat_nz*self.options.lat_ny*self.options.lat_nx,
+                                1: -self.options.lat_nz*self.options.lat_ny*self.options.lat_nx}]
+        ctx['bnd_limits'] = [self.options.lat_nx, self.options.lat_ny, self.options.lat_nz]
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['periodicity'] = [int(self.options.periodic_x), int(self.options.periodic_y),
                             int(self.options.periodic_z)]
@@ -444,15 +444,15 @@ class LBMSim(object):
         self.gpu_rho = self.backend.alloc_buf(like=self.rho)
 
         # Tracer particles.
-        self.tracer_x = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_w
-        self.tracer_y = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_h
+        self.tracer_x = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_nx
+        self.tracer_y = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_ny
         self.tracer_loc = [self.tracer_x, self.tracer_y]
         self.gpu_tracer_x = self.backend.alloc_buf(like=self.tracer_x)
         self.gpu_tracer_y = self.backend.alloc_buf(like=self.tracer_y)
         self.gpu_tracer_loc = [self.gpu_tracer_x, self.gpu_tracer_y]
 
         if self.grid.dim == 3:
-            self.tracer_z = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_d
+            self.tracer_z = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_nz
             self.gpu_tracer_z = self.backend.alloc_buf(like=self.tracer_z)
             self.tracer_loc.append(self.tracer_z)
             self.gpu_tracer_loc.append(self.gpu_tracer_z)
@@ -515,9 +515,9 @@ class LBMSim(object):
         }
 
         if self.grid.dim == 2:
-            self.kern_grid_size = (self.options.lat_w/self.block_size, self.options.lat_h)
+            self.kern_grid_size = (self.options.lat_nx/self.block_size, self.options.lat_ny)
         else:
-            self.kern_grid_size = (self.options.lat_w/self.block_size * self.options.lat_h, self.options.lat_d)
+            self.kern_grid_size = (self.options.lat_nx/self.block_size * self.options.lat_ny, self.options.lat_nz)
 
     def sim_step(self, tracers=True, get_data=False):
         """Perform a single step of the simulation.
@@ -552,7 +552,7 @@ class LBMSim(object):
         else:
             it = self.options.every
 
-        mlups = float(it) * self.options.lat_w * self.options.lat_h * self.options.lat_d * 1e-6 / tdiff
+        mlups = float(it) * self.options.lat_nx * self.options.lat_ny * self.options.lat_nz * 1e-6 / tdiff
         self._mlups = (mlups + self._mlups * self._mlups_calls) / (self._mlups_calls + 1)
         self._mlups_calls += 1
         return (self._mlups, mlups)

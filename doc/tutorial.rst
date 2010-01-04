@@ -39,8 +39,8 @@ two methods: ``define_nodes`` and ``init_dist``.
 
 ``define_nodes`` is used to set the type of each node in the simulation domain.  The
 size of the simulation domain is already known when the geometry class is instantiated
-and can be accessed via its attributes ``lat_w`` (size along the X axis), ``lat_h``
-(size along the Y axis) and ``lat_d`` (size along the Z axis, for 2D simulations always
+and can be accessed via its attributes ``lat_nx`` (size along the X axis), ``lat_ny``
+(size along the Y axis) and ``lat_nz`` (size along the Z axis, for 2D simulations always
 equal to 1).
 
 By default, the whole domain is initialized as fluid nodes.  To define the geometry, we
@@ -60,12 +60,12 @@ our function as follows::
     class LBMGeoLDC(geo.LBMGeo2D):
         max_v = 0.1
         def define_nodes(self):
-            for i in range(0, self.lat_w):
+            for i in range(0, self.lat_nx):
                 self.set_geo((i, 0), self.NODE_WALL)
-                self.set_geo((i, self.lat_h-1), self.NODE_VELOCITY, (self.max_v, 0.0))
-            for i in range(0, self.lat_h):
+                self.set_geo((i, self.lat_ny-1), self.NODE_VELOCITY, (self.max_v, 0.0))
+            for i in range(0, self.lat_ny):
                 self.set_geo((0, i), self.NODE_WALL)
-                self.set_geo((self.lat_w-1, i), self.NODE_WALL)
+                self.set_geo((self.lat_nx-1, i), self.NODE_WALL)
 
 Now that we have the geometry out of the way, we can deal with the initial conditions.
 This is done in the ``init_dist(dist)`` function, which is responsible for setting the initial
@@ -81,8 +81,8 @@ we set the fluid to have to a ``max_v`` velocity in the horizontal direction::
             self.velocity_to_dist((0,0), (0.0, 0.0), dist)
             self.fill_dist((0,0), dist)
 
-            for i in range(0, self.lat_w):
-                self.velocity_to_dist((i, self.lat_h-1), (self.max_v, 0.0), dist)
+            for i in range(0, self.lat_nx):
+                self.velocity_to_dist((i, self.lat_ny-1), (self.max_v, 0.0), dist)
 
 The only new thing here is the ``fill_dist`` function, which we use to copy the
 distributions from node (0,0) to the whole simulation domain.  We do so to make the
@@ -107,7 +107,7 @@ options which can be used to control the simulation.  To get a full list of curr
 options, run any Sailfish simulation with the ``--help`` command line option.  Some of the
 basic settings you might want to play with when starting to work with Sailfish are the following:
 
-* ``--lat_w=N``, ``--lat_h=N``, ``--lat_d=N``: set lattice dimensions (width, height and depth, respectively)
+* ``--lat_nx=N``, ``--lat_ny=N``, ``--lat_nz=N``: set lattice dimensions (width, height and depth, respectively)
 * ``--precision=X``: set the precision of floating-point numbers used in the simulation (``single`` or ``double``).
   Note that double precision calculations will currently be significantly slower than their single precision
   counterparts and might not be supported at all on some older devices.
