@@ -131,8 +131,6 @@ class LBMSim(object):
         group.add_option('--noformat_src', dest='format_src', help='do not format the generated source code', action='store_false', default=True)
         group.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
         group.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat', 'vtk'], default='h5flat')
-        group.add_option('--savegeocache', dest='save_geocache', help='cache geometry data', action='store_true', default=False)
-        group.add_option('--geocache', dest='geocache', help='use cached geometry data', action='store_true', default=False)
         parser.add_option_group(group)
 
         group = OptionGroup(parser, 'Visualization options')
@@ -330,8 +328,7 @@ class LBMSim(object):
 
         # Simulation geometry.
         self.geo = self.geo_class(list(reversed(self.shape)), self.options,
-                self.float, self.backend, self,
-                self.options.save_geocache, self.options.geocache)
+                self.float, self.backend, self)
         self.geo.init_dist(self.dist1)
         self.dist2 = self.dist1.copy()
         self.geo_params = self.float(self.geo.params)
