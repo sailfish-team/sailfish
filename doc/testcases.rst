@@ -72,12 +72,33 @@ Poiseuille flow
 ^^^^^^^^^^^^^^^
 The code for this example is located in ``examples/lbm_poiseuille_3d.py``.
 
+This example is like the 2D Poiseuille flow, but the pipe is now a proper cylinder with a
+circular cross section.  The flow can currently only be driven by a global body force.
 
+The flow in this geometry is, like its 2D counterpart, solvable analytically and the result
+is also a parabolic velocity profile.
 
 Flow around a sphere
 ^^^^^^^^^^^^^^^^^^^^
 The code for this example is located in ``examples/lbm_sphere_3d.py`` and ``examples/lbm_sphere_force_3d.py``.
 
+This example comes in two variants.  The first one is a direct counterpart of the flow around
+a cylinder example in 2D.  The classes are derived from the 3D Poiseuille example, the
+only difference being the spherical obstacle placed on the axis of the pipe.  The obstacle
+is formed by no-slip nodes.
 
 .. image:: img/sphere3d.png
 
+The image illustrates the velocity field of the fluid.  The red tubes depict streamlines.
+
+In the second and more useful variant, the flow is driven by velocity boundary conditions
+at the inlet and walls of the pipe.  This corresponds to the physical problem of a moving
+sphere in a pipe with stationary fluid, as seen from the frame of reference comoving with
+the sphere.
+
+This example is interesting, because it makes it possible to calculate the drag force
+exerted on the sphere by the fluid.  The value of the drag coefficent can then be compared
+with an approximate theoretical prediction or with experimental data.  In order to see the
+computed drag coefficient, run the example in the batch mode with verbose output (``./lbm_sphere_force_3d.py --batch -v``).
+
+This example is also used as a part of the automated regression test in ``regtest/drag_coefficient.py``.
