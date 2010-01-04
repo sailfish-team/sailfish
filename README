@@ -27,7 +27,7 @@ To run the examples, go to the appropriate directory and let Python know
 where Sailfish is located by adjusting the PYTHONPATH environment variable,
 e.g.:
 
+$ export PYTHONPATH=$PWD:$PYTHONPATH
 $ cd examples
-$ export PYTHONPATH=$PWD/..:$PYTHONPATH
 $ ./lbm_ldc.py
 
