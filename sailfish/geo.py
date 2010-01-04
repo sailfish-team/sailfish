@@ -13,13 +13,16 @@ def abstract():
 class LBMGeo(object):
     """Abstract class for the LBM geometry."""
 
-    # Dimensionality, needs to be overridden in child classes.
+    #: Dimensionality, needs to be overridden in child classes.
     dim = 0
 
-    # Node types.
+    #: Fluid node.
     NODE_FLUID = 0
+    #: No-slip boundary condition node.
     NODE_WALL = 1
+    #: Velocity boundary condition node.
     NODE_VELOCITY = 2
+    #: Pressure boundary condition node.
     NODE_PRESSURE = 3
 
     NODE_TYPES = [NODE_WALL, NODE_VELOCITY, NODE_PRESSURE]
@@ -426,6 +429,7 @@ class LBMGeo(object):
         return force
 
 class LBMGeo2D(LBMGeo):
+    """Base class for 2D geometries."""
 
     dim = 2
 
@@ -496,6 +500,7 @@ class LBMGeo2D(LBMGeo):
                     self.map[y][x] = self._encode_node(self.NODE_DIR_OTHER, self.map[y][x])
 
 class LBMGeo3D(LBMGeo):
+    """Base class for 3D geometries."""
 
     dim = 3
 
