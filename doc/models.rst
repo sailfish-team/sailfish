@@ -64,7 +64,7 @@ condition.
 
 Equilibrium
 -----------
-This boundary condition algorithm works by imposing the BGK equilibrium distritbutions for
+This boundary condition algorithm works by imposing the BGK equilibrium distributions for
 a node.  It currently works for all types of boundary conditions in two dimensions only.
 
 Zou-He

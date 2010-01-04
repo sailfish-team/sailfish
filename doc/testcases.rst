@@ -2,7 +2,7 @@ Examples and test cases
 =======================
 
 Several sample simulations are included in the Sailfish code repository.  They serve to both
-illustrate the capabilities of the solver, as well as to test the correctness of the simuations
+illustrate the capabilities of the solver, as well as to test the correctness of the simulations
 by comparing their results to data from the literature or other CFD solvers.
 
 Most of the examples can be both run interactively, and as a part of a regression test.
@@ -45,7 +45,7 @@ simulation with the correct pressure profile if the pressure driving is used.
 
 This flow configuration is one of the few cases which can be solved analytically.  The point
 of the test is to make sure that the generated velocity profile is the same as the analytical
-solution (i.e. paraboidal, with maximum velocity at the center of the channel).
+solution (i.e. parabolic, with maximum velocity at the center of the channel).
 
 This example is also used as a part of the automated regression test in ``regtest/poiseuille.py``.
 
@@ -56,7 +56,7 @@ The code for this example is located in ``examples/lbm_cylinder.py``.
 The classes in this example are derived from the ones used in the Poiseuille test, so the
 geometry and available command line options are exactly as described in the previous
 section.  A circular obstacle is added at the axis of the channel.  If the Reynolds number
-is in the correct range, a vortex schedding process occurs and vortices detaching periodically
+is in the correct range, a vortex shedding process occurs and vortices detaching periodically
 from the obstacle can be observed.
 
 This example is currently not used as an automated regression test.
@@ -97,7 +97,7 @@ sphere in a pipe with stationary fluid, as seen from the frame of reference como
 the sphere.
 
 This example is interesting, because it makes it possible to calculate the drag force
-exerted on the sphere by the fluid.  The value of the drag coefficent can then be compared
+exerted on the sphere by the fluid.  The value of the drag coefficient can then be compared
 with an approximate theoretical prediction or with experimental data.  In order to see the
 computed drag coefficient, run the example in the batch mode with verbose output (``./lbm_sphere_force_3d.py --batch -v``).
 

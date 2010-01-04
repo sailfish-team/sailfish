@@ -2,7 +2,7 @@ Simulation results processing
 =============================
 
 Results form Sailfish simulations can saved to disk for processing in external
-appliations or visualized in real-time.  These options are not exlusive, so
+applications or visualized in real-time.  These options are not exclusive, so
 concurrent visualization and data saving is fully supported.
 
 Data output

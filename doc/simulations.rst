@@ -7,8 +7,8 @@ Mapping physical quantities to simulation parameters
 Having a good grasp of how choosing LBM parameters such as grid size, numerical
 viscosity and maximum velocity affects the results is essential for running simulations
 efficiently and for interpreting their results.  The mapping between physical quantities
-describing a system and their correspoding counterparts in the simulation is often
-a source of unnnecessary confusion.  In this section, we will show how to do it and
+describing a system and their corresponding counterparts in the simulation is often
+a source of unnecessary confusion.  In this section, we will show how to do it and
 how different choices of various simulation parameters impact the precision of the
 results and simulation time.
 
@@ -36,13 +36,13 @@ Let's choose a lattice of 101x201 nodes.  This sets the lattice
 spacing to :math:`\Delta x = 0.01 \,\mathrm{m}`.  We know the Reynolds number, which is 1000, but
 we need one more constraint to calculate the size of the time step and the numerical
 viscosity.  The constraint we need is the maximum lattice flow speed.  The flow speed
-can never exceed the lattice speed of sound :math:`c_s`, which is :math:`1/\sqrt{3}` lu/ls
+can never exceed the lattice speed of sound :math:`c_s`, which is :math:`1/\sqrt{3}` lu/lt
 for the D2Q9 lattice.  It will in fact have to be much lower than that, since the
 Lattice Boltzmann model only works in the limit of low Mach numbers.  The highest
 relatively safe value used in practice is 0.1 lu/lt, and this is what we are going
 to use for calculation.  Setting:
 
-.. math:: 10 \,\mathrm{m/s} = \frac{\Delta x}{\Delta t} 0.1 \,\mathrm{lu/ls}
+.. math:: 10 \,\mathrm{m/s} = \frac{\Delta x}{\Delta t} 0.1 \,\mathrm{lu/lt}
 
 we can easily calculate the time step size, which is :math:`\Delta t = 10^{-4} \,s`
 and the lattice viscosity :math:`\nu_{lb} = 10^{-3} = 1/\mathrm{Re}`.

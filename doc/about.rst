@@ -14,7 +14,7 @@ How to help?
 * Join the project mailing list at http://groups.google.com/group/sailfish-cfd and help
   other users.
 
-* Send us patches implementing new functonality, fixing bugs or adding new test cases.
+* Send us patches implementing new functionality, fixing bugs or adding new test cases.
   Patches should be sent to the project mailing list.
 
 * Don't know what to start with?  Not a problem!  Have a look at the tasks in our
