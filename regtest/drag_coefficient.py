@@ -56,7 +56,7 @@ def run_test(precision, model, grid, name):
         yvec.append(dc)
         yvec2.append(dct)
 
-        print >>f, dc, dct
+        print >>f, re, dc, dct
 
     print
 
