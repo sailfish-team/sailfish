@@ -754,6 +754,9 @@ def cexpr(grid, incompressible, pointers, ex, rho):
 
     t = ex
 
+    if type(t) is int:
+        return str(t)
+
     if type(rho) is str:
         rho = Symbol(rho)
         t = t.subs(grid.rho, rho)

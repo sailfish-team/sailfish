@@ -411,7 +411,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 
 	// Calculate equilibrium distributions in moment space.
 	%for i, eq in enumerate(grid.mrt_equilibrium):
-		%if eq != 0:
+		%if grid.mrt_collision[i] != 0:
 			feq.${grid.mrt_names[i]} = ${cex(eq, rho='fm.rho')};
 		%endif
 	%endfor
