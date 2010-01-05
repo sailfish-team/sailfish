@@ -90,4 +90,4 @@ else:
 
 print 'Running tests for %s' % (options.precision)
 
-run_test(options.precision, options.model, grid, 'drag_coeffcient')
+run_test(options.precision, options.model, grid, 'drag_coefficient')
