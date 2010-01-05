@@ -64,6 +64,7 @@ Contents
    results
    models
    testcases
+   regtest
    api
    about
 

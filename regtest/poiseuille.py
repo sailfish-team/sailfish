@@ -40,9 +40,10 @@ def run_test(bc, drive, precision, model, grid, name):
     defaults['grid'] = grid
     defaults['model'] = model
     defaults['drive'] = drive
-    defaults['bc_wall'] = bc
     if drive == 'pressure':
         defaults['bc_pressure'] = bc
+    else:
+        defaults['bc_wall'] = bc
     defaults['precision'] = precision
 
     print '* Testing "%s" for visc' % bc,

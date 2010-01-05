@@ -29,7 +29,7 @@ help:
 
 clean:
 	-rm -rf $(BUILDDIR)/*
-
+	-rm -rf build/*
 html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
