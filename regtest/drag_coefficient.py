@@ -11,11 +11,10 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
 
-sys.path.append('.')
-import geo
-import sym
+from sailfish import geo
+from sailfish import sym
 
-from lbm_sphere_force_3d import LSphereSim, LBMGeoSphere
+from examples.lbm_sphere_force_3d import LSphereSim, LBMGeoSphere
 
 MAX_ITERS = 50000
 
@@ -87,7 +86,7 @@ geo_type = geo.LBMGeo3D.NODE_VELOCITY
 if options.grid:
     grid = options.grid
 else:
-    grid = sym.GRID.__name__
+    grid = 'D3Q13'
 
 print 'Running tests for %s' % (options.precision)
 

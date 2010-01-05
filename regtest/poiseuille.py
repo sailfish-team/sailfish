@@ -11,9 +11,8 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
 
-sys.path.append('.')
-import geo
-import sym
+from sailfish import geo
+from sailfish import sym
 
 MAX_ITERS = 10000
 POINTS = 30
@@ -22,6 +21,7 @@ defaults = {
         'stationary': True,
         'batch': True,
         'quiet': True,
+        'verbose': False,
         'lat_nx': 64,
         'lat_ny': 64,
     }
@@ -114,10 +114,10 @@ parser.add_option('--bc', dest='bc', help='boundary conditions to test (comma se
 (options, args) = parser.parse_args()
 
 if options.dim == '2':
-    from lbm_poiseuille import LPoiSim, LBMGeoPoiseuille
+    from examples.lbm_poiseuille import LPoiSim, LBMGeoPoiseuille
     name = 'poiseuille'
 else:
-    from lbm_poiseuille_3d import LPoiSim, LBMGeoPoiseuille
+    from examples.lbm_poiseuille_3d import LPoiSim, LBMGeoPoiseuille
     defaults['along_y'] = True
     defaults['along_z'] = False
     defaults['along_x'] = False
@@ -127,7 +127,10 @@ else:
 if options.grid:
     grid = options.grid
 else:
-    grid = sym.GRID.__name__
+    if options.dim == '2':
+        grid = 'D2Q9'
+    else:
+        grid = 'D3Q13'
 
 if options.drive == 'force':
     geo_type = geo.LBMGeo.NODE_WALL
@@ -149,8 +152,6 @@ class LTestPoiSim(LPoiSim):
 #       self.result = (numpy.max(self.vy[16,1:self.geo.lat_nx-1]) / max(self.geo.get_velocity_profile())) - 1.0
         self.res_maxv = numpy.max(self.geo.mask_array_by_fluid(self.vy))
         self.th_maxv = max(self.geo.get_velocity_profile())
-
-        print self.res_maxv, self.geo.get_velocity_profile()
 
         self.result = self.res_maxv / self.th_maxv - 1.0
 
