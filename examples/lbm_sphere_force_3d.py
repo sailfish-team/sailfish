@@ -155,7 +155,7 @@ class LSphereSim(lbm.LBMSim):
 
         lbm.LBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
-        if self.options.batch:
+        if self.options.batch and not ('every' in self.options.specified):
             self.options.every = 1000
 
         diam = sphere_diam(self.options.lat_ny, geo.get_bc(self.options.bc_velocity))

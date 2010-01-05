@@ -526,7 +526,9 @@ class LBMSim(object):
         i = self.iter_
         kerns = self.kern_map[i & 1]
 
-        if (not self.options.benchmark and not self.options.batch and i % self.options.every == 0) or get_data:
+        if (not self.options.benchmark and (not self.options.batch or
+            (self.options.batch and self.options.output)) and
+            i % self.options.every == 0) or get_data:
             self.backend.run_kernel(kerns[1], self.kern_grid_size)
             if tracers:
                 self.backend.run_kernel(kerns[2], (self.options.tracers,))
@@ -534,7 +536,7 @@ class LBMSim(object):
             self.hostsync_velocity()
             self.hostsync_density()
 
-            if self.options.output:
+            if self.options.output and i % self.options.every == 0:
                 self._output_data(i)
         else:
             self.backend.run_kernel(kerns[0], self.kern_grid_size)
