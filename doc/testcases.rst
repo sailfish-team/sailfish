@@ -47,7 +47,8 @@ This flow configuration is one of the few cases which can be solved analytically
 of the test is to make sure that the generated velocity profile is the same as the analytical
 solution (i.e. parabolic, with maximum velocity at the center of the channel).
 
-This example is also used as a part of the automated regression test in ``regtest/poiseuille.py``.
+This example is also used as a part of the automated regression test in ``regtest/poiseuille.py``,
+see :doc:`regtest-poiseuille` for results.
 
 Flow around a cylinder
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -78,6 +79,9 @@ circular cross section.  The flow can currently only be driven by a global body 
 The flow in this geometry is, like its 2D counterpart, solvable analytically and the result
 is also a parabolic velocity profile.
 
+This example is used as a part of the automated regression test in ``regtest/poiseuille.py``,
+see :doc:`regtest-poiseuille3d` for results.
+
 Flow around a sphere
 ^^^^^^^^^^^^^^^^^^^^
 The code for this example is located in ``examples/lbm_sphere_3d.py`` and ``examples/lbm_sphere_force_3d.py``.
@@ -102,4 +106,5 @@ with an approximate theoretical prediction or with experimental data.  In order 
 computed drag coefficient, run the example in the batch mode with verbose output (``./lbm_sphere_force_3d.py --batch -v``).
 You can also select different Reynolds numbers using the ``--re=N`` command line option.
 
-This example is also used as a part of the automated regression test in ``regtest/drag_coefficient.py``.
+This example is also used as a part of the automated regression test in ``regtest/drag_coefficient.py``,
+see :doc:`regtest-drag_coefficient` for results.

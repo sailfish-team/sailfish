@@ -31,8 +31,4 @@ Results for the D3Q19 grid.
          ('D3Q19/bgk/force/single/fullbb.dat', 'D3Q19/mrt/force/single/fullbb.dat'),
          ('D3Q19 / BGK / single / fullbb', 'D3Q19 / MRT / single / fullbb'))
 
-Drag coefficient of a sphere (3D)
----------------------------------
-
-Results for the D3Q13 grid.
 

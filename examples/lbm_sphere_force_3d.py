@@ -210,9 +210,7 @@ class LSphereSim(lbm.LBMSim):
         self.force = self.geo.force('sphere', self.dist)
         coeff = self.drag_coeff(self.force)
 
-        # Keep the last ten drag coefficients (for averaging in the regtest).
         self.coeffs.append(coeff)
-        self.coeffs = self.coeffs[-10:]
 
         if self.options.verbose:
             self._timed_print(coeff)

@@ -22,6 +22,7 @@ defaults = {
         'batch': True,
         'verbose': True,
         'max_iters': MAX_ITERS,
+        'every': 100,
     }
 
 def run_test(precision, model, grid, name):
@@ -29,9 +30,10 @@ def run_test(precision, model, grid, name):
     yvec = []
     yvec2 = []
     basepath = os.path.join('regtest/results', name, grid, model, precision)
+    seriespath = os.path.join(basepath, 'series')
 
-    if not os.path.exists(basepath):
-        os.makedirs(basepath)
+    if not os.path.exists(seriespath):
+        os.makedirs(seriespath)
 
     bc = 'fullbb'
 
@@ -49,7 +51,13 @@ def run_test(precision, model, grid, name):
         sim = LSphereSim(LBMGeoSphere, defaults)
         sim.run()
 
-        dc = math.fsum(sim.coeffs)/len(sim.coeffs)
+        coeffs = sim.coeffs[-100:]
+
+        with open(os.path.join(seriespath, '%s-re%s' % (bc, re)), 'w') as flog:
+            for i, val in enumerate(sim.coeffs):
+                print >>flog, sim.dt * i, val
+
+        dc = math.fsum(coeffs)/len(coeffs)
         dct = sim.drag_theo()
 
         xvec.append(re)
