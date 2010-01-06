@@ -48,7 +48,7 @@ of the test is to make sure that the generated velocity profile is the same as t
 solution (i.e. parabolic, with maximum velocity at the center of the channel).
 
 This example is also used as a part of the automated regression test in ``regtest/poiseuille.py``,
-see :doc:`regtest-poiseuille` for results.
+see :doc:`regtest-poiseuille2d` for results.
 
 Flow around a cylinder
 ^^^^^^^^^^^^^^^^^^^^^^
