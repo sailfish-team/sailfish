@@ -178,36 +178,26 @@ class D3Q13(DxQy):
         cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxy']]
         cls.mrt_collision[n2i['pzx']] = cls.mrt_collision[n2i['pxy']]
 
-        vec_rho = cls.mrt_matrix[n2i['rho'],:]
-        vec_mx = cls.mrt_matrix[n2i['mx'],:]
-        vec_my = cls.mrt_matrix[n2i['my'],:]
-        vec_my = cls.mrt_matrix[n2i['mz'],:]
-
         # Form of the equilibrium functions follows that from
         # PhysRevE.63.066702.
+
+        mrt_eq = {
+            'm3x': 0,
+            'm3y': 0,
+            'm3z': 0,
+            'pxy': 1/cls.rho0 * (cls.mx * cls.my),
+            'pyz': 1/cls.rho0 * (cls.my * cls.mz),
+            'pzx': 1/cls.rho0 * (cls.mx * cls.mz),
+            'pxx': 1/cls.rho0 * (2 * cls.mx**2 - cls.my**2 - cls.mz**2),
+            'pww': 1/cls.rho0 * (cls.my**2 - cls.mz**2),
+            'en': 3*cls.rho*(13*cls.cssq - 8)/2 + 13/(2 * cls.rho0)*(cls.mx**2 + cls.my**2 + cls.mz**2),
+        }
+
         for i, name in enumerate(cls.mrt_names):
             if cls.mrt_collision[i] == 0:
                 cls.mrt_equilibrium.append(0)
-                continue
-
-            vec_e = cls.mrt_matrix[i,:]
-
-            if name == 'm3x' or name == 'm3y' or name == 'm3z':
-                t = 0
-            elif name == 'pxy':
-                t = 1/cls.rho0 * (cls.mx * cls.my)
-            elif name == 'pyz':
-                t = 1/cls.rho0 * (cls.my * cls.mz)
-            elif name == 'pzx':
-                t = 1/cls.rho0 * (cls.mx * cls.mz)
-            elif name == 'pxx':
-                t = 1/cls.rho0 * (2 * cls.mx**2 - cls.my**2 - cls.mz**2)
-            elif name == 'pww':
-                t = 1/cls.rho0 * (cls.my**2 - cls.mz**2)
-            elif name == 'en':
-                t = 3*cls.rho*(13*cls.cssq - 8)/2 + 13/(2 * cls.rho0)*(cls.mx**2 + cls.my**2 + cls.mz**2)
-
-            cls.mrt_equilibrium.append(t)
+            else:
+                cls.mrt_equilibrium.append(mrt_eq[name])
 
 
 class D3Q15(DxQy):
@@ -263,44 +253,27 @@ class D3Q15(DxQy):
         cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxx']]
         cls.mrt_collision[n2i['pzx']] = cls.mrt_collision[n2i['pxx']]
 
-        vec_rho = cls.mrt_matrix[n2i['rho'],:]
-        vec_mx = cls.mrt_matrix[n2i['mx'],:]
-        vec_my = cls.mrt_matrix[n2i['my'],:]
-
         # Form of the equilibrium functions follows that from
         # dHumieres, PhilTranA, 2002.
+        mrt_eq = {
+            'en':  -cls.rho + 1/cls.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
+            'ens': -cls.rho,
+            'ex':  -Rational(7,3)*cls.mx,
+            'ey':  -Rational(7,3)*cls.my,
+            'ez':  -Rational(7,3)*cls.mz,
+            'pxx': 1/cls.rho0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
+            'pww': 1/cls.rho0 * (cls.my**2 - cls.mz**2),
+            'pxy': 1/cls.rho0 * (cls.mx * cls.my),
+            'pyz': 1/cls.rho0 * (cls.my * cls.mz),
+            'pzx': 1/cls.rho0 * (cls.mx * cls.mz),
+            'mxyz': 0
+        }
+
         for i, name in enumerate(cls.mrt_names):
             if cls.mrt_collision[i] == 0:
                 cls.mrt_equilibrium.append(0)
-                continue
-
-            vec_e = cls.mrt_matrix[i,:]
-            if name == 'en':
-                t = -cls.rho + 1/cls.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2)
-            elif name == 'ens':
-                t = -cls.rho
-            elif name == 'ex':
-                t = -Rational(7,3)*cls.mx
-            elif name == 'ey':
-                t = -Rational(7,3)*cls.my
-            elif name == 'ez':
-                t = -Rational(7,3)*cls.mz
-            elif name == 'pxx':
-                t = 1/(cls.rho0) * (2*cls.mx**2 - (cls.my**2 + cls.mz**2))
-            elif name == 'pww':
-                t = 1/cls.rho0 * (cls.my**2 - cls.mz**2)
-            elif name == 'pxy':
-                t = 1/cls.rho0 * (cls.mx * cls.my)
-            elif name == 'pyz':
-                t = 1/cls.rho0 * (cls.my * cls.mz)
-            elif name == 'pzx':
-                t = 1/cls.rho0 * (cls.mx * cls.mz)
-            elif name == 'myz':
-                t = 0
-
-#           t = poly_factorize(t)
-            cls.mrt_equilibrium.append(t)
-
+            else:
+                cls.mrt_equilibrium.append(mrt_eq[name])
 
 class D3Q19(DxQy):
     dim = 3
@@ -362,43 +335,31 @@ class D3Q19(DxQy):
         cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxx']]
         cls.mrt_collision[n2i['pzx']] = cls.mrt_collision[n2i['pxx']]
 
-        vec_rho = cls.mrt_matrix[n2i['rho'],:]
-        vec_mx = cls.mrt_matrix[n2i['mx'],:]
-        vec_my = cls.mrt_matrix[n2i['my'],:]
-
         # Form of the equilibrium functions follows that from
         # dHumieres, PhilTranA, 2002.
+        mrt_eq = {
+            'en':  -11 * cls.rho + 19/cls.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
+            'ens': -Rational(475,63)/cls.rho0*(cls.mx**2 + cls.my**2 + cls.mz**2),
+            'ex':  -Rational(2,3)*cls.mx,
+            'ey':  -Rational(2,3)*cls.my,
+            'ez':  -Rational(2,3)*cls.mz,
+            'pxx': 1/cls.rho0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
+            'pww': 1/cls.rho0 * (cls.my**2 - cls.mz**2),
+            'pxy': 1/cls.rho0 * (cls.mx * cls.my),
+            'pyz': 1/cls.rho0 * (cls.my * cls.mz),
+            'pzx': 1/cls.rho0 * (cls.mx * cls.mz),
+            'm3x': 0,
+            'm3y': 0,
+            'm3z': 0,
+            'pixx': 0,
+            'piww': 0,
+        }
+
         for i, name in enumerate(cls.mrt_names):
             if cls.mrt_collision[i] == 0:
                 cls.mrt_equilibrium.append(0)
-                continue
-
-            vec_e = cls.mrt_matrix[i,:]
-            if name == 'en':
-                t = -11 * cls.rho + 19/cls.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2)
-            elif name == 'ens':
-                t = - Rational(475,63)/cls.rho0*(cls.mx**2 + cls.my**2 + cls.mz**2)
-            elif name == 'ex':
-                t = -Rational(2,3)*cls.mx
-            elif name == 'ey':
-                t = -Rational(2,3)*cls.my
-            elif name == 'ez':
-                t = -Rational(2,3)*cls.mz
-            elif name == 'pxx':
-                t = 1/cls.rho0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2))
-            elif name == 'pww':
-                t = 1/cls.rho0 * (cls.my**2 - cls.mz**2)
-            elif name == 'pxy':
-                t = 1/cls.rho0 * (cls.mx * cls.my)
-            elif name == 'pyz':
-                t = 1/cls.rho0 * (cls.my * cls.mz)
-            elif name == 'pzx':
-                t = 1/cls.rho0 * (cls.mx * cls.mz)
-            elif name == 'm3x' or name == 'm3y' or name == 'm3z' or name == 'pixx' or name == 'piww':
-                t = 0
-
-#           t = poly_factorize(t)
-            cls.mrt_equilibrium.append(t)
+            else:
+                cls.mrt_equilibrium.append(mrt_eq[name])
 
 def bgk_equilibrium(grid):
     """Get expressions for the BGK equilibrium distribution.
