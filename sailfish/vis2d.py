@@ -114,7 +114,9 @@ class Fluid2DVis(object):
 
     @property
     def velocity_norm(self):
-        return self.sim.geo.mask_array_by_fluid(numpy.sqrt(self.sim.vx*self.sim.vx + self.sim.vy*self.sim.vy))
+        return self.sim.geo.mask_array_by_fluid(
+                numpy.sqrt(numpy.add(numpy.square(self.vx),
+                    numpy.square(self.vy))))
 
     @property
     def vx(self):
@@ -352,7 +354,8 @@ class Fluid3DVisCutplane(Fluid2DVis):
     @property
     def velocity_norm(self):
         # FIXME: This should be masked by fluid.
-        return numpy.sqrt(self.vx*self.vx + self.vy*self.vy + self.vz*self.vz)
+        return numpy.sqrt(numpy.add(numpy.add(numpy.square(self.vx),
+            numpy.square(self.vy)), numpy.square(self.vz)))
 
     @property
     def vx(self):
