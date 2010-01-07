@@ -29,12 +29,20 @@ Tests:
 
 * matplotlib
 
+Downloading Sailfish
+--------------------
+
+We currently do not provide snapshot tarballs of the code, so you will need to get Sailfish
+directly from its git repositorye::
+
+  git clone git://gitorious.org/sailfish/sailfish.git
+
 Gentoo installation instructions
 --------------------------------
 
 To install the required packages on a Gentoo system::
 
-  emerge numpy scipy pytables mayavi matplotlib mako pygame pycuda sympy
+  emerge numpy scipy pytables mayavi matplotlib mako pygame pycuda sympy dev-util/git
 
 Ubuntu installation instructions
 --------------------------------
