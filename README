@@ -21,7 +21,7 @@ that need to be installed on the host system in order for Sailfish to work.
 For a full list of these modules and their installation instructions, please
 refer to the Sailfish manual at:
 
-http://dev.gentoo.org/~spock/projects/cuda/sailfish/doc/
+http://sailfish.us.edu.pl/
 
 To run the examples, go to the appropriate directory and let Python know
 where Sailfish is located by adjusting the PYTHONPATH environment variable,
