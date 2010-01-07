@@ -122,8 +122,9 @@ class LBMGeo(object):
     def _clear_state(self):
         self._params = None
         self.map = numpy.zeros(tuple(reversed(self.shape)), numpy.int32)
-        self._velocity_map = numpy.zeros(shape=([self.dim] + list(self.map.shape)), dtype=self.float)
-        self._pressure_map = numpy.zeros(shape=self.map.shape, dtype=self.float)
+        self._velocity_map = numpy.ma.array(numpy.zeros(shape=([self.dim] + list(self.map.shape)), dtype=self.float),
+                mask=True)
+        self._pressure_map = numpy.ma.array(numpy.zeros(shape=self.map.shape, dtype=self.float), mask=True)
         self._num_velocities = 0
         self._num_pressures = 0
 
@@ -306,6 +307,8 @@ class LBMGeo(object):
             v1, i1 = numpy.unique1d(self._velocity_map[0,:,:], return_inverse=True)
             v2, i2 = numpy.unique1d(self._velocity_map[1,:,:], return_inverse=True)
 
+        # Calculate a single linear index. i1, i2, i3 are arrays of indices for the
+        # matrices v1, v2, v3.
         i1m = numpy.max(i1) + 1
         i2m = numpy.max(i2) + 1
         idx = i1 + i1m*i2
@@ -317,13 +320,14 @@ class LBMGeo(object):
         ifin = ifin.reshape(self._velocity_map.shape[1:])
 
         for j, v in enumerate(vfin):
-            if j == 0:
-                continue
-
             at = v / i1m
             a1 = v % i1m
             a2 = at % i2m
             a3 = at / i2m
+
+            if (v1[a1] is numpy.ma.masked or v2[a2] is numpy.ma.masked or
+                    (self.dim == 3 and v3[a3] is numpy.ma.masked)):
+                continue
 
             midx = (ifin == j)
             ret.extend((v1[a1], v2[a2]))
@@ -341,7 +345,7 @@ class LBMGeo(object):
         ifin = ifin.reshape(self._pressure_map.shape)
 
         for j, v in enumerate(pressure):
-            if j == 0:
+            if v is numpy.ma.masked:
                 continue
 
             midx = (ifin == j)
