@@ -32,8 +32,9 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
                 pressure = self.maxv * (8.0 * self.options.visc) / (self.get_chan_width()**2) * self.lat_nx
 
                 for i in range(1, self.lat_ny-1):
-                    self.set_geo((0, i), self.NODE_PRESSURE, (1.0/3.0) - pressure/2.0)
-                    self.set_geo((self.lat_nx-1, i), self.NODE_PRESSURE, (1.0/3.0) + pressure/2.0)
+                    self.set_geo((0, i), self.NODE_PRESSURE, (1.0/3.0) + pressure/2.0)
+                    self.set_geo((self.lat_nx-1, i), self.NODE_PRESSURE,
+                            (1.0/3.0) - pressure/2.0)
             else:
                 pressure = self.maxv * (8.0 * self.options.visc) / (self.get_chan_width()**2) * self.lat_ny
 
