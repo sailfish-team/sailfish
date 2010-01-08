@@ -106,7 +106,7 @@ class Fluid2DVis(object):
         self.sim = sim
 
         pygame.key.set_repeat(100,50)
-        pygame.display.set_caption('Sailfish v0.1')
+        pygame.display.set_caption('Sailfish v0.1-alpha1')
 
     def _reset(self):
         self._maxv = 0.000001
