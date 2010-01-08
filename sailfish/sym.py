@@ -493,6 +493,15 @@ def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=Non
 
     :param distp: name of the pointer to the distribution structure
     :param comp: velocity component number: 0, 1 or 2 (for 3D lattices)
+    :param momentum: if ``True``, an expression for momentum is returned instead
+        of for velocity
+    :param missing_dir: the number of a basis vector decreased by 1 if an
+        expression for a node where not all distributions are known is
+        necessary. This parameter identifies the normal vector
+        pointing towards the fluid (i.e. the distributions in this direction
+        are unknown).
+    :param par_rho: name of the variable (a string) containing the externally
+        imposed density (e.g. from a boundary condition)
 
     :rtype: sympy expression for the velocity in a given direction
     """
