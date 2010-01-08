@@ -471,10 +471,12 @@ def fill_missing_dists(grid, distp, missing_dir):
 
     return ret
 
-def ex_rho(grid, distp, missing_dir=None):
+def ex_rho(grid, distp, incompressible, missing_dir=None):
     """Express density as a function of the distributions.
 
     :param distp: name of the pointer to the distribution structure
+    :param incompressible: if ``True``, an expression for the incompressible
+        model will be returned
     :param missing_dir: direction number specified if an expression for
         a node where not all distributions are known is necessary. This
         parameter identifies the normal vector pointing towards the
@@ -493,7 +495,10 @@ def ex_rho(grid, distp, missing_dir=None):
     # This is derived by considering a system of equations for the macroscopic
     # quantities and cancelling out the unknown distributions so as to get an
     # expression for rho using only known quantities.
-    return grid.rho / (1 - grid.dir_to_vec(missing_dir).dot(grid.v))
+    if incompressible:
+        return grid.rho + grid.rho0 * grid.dir_to_vec(missing_dir).dot(grid.v)
+    else:
+        return grid.rho / (1 - grid.dir_to_vec(missing_dir).dot(grid.v))
 
 def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=None):
     """Express velocity as a function of the distributions.

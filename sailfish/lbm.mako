@@ -137,7 +137,7 @@ ${device_func} inline void bounce_back(Dist *fi)
 
 ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 {
-	*rho = ${sym.ex_rho(grid, 'fi')};
+	*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
 	%for d in range(0, grid.dim):
 		v[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d), pointers=True)};
 	%endfor
@@ -203,7 +203,7 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 		}
 	} else if (isVelocityNode(node_type)) {
 		%if bc_velocity == 'zouhe':
-			*rho = ${sym.ex_rho(grid, 'fi')};
+			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
 			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
 			zouhe_bb(fi, orientation, rho, v);
 		// We're dealing with a boundary node, for which some of the distributions
@@ -211,13 +211,13 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 		// distributions.
 		%elif bc_velocity == 'equilibrium':
 			${fill_missing_distributions()}
-			*rho = ${sym.ex_rho(grid, 'fi')};
+			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
 			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
 
 			switch (orientation) {
 				%for i in range(1, grid.dim*2+1):
 					case ${i}:
-						*rho = ${cex(sym.ex_rho(grid, 'fi', missing_dir=i), pointers=True)};
+						*rho = ${cex(sym.ex_rho(grid, 'fi', incompressible, missing_dir=i), pointers=True)};
 						break;
 				%endfor
 			}
@@ -227,7 +227,7 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 	} else if (isPressureNode(node_type)) {
 		%if bc_pressure == 'zouhe' or bc_pressure == 'equilibrium':
 			${fill_missing_distributions()}
-			*rho = ${sym.ex_rho(grid, 'fi')};
+			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
 			float par_rho;
 			${get_boundary_pressure('node_type', 'par_rho')}
 
@@ -271,7 +271,7 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 				fi->${grid.idx_name[i]} += ${cex(
 					grid.rho0 * 2 * grid.weights[i] * grid.v.dot(ve) / grid.cssq, pointers=True)};
 			%endfor
-			*rho = ${sym.ex_rho(grid, 'fi')};
+			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
 		}
 	%endif
 
