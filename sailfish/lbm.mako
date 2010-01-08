@@ -82,12 +82,14 @@ ${const_var} float geo_params[${num_params+1}] = {
 <%def name="fill_missing_distributions()">
 	switch (orientation) {
 		%for i in range(0, grid.Q-1):
-			case ${i}: {
-				%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
-					${lvalue} = ${rvalue};
-				%endfor
-				break;
-			}
+			%if grid.basis[i+1].dot(grid.basis[i+1]) == 1:
+				case ${i}: {
+					%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
+						${lvalue} = ${rvalue};
+					%endfor
+					break;
+				}
+			%endif
 		%endfor
 	}
 </%def>
@@ -149,7 +151,9 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
 	// Bounce-back of the non-equilibrium parts.
 	switch (orientation) {
 		%for i in range(0, len(grid.basis)-1):
-			${noneq_bb(i)}
+			%if grid.basis[i+1].dot(grid.basis[i+1]) == 1:
+				${noneq_bb(i)}
+			%endif
 		%endfor
 		case ${geo_dir_other}:
 			bounce_back(fi);
@@ -177,7 +181,9 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
 
 	switch (orientation) {
 		%for i in range(0, len(grid.basis)-1):
-			${zouhe_fixup(i)}
+			%if grid.basis[i+1].dot(grid.basis[i+1]) == 1:
+				${zouhe_fixup(i)}
+			%endif
 		%endfor
 	}
 }
@@ -216,9 +222,11 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 
 			switch (orientation) {
 				%for i in range(0, grid.Q-1):
-					case ${i}:
-						*rho = ${cex(sym.ex_rho(grid, 'fi', missing_dir=i), pointers=True)};
-						break;
+					%if grid.basis[i+1].dot(grid.basis[i+1]) == 1:
+						case ${i}:
+							*rho = ${cex(sym.ex_rho(grid, 'fi', missing_dir=i), pointers=True)};
+							break;
+					%endif
 				%endfor
 			}
 		%else:
@@ -233,12 +241,14 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 
 			switch (orientation) {
 				%for i in range(0, grid.Q-1):
-					case ${i}: {
-						%for d in range(0, grid.dim):
-							v[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, missing_dir=i, par_rho='par_rho'), pointers=True)};
-						%endfor
-						break;
-					 }
+					%if grid.basis[i+1].dot(grid.basis[i+1]) == 1:
+						case ${i}: {
+							%for d in range(0, grid.dim):
+								v[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, missing_dir=i, par_rho='par_rho'), pointers=True)};
+							%endfor
+							break;
+						 }
+					%endif
 				%endfor
 			}
 

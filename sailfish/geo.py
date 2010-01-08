@@ -27,21 +27,9 @@ class LBMGeo(object):
 
     NODE_TYPES = [NODE_WALL, NODE_VELOCITY, NODE_PRESSURE]
 
-    # Constants to specify node orientation.  This needs to match the order
-    # in sym.basis.
-    NODE_DIR_E = 0
-    NODE_DIR_N = 1
-    NODE_DIR_W = 2
-    NODE_DIR_S = 3
-    NODE_DIR_NE = 4
-    NODE_DIR_NW = 5
-    NODE_DIR_SW = 6
-    NODE_DIR_SE = 7
-    NODE_DIR_OTHER = 8
-
-    NODE_TYPE_MASK = 0xfffffff0
-    NODE_ORIENTATION_SHIFT = 4
-    NODE_ORIENTATION_MASK = 0xf
+    NODE_TYPE_MASK = 0xffffffff
+    NODE_ORIENTATION_SHIFT = 0
+    NODE_ORIENTATION_MASK = 0
 
     @classmethod
     def _encode_node(cls, orientation, type):
@@ -437,6 +425,18 @@ class LBMGeo2D(LBMGeo):
 
     dim = 2
 
+    # Constants to specify node orientation.  This needs to match the order
+    # in sym.basis.
+    NODE_DIR_E = 0
+    NODE_DIR_N = 1
+    NODE_DIR_W = 2
+    NODE_DIR_S = 3
+    NODE_DIR_OTHER = 4
+
+    NODE_TYPE_MASK = 0xfffffff8
+    NODE_ORIENTATION_SHIFT = 3
+    NODE_ORIENTATION_MASK = 0x7
+
     def __init__(self, shape, *args, **kwargs):
         self.lat_nx, self.lat_ny = shape
         LBMGeo.__init__(self, shape, *args, **kwargs)
@@ -450,19 +450,11 @@ class LBMGeo2D(LBMGeo):
     def get_defines(self):
         return {'geo_fluid': self.NODE_FLUID,
                 'geo_wall': self.NODE_WALL,
-                'geo_wall_e': self.NODE_DIR_E,
-                'geo_wall_w': self.NODE_DIR_W,
-                'geo_wall_s': self.NODE_DIR_S,
-                'geo_wall_n': self.NODE_DIR_N,
-                'geo_wall_ne': self.NODE_DIR_NE,
-                'geo_wall_se': self.NODE_DIR_SE,
-                'geo_wall_nw': self.NODE_DIR_NW,
-                'geo_wall_sw': self.NODE_DIR_SW,
-                'geo_dir_other': self.NODE_DIR_OTHER,
                 'geo_bcv': self.NODE_VELOCITY,
                 'geo_bcp': self.NODE_PRESSURE + self._num_velocities - 1,
                 'geo_orientation_mask': self.NODE_ORIENTATION_MASK,
                 'geo_orientation_shift': self.NODE_ORIENTATION_SHIFT,
+                'geo_dir_other': self.NODE_DIR_OTHER,
                 }
 
     def _postprocess_nodes(self, nodes=None):
@@ -491,17 +483,9 @@ class LBMGeo2D(LBMGeo):
                     self.map[y][x] = self._encode_node(self.NODE_DIR_W, self.map[y][x])
                 elif east and not south and not north:
                     self.map[y][x] = self._encode_node(self.NODE_DIR_E, self.map[y][x])
-                # Corners.
-                elif y > 0 and x > 0 and self.map[y-1][x-1] == self.NODE_FLUID:
-                    self.map[y][x] = self._encode_node(self.NODE_DIR_SW, self.map[y][x])
-                elif y > 0 and x < lat_nx-1 and self.map[y-1][x+1] == self.NODE_FLUID:
-                    self.map[y][x] = self._encode_node(self.NODE_DIR_SE, self.map[y][x])
-                elif y < lat_ny-1 and x > 0 and self.map[y+1][x-1] == self.NODE_FLUID:
-                    self.map[y][x] = self._encode_node(self.NODE_DIR_NW, self.map[y][x])
-                elif y < lat_ny-1 and x < lat_nx-1 and self.map[y+1][x+1] == self.NODE_FLUID:
-                    self.map[y][x] = self._encode_node(self.NODE_DIR_NE, self.map[y][x])
                 else:
-                    self.map[y][x] = self._encode_node(self.NODE_DIR_OTHER, self.map[y][x])
+                    self.map[y][x] = self._encode_node(self.NODE_DIR_OTHER,
+                            self.map[y][x])
 
 class LBMGeo3D(LBMGeo):
     """Base class for 3D geometries."""
