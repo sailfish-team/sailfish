@@ -300,12 +300,12 @@ class LBMGeo(object):
         i = 0
 
         if self.dim == 3:
-            v1, i1 = numpy.unique1d(self._velocity_map[0,:,:,:], return_inverse=True)
-            v2, i2 = numpy.unique1d(self._velocity_map[1,:,:,:], return_inverse=True)
-            v3, i3 = numpy.unique1d(self._velocity_map[2,:,:,:], return_inverse=True)
+            v1, i1 = numpy.unique(self._velocity_map[0,:,:,:], return_inverse=True)
+            v2, i2 = numpy.unique(self._velocity_map[1,:,:,:], return_inverse=True)
+            v3, i3 = numpy.unique(self._velocity_map[2,:,:,:], return_inverse=True)
         else:
-            v1, i1 = numpy.unique1d(self._velocity_map[0,:,:], return_inverse=True)
-            v2, i2 = numpy.unique1d(self._velocity_map[1,:,:], return_inverse=True)
+            v1, i1 = numpy.unique(self._velocity_map[0,:,:], return_inverse=True)
+            v2, i2 = numpy.unique(self._velocity_map[1,:,:], return_inverse=True)
 
         # Calculate a single linear index. i1, i2, i3 are arrays of indices for the
         # matrices v1, v2, v3.
@@ -316,7 +316,7 @@ class LBMGeo(object):
         if self.dim == 3:
             idx += i1m*i3*i2m
 
-        vfin, ifin = numpy.unique1d(idx, return_inverse=True)
+        vfin, ifin = numpy.unique(idx, return_inverse=True)
         ifin = ifin.reshape(self._velocity_map.shape[1:])
 
         for j, v in enumerate(vfin):
@@ -341,7 +341,7 @@ class LBMGeo(object):
         self._num_velocities = i
         i -= 1
 
-        pressure, ifin = numpy.unique1d(self._pressure_map, return_inverse=True)
+        pressure, ifin = numpy.unique(self._pressure_map, return_inverse=True)
         ifin = ifin.reshape(self._pressure_map.shape)
 
         for j, v in enumerate(pressure):
