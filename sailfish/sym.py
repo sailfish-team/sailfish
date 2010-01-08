@@ -533,7 +533,7 @@ def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=Non
             if sp <= 0:
                 ret = 1
 
-        ret = ret * (grid.rho0 - prho)
+        ret = ret * (grid.rho - prho)
         ret *= -grid.dir_to_vec(missing_dir)[comp]
         if not momentum:
             ret = ret / prho
