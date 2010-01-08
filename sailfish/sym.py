@@ -464,9 +464,14 @@ def fill_missing_dists(grid, distp, missing_dir):
     return ret
 
 def ex_rho(grid, distp, missing_dir=None):
-    """Express density as a function of the distibutions.
+    """Express density as a function of the distributions.
 
     :param distp: name of the pointer to the distribution structure
+    :param missing_dir: the number of a basis vector decreased by 1 if an
+        expression for a node where not all distributions are known is
+        necessary. This parameter identifies the normal vector
+        pointing towards the fluid (i.e. the distributions in this direction
+        are unknown).
 
     :rtype: sympy expression for the density
     """
@@ -478,7 +483,10 @@ def ex_rho(grid, distp, missing_dir=None):
             ret += sym
         return ret
 
-    return grid.rho / (grid.basis[missing_dir+1].dot(grid.v) + 1)
+    # This is derived by considering a system of equations for the macroscopic
+    # quantities and cancelling out the unknown distributions so as to get an
+    # expression for rho using only known quantities.
+    return grid.rho / (1 - grid.basis[missing_dir+1].dot(grid.v))
 
 def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=None):
     """Express velocity as a function of the distributions.
