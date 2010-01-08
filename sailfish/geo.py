@@ -30,6 +30,7 @@ class LBMGeo(object):
     NODE_TYPE_MASK = 0xffffffff
     NODE_ORIENTATION_SHIFT = 0
     NODE_ORIENTATION_MASK = 0
+    NODE_DIR_OTHER = 0
 
     @classmethod
     def _encode_node(cls, orientation, type):
@@ -425,14 +426,6 @@ class LBMGeo2D(LBMGeo):
 
     dim = 2
 
-    # Constants to specify node orientation.  This needs to match the order
-    # in sym.basis.
-    NODE_DIR_E = 0
-    NODE_DIR_N = 1
-    NODE_DIR_W = 2
-    NODE_DIR_S = 3
-    NODE_DIR_OTHER = 4
-
     NODE_TYPE_MASK = 0xfffffff8
     NODE_ORIENTATION_SHIFT = 3
     NODE_ORIENTATION_MASK = 0x7
@@ -465,6 +458,11 @@ class LBMGeo2D(LBMGeo):
         else:
             nodes_ = nodes
 
+        dir_e = self.sim.grid.vec_to_dir((1,0))
+        dir_w = self.sim.grid.vec_to_dir((-1,0))
+        dir_n = self.sim.grid.vec_to_dir((0,1))
+        dir_s = self.sim.grid.vec_to_dir((0,-1))
+
         for x, y in nodes_:
             if self.map[y][x] != self.NODE_FLUID:
                 # If the bool corresponding to a specific direction is True, the
@@ -476,13 +474,13 @@ class LBMGeo2D(LBMGeo):
 
                 # Walls aligned with the grid.
                 if north and not west and not east:
-                    self.map[y][x] = self._encode_node(self.NODE_DIR_N, self.map[y][x])
+                    self.map[y][x] = self._encode_node(dir_n, self.map[y][x])
                 elif south and not west and not east:
-                    self.map[y][x] = self._encode_node(self.NODE_DIR_S, self.map[y][x])
+                    self.map[y][x] = self._encode_node(dir_s, self.map[y][x])
                 elif west and not south and not north:
-                    self.map[y][x] = self._encode_node(self.NODE_DIR_W, self.map[y][x])
+                    self.map[y][x] = self._encode_node(dir_w, self.map[y][x])
                 elif east and not south and not north:
-                    self.map[y][x] = self._encode_node(self.NODE_DIR_E, self.map[y][x])
+                    self.map[y][x] = self._encode_node(dir_e, self.map[y][x])
                 else:
                     self.map[y][x] = self._encode_node(self.NODE_DIR_OTHER,
                             self.map[y][x])

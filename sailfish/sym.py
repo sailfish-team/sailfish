@@ -45,6 +45,14 @@ class DxQy(object):
         else:
             return True
 
+    @classmethod
+    def vec_to_dir(cls, vec):
+        return cls.vecidx2dir[cls.basis.index(Matrix((vec,)))]
+
+    @classmethod
+    def dir_to_vec(cls, dir):
+        return cls.basis[cls.dir2vecidx[dir]]
+
 class D2Q9(DxQy):
     dim = 2
     Q = 9
@@ -456,7 +464,7 @@ def fill_missing_dists(grid, distp, missing_dir):
     ret = []
 
     for i, sym in enumerate(syms):
-        sp = grid.basis[i].dot(grid.basis[missing_dir+1])
+        sp = grid.basis[i].dot(grid.dir_to_vec(missing_dir))
 
         if sp < 0:
             ret.append((syms[grid.idx_opposite[i]], sym))
@@ -467,11 +475,10 @@ def ex_rho(grid, distp, missing_dir=None):
     """Express density as a function of the distributions.
 
     :param distp: name of the pointer to the distribution structure
-    :param missing_dir: the number of a basis vector decreased by 1 if an
-        expression for a node where not all distributions are known is
-        necessary. This parameter identifies the normal vector
-        pointing towards the fluid (i.e. the distributions in this direction
-        are unknown).
+    :param missing_dir: direction number specified if an expression for
+        a node where not all distributions are known is necessary. This
+        parameter identifies the normal vector pointing towards the
+        fluid (i.e. the distributions in this direction are unknown).
 
     :rtype: sympy expression for the density
     """
@@ -486,7 +493,7 @@ def ex_rho(grid, distp, missing_dir=None):
     # This is derived by considering a system of equations for the macroscopic
     # quantities and cancelling out the unknown distributions so as to get an
     # expression for rho using only known quantities.
-    return grid.rho / (1 - grid.basis[missing_dir+1].dot(grid.v))
+    return grid.rho / (1 - grid.dir_to_vec(missing_dir).dot(grid.v))
 
 def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=None):
     """Express velocity as a function of the distributions.
@@ -495,11 +502,10 @@ def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=Non
     :param comp: velocity component number: 0, 1 or 2 (for 3D lattices)
     :param momentum: if ``True``, an expression for momentum is returned instead
         of for velocity
-    :param missing_dir: the number of a basis vector decreased by 1 if an
-        expression for a node where not all distributions are known is
-        necessary. This parameter identifies the normal vector
-        pointing towards the fluid (i.e. the distributions in this direction
-        are unknown).
+    :param missing_dir: direction number specified if an expression for
+        a node where not all distributions are known is necessary. This
+        parameter identifies the normal vector pointing towards the
+        fluid (i.e. the distributions in this direction are unknown).
     :param par_rho: name of the variable (a string) containing the externally
         imposed density (e.g. from a boundary condition)
 
@@ -518,12 +524,12 @@ def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=Non
         prho = Symbol(par_rho)
 
         for i, sym in enumerate(syms):
-            sp = grid.basis[i].dot(grid.basis[missing_dir+1])
+            sp = grid.basis[i].dot(grid.dir_to_vec(missing_dir))
             if sp <= 0:
                 ret = 1
 
         ret = ret * (grid.rho0 - prho)
-        ret *= -grid.basis[missing_dir+1][comp]
+        ret *= -grid.dir_to_vec(missing_dir)[comp]
         if not momentum:
             ret = ret / prho
 
@@ -563,8 +569,7 @@ def _get_known_dists(grid, normal):
     return known, unknown
 
 def noneq_bb(grid, orientation):
-    idx = orientation + 1
-    normal = grid.basis[idx]
+    normal = grid.dir_to_vec(orientation)
     known, unknown = _get_known_dists(grid, normal)
     ret = []
 
@@ -584,12 +589,11 @@ def noneq_bb(grid, orientation):
     return ret
 
 def zouhe_fixup(grid, orientation):
-    idx = orientation + 1
-    normal = grid.basis[idx]
+    normal = grid.dir_to_vec(orientation)
     known, unknown = _get_known_dists(grid, normal)
 
     unknown_not_normal = set(unknown)
-    unknown_not_normal.remove(idx)
+    unknown_not_normal.remove(grid.basis.index(normal))
 
     ret = []
 
@@ -817,7 +821,11 @@ def _prepare_grids():
                      {-1: 'W', 1: 'E', 0: ''}]
             grid.v = Matrix(([grid.vx, grid.vy, grid.vz],))
 
-        for ei in grid.basis:
+        grid.dir2vecidx = {}
+        grid.vecidx2dir = {}
+        dir = 1
+
+        for k, ei in enumerate(grid.basis):
             # Compute direction names.
             name = 'f'
             for i, comp in enumerate(reversed(ei.tolist()[0])):
@@ -835,6 +843,11 @@ def _prepare_grids():
                     break
             else:
                 raise TypeError('Opposite vector for %s not found.' % ei)
+
+            if ei.dot(ei) == 1:
+                grid.dir2vecidx[dir] = k
+                grid.vecidx2dir[k] = dir
+                dir += 1
 
         grid.eq_dist = bgk_equilibrium(grid)
 
