@@ -82,6 +82,14 @@ class LBMGeo(object):
         """Lattice spacing in simulation units."""
         return 1.0/min(self.shape)
 
+    @property
+    def has_pressure_nodes(self):
+        return self._num_pressures > 0
+
+    @property
+    def has_velocity_nodes(self):
+        return self._num_velocities > 0
+
     def define_nodes(self):
         """Define the types of all nodes in the simulation domain.
 
@@ -117,14 +125,6 @@ class LBMGeo(object):
         self._num_velocities = 0
         self._num_pressures = 0
 
-    @property
-    def has_pressure_nodes(self):
-        return self._num_pressures > 0
-
-    @property
-    def has_velocity_nodes(self):
-        return self._num_velocities > 0
-
     def reset(self):
         """Perform a full reset of the geometry."""
 
@@ -159,7 +159,8 @@ class LBMGeo(object):
         :param location: location of the node
         :param type: type of the node, one of the NODE_* constants
         :param val: optional argument for the node, e.g. the value of velocity or pressure
-        :param update: whether to automatically update the geometry for the simulation
+        :param update: whether to automatically update the geometry for the
+            simulation by copying it to the compute unit
         """
         self._set_map(location, numpy.int32(type))
 
@@ -177,6 +178,25 @@ class LBMGeo(object):
 
         if update:
             self._postprocess_nodes(nodes=[location])
+            self._update_map()
+
+    def set_geo_from_bool_array(self, array, update=False):
+        """Set the geometry for the whole simulation domain using a numpy bool
+        array.
+
+        The order of the axes in the array should be [z,],y,x.  The locations
+        corresponding to the elements of the array with the value ``True`` will
+        be marked as wall (no-slip) nodes, and the ones corresponding to the
+        value ``False`` will not be changed.
+
+        :param array: a numpy bool array representing the geometry
+        :param update: whether to automatically update the geometry for the
+            simulation by copying it to the compute unit
+        """
+        self.map[array] = numpy.int32(self.NODE_WALL)
+
+        if update:
+            self._postprocess_nodes()
             self._update_map()
 
     def mask_array_by_fluid(self, array):
