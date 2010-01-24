@@ -52,7 +52,7 @@ class CUDABackend(object):
         for i, dim in enumerate(grid):
             global_size.append(dim * kernel.block[i])
 
-        cl.enqueue_nd_range_kernel(self.queue, kernel, global_size, kernel.block)
+        cl.enqueue_nd_range_kernel(self.queue, kernel, global_size, kernel.block[0:len(global_size)])
 
     def sync(self):
         self.queue.finish()
