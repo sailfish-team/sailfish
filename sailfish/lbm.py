@@ -93,6 +93,11 @@ class LBMSim(object):
         grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == geo_class.dim]
         default_grid = grids[0]
 
+        supported_backends = get_backends()
+
+        if not supported_backends:
+            raise ValueError('There are no supported compute backends on your system. Make sure pycuda or pyopencl are correctly installed.')
+
         parser = OptionParser()
 
         parser.add_option('-q', '--quiet', dest='quiet', help='reduce verbosity', action='store_true', default=False)
@@ -121,7 +126,7 @@ class LBMSim(object):
         parser.add_option_group(group)
 
         group = OptionGroup(parser, 'Run mode settings')
-        group.add_option('--backend', dest='backend', help='backend', type='choice', choices=get_backends(), default=get_backends()[0])
+        group.add_option('--backend', dest='backend', help='backend', type='choice', choices=supported_backends, default=supported_backends[0])
         group.add_option('--benchmark', dest='benchmark', help='benchmark mode, implies no visualization', action='store_true', default=False)
         group.add_option('--max_iters', dest='max_iters', help='number of iterations to run in benchmark/batch mode', action='store', type='int', default=0)
         group.add_option('--batch', dest='batch', help='run in batch mode, with no visualization', action='store_true', default=False)
