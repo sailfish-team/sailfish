@@ -92,7 +92,7 @@ class Fluid2DVis(object):
         self._convolve = False
         self._font = pygame.font.SysFont('Liberation Mono', 14)
         self._screen = pygame.display.set_mode((width, height),
-                pygame.RESIZABLE)
+                pygame.RESIZABLE, 24)
         self.lat_nx = lat_nx
         self.lat_ny = lat_ny
 
@@ -234,7 +234,7 @@ class Fluid2DVis(object):
             if event.type == pygame.QUIT:
                 sys.exit()
             elif event.type == pygame.VIDEORESIZE:
-                self._screen = pygame.display.set_mode(event.size, pygame.RESIZABLE)
+                self._screen = pygame.display.set_mode(event.size, pygame.RESIZABLE, 24)
             elif event.type == pygame.MOUSEBUTTONUP:
                 self._draw_type = event.button
                 self._draw_wall(event)
@@ -402,7 +402,7 @@ class Fluid3DVisCutplane(Fluid2DVis):
 
         self._dims = dims
         self._screen = pygame.display.set_mode((int(self.shape[dims[0]] * self._scr_scale),
-                int(self.shape[dims[1]] * self._scr_scale)), pygame.RESIZABLE)
+                int(self.shape[dims[1]] * self._scr_scale)), pygame.RESIZABLE, 24)
 
         # For compatibility with other functions for 2D.
         self.lat_nx = self.shape[dims[0]]
