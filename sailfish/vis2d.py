@@ -110,7 +110,7 @@ class Fluid2DVis(object):
 
     def _reset(self):
         self._maxv = 0.000001
-        self._vscale  = 0.005
+        self._vscale = 0.005
 
     @property
     def velocity_norm(self):
@@ -148,7 +148,7 @@ class Fluid2DVis(object):
         ret.append('max_v: %.3f' % maxv)
         ret.append('rho_avg: %.3f' % numpy.average(self.density))
 
-        b = (self.sim.geo._decode_node_type(self.geo_map) == geo.LBMGeo.NODE_WALL)
+        wall_map = (self.sim.geo._decode_node_type(self.geo_map) == geo.LBMGeo.NODE_WALL)
 
         if self._vismode == 0:
             drw = self.velocity_norm / self._maxv
@@ -157,7 +157,7 @@ class Fluid2DVis(object):
         elif self._vismode == 2:
             drw = self.vy / self._maxv
         elif self._vismode == 3:
-            mrho = numpy.ma.array(self.density, mask=(b))
+            mrho = numpy.ma.array(self.density, mask=(wall_map))
             rho_min = numpy.min(mrho)
             rho_max = numpy.max(mrho)
             drw = ((self.density - rho_min) / (rho_max - rho_min))
@@ -169,22 +169,8 @@ class Fluid2DVis(object):
                 g = gauss_kernel(2, sizey=2)
                 drw = signal.convolve(drw,g, mode='same')
 
-        # Rotate the field to the correct position.
-        drw = numpy.rot90(drw.astype(numpy.float32), 3)
-        a = pygame.surfarray.pixels3d(srf)
-        b = numpy.rot90(b, 3)
-        # Draw the walls.
-        a[b] = (255, 255, 255)
-
-        # Draw the data field for all sites which are not marked as a wall.
-        b = numpy.logical_not(b)
-        drw = vis_map[vismode](drw, width, height)
-        a[b] = drw[b]
-
-        # Unlock the surface and put the picture on screen.
-        del a
-        pygame.transform.scale(srf, self._screen.get_size(), self._screen)
-
+        srf2 = self._draw_field(drw, srf, wall_map, vismode, width, height)
+        pygame.transform.scale(srf2, self._screen.get_size(), self._screen)
         sw, sh = self._screen.get_size()
 
         # Draw the velocity field
@@ -204,6 +190,23 @@ class Fluid2DVis(object):
 
         self._draw_tracers(tx, ty, sw, sh, width, height)
         return ret
+
+    def _draw_field(self, field, srf, wall_map, vismode, width, height):
+        # Rotate the field to the correct position.
+        field = numpy.rot90(field.astype(numpy.float32), 3)
+        a = pygame.surfarray.pixels3d(srf)
+        wall_map = numpy.rot90(wall_map, 3)
+        # Draw the walls.
+        a[wall_map] = (255, 255, 255)
+
+        # Draw the data field for all sites which are not marked as a wall.
+        wall_map = numpy.logical_not(wall_map)
+        field = vis_map[vismode](field, width, height)
+        a[wall_map] = field[wall_map]
+
+        # Unlock the surface and put the picture on screen.
+        del a
+        return srf
 
     def _draw_tracers(self, tx, ty, sw, sh, width, height):
         # Draw the tracer particles
