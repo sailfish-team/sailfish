@@ -60,6 +60,7 @@ class FluidSurfaceVis(object):
         self.mesh_y = self.mesh_y.astype(numpy.float32)
         self.mesh_n = (self.lat_nx-1) * (self.lat_ny-1) * 4
 
+        self._polygon_mode = 0
         self._show_info = True
         self._velocity = False
         self._paused = False
@@ -195,6 +196,11 @@ class FluidSurfaceVis(object):
                     self._maxv /= 1.1
                 elif event.key == pygame.K_PERIOD:
                     self._maxv *= 1.1
+                elif event.key == pygame.K_w:
+                    modes = [GL_FILL, GL_LINE, GL_POINT]
+                    self._polygon_mode += 1
+                    self._polygon_mode %= 3
+                    glPolygonMode(GL_FRONT_AND_BACK, modes[self._polygon_mode]);
 
     def main(self):
         t_prev = time.time()
