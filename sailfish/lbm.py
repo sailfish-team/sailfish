@@ -88,7 +88,7 @@ class LBMSim(object):
             core LB engine settings
         :rtype: iterable of optparse.OptionGroup instances
         """
-        pass
+        return []
 
     def __init__(self, geo_class, options=[], args=None, defaults=None):
         """
@@ -174,20 +174,6 @@ class LBMSim(object):
         self._mlups = 0.0
         self.clear_hooks()
         self.backend = sys.modules['sailfish.%s' % SUPPORTED_BACKENDS[self.options.backend]].backend()
-
-        for x in sym.KNOWN_GRIDS:
-            if x.__name__ == self.options.grid:
-                self.grid = x
-                break
-
-        # If the model has not been explicitly specified by the user, try to automatically
-        # select a working model.
-        if 'model' not in self.options.specified and defaults is not None and 'model' not in defaults.keys():
-            for x in [self.options.model, 'mrt', 'bgk']:
-                if self.grid.model_supported(x):
-                    break
-            self.options.model = x
-
         if not self.options.quiet:
             print 'Using the "%s" backend.' % self.options.backend
 
@@ -195,6 +181,18 @@ class LBMSim(object):
             self.float = numpy.float32
         else:
             self.float = numpy.float64
+
+    def _set_grid(self, name):
+        for x in sym.KNOWN_GRIDS:
+            if x.__name__ == name:
+                self.grid = x
+                break
+
+    def _set_model(self, models):
+        for x in models:
+            if self.grid.model_supported(x):
+                self.lbm_model = x
+                break
 
     def hostsync_dist(self):
         """Copy the current distributions from the compute unit to the host.
@@ -260,17 +258,6 @@ class LBMSim(object):
                 self._init_vis_2d()
             elif self.grid.dim == 3:
                 self._init_vis_3d()
-
-    def _init_vis_2d(self):
-        self.vis = vis2d.Fluid2DVis(self, self.options.scr_w, self.options.scr_h,
-                                    self.options.lat_nx, self.options.lat_ny)
-
-    def _init_vis_3d(self):
-        if self.options.vis3d == 'mayavi':
-            import vis3d
-            self.vis = vis3d.Fluid3DVis(self)
-        else:
-            self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)), self.options.scr_scale)
 
     def add_iter_hook(self, i, func, every=False):
         """Add a hook that will be executed during the simulation.
@@ -360,6 +347,8 @@ class LBMSim(object):
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['periodicity'] = [int(self.options.periodic_x), int(self.options.periodic_y),
                             int(self.options.periodic_z)]
+        ctx['grid'] = self.grid
+        ctx['model'] = self.lbm_model
 
         self._update_ctx(ctx)
         ctx.update(self.geo.get_defines())
@@ -585,7 +574,7 @@ class LBMSim(object):
             self.h5file.setNodeAttr(self.h5grp, 'accel_y', self.options.accel_y)
             self.h5file.setNodeAttr(self.h5grp, 'accel_z', self.options.accel_z)
             self.h5file.setNodeAttr(self.h5grp, 'sample_rate', self.options.every)
-            self.h5file.setNodeAttr(self.h5grp, 'model', self.options.model)
+            self.h5file.setNodeAttr(self.h5grp, 'model', self.lbm_model)
 
             if self.options.output_format == 'h5nested':
                 desc = {
@@ -655,8 +644,9 @@ class LBMSim(object):
 
         This automatically handles any options related to visualization and the benchmark and batch modes.
         """
-        if not self.grid.model_supported(self.options.model):
-            raise ValueError('The LBM model "%s" is not supported with grid type %s' % (self.options.model, self.grid.__name__))
+        if not self.grid.model_supported(self.lbm_model):
+            raise ValueError('The LBM model "%s" is not supported with '
+                    'grid type %s' % (self.lbm_model, self.grid.__name__))
 
         self._calc_screen_size()
         self._init_geo()
@@ -686,7 +676,7 @@ class FluidLBMSim(LBMSim):
     def sim_info(self):
         ret = LBMSim.sim_info.fget(self)
         ret['incompressible'] = self.options.incompressible
-        ret['model'] = self.options.model
+        ret['model'] = self.lbm_model
         ret['grid'] = self.grid.__name__
         ret['bc_wall'] = self.options.bc_wall
         ret['bc_velocity'] = self.options.bc_velocity
@@ -702,14 +692,23 @@ class FluidLBMSim(LBMSim):
 
         return ret
 
+    def __init__(self, geo_class, options=[], args=None, defaults=None):
+        LBMSim.__init__(self, geo_class, options, args, defaults)
+        self._set_grid(self.options.grid)
+
+        # If the model has not been explicitly specified by the user, try to automatically
+        # select a working model.
+        if 'model' not in self.options.specified and defaults is not None and 'model' not in defaults.keys():
+            self._set_model([self.options.model, 'mrt', 'bgk'])
+        else:
+            self._set_model([self.options.model])
+
     def _update_ctx(self, ctx):
-        ctx['model'] = self.options.model
         ctx['incompressible'] = self.options.incompressible
         ctx['ext_accel_x'] = self.options.accel_x
         ctx['ext_accel_y'] = self.options.accel_y
         ctx['ext_accel_z'] = self.options.accel_z
         ctx['bc_wall'] = self.options.bc_wall
-        ctx['grid'] = self.grid
 
         if self.geo.has_velocity_nodes:
             ctx['bc_velocity'] = self.options.bc_velocity
@@ -759,6 +758,24 @@ class FluidLBMSim(LBMSim):
 
         return [group]
 
+    def _init_vis_2d(self):
+        self.vis = vis2d.Fluid2DVis(self, self.options.scr_w, self.options.scr_h,
+                                    self.options.lat_nx, self.options.lat_ny)
+
+    def _init_vis_3d(self):
+        if self.options.vis3d == 'mayavi':
+            import vis3d
+            self.vis = vis3d.Fluid3DVis(self)
+        else:
+            self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)), self.options.scr_scale)
+
+
 class FreeSurfaceLBMSim(LBMSim):
-    pass
+    def __init__(self, geo_class, options=[], args=None, defaults=None):
+        LBMSim.__init__(self, geo_class, options, args, defaults)
+        self._set_grid('D2Q9')
+        self._set_model('bgk')
+
+    def _init_vis_2d(self):
+        pass
 
