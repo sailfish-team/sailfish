@@ -58,6 +58,9 @@ class D2Q9(DxQy):
     dim = 2
     Q = 9
 
+    # Gravitational acceleration for free surface models.
+    gravity = Symbol('gravity')
+
     # Discretized velocities.
     basis = map(lambda x: Matrix((x,)),
                 [(0,0), (1,0), (0, 1), (-1, 0), (0, -1), (1, 1), (-1, 1), (-1, -1), (1, -1)])
@@ -379,14 +382,14 @@ def shallow_water_equilibrium(grid):
 
     out = []
     out.append((grid.rho - grid.weights[0] * grid.rho * (Rational(15, 2) *
-        grid.g * grid.rho - 3 * grid.v.dot(grid.v)), grid.idx_name[0]))
+        grid.gravity * grid.rho - 3 * grid.v.dot(grid.v)), grid.idx_name[0]))
 
     for i, ei in enumerate(grid.basis):
         if i == 0:
             continue
 
         t = (grid.weights[i] * (
-                grid.rho * (Rational(3,2) * grid.rho * grid.g + 3*ei.dot(grid.v) +
+                grid.rho * poly_factorize(Rational(3,2) * grid.rho * grid.gravity + 3*ei.dot(grid.v) +
                     Rational(9,2) * (ei.dot(grid.v))**2 - Rational(3, 2) * grid.v.dot(grid.v))))
 
         out.append((t, grid.idx_name[i]))
@@ -426,6 +429,9 @@ def lambdify_equilibrium(sim):
         subs[sim.grid.rho0] = 1
     else:
         subs[sim.grid.rho0] = sim.grid.rho
+
+    if hasattr(sim, 'gravity'):
+        subs[sim.grid.gravity] = sim.gravity
 
     ret = []
 

@@ -10,6 +10,10 @@
 
 #define DT 1.0f
 
+%if 'gravity' in context.keys():
+	${const_var} float gravity = ${gravity}f;
+%endif
+
 ${const_var} float tau = ${tau}f;		// relaxation time
 ${const_var} float visc = ${visc}f;		// viscosity
 ${const_var} float geo_params[${num_params+1}] = {

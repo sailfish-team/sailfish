@@ -86,9 +86,9 @@ class LBMSim(object):
         :param parser: instance of the optparse.OptionParser class
         :param lb_group: instance of optparser.OptionGroup class representing
             core LB engine settings
-        :rtype: iterable of optparse.OptionGroup instances
+        :rtype: iterable of optparse.OptionGroup instances or None
         """
-        return []
+        pass
 
     def __init__(self, geo_class, options=[], args=None, defaults=None):
         """
@@ -140,14 +140,16 @@ class LBMSim(object):
         group.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat', 'vtk'], default='h5flat')
         parser.add_option_group(group)
 
-        for group in class_options:
-            parser.add_option_group(group)
+        if class_options is not None:
+            for group in class_options:
+                parser.add_option_group(group)
 
         group = OptionGroup(parser, 'Simulation-specific options')
         for option in options:
             group.add_option(option)
 
-        parser.add_option_group(group)
+        if options:
+            parser.add_option_group(group)
 
         self.options = Values(parser.defaults)
         parser.parse_args(args, self.options)
@@ -169,6 +171,7 @@ class LBMSim(object):
             # value and device capabilities.
             self.block_size = 64
 
+        self.num_tracers = 0
         self.iter_ = 0
         self._mlups_calls = 0
         self._mlups = 0.0
@@ -188,7 +191,7 @@ class LBMSim(object):
                 self.grid = x
                 break
 
-    def _set_model(self, models):
+    def _set_model(self, *models):
         for x in models:
             if self.grid.model_supported(x):
                 self.lbm_model = x
@@ -387,18 +390,21 @@ class LBMSim(object):
         self.gpu_rho = self.backend.alloc_buf(like=self.rho)
 
         # Tracer particles.
-        self.tracer_x = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_nx
-        self.tracer_y = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_ny
-        self.tracer_loc = [self.tracer_x, self.tracer_y]
-        self.gpu_tracer_x = self.backend.alloc_buf(like=self.tracer_x)
-        self.gpu_tracer_y = self.backend.alloc_buf(like=self.tracer_y)
-        self.gpu_tracer_loc = [self.gpu_tracer_x, self.gpu_tracer_y]
-
-        if self.grid.dim == 3:
-            self.tracer_z = numpy.random.random_sample(self.options.tracers).astype(self.float) * self.options.lat_nz
-            self.gpu_tracer_z = self.backend.alloc_buf(like=self.tracer_z)
-            self.tracer_loc.append(self.tracer_z)
-            self.gpu_tracer_loc.append(self.gpu_tracer_z)
+        if self.num_tracers:
+            self.tracer_x = numpy.random.random_sample(self.num_tracers).astype(self.float) * self.options.lat_nx
+            self.tracer_y = numpy.random.random_sample(self.num_tracers).astype(self.float) * self.options.lat_ny
+            self.tracer_loc = [self.tracer_x, self.tracer_y]
+            self.gpu_tracer_x = self.backend.alloc_buf(like=self.tracer_x)
+            self.gpu_tracer_y = self.backend.alloc_buf(like=self.tracer_y)
+            self.gpu_tracer_loc = [self.gpu_tracer_x, self.gpu_tracer_y]
+            if self.grid.dim == 3:
+                self.tracer_z = numpy.random.random_sample(self.num_tracers).astype(self.float) * self.options.lat_nz
+                self.gpu_tracer_z = self.backend.alloc_buf(like=self.tracer_z)
+                self.tracer_loc.append(self.tracer_z)
+                self.gpu_tracer_loc.append(self.gpu_tracer_z)
+        else:
+            self.tracer_loc = []
+            self.gpu_tracer_loc = []
 
         # Particle distributions in device memory, A-B access pattern.
         self.gpu_dist1 = self.backend.alloc_buf(like=self.dist1)
@@ -477,7 +483,7 @@ class LBMSim(object):
             i % self.options.every == 0) or get_data:
             self.backend.run_kernel(kerns[1], self.kern_grid_size)
             if tracers:
-                self.backend.run_kernel(kerns[2], (self.options.tracers,))
+                self.backend.run_kernel(kerns[2], (self.num_tracers,))
                 self.hostsync_tracers()
             self.hostsync_velocity()
             self.hostsync_density()
@@ -487,7 +493,7 @@ class LBMSim(object):
         else:
             self.backend.run_kernel(kerns[0], self.kern_grid_size)
             if tracers:
-                self.backend.run_kernel(kerns[2], (self.options.tracers,))
+                self.backend.run_kernel(kerns[2], (self.num_tracers,))
 
         self.iter_ += 1
 
@@ -690,10 +696,11 @@ class FluidLBMSim(LBMSim):
         # If the model has not been explicitly specified by the user, try to automatically
         # select a working model.
         if 'model' not in self.options.specified and defaults is not None and 'model' not in defaults.keys():
-            self._set_model([self.options.model, 'mrt', 'bgk'])
+            self._set_model(self.options.model, 'mrt', 'bgk')
         else:
-            self._set_model([self.options.model])
+            self._set_model(self.options.model)
 
+        self.num_tracers = self.options.tracers
         self.incompressible = self.options.incompressible
         self.equilibrium = sym.bgk_equilibrium(self.grid)
 
@@ -771,6 +778,24 @@ class FreeSurfaceLBMSim(LBMSim):
         self._set_grid('D2Q9')
         self._set_model('bgk')
         self.equilibrium = sym.shallow_water_equilibrium(self.grid)
+        self.gravity = self.options.gravity
+
+    def _add_options(self, parser, lb_group):
+        lb_group.add_option('--gravity', dest='gravity',
+            help='gravitational acceleration', action='store', type='float',
+            default=10.0)
+
+    def _update_ctx(self, ctx):
+        ctx['gravity'] = self.gravity
+        ctx['ext_accel_x'] = 0.0
+        ctx['ext_accel_y'] = 0.0
+        ctx['ext_accel_z'] = 0.0
+        ctx['bc_wall'] = 'fullbb'
+        ctx['bc_velocity'] = None
+        ctx['bc_pressure'] = None
+        ctx['bc_wall_'] = geo.get_bc('fullbb')
+        ctx['bc_velocity_'] = geo.get_bc('fullbb')
+        ctx['bc_pressure_'] = geo.get_bc('fullbb')
 
     def _init_vis_2d(self):
         pass
