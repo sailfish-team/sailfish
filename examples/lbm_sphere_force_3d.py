@@ -136,7 +136,7 @@ class LBMGeoSphere(geo.LBMGeo3D):
 
         return w
 
-class LSphereSim(lbm.LBMSim):
+class LSphereSim(lbm.FluidLBMSim):
     filename = 'sphere3d'
 
     def __init__(self, geo_class, defaults={}, args=sys.argv[1:]):
@@ -153,7 +153,7 @@ class LSphereSim(lbm.LBMSim):
             'verbose': True}
         defaults_.update(defaults)
 
-        lbm.LBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
+        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
         if self.options.batch and not ('every' in self.options.specified):
             self.options.every = 1000

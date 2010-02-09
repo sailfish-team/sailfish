@@ -110,7 +110,7 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
     def get_reynolds(self, viscosity):
         return int(self.get_width() * self.maxv/viscosity)
 
-class LPoiSim(lbm.LBMSim):
+class LPoiSim(lbm.FluidLBMSim):
 
     filename = 'poiseuille'
 
@@ -126,7 +126,7 @@ class LPoiSim(lbm.LBMSim):
             defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_nx': 64,
                     'lat_ny': 64, 'verbose': True}
 
-        lbm.LBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
+        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
         if self.options.drive == 'force':
             self._init_geo()

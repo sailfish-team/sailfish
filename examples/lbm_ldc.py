@@ -34,7 +34,7 @@ class LBMGeoLDC(geo.LBMGeo2D):
     def get_reynolds(self, viscosity):
         return int((self.lat_nx-1) * self.max_v/viscosity)
 
-class LDCSim(lbm.LBMSim):
+class LDCSim(lbm.FluidLBMSim):
 
     filename = 'ldc'
 
@@ -43,7 +43,7 @@ class LDCSim(lbm.LBMSim):
         opts.append(optparse.make_option('--test_re100', dest='test_re100', action='store_true', default=False, help='generate test data for Re=100'))
         opts.append(optparse.make_option('--test_re1000', dest='test_re1000', action='store_true', default=False, help='generate test data for Re=1000'))
 
-        lbm.LBMSim.__init__(self, geo_class, options=opts,
+        lbm.FluidLBMSim.__init__(self, geo_class, options=opts,
                 defaults={'bc_velocity': 'equilibrium', 'verbose': True})
 
         if self.options.test_re100:

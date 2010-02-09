@@ -40,7 +40,7 @@ class LBMGeoLDC(geo.LBMGeo3D):
     def get_reynolds(self, viscosity):
         return int((self.lat_nx-1) * self.max_v/viscosity)
 
-class LDCSim(lbm.LBMSim):
+class LDCSim(lbm.FluidLBMSim):
 
     filename = 'ldc'
 
@@ -48,7 +48,7 @@ class LDCSim(lbm.LBMSim):
         opts = []
         defaults={'lat_nz': 64, 'lat_ny': 64, 'lat_nx': 64, 'grid':
                 'D3Q13', 'verbose': True}
-        lbm.LBMSim.__init__(self, geo_class, options=opts, defaults=defaults)
+        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, defaults=defaults)
 
 sim = LDCSim(LBMGeoLDC)
 sim.run()

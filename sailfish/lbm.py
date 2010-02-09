@@ -76,6 +76,20 @@ class LBMSim(object):
             return self.dist1
         return curr
 
+    def _add_options(self, parser, lb_group):
+        """Add simulation options common to a class of simulations.
+
+        Descendant classes (e.g. free surface, single fluid, etc) should use
+        this method to provide their own generic options common to all
+        simulations.
+
+        :param parser: instance of the optparse.OptionParser class
+        :param lb_group: instance of optparser.OptionGroup class representing
+            core LB engine settings
+        :rtype: iterable of optparse.OptionGroup instances
+        """
+        pass
+
     def __init__(self, geo_class, options=[], args=None, defaults=None):
         """
         :param geo_class: geometry class to use for the simulation
@@ -90,39 +104,27 @@ class LBMSim(object):
         if args is None:
             args = sys.argv[1:]
 
-        grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == geo_class.dim]
-        default_grid = grids[0]
-
         supported_backends = get_backends()
 
         if not supported_backends:
             raise ValueError('There are no supported compute backends on your system. Make sure pycuda or pyopencl are correctly installed.')
 
-        parser = OptionParser()
+        self.geo_class = geo_class
 
+        parser = OptionParser()
         parser.add_option('-q', '--quiet', dest='quiet', help='reduce verbosity', action='store_true', default=False)
+        parser.add_option('-v', '--verbose', dest='verbose', help='print additional info about the simulation', action='store_true', default=False)
+
         group = OptionGroup(parser, 'LB engine settings')
+        group.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
         group.add_option('--lat_nx', dest='lat_nx', help='lattice width', type='int', action='store', default=128)
         group.add_option('--lat_ny', dest='lat_ny', help='lattice height', type='int', action='store', default=128)
         group.add_option('--lat_nz', dest='lat_nz', help='lattice depth', type='int', action='store', default=1)
-        group.add_option('--visc', dest='visc', help='viscosity', type='float', action='store', default=0.01)
-        group.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
-        group.add_option('--incompressible', dest='incompressible', help='whether to use the incompressible model of Luo and He', action='store_true', default=False)
-        group.add_option('--grid', dest='grid', help='grid type to use', type='choice', choices=grids, default=default_grid)
-        group.add_option('--accel_x', dest='accel_x', help='y component of the external acceleration', action='store', type='float', default=0.0)
-        group.add_option('--accel_y', dest='accel_y', help='x component of the external acceleration', action='store', type='float', default=0.0)
-        group.add_option('--accel_z', dest='accel_z', help='z component of the external acceleration', action='store', type='float', default=0.0)
         group.add_option('--periodic_x', dest='periodic_x', help='lattice periodic in the X direction', action='store_true', default=False)
         group.add_option('--periodic_y', dest='periodic_y', help='lattice periodic in the Y direction', action='store_true', default=False)
         group.add_option('--periodic_z', dest='periodic_z', help='lattice periodic in the Z direction', action='store_true', default=False)
-        group.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
-        group.add_option('--bc_wall', dest='bc_wall', help='boundary condition implementation to use for wall nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_WALL in x.supported_types and x.supports_dim(geo_class.dim)], default='fullbb')
-        group.add_option('--bc_velocity', dest='bc_velocity', help='boundary condition implementation to use for velocity nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_VELOCITY in x.supported_types and x.supports_dim(geo_class.dim)], default='fullbb')
-        group.add_option('--bc_pressure', dest='bc_pressure', help='boundary condition implementation to use for pressure nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if geo.LBMGeo.NODE_PRESSURE in x.supported_types and x.supports_dim(geo_class.dim)], default='equilibrium')
-        group.add_option('-v', '--verbose', dest='verbose', help='print additional info about the simulation', action='store_true', default=False)
+        group.add_option('--visc', dest='visc', help='viscosity', type='float', action='store', default=0.01)
+        class_options = self._add_options(parser, group)
         parser.add_option_group(group)
 
         group = OptionGroup(parser, 'Run mode settings')
@@ -138,15 +140,8 @@ class LBMSim(object):
         group.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat', 'vtk'], default='h5flat')
         parser.add_option_group(group)
 
-        group = OptionGroup(parser, 'Visualization options')
-        group.add_option('--scr_w', dest='scr_w', help='screen width', type='int', action='store', default=0)
-        group.add_option('--scr_h', dest='scr_h', help='screen height', type='int', action='store', default=0)
-        group.add_option('--scr_scale', dest='scr_scale', help='screen scale', type='float', action='store', default=3.0)
-        group.add_option('--every', dest='every', help='update the visualization every N steps', metavar='N', type='int', action='store', default=100)
-        group.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
-        group.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=vis2d.vis_map.keys(), action='store', default='rgb1')
-        group.add_option('--vis3d', dest='vis3d', help='3D visualization engine', type='choice', choices=['mayavi', 'cutplane'], action='store', default='cutplane')
-        parser.add_option_group(group)
+        for group in class_options:
+            parser.add_option_group(group)
 
         group = OptionGroup(parser, 'Simulation-specific options')
         for option in options:
@@ -154,7 +149,6 @@ class LBMSim(object):
 
         parser.add_option_group(group)
 
-        self.geo_class = geo_class
         self.options = Values(parser.defaults)
         parser.parse_args(args, self.options)
 
@@ -239,26 +233,11 @@ class LBMSim(object):
     def sim_info(self):
         """A dictionary of simulation settings."""
         ret = {}
-        ret['grid'] = self.grid.__name__
+        ret['precision'] = self.options.precision
         ret['size'] = tuple(reversed(self.shape))
         ret['visc'] = self.options.visc
-        ret['model'] = self.options.model
-        ret['incompressible'] = self.options.incompressible
         ret['dx'] = self.geo.dx
         ret['dt'] = self.dt
-        ret['precision'] = self.options.precision
-        ret['bc_wall'] = self.options.bc_wall
-        ret['bc_velocity'] = self.options.bc_velocity
-        ret['bc_pressure'] = self.options.bc_pressure
-
-        if self.grid.dim == 2:
-            ret['accel'] = (self.options.accel_x, self.options.accel_y)
-        else:
-            ret['accel'] = (self.options.accel_x, self.options.accel_y, self.options.accel_z)
-
-        if hasattr(self.geo, 'get_reynolds'):
-            ret['Re'] = self.geo.get_reynolds(self.options.visc)
-
         return ret
 
     def _is_double_precision(self):
@@ -340,6 +319,9 @@ class LBMSim(object):
         # HACK: Prevent this method from being called again.
         self._init_geo = lambda: True
 
+    def _update_ctx(self, ctx):
+        pass
+
     def _init_code(self):
         self._timed_print('Preparing compute device code.')
 
@@ -354,43 +336,20 @@ class LBMSim(object):
 
         self.tau = self.get_tau()
         ctx = {}
-        ctx['grid'] = self.grid
         ctx['dim'] = self.grid.dim
         ctx['block_size'] = self.block_size
         ctx['lat_ny'] = self.options.lat_ny
         ctx['lat_nx'] = self.options.lat_nx
         ctx['lat_nz'] = self.options.lat_nz
-        ctx['num_params'] = len(self.geo_params)
-        ctx['model'] = self.options.model
-        ctx['incompressible'] = self.options.incompressible
         ctx['periodic_x'] = int(self.options.periodic_x)
         ctx['periodic_y'] = int(self.options.periodic_y)
         ctx['periodic_z'] = int(self.options.periodic_z)
-        ctx['dist_size'] = self.get_dist_size()
-        ctx['ext_accel_x'] = self.options.accel_x
-        ctx['ext_accel_y'] = self.options.accel_y
-        ctx['ext_accel_z'] = self.options.accel_z
+        ctx['num_params'] = len(self.geo_params)
+        ctx['geo_params'] = self.geo_params
         ctx['tau'] = self.tau
         ctx['visc'] = self.float(self.options.visc)
         ctx['backend'] = self.options.backend
-        ctx['geo_params'] = self.geo_params
-        ctx['bc_wall'] = self.options.bc_wall
-
-        if self.geo.has_velocity_nodes:
-            ctx['bc_velocity'] = self.options.bc_velocity
-        else:
-            ctx['bc_velocity'] = None
-
-        if self.geo.has_pressure_nodes:
-            ctx['bc_pressure'] = self.options.bc_pressure
-        else:
-            ctx['bc_pressure'] = None
-
-
-        ctx['bc_wall_'] = geo.get_bc(self.options.bc_wall)
-        ctx['bc_velocity_'] = geo.get_bc(self.options.bc_velocity)
-        ctx['bc_pressure_'] = geo.get_bc(self.options.bc_pressure)
-
+        ctx['dist_size'] = self.get_dist_size()
         ctx['pbc_offsets'] = [{-1: self.options.lat_nx,
                                 1: -self.options.lat_nx},
                               {-1: self.options.lat_ny*self.options.lat_nx,
@@ -402,6 +361,7 @@ class LBMSim(object):
         ctx['periodicity'] = [int(self.options.periodic_x), int(self.options.periodic_y),
                             int(self.options.periodic_z)]
 
+        self._update_ctx(ctx)
         ctx.update(self.geo.get_defines())
         ctx.update(self.backend.get_defines())
 
@@ -718,4 +678,87 @@ class LBMSim(object):
             self._run_batch()
         else:
             self.vis.main()
+
+
+class FluidLBMSim(LBMSim):
+
+    @property
+    def sim_info(self):
+        ret = LBMSim.sim_info.fget(self)
+        ret['incompressible'] = self.options.incompressible
+        ret['model'] = self.options.model
+        ret['grid'] = self.grid.__name__
+        ret['bc_wall'] = self.options.bc_wall
+        ret['bc_velocity'] = self.options.bc_velocity
+        ret['bc_pressure'] = self.options.bc_pressure
+
+        if self.grid.dim == 2:
+            ret['accel'] = (self.options.accel_x, self.options.accel_y)
+        else:
+            ret['accel'] = (self.options.accel_x, self.options.accel_y, self.options.accel_z)
+
+        if hasattr(self.geo, 'get_reynolds'):
+            ret['Re'] = self.geo.get_reynolds(self.options.visc)
+
+        return ret
+
+    def _update_ctx(self, ctx):
+        ctx['model'] = self.options.model
+        ctx['incompressible'] = self.options.incompressible
+        ctx['ext_accel_x'] = self.options.accel_x
+        ctx['ext_accel_y'] = self.options.accel_y
+        ctx['ext_accel_z'] = self.options.accel_z
+        ctx['bc_wall'] = self.options.bc_wall
+        ctx['grid'] = self.grid
+
+        if self.geo.has_velocity_nodes:
+            ctx['bc_velocity'] = self.options.bc_velocity
+        else:
+            ctx['bc_velocity'] = None
+
+        if self.geo.has_pressure_nodes:
+            ctx['bc_pressure'] = self.options.bc_pressure
+        else:
+            ctx['bc_pressure'] = None
+
+        ctx['bc_wall_'] = geo.get_bc(self.options.bc_wall)
+        ctx['bc_velocity_'] = geo.get_bc(self.options.bc_velocity)
+        ctx['bc_pressure_'] = geo.get_bc(self.options.bc_pressure)
+
+    def _add_options(self, parser, lb_group):
+        grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == self.geo_class.dim]
+        default_grid = grids[0]
+
+        lb_group.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
+        lb_group.add_option('--incompressible', dest='incompressible', help='whether to use the incompressible model of Luo and He', action='store_true', default=False)
+        lb_group.add_option('--grid', dest='grid', help='grid type to use', type='choice', choices=grids, default=default_grid)
+        lb_group.add_option('--accel_x', dest='accel_x', help='y component of the external acceleration', action='store', type='float', default=0.0)
+        lb_group.add_option('--accel_y', dest='accel_y', help='x component of the external acceleration', action='store', type='float', default=0.0)
+        lb_group.add_option('--accel_z', dest='accel_z', help='z component of the external acceleration', action='store', type='float', default=0.0)
+        lb_group.add_option('--bc_wall', dest='bc_wall', help='boundary condition implementation to use for wall nodes', type='choice',
+                choices=[x.name for x in geo.SUPPORTED_BCS if
+                    geo.LBMGeo.NODE_WALL in x.supported_types and
+                    x.supports_dim(self.geo_class.dim)], default='fullbb')
+        lb_group.add_option('--bc_velocity', dest='bc_velocity', help='boundary condition implementation to use for velocity nodes', type='choice',
+                choices=[x.name for x in geo.SUPPORTED_BCS if
+                    geo.LBMGeo.NODE_VELOCITY in x.supported_types and
+                    x.supports_dim(self.geo_class.dim)], default='fullbb')
+        lb_group.add_option('--bc_pressure', dest='bc_pressure', help='boundary condition implementation to use for pressure nodes', type='choice',
+                choices=[x.name for x in geo.SUPPORTED_BCS if
+                    geo.LBMGeo.NODE_PRESSURE in x.supported_types and
+                    x.supports_dim(self.geo_class.dim)], default='equilibrium')
+
+        group = OptionGroup(parser, 'Visualization options')
+        group.add_option('--scr_w', dest='scr_w', help='screen width', type='int', action='store', default=0)
+        group.add_option('--scr_h', dest='scr_h', help='screen height', type='int', action='store', default=0)
+        group.add_option('--scr_scale', dest='scr_scale', help='screen scale', type='float', action='store', default=3.0)
+        group.add_option('--every', dest='every', help='update the visualization every N steps', metavar='N', type='int', action='store', default=100)
+        group.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
+        group.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=vis2d.vis_map.keys(), action='store', default='rgb1')
+        group.add_option('--vis3d', dest='vis3d', help='3D visualization engine', type='choice', choices=['mayavi', 'cutplane'], action='store', default='cutplane')
+
+        return [group]
+
+class FreeSurfaceLBMSim(LBMSim):
+    pass
 

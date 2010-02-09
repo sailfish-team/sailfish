@@ -99,7 +99,7 @@ class Fluid2DVisPresentation(vis2d.Fluid2DVis):
         a = a.sum(axis=-1)>0
         self.sim.geo.set_geo_from_bool_array(numpy.flipud(a.transpose()), update=True)
 
-class LPresSim(lbm.LBMSim):
+class LPresSim(lbm.FluidLBMSim):
     filename = 'Sailfish_Presentation'
 
     def __init__(self, geo_class, args=sys.argv[1:], defaults=None):
@@ -112,10 +112,10 @@ class LPresSim(lbm.LBMSim):
             defaults_ = defaults
         else:
             defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_nx': 320,
-                    'lat_ny': 240, 'verbose': True, 'vismode': '2col', 
+                    'lat_ny': 240, 'verbose': True, 'vismode': '2col',
                     'every': 400, 'model': 'mrt','visc':0.001,'scr_scale':1.0}
 
-        lbm.LBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
+        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
     def _init_vis_2d(self):
         self.vis = Fluid2DVisPresentation(self, self.options.scr_w, self.options.scr_h,
