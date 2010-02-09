@@ -87,7 +87,15 @@ vis_map = {
 
 class Fluid2DVis(object):
 
-    def __init__(self, sim, width, height, lat_nx, lat_ny):
+    def __init__(self, sim, width, height, lat_nx, lat_ny, scale):
+        # If the size of the window has not been explicitly defined, automatically adjust it
+        # based on the size of the grid,
+        if width == 0:
+            width = int(lat_nx * scale)
+
+        if height == 0:
+            height = int(lat_ny * scale)
+
         self._vismode = 0
         self._convolve = False
         self._font = pygame.font.SysFont('Liberation Mono', 14)
@@ -336,7 +344,8 @@ class Fluid2DVis(object):
 class Fluid3DVisCutplane(Fluid2DVis):
 
     def __init__(self, sim, shape, scr_scale):
-        Fluid2DVis.__init__(self, sim, int(shape[0] * scr_scale), int(shape[1] * scr_scale), shape[0], shape[1])
+        Fluid2DVis.__init__(self, sim, int(shape[0] * scr_scale), int(shape[1] *
+            scr_scale), shape[0], shape[1], scr_scale)
         self.shape = shape
         self._scr_scale = scr_scale
         self._cut_dim = 2

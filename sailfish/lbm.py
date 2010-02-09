@@ -241,15 +241,6 @@ class LBMSim(object):
     def _is_double_precision(self):
         return self.options.precision == 'double'
 
-    def _calc_screen_size(self):
-        # If the size of the window has not been explicitly defined, automatically adjust it
-        # based on the size of the grid,
-        if self.options.scr_w == 0:
-            self.options.scr_w = int(self.options.lat_nx * self.options.scr_scale)
-
-        if self.options.scr_h == 0:
-            self.options.scr_h = int(self.options.lat_ny * self.options.scr_scale)
-
     def _init_vis(self):
         self._timed_print('Initializing visualization engine.')
 
@@ -648,7 +639,6 @@ class LBMSim(object):
             raise ValueError('The LBM model "%s" is not supported with '
                     'grid type %s' % (self.lbm_model, self.grid.__name__))
 
-        self._calc_screen_size()
         self._init_geo()
         self._init_vis()
         self._init_code()
@@ -760,7 +750,8 @@ class FluidLBMSim(LBMSim):
 
     def _init_vis_2d(self):
         self.vis = vis2d.Fluid2DVis(self, self.options.scr_w, self.options.scr_h,
-                                    self.options.lat_nx, self.options.lat_ny)
+                                    self.options.lat_nx, self.options.lat_ny,
+                                    self.options.scr_scale)
 
     def _init_vis_3d(self):
         if self.options.vis3d == 'mayavi':
