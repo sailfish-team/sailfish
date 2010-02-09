@@ -48,8 +48,13 @@ class FluidSurfaceVis(object):
         self.lat_ny = lat_ny
         self.sim = sim
 
-        self.mesh_x, self.mesh_y = numpy.mgrid[-1:1:complex(0, self.lat_nx),
-                -1:1:complex(0, self.lat_ny)]
+        m = min(lat_nx, lat_ny)
+        mx = lat_nx / m
+        my = lat_ny / m
+
+        self.mesh_x, self.mesh_y = numpy.mgrid[
+                -my:my:complex(0, lat_ny),
+                -mx:mx:complex(0, lat_nx)]
 
         self.mesh_x = self.mesh_x.astype(numpy.float32)
         self.mesh_y = self.mesh_y.astype(numpy.float32)
@@ -136,6 +141,7 @@ class FluidSurfaceVis(object):
 
         glTranslatef(0.0, -0.5, -4.0)
         glRotatef(-60.0, 1.0, 0.0, 0.0)
+        glRotatef(90.0, 0.0, 0.0, 1.0)
 
         glEnableClientState(GL_COLOR_ARRAY)
         glEnableClientState(GL_VERTEX_ARRAY)
