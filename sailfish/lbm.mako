@@ -277,7 +277,7 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 
 	%if bc_velocity == 'equilibrium':
 		if (isVelocityNode(node_type)) {
-			%for feq, idx in sym.bgk_equilibrium(grid):
+			%for feq, idx in bgk_equilibrium:
 				fi->${idx} = ${cex(feq, pointers=True)};
 			%endfor
 		}
@@ -285,7 +285,7 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 
 	%if bc_pressure == 'equilibrium':
 		if (isPressureNode(node_type)) {
-			%for feq, idx in sym.bgk_equilibrium(grid):
+			%for feq, idx in bgk_equilibrium:
 				fi->${idx} = ${cex(feq, pointers=True)};
 			%endfor
 		}
@@ -468,7 +468,7 @@ ${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
 	#define vy v[1]
 	#define vz v[2]
 
-	%for feq, idx in sym.bgk_equilibrium(grid):
+	%for feq, idx in bgk_equilibrium:
 		feq.${idx} = ${cex(feq)};
 	%endfor
 

@@ -1,5 +1,6 @@
 from operator import itemgetter
 import math
+import numpy
 import sympy
 from sympy import Matrix, Rational, Symbol, Poly
 import re
@@ -412,33 +413,31 @@ def bgk_equilibrium(grid):
 
     return out
 
-def eval_bgk_equilibrium(grid, incompressible, velocity, rho):
-    """Get BGK equilibrium distributions for a specific velocity and density.
+def lambdify_equilibrium(sim):
+    """Get a lambdified version of the equilibrium distribution.
 
-    :param grid: the grid class to be used
-    :param incompressible: if ``True``, use the incompressible model
-    :param velocity: a n-tuple of velocity components
-    :param rho: density
-
-    :rtype: list of values of the distributions (in the same order as the basis
-      vectors for the current grid)
+    :param sim: a lbm.LBMSim instance
+    :rtype: iterable of Q callables, Q being the number of basis vectors
+        for the grid used in `sim`
     """
-    vals = []
+    subs={}
 
-    subs={grid.rho: rho}
-
-    if incompressible:
-        subs[grid.rho0] = 1
+    if hasattr(sim, 'incompressible') and sim.incompressible:
+        subs[sim.grid.rho0] = 1
     else:
-        subs[grid.rho0] = rho
+        subs[sim.grid.rho0] = sim.grid.rho
 
-    for i, v in enumerate(velocity):
-        subs[grid.v[i]] = v
+    ret = []
 
-    for eqd, idx in grid.eq_dist:
-        vals.append(sympy.N(eqd, subs=subs))
+    if sim.grid.dim == 2:
+        args = (sim.grid.rho, sim.grid.vx, sim.grid.vy)
+    else:
+        args = (sim.grid.rho, sim.grid.vx, sim.grid.vy, sim.grid.vz)
 
-    return vals
+    for eq_expr, dist_name in sim.equilibrium:
+        ret.append(sympy.lambdify(args, eq_expr.subs(subs), numpy))
+
+    return ret
 
 def bgk_external_force(grid):
     """Get expressions for the external body force correction in the BGK model.
@@ -876,8 +875,6 @@ def _prepare_grids():
                 grid.dir2vecidx[dir] = k
                 grid.vecidx2dir[k] = dir
                 dir += 1
-
-        grid.eq_dist = bgk_equilibrium(grid)
 
         # If MRT is supported for the current grid, compute the transformation
         # matrix from the velocity space to moment space.  The procedure is as

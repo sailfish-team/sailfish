@@ -340,6 +340,7 @@ class LBMSim(object):
                             int(self.options.periodic_z)]
         ctx['grid'] = self.grid
         ctx['model'] = self.lbm_model
+        ctx['bgk_equilibrium'] = self.equilibrium
 
         self._update_ctx(ctx)
         ctx.update(self.geo.get_defines())
@@ -665,7 +666,7 @@ class FluidLBMSim(LBMSim):
     @property
     def sim_info(self):
         ret = LBMSim.sim_info.fget(self)
-        ret['incompressible'] = self.options.incompressible
+        ret['incompressible'] = self.incompressible
         ret['model'] = self.lbm_model
         ret['grid'] = self.grid.__name__
         ret['bc_wall'] = self.options.bc_wall
@@ -693,8 +694,11 @@ class FluidLBMSim(LBMSim):
         else:
             self._set_model([self.options.model])
 
+        self.incompressible = self.options.incompressible
+        self.equilibrium = sym.bgk_equilibrium(self.grid)
+
     def _update_ctx(self, ctx):
-        ctx['incompressible'] = self.options.incompressible
+        ctx['incompressible'] = self.incompressible
         ctx['ext_accel_x'] = self.options.accel_x
         ctx['ext_accel_y'] = self.options.accel_y
         ctx['ext_accel_z'] = self.options.accel_z
@@ -766,6 +770,7 @@ class FreeSurfaceLBMSim(LBMSim):
         LBMSim.__init__(self, geo_class, options, args, defaults)
         self._set_grid('D2Q9')
         self._set_model('bgk')
+        self.equilibrium = sym.shallow_water_equilibrium(self.grid)
 
     def _init_vis_2d(self):
         pass

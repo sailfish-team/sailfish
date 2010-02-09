@@ -69,13 +69,10 @@ class LBMGeo(object):
         self.map = numpy.zeros(shape, numpy.int32)
         self.gpu_map = backend.alloc_buf(like=self.map)
         self.float = float
+        self.lambda_equilibrium = sym.lambdify_equilibrium(sim)
 
         self._force_nodes = {}
         self.reset()
-
-        # Cache for equilibrium distributions.  Sympy numerical evaluation
-        # is expensive, so we try to avoid unnecessary recomputations.
-        self.feq_cache = {}
 
     @property
     def dx(self):
@@ -280,18 +277,22 @@ class LBMGeo(object):
 
         This function is used to set the initial conditions for the simulation.
 
-        :param location: location of the node, a n-tuple
-        :param velocity: velocity to set, a n-tuple
+        :param location: location of the node, one of the following:
+            1) a n-tuple specifyfing the location
+            2) a numpy bool matrix
+            3) a slice object
+        :param velocity: velocity to set, a n-tuple of floats or numpy arrays
         :param dist: the distribution array
-        :param rho: the density to use for the node
+        :param rho: the density to use for the node, a float or a numpy array
         """
-        if (rho, velocity) not in self.feq_cache:
-            vals = []
-            self.feq_cache[(rho, velocity)] = map(self.float,
-                    sym.eval_bgk_equilibrium(self.sim.grid, self.options.incompressible, velocity, rho))
 
-        for i, val in enumerate(self.feq_cache[(rho, velocity)]):
-            dist[i][tuple(reversed(location))] = val
+        if type(location) is tuple or type(location) is list:
+            loc = tuple(reversed(location))
+        else:
+            loc = location
+
+        for i, lambda_eq in enumerate(self.lambda_equilibrium):
+            dist[i][loc] = lambda_eq(rho, *velocity)
 
     def _postprocess_nodes(self, nodes=None):
         """Detect types of wall nodes and mark them appropriately.
