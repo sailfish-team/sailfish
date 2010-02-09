@@ -381,7 +381,7 @@ def shallow_water_equilibrium(grid):
         raise TypeError('Shallow water equation requires the D2Q9 grid.')
 
     out = []
-    out.append((grid.rho - grid.weights[0] * grid.rho * (Rational(15, 2) *
+    out.append((grid.rho - grid.weights[0] * grid.rho * (Rational(15, 8) *
         grid.gravity * grid.rho - 3 * grid.v.dot(grid.v)), grid.idx_name[0]))
 
     for i, ei in enumerate(grid.basis):
