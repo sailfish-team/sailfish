@@ -6,6 +6,7 @@ import sys
 import time
 from sailfish import geo
 from sailfish import vis2d
+from sailfish import vis_surf
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
@@ -16,6 +17,8 @@ from mako.lookup import TemplateLookup
 from sailfish import sym
 
 SUPPORTED_BACKENDS = {'cuda': 'backend_cuda', 'opencl': 'backend_opencl'}
+
+__version__ = '0.1-alpha1'
 
 for backend in SUPPORTED_BACKENDS.values():
     try:
@@ -124,6 +127,9 @@ class LBMSim(object):
         group.add_option('--periodic_y', dest='periodic_y', help='lattice periodic in the Y direction', action='store_true', default=False)
         group.add_option('--periodic_z', dest='periodic_z', help='lattice periodic in the Z direction', action='store_true', default=False)
         group.add_option('--visc', dest='visc', help='viscosity', type='float', action='store', default=0.01)
+        group.add_option('--every', dest='every',
+            help='update the data on the host every N steps', metavar='N',
+            type='int', action='store', default=100)
         class_options = self._add_options(parser, group)
         parser.add_option_group(group)
 
@@ -752,7 +758,6 @@ class FluidLBMSim(LBMSim):
         group.add_option('--scr_w', dest='scr_w', help='screen width', type='int', action='store', default=0)
         group.add_option('--scr_h', dest='scr_h', help='screen height', type='int', action='store', default=0)
         group.add_option('--scr_scale', dest='scr_scale', help='screen scale', type='float', action='store', default=3.0)
-        group.add_option('--every', dest='every', help='update the visualization every N steps', metavar='N', type='int', action='store', default=100)
         group.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
         group.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=vis2d.vis_map.keys(), action='store', default='rgb1')
         group.add_option('--vis3d', dest='vis3d', help='3D visualization engine', type='choice', choices=['mayavi', 'cutplane'], action='store', default='cutplane')
@@ -783,7 +788,15 @@ class FreeSurfaceLBMSim(LBMSim):
     def _add_options(self, parser, lb_group):
         lb_group.add_option('--gravity', dest='gravity',
             help='gravitational acceleration', action='store', type='float',
-            default=10.0)
+            default=0.001)
+
+        group = OptionGroup(parser, 'Visualization options')
+        group.add_option('--scr_w', dest='scr_w', help='screen width',
+                type='int', action='store', default=640)
+        group.add_option('--scr_h', dest='scr_h', help='screen height',
+                type='int', action='store', default=480)
+
+        return [group]
 
     def _update_ctx(self, ctx):
         ctx['gravity'] = self.gravity
@@ -798,5 +811,6 @@ class FreeSurfaceLBMSim(LBMSim):
         ctx['bc_pressure_'] = geo.get_bc('fullbb')
 
     def _init_vis_2d(self):
-        pass
+        self.vis = vis_surf.FluidSurfaceVis(self, self.options.scr_w,
+                self.options.scr_h, self.options.lat_nx, self.options.lat_ny)
 
