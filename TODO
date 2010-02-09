@@ -52,6 +52,4 @@
   Make it possible to define regions of the simulation domain which are
   to be simulated at a higher spatial and temporal resolution.
 
-- Add support for free surface flows.
-
 - Add support for heat transfer calculation.
