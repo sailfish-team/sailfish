@@ -369,6 +369,29 @@ class D3Q19(DxQy):
             else:
                 cls.mrt_equilibrium.append(mrt_eq[name])
 
+def shallow_water_equilibrium(grid):
+    """Get expressions for the BGK equilibrium distribution for the shallow
+    water equation."""
+
+    if grid.dim != 2 or grid.Q != 9:
+        raise TypeError('Shallow water equation requires the D2Q9 grid.')
+
+    out = []
+    out.append((grid.rho - grid.weights[0] * grid.rho * (Rational(15, 2) *
+        grid.g * grid.rho - 3 * grid.v.dot(grid.v)), grid.idx_name[0]))
+
+    for i, ei in enumerate(grid.basis):
+        if i == 0:
+            continue
+
+        t = (grid.weights[i] * (
+                grid.rho * (Rational(3,2) * grid.rho * grid.g + 3*ei.dot(grid.v) +
+                    Rational(9,2) * (ei.dot(grid.v))**2 - Rational(3, 2) * grid.v.dot(grid.v))))
+
+        out.append((t, grid.idx_name[i]))
+
+    return out
+
 def bgk_equilibrium(grid):
     """Get expressions for the BGK equilibrium distribution.
 
