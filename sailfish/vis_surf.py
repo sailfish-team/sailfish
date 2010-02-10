@@ -70,13 +70,17 @@ class FluidSurfaceVis(object):
         self._paused = False
         self._reset()
 
+        self._minh = -0.2
+        self._maxh = 0.2
+
         pygame.key.set_repeat(100,50)
 
         from lbm import __version__ as version
         pygame.display.set_caption('Sailfish v%s' % version)
 
     def _reset(self):
-        self._maxv = 0.000001
+        self._minh = 10000000.0
+        self._maxh = -10000000.0
 
     @property
     def velocity_norm(self):
@@ -124,11 +128,11 @@ class FluidSurfaceVis(object):
         min_ = numpy.min(mesh_z)
         max_ = numpy.max(mesh_z)
 
-        min_ = -0.2
-        max_ = 0.2
+        self._minh = min(self._minh, numpy.min(mesh_z))
+        self._maxh = max(self._maxh, numpy.max(mesh_z))
 
         tmp = vtx[2::3]
-        col[1,:] = (tmp[:]-min_)/(max_-min_)
+        col[1,:] = (tmp[:]-self._minh)/(self._maxh-self._minh)
         col = numpy.ravel(numpy.transpose(col))
 
         vtx.shape = (self.mesh_n, 3)
