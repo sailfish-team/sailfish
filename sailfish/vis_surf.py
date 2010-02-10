@@ -60,6 +60,10 @@ class FluidSurfaceVis(object):
         self.mesh_y = self.mesh_y.astype(numpy.float32)
         self.mesh_n = (self.lat_nx-1) * (self.lat_ny-1) * 4
 
+        self._zoom = -4.0
+        self._angle_x = -60.0
+        self._angle_z = 90.0
+
         self._polygon_mode = 0
         self._show_info = True
         self._velocity = False
@@ -97,7 +101,7 @@ class FluidSurfaceVis(object):
         return self.sim.geo.map
 
     def _gl_arrays(self):
-        mesh_z = self.height.astype(numpy.float32)
+        mesh_z = self.height.astype(numpy.float32) - 1.0
 
         a = numpy.dstack((self.mesh_x, self.mesh_y, mesh_z))
         b = numpy.roll(a, -1, 0)
@@ -120,8 +124,8 @@ class FluidSurfaceVis(object):
         min_ = numpy.min(mesh_z)
         max_ = numpy.max(mesh_z)
 
-        min_ = 0.8
-        max_ = 1.2
+        min_ = -0.2
+        max_ = 0.2
 
         tmp = vtx[2::3]
         col[1,:] = (tmp[:]-min_)/(max_-min_)
@@ -140,9 +144,9 @@ class FluidSurfaceVis(object):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
 
-        glTranslatef(0.0, -0.5, -4.0)
-        glRotatef(-60.0, 1.0, 0.0, 0.0)
-        glRotatef(90.0, 0.0, 0.0, 1.0)
+        glTranslatef(0.0, 0.0, self._zoom)
+        glRotatef(self._angle_x, 1.0, 0.0, 0.0)
+        glRotatef(self._angle_z, 0.0, 0.0, 1.0)
 
         glEnableClientState(GL_COLOR_ARRAY)
         glEnableClientState(GL_VERTEX_ARRAY)
@@ -165,6 +169,11 @@ class FluidSurfaceVis(object):
                 self._screen = pygame.display.set_mode(event.size,
                         self.display_flags, self.display_depth)
                 _GL_resize(*event.size)
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 4:
+                    self._zoom -= 0.05
+                elif event.button == 5:
+                    self._zoom += 0.05
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_v:
                     self._velocity = not self._velocity
@@ -201,6 +210,26 @@ class FluidSurfaceVis(object):
                     self._polygon_mode += 1
                     self._polygon_mode %= 3
                     glPolygonMode(GL_FRONT_AND_BACK, modes[self._polygon_mode]);
+                elif event.key == pygame.K_UP:
+                    if event.mod & pygame.KMOD_SHIFT:
+                        self._angle_x += 3.0
+                    else:
+                        self._angle_x += 1.0
+                elif event.key == pygame.K_DOWN:
+                    if event.mod & pygame.KMOD_SHIFT:
+                        self._angle_x -= 3.0
+                    else:
+                        self._angle_x -= 1.0
+                elif event.key == pygame.K_LEFT:
+                    if event.mod & pygame.KMOD_SHIFT:
+                        self._angle_z -= 3.0
+                    else:
+                        self._angle_z -= 1.0
+                elif event.key == pygame.K_RIGHT:
+                    if event.mod & pygame.KMOD_SHIFT:
+                        self._angle_z += 3.0
+                    else:
+                        self._angle_z += 1.0
 
     def main(self):
         t_prev = time.time()
