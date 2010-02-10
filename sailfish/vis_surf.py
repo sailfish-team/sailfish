@@ -32,6 +32,22 @@ def _GL_init():
     glDepthFunc(GL_LEQUAL)
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
 
+def _vis_rgb(v):
+    r = numpy.sqrt(v)
+    g = numpy.power(v, 3)
+    b = numpy.sin(v * math.pi)
+    return numpy.vstack((r,g,b))
+
+def _vis_scl(v):
+    col = numpy.zeros((3, len(v)), dtype=numpy.float32)
+    col[1,:] = v
+    return col
+
+colormaps = {
+    'rgb': _vis_rgb,
+    'scl': _vis_scl,
+    }
+
 class FluidSurfaceVis(object):
     display_flags = pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE
     display_depth = 24
@@ -70,8 +86,9 @@ class FluidSurfaceVis(object):
         self._paused = False
         self._reset()
 
-        self._minh = -0.2
-        self._maxh = 0.2
+        self._colormap = colormaps.keys()[0]
+        self._minh = -0.1
+        self._maxh = 0.1
 
         pygame.key.set_repeat(100,50)
 
@@ -124,15 +141,13 @@ class FluidSurfaceVis(object):
         res = numpy.dstack((a, b, c, d))
         vtx = numpy.ravel(res)
 
-        col = numpy.zeros((3, self.mesh_n), dtype=numpy.float32)
         min_ = numpy.min(mesh_z)
         max_ = numpy.max(mesh_z)
 
         self._minh = min(self._minh, numpy.min(mesh_z))
         self._maxh = max(self._maxh, numpy.max(mesh_z))
 
-        tmp = vtx[2::3]
-        col[1,:] = (tmp[:]-self._minh)/(self._maxh-self._minh)
+        col = colormaps[self._colormap]((vtx[2::3]-self._minh)/(self._maxh-self._minh))
         col = numpy.ravel(numpy.transpose(col))
 
         vtx.shape = (self.mesh_n, 3)
@@ -174,9 +189,9 @@ class FluidSurfaceVis(object):
                         self.display_flags, self.display_depth)
                 _GL_resize(*event.size)
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 4:
+                if event.button == 5:
                     self._zoom -= 0.05
-                elif event.button == 5:
+                elif event.button == 4:
                     self._zoom += 0.05
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_v:
@@ -234,6 +249,10 @@ class FluidSurfaceVis(object):
                         self._angle_z += 3.0
                     else:
                         self._angle_z += 1.0
+                elif event.key == pygame.K_c:
+                    idx = colormaps.keys().index(self._colormap) + 1
+                    idx %= len(colormaps.keys())
+                    self._colormap = colormaps.keys()[idx]
 
     def main(self):
         t_prev = time.time()
