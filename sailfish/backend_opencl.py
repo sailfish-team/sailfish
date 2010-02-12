@@ -1,10 +1,10 @@
 import pyopencl as cl
 
-class CUDABackend(object):
+class OpenCLBackend(object):
 
     def __init__(self):
         self.platform = cl.get_platforms()[0]
-        self.ctx = cl.Context(dev_type=cl.device_type.ALL, properties=[(cl.context_properties.PLATFORM, self.platform)])
+        self.ctx = cl.Context(dev_type=cl.device_type.GPU, properties=[(cl.context_properties.PLATFORM, self.platform)])
         self.queue = cl.CommandQueue(self.ctx)
         self.buffers = {}
 
@@ -67,4 +67,4 @@ class CUDABackend(object):
             'const_var': '__constant',
         }
 
-backend=CUDABackend
+backend=OpenCLBackend
