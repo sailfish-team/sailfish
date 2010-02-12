@@ -119,7 +119,7 @@ class LPresSim(lbm.FluidLBMSim):
 
     def _init_vis_2d(self):
         self.vis = Fluid2DVisPresentation(self, self.options.scr_w, self.options.scr_h,
-            self.options.lat_nx, self.options.lat_ny)
+                                          self.options.scr_depth, self.options.lat_nx, self.options.lat_ny)
 
 if __name__ == '__main__':
     sim = LPresSim(LBMGeoPoiseuille)

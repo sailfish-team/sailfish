@@ -87,7 +87,7 @@ vis_map = {
 
 class Fluid2DVis(object):
 
-    def __init__(self, sim, width, height, lat_nx, lat_ny, scale):
+    def __init__(self, sim, width, height, depth, lat_nx, lat_ny, scale):
         # If the size of the window has not been explicitly defined, automatically adjust it
         # based on the size of the grid,
         if width == 0:
@@ -96,11 +96,11 @@ class Fluid2DVis(object):
         if height == 0:
             height = int(lat_ny * scale)
 
+        self.depth = depth
         self._vismode = 0
         self._convolve = False
         self._font = pygame.font.SysFont('Liberation Mono', 14)
-        self._screen = pygame.display.set_mode((width, height),
-                pygame.RESIZABLE, 24)
+        self.set_mode(width, height)
         self.lat_nx = lat_nx
         self.lat_ny = lat_ny
 
@@ -115,6 +115,14 @@ class Fluid2DVis(object):
 
         pygame.key.set_repeat(100,50)
         pygame.display.set_caption('Sailfish v0.1-alpha1')
+
+    def set_mode(self, width, height):
+        if self.depth != 0:
+            self._screen = pygame.display.set_mode((width, height),
+                    pygame.RESIZABLE, self.depth)
+        else:
+            self._screen = pygame.display.set_mode((width, height),
+                    pygame.RESIZABLE)
 
     def _reset(self):
         self._maxv = 0.000001
@@ -242,7 +250,7 @@ class Fluid2DVis(object):
             if event.type == pygame.QUIT:
                 sys.exit()
             elif event.type == pygame.VIDEORESIZE:
-                self._screen = pygame.display.set_mode(event.size, pygame.RESIZABLE, 24)
+                self.set_mode(*event.size)
             elif event.type == pygame.MOUSEBUTTONUP:
                 self._draw_type = event.button
                 self._draw_wall(event)
@@ -343,9 +351,9 @@ class Fluid2DVis(object):
 
 class Fluid3DVisCutplane(Fluid2DVis):
 
-    def __init__(self, sim, shape, scr_scale):
+    def __init__(self, sim, shape, depth, scr_scale):
         Fluid2DVis.__init__(self, sim, int(shape[0] * scr_scale), int(shape[1] *
-            scr_scale), shape[0], shape[1], scr_scale)
+            scr_scale), depth, shape[0], shape[1], scr_scale)
         self.shape = shape
         self._scr_scale = scr_scale
         self._cut_dim = 2
@@ -410,8 +418,8 @@ class Fluid3DVisCutplane(Fluid2DVis):
         dims = sorted(list(dims))
 
         self._dims = dims
-        self._screen = pygame.display.set_mode((int(self.shape[dims[0]] * self._scr_scale),
-                int(self.shape[dims[1]] * self._scr_scale)), pygame.RESIZABLE, 24)
+        self.set_mode(int(self.shape[dims[0]] * self._scr_scale),
+                int(self.shape[dims[1]] * self._scr_scale))
 
         # For compatibility with other functions for 2D.
         self.lat_nx = self.shape[dims[0]]

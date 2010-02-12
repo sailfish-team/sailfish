@@ -758,6 +758,8 @@ class FluidLBMSim(LBMSim):
         group.add_option('--scr_w', dest='scr_w', help='screen width', type='int', action='store', default=0)
         group.add_option('--scr_h', dest='scr_h', help='screen height', type='int', action='store', default=0)
         group.add_option('--scr_scale', dest='scr_scale', help='screen scale', type='float', action='store', default=3.0)
+        group.add_option('--scr_depth', dest='scr_depth', help='screen color depth', type='int', action='store',
+                         default=0)
         group.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
         group.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=vis2d.vis_map.keys(), action='store', default='rgb1')
         group.add_option('--vis3d', dest='vis3d', help='3D visualization engine', type='choice', choices=['mayavi', 'cutplane'], action='store', default='cutplane')
@@ -765,7 +767,7 @@ class FluidLBMSim(LBMSim):
         return [group]
 
     def _init_vis_2d(self):
-        self.vis = vis2d.Fluid2DVis(self, self.options.scr_w, self.options.scr_h,
+        self.vis = vis2d.Fluid2DVis(self, self.options.scr_w, self.options.scr_h, self.options.scr_depth,
                                     self.options.lat_nx, self.options.lat_ny,
                                     self.options.scr_scale)
 
@@ -774,7 +776,8 @@ class FluidLBMSim(LBMSim):
             import vis3d
             self.vis = vis3d.Fluid3DVis(self)
         else:
-            self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)), self.options.scr_scale)
+            self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)),
+                                                self.options.scr_depth, self.options.scr_scale)
 
 
 class FreeSurfaceLBMSim(LBMSim):
@@ -795,6 +798,8 @@ class FreeSurfaceLBMSim(LBMSim):
                 type='int', action='store', default=640)
         group.add_option('--scr_h', dest='scr_h', help='screen height',
                 type='int', action='store', default=480)
+        group.add_option('--scr_depth', dest='scr_depth', help='screen color depth', type='int', action='store',
+                         default=0)
 
         return [group]
 
@@ -812,5 +817,6 @@ class FreeSurfaceLBMSim(LBMSim):
 
     def _init_vis_2d(self):
         self.vis = vis_surf.FluidSurfaceVis(self, self.options.scr_w,
-                self.options.scr_h, self.options.lat_nx, self.options.lat_ny)
+                self.options.scr_h, self.options.scr_depth,
+                self.options.lat_nx, self.options.lat_ny)
 

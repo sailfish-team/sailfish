@@ -49,13 +49,11 @@ colormaps = {
     }
 
 class FluidSurfaceVis(object):
-    display_flags = pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE
-    display_depth = 24
 
-    def __init__(self, sim, width, height, lat_nx, lat_ny):
+    def __init__(self, sim, width, height, depth, lat_nx, lat_ny):
         self._font = pygame.font.SysFont('Liberation Mono', 14)
-        self._screen = pygame.display.set_mode((width, height), self.display_flags,
-                self.display_depth)
+        self.depth = depth
+        self.set_mode(width, height)
 
         _GL_resize(width, height)
         _GL_init()
@@ -98,6 +96,14 @@ class FluidSurfaceVis(object):
     def _reset(self):
         self._minh = 10000000.0
         self._maxh = -10000000.0
+
+    def set_mode(self, width, height):
+        display_flags = pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE
+        if self.depth > 0:
+            self._screen = pygame.display.set_mode((width, height), display_flags,
+                self.depth)
+        else:
+            self._screen = pygame.display.set_mode((width, height), display_flags)
 
     @property
     def velocity_norm(self):
@@ -185,8 +191,7 @@ class FluidSurfaceVis(object):
             elif event.type == pygame.QUIT:
                 sys.exit()
             elif event.type == pygame.VIDEORESIZE:
-                self._screen = pygame.display.set_mode(event.size,
-                        self.display_flags, self.display_depth)
+                self.set_mode(*event.size)
                 _GL_resize(*event.size)
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 5:
