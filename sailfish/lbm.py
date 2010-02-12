@@ -221,6 +221,7 @@ class LBMSim(object):
             self.backend.from_buf(self.gpu_dist2)
         else:
             self.backend.from_buf(self.gpu_dist1)
+        self.backend.sync()
 
     def hostsync_velocity(self):
         """Copy the current velocity field from the compute unit to the host.
@@ -229,6 +230,7 @@ class LBMSim(object):
         """
         for vel in self.gpu_velocity:
             self.backend.from_buf(vel)
+        self.backend.sync()
 
     def hostsync_density(self):
         """Copy the current density field from the compute unit to the host.
@@ -236,6 +238,7 @@ class LBMSim(object):
         The density field is then available in :attr:`rho`.
         """
         self.backend.from_buf(self.gpu_rho)
+        self.backend.sync()
 
     def hostsync_tracers(self):
         """Copy the tracer positions from the compute unit to the host.
@@ -244,6 +247,7 @@ class LBMSim(object):
         """
         for loc in self.gpu_tracer_loc:
             self.backend.from_buf(loc)
+        self.backend.sync()
 
     @property
     def sim_info(self):
