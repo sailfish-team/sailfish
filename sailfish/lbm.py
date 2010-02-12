@@ -31,6 +31,9 @@ def get_backends():
     return sorted([k for k, v in SUPPORTED_BACKENDS.iteritems()
         if ('sailfish.%s' % v) in sys.modules])
 
+def get_backend_module(backend):
+    return sys.modules['sailfish.%s' % SUPPORTED_BACKENDS[backend]]
+
 class Values(optparse.Values):
     def __init__(self, *args):
         optparse.Values.__init__(self, *args)
@@ -133,6 +136,12 @@ class LBMSim(object):
         class_options = self._add_options(parser, group)
         parser.add_option_group(group)
 
+        for backend in supported_backends:
+            group = OptionGroup(parser, '"%s" backend settings' % backend)
+            opts = get_backend_module(backend).backend.add_options(group)
+            if opts:
+                parser.add_option_group(group)
+
         group = OptionGroup(parser, 'Run mode settings')
         group.add_option('--backend', dest='backend', help='backend', type='choice', choices=supported_backends, default=supported_backends[0])
         group.add_option('--benchmark', dest='benchmark', help='benchmark mode, implies no visualization', action='store_true', default=False)
@@ -182,7 +191,7 @@ class LBMSim(object):
         self._mlups_calls = 0
         self._mlups = 0.0
         self.clear_hooks()
-        self.backend = sys.modules['sailfish.%s' % SUPPORTED_BACKENDS[self.options.backend]].backend()
+        self.backend = get_backend_module(self.options.backend).backend(self.options)
         if not self.options.quiet:
             print 'Using the "%s" backend.' % self.options.backend
 

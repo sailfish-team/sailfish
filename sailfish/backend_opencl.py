@@ -2,9 +2,18 @@ import pyopencl as cl
 
 class OpenCLBackend(object):
 
-    def __init__(self):
-        self.platform = cl.get_platforms()[0]
-        self.ctx = cl.Context(dev_type=cl.device_type.GPU, properties=[(cl.context_properties.PLATFORM, self.platform)])
+    @classmethod
+    def add_options(cls, group):
+        group.add_option('--opencl-interactive-select', dest='opencl_interactive',
+                help='select the OpenCL device in an interactive manner', action='store_true', default=False)
+        return 1
+
+    def __init__(self, options):
+        if options.opencl_interactive:
+            self.ctx = cl.create_some_context(True)
+        else:
+            platform = cl.get_platforms()[0]
+            self.ctx = cl.Context(dev_type=cl.device_type.GPU, properties=[(cl.context_properties.PLATFORM, platform)])
         self.queue = cl.CommandQueue(self.ctx)
         self.buffers = {}
 

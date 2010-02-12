@@ -22,7 +22,11 @@ def _expand_grid(grid):
 
 class CUDABackend(object):
 
-    def __init__(self):
+    @classmethod
+    def add_options(cls, group):
+        return 0
+
+    def __init__(self, options):
         self.buffers = {}
 
     def alloc_buf(self, size=None, like=None):
