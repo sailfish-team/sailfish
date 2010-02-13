@@ -714,7 +714,7 @@ class FluidLBMSim(LBMSim):
 
         # If the model has not been explicitly specified by the user, try to automatically
         # select a working model.
-        if 'model' not in self.options.specified and defaults is not None and 'model' not in defaults.keys():
+        if 'model' not in self.options.specified and (defaults is None or 'model' not in defaults.keys()):
             self._set_model(self.options.model, 'mrt', 'bgk')
         else:
             self._set_model(self.options.model)
