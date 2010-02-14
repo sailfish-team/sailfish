@@ -6,7 +6,6 @@ import sys
 import time
 from sailfish import geo
 from sailfish import vis2d
-from sailfish import vis_surf
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
@@ -607,10 +606,7 @@ class LBMSim(object):
                 self.h5tbl = self.h5file.createTable(self.h5grp, 'results', desc, 'results')
 
     def _run_benchmark(self):
-        if self.options.max_iters:
-            cycles = self.options.max_iters
-        else:
-            cycles = 1000
+        cycles = self.options.every
 
         print '# iters mlups_avg mlups_curr'
 
@@ -619,7 +615,7 @@ class LBMSim(object):
         while True:
             t_prev = time.time()
 
-            for i in range(0, cycles):
+            for i in xrange(0, cycles):
                 self.sim_step(tracers=False)
 
             self.backend.sync()
@@ -627,7 +623,7 @@ class LBMSim(object):
             print self.iter_,
             print '%.2f %.2f' % self.get_mlups(t_now - t_prev, cycles)
 
-            if self.options.max_iters:
+            if self.options.max_iters <= self.iter_:
                 break
 
     def _run_batch(self):
@@ -829,6 +825,7 @@ class FreeSurfaceLBMSim(LBMSim):
         ctx['bc_pressure_'] = geo.get_bc('fullbb')
 
     def _init_vis_2d(self):
+        from sailfish import vis_surf
         self.vis = vis_surf.FluidSurfaceVis(self, self.options.scr_w,
                 self.options.scr_h, self.options.scr_depth,
                 self.options.lat_nx, self.options.lat_ny)
