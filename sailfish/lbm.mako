@@ -347,6 +347,14 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 		int idx = ix + ${lat_nx}*iy + ${lat_nx*lat_ny}*iz;
 	%endif
 
+	int type, orientation;
+	decodeNodeType(map[idx], &orientation, &type);
+
+	// Unused nodes do not participate in the simulation.
+	if (isUnusedNode(type)) {
+		return;
+	}
+
 	Dist fc;
 
 ## HACK: If a call to getDist() is made below, the overall performance of the simulation
@@ -359,8 +367,6 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 		fc.${dname} = dist[idx + DIST_SIZE*${i}];
 	%endfor
 
-	int type, orientation;
-	decodeNodeType(map[idx], &orientation, &type);
 	getMacro(&fc, type, orientation, &rho, v);
 
 	cx = cx + v[0] * DT;
@@ -648,12 +654,17 @@ ${kernel} void LBMCollideAndPropagate(${global_ptr} int *map, ${global_ptr} floa
 		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
 	%endfor
 
+	int type, orientation;
+	decodeNodeType(map[gi], &orientation, &type);
+
+	// Unused nodes do not participate in the simulation.
+	if (isUnusedNode(type)) {
+		return;
+	}
+
 	// cache the distributions in local variables
 	Dist fi;
 	getDist(&fi, dist_in, gi);
-
-	int type, orientation;
-	decodeNodeType(map[gi], &orientation, &type);
 
 	// macroscopic quantities for the current cell
 	float rho, v[${dim}];

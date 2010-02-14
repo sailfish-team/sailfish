@@ -23,6 +23,10 @@ ${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int idx
 	%endfor
 }
 
+${device_func} inline bool isUnusedNode(int type) {
+	return type == ${geo_unused};
+}
+
 ${device_func} inline bool isFluidNode(int type) {
 	return type == ${geo_fluid};
 }

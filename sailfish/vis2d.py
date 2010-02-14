@@ -87,6 +87,9 @@ vis_map = {
 
 class Fluid2DVis(object):
 
+    _color_unused = (128, 128, 128)
+    _color_wall = (255, 255, 255)
+
     def __init__(self, sim, width, height, depth, lat_nx, lat_ny, scale):
         # If the size of the window has not been explicitly defined, automatically adjust it
         # based on the size of the grid,
@@ -164,7 +167,9 @@ class Fluid2DVis(object):
         ret.append('max_v: %.3f' % maxv)
         ret.append('rho_avg: %.3f' % numpy.average(self.density))
 
-        wall_map = (self.sim.geo._decode_node_type(self.geo_map) == geo.LBMGeo.NODE_WALL)
+        dec_map = self.sim.geo._decode_node_type(self.geo_map)
+        wall_map = (dec_map == geo.LBMGeo.NODE_WALL)
+        unused_map = (dec_map == geo.LBMGeo.NODE_UNUSED)
 
         if self._vismode == 0:
             drw = self.velocity_norm / self._maxv
@@ -185,7 +190,7 @@ class Fluid2DVis(object):
                 g = gauss_kernel(2, sizey=2)
                 drw = signal.convolve(drw,g, mode='same')
 
-        srf2 = self._draw_field(drw, srf, wall_map, vismode, width, height)
+        srf2 = self._draw_field(drw, srf, wall_map, unused_map, vismode, width, height)
         pygame.transform.scale(srf2, self._screen.get_size(), self._screen)
         sw, sh = self._screen.get_size()
 
@@ -207,16 +212,18 @@ class Fluid2DVis(object):
         self._draw_tracers(tx, ty, sw, sh, width, height)
         return ret
 
-    def _draw_field(self, field, srf, wall_map, vismode, width, height):
+    def _draw_field(self, field, srf, wall_map, unused_map, vismode, width, height):
         # Rotate the field to the correct position.
         field = numpy.rot90(field.astype(numpy.float32), 3)
         a = pygame.surfarray.pixels3d(srf)
         wall_map = numpy.rot90(wall_map, 3)
+        unused_map = numpy.rot90(unused_map, 3)
         # Draw the walls.
-        a[wall_map] = (255, 255, 255)
+        a[wall_map] = self._color_wall
+        a[unused_map] = self._color_unused
 
         # Draw the data field for all sites which are not marked as a wall.
-        wall_map = numpy.logical_not(wall_map)
+        wall_map = numpy.logical_not(numpy.logical_or(wall_map, unused_map))
         field = vis_map[vismode](field, width, height)
         a[wall_map] = field[wall_map]
 

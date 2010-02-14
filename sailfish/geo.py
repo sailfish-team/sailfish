@@ -20,12 +20,14 @@ class LBMGeo(object):
     NODE_FLUID = 0
     #: No-slip boundary condition node.
     NODE_WALL = 1
+    #: A node completely surrounded by wall nodes.
+    NODE_UNUSED = 2
     #: Velocity boundary condition node.
-    NODE_VELOCITY = 2
+    NODE_VELOCITY = 3
     #: Pressure boundary condition node.
-    NODE_PRESSURE = 3
+    NODE_PRESSURE = 4
 
-    NODE_TYPES = [NODE_WALL, NODE_VELOCITY, NODE_PRESSURE]
+    NODE_TYPES = [NODE_WALL, NODE_VELOCITY, NODE_PRESSURE, NODE_UNUSED]
 
     NODE_TYPE_MASK = 0xffffffff
     NODE_ORIENTATION_SHIFT = 0
@@ -464,6 +466,7 @@ class LBMGeo2D(LBMGeo):
     def get_defines(self):
         return {'geo_fluid': self.NODE_FLUID,
                 'geo_wall': self.NODE_WALL,
+                'geo_unused': self.NODE_UNUSED,
                 'geo_bcv': self.NODE_VELOCITY,
                 'geo_bcp': self.NODE_PRESSURE + self._num_velocities - 1,
                 'geo_orientation_mask': self.NODE_ORIENTATION_MASK,
@@ -524,6 +527,7 @@ class LBMGeo3D(LBMGeo):
     def get_defines(self):
         return {'geo_fluid': self.NODE_FLUID,
                 'geo_wall': self.NODE_WALL,
+                'geo_unused': self.NODE_UNUSED,
                 'geo_bcv': self.NODE_VELOCITY,
                 'geo_bcp': self.NODE_PRESSURE + self._num_velocities - 1,
                 'geo_orientation_mask': self.NODE_ORIENTATION_MASK,
@@ -536,6 +540,19 @@ class LBMGeo3D(LBMGeo):
 
         # FIXME: Eventually, we will need to postprocess nodes in 3D grids as well.
         if nodes is None:
+
+            # Detect unused nodes.
+            cnt = numpy.zeros_like(self.map).astype(numpy.int32)
+
+            for i, vec in enumerate(self.sim.grid.basis):
+                a = numpy.roll(self.map, -vec[0], axis=2)
+                a = numpy.roll(a, -vec[1], axis=1)
+                a = numpy.roll(a, -vec[2], axis=0)
+
+                cnt[(a == self.NODE_WALL)] += 1
+
+            self.map[(cnt == self.sim.grid.Q)] = self.NODE_UNUSED
+
             # Postprocess the whole domain here.
             orientation = numpy.empty(shape=self.map.shape, dtype=numpy.int32)
             orientation[:,:,:] = self.NODE_DIR_OTHER
