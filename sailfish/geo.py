@@ -89,6 +89,10 @@ class LBMGeo(object):
     def has_velocity_nodes(self):
         return self._num_velocities > 0
 
+    def count_active_nodes(self):
+        """Get the number of active nodes in the simulation domain."""
+        return numpy.sum(self._decode_node_type(self.map) != self.NODE_UNUSED)
+
     def define_nodes(self):
         """Define the types of all nodes in the simulation domain.
 

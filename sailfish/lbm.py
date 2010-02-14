@@ -521,7 +521,7 @@ class LBMSim(object):
         else:
             it = self.options.every
 
-        mlups = float(it) * self.options.lat_nx * self.options.lat_ny * self.options.lat_nz * 1e-6 / tdiff
+        mlups = float(it) * self.geo.count_active_nodes() * 1e-6 / tdiff
         self._mlups = (mlups + self._mlups * self._mlups_calls) / (self._mlups_calls + 1)
         self._mlups_calls += 1
         return (self._mlups, mlups)
