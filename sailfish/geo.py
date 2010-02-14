@@ -482,7 +482,18 @@ class LBMGeo2D(LBMGeo):
         lat_nx, lat_ny = self.shape
 
         if nodes is None:
-            nodes_ = ((x, y) for x in range(0, lat_nx) for y in range(0, lat_ny))
+            nodes_ = ((x, y) for x in xrange(0, lat_nx) for y in xrange(0, lat_ny))
+
+            # Detect unused nodes.
+            cnt = numpy.zeros_like(self.map).astype(numpy.int32)
+
+            for i, vec in enumerate(self.sim.grid.basis):
+                a = numpy.roll(self.map, -vec[0], axis=1)
+                a = numpy.roll(a, -vec[1], axis=0)
+
+                cnt[(a == self.NODE_WALL)] += 1
+
+            self.map[(cnt == self.sim.grid.Q)] = self.NODE_UNUSED
         else:
             nodes_ = nodes
 
