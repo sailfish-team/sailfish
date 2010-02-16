@@ -27,7 +27,7 @@ class LBMGeo(object):
     #: Pressure boundary condition node.
     NODE_PRESSURE = 4
 
-    NODE_TYPES = [NODE_WALL, NODE_VELOCITY, NODE_PRESSURE, NODE_UNUSED]
+    NODE_TYPES = [NODE_FLUID, NODE_WALL, NODE_UNUSED, NODE_VELOCITY, NODE_PRESSURE]
 
     NODE_TYPE_MASK = 0xffffffff
     NODE_ORIENTATION_SHIFT = 0
@@ -156,27 +156,33 @@ class LBMGeo(object):
         """Copy the node map to the compute unit."""
         self.backend.to_buf(self.gpu_map, self.map)
 
-    def set_geo(self, location, type, val=None, update=False):
+    def set_geo(self, location, type_, val=None, update=False):
         """Set the type of a grid node.
 
         :param location: location of the node
-        :param type: type of the node, one of the NODE_* constants
+        :param type_: type of the node, one of the NODE_* constants
         :param val: optional argument for the node, e.g. the value of velocity or pressure
         :param update: whether to automatically update the geometry for the
             simulation by copying it to the compute unit
         """
-        self._set_map(location, numpy.int32(type))
 
-        rloc = tuple(reversed(location))
-        rloc2 = tuple([slice(None)] + list(rloc))
+        if type(location) is tuple or type(location) is list:
+            self._set_map(location, numpy.int32(type_))
+
+            rloc = tuple(reversed(location))
+            rloc2 = tuple([slice(None)] + list(rloc))
+        else:
+            self.map[location] = numpy.int32(type_)
+            rloc = location
+            rloc2 = numpy.resize(location, [self.dim] + list(location.shape))
 
         if val is not None:
-            if type == self.NODE_VELOCITY:
+            if type_ == self.NODE_VELOCITY:
                 if len(val) == self.dim:
                     self._velocity_map[rloc2] = val
                 else:
                     raise ValueError('Invalid velocity specified.')
-            elif type == self.NODE_PRESSURE:
+            elif type_ == self.NODE_PRESSURE:
                 self._pressure_map[rloc] = val
 
         if update:
@@ -581,7 +587,7 @@ class LBMGeo3D(LBMGeo):
                 if cnode_type != self.NODE_FLUID:
                     self._set_map(loc, self._encode_node(self.NODE_DIR_OTHER, cnode_type))
 
-#
+
 # Boundary conditions
 #
 class LBMBC(object):
