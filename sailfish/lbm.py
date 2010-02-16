@@ -50,11 +50,17 @@ def _convert_to_double(src):
 class LBMSim(object):
     """Base class for LBM simulations. Descendant classes should be declared for specific simulations."""
 
+    #: Additional floating-point fields.
+    float_fields = []
+
     #: The filename base for screenshots.
     filename = 'lbm_sim'
 
     #: The command to use to automatically format the compute unit source code.
     format_cmd = r"indent -linux -sob -l120 {file} ; sed -i -e '/^$/{{N; s/\n\([\t ]*}}\)$/\1/}}' -e '/{{$/{{N; s/{{\n$/{{/}}' {file}"
+
+    #: Kernel function name
+    kernel_name = 'LBMCollideAndPropagate'
 
     @property
     def time(self):
@@ -332,7 +338,7 @@ class LBMSim(object):
 
         lookup = TemplateLookup(directories=sys.path,
                 module_directory='/tmp/sailfish_modules-%s' % (pwd.getpwuid(os.getuid())[0]))
-        lbm_tmpl = lookup.get_template('sailfish/lbm.mako')
+        lbm_tmpl = lookup.get_template('sailfish/templates/lbm.mako')
 
         self.tau = self.get_tau()
         ctx = {}
@@ -408,6 +414,15 @@ class LBMSim(object):
         self.rho = numpy.zeros(self.shape, self.float)
         self.gpu_rho = self.backend.alloc_buf(like=self.rho)
 
+        aux_kernel_args = []
+
+        # Auxiliary floating-point fields.
+        for field in self.float_fields:
+            setattr(self, field, numpy.zeros(self.shape, self.float))
+            gpu_field = self.backend.alloc_buf(like=getattr(self, field))
+            setattr(self, 'gpu_%s' % field, gpu_field)
+            aux_kernel_args.append(gpu_field)
+
         # Tracer particles.
         if self.num_tracers:
             self.tracer_x = numpy.random.random_sample(self.num_tracers).astype(self.float) * self.options.lat_nx
@@ -432,36 +447,36 @@ class LBMSim(object):
         # Kernel arguments.
         args_tracer2 = [self.gpu_dist1, self.geo.gpu_map] + self.gpu_tracer_loc
         args_tracer1 = [self.gpu_dist2, self.geo.gpu_map] + self.gpu_tracer_loc
-        args1 = [self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, self.gpu_rho] + self.gpu_velocity + [numpy.uint32(0)]
-        args2 = [self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho] + self.gpu_velocity + [numpy.uint32(0)]
+        args1 = ([self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, self.gpu_rho] + self.gpu_velocity +
+                 [numpy.uint32(0)] + aux_kernel_args)
+        args2 = ([self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho] + self.gpu_velocity +
+                 [numpy.uint32(0)] + aux_kernel_args)
 
         # Special argument list for the case where macroscopic quantities data is to be
         # saved in global memory, i.e. a visualization step.
-        args1v = [self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, self.gpu_rho] + self.gpu_velocity + [numpy.uint32(1)]
-        args2v = [self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho] + self.gpu_velocity + [numpy.uint32(1)]
+        args1v = ([self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, self.gpu_rho] + self.gpu_velocity +
+                  [numpy.uint32(1)] + aux_kernel_args)
+        args2v = ([self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho] + self.gpu_velocity +
+                  [numpy.uint32(1)] + aux_kernel_args)
 
         if self.grid.dim == 2:
             k_block_size = (self.block_size, 1)
         else:
             k_block_size = (self.block_size, 1, 1)
 
-        kern_cnp1 = self.backend.get_kernel(self.mod,
-                    'LBMCollideAndPropagate',
+        kern_cnp1 = self.backend.get_kernel(self.mod, self.kernel_name,
                     args=args1,
                     args_format='P'*(len(args1)-1)+'i',
                     block=k_block_size)
-        kern_cnp2 = self.backend.get_kernel(self.mod,
-                    'LBMCollideAndPropagate',
+        kern_cnp2 = self.backend.get_kernel(self.mod, self.kernel_name,
                     args=args2,
                     args_format='P'*(len(args2)-1)+'i',
                     block=k_block_size)
-        kern_cnp1s = self.backend.get_kernel(self.mod,
-                    'LBMCollideAndPropagate',
+        kern_cnp1s = self.backend.get_kernel(self.mod, self.kernel_name,
                     args=args1v,
                     args_format='P'*(len(args1v)-1)+'i',
                     block=k_block_size)
-        kern_cnp2s = self.backend.get_kernel(self.mod,
-                    'LBMCollideAndPropagate',
+        kern_cnp2s = self.backend.get_kernel(self.mod, self.kernel_name,
                     args=args2v,
                     args_format='P'*(len(args2v)-1)+'i',
                     block=k_block_size)
@@ -788,6 +803,10 @@ class FluidLBMSim(LBMSim):
             self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)),
                                                 self.options.scr_depth, self.options.scr_scale)
 
+
+class SinglePhaseFreeSurfaceLBMSim(FluidLBMSim):
+    float_fields = ['mass', 'eps']
+    kernel_name = 'LBMCollideAndPropagateSinglePhase'
 
 class FreeSurfaceLBMSim(LBMSim):
 
