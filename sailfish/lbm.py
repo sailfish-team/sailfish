@@ -57,7 +57,9 @@ class LBMSim(object):
     filename = 'lbm_sim'
 
     #: The command to use to automatically format the compute unit source code.
-    format_cmd = r"indent -linux -sob -l120 {file} ; sed -i -e '/^$/{{N; s/\n\([\t ]*}}\)$/\1/}}' -e '/{{$/{{N; s/{{\n$/{{/}}' {file}"
+    format_cmd = (r"sed -i -e '{{:s;N;\#//#{{p ;d}}; \!#!{{p;d}} ; s/\n//g;t s}}' {file} ; "
+                  r"sed -i -e 's/}}/}}\n\n/g' {file} ; indent -linux -sob -l120 {file} ; "
+                  r"sed -i -e '/^$/{{N; s/\n\([\t ]*}}\)$/\1/}}' -e '/{{$/{{N; s/{{\n$/{{/}}' {file}")
 
     #: Kernel function name
     kernel_name = 'LBMCollideAndPropagate'
