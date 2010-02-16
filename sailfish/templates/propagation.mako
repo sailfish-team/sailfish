@@ -69,19 +69,23 @@
 	%endfor
 </%def>
 
-<%def name="set_odist(idir, xoff, yoff, zoff, offset, local)">
-<%
-	def rel_offset(x, y, z):
-		if grid.dim == 2:
-			return x + y * lat_nx
-		else:
-			return x + lat_nx * (y + lat_ny*z)
-%>
-
-	%if local:
-		dist_out[gi + ${dist_size*idir + rel_offset(xoff, yoff, zoff) + offset}] = prop_${grid.idx_name[idir]}[lx];
+<%def name="rel_offset(x, y, z)">
+	%if grid.dim == 2:
+		${x + y * lat_nx}
 	%else:
-		dist_out[gi + ${dist_size*idir + rel_offset(xoff, yoff, zoff) + offset}] = fi.${grid.idx_name[idir]};
+		${x + lat_nx * (y + lat_ny*z)}
+	%endif
+</%def>
+
+<%def name="get_odist(idir, xoff=0, yoff=0, zoff=0, offset=0)">
+	dist_out[gi + ${dist_size*idir + offset} + ${rel_offset(xoff, yoff, zoff)}]
+</%def>
+
+<%def name="set_odist(idir, xoff, yoff, zoff, offset, local)">
+	%if local:
+		${get_odist(idir, xoff, yoff, zoff, offset)} = prop_${grid.idx_name[idir]}[lx];
+	%else:
+		${get_odist(idir, xoff, yoff, zoff, offset)} = fi.${grid.idx_name[idir]};
 	%endif
 </%def>
 
