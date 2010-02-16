@@ -50,7 +50,7 @@ class Test3DForce(unittest.TestCase):
         backend = backend_dummy.DummyBackend()
         options = DummyOptions()
         options.force = True
-        self.sim = lbm.LBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True})
+        self.sim = lbm.FluidLBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True})
         self.geo = TestGeo3D(self.shape, options, float=numpy.float32, backend=backend,
                 sim=self.sim)
 
@@ -123,7 +123,7 @@ class Test3DNodeProcessing(unittest.TestCase):
 
     def setUp(self):
         backend = backend_dummy.DummyBackend()
-        self.sim = lbm.LBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True})
+        self.sim = lbm.FluidLBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True})
         self.geo = TestGeo3D(self.shape, options=DummyOptions(), float=numpy.float32,
                 backend=backend, sim=self.sim)
 

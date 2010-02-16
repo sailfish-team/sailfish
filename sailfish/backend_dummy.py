@@ -10,7 +10,7 @@ class DummyBackend(object):
     def add_options(cls, group):
         return 0
 
-    def __init__(self, options):
+    def __init__(self, options=None):
         self.buffers = {}
 
     def alloc_buf(self, size=None, like=None):
