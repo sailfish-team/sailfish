@@ -252,6 +252,7 @@ class LBMSim(object):
     def sim_info(self):
         """A dictionary of simulation settings."""
         ret = {}
+        ret['grid'] = self.grid.__name__
         ret['precision'] = self.options.precision
         ret['size'] = tuple(reversed(self.shape))
         ret['visc'] = self.options.visc
@@ -689,7 +690,6 @@ class FluidLBMSim(LBMSim):
         ret = LBMSim.sim_info.fget(self)
         ret['incompressible'] = self.incompressible
         ret['model'] = self.lbm_model
-        ret['grid'] = self.grid.__name__
         ret['bc_wall'] = self.options.bc_wall
         ret['bc_velocity'] = self.options.bc_velocity
         ret['bc_pressure'] = self.options.bc_pressure
@@ -790,6 +790,13 @@ class FluidLBMSim(LBMSim):
 
 
 class FreeSurfaceLBMSim(LBMSim):
+
+    @property
+    def sim_info(self):
+        ret = LBMSim.sim_info.fget(self)
+        ret['gravity'] = self.gravity
+        return ret
+
     def __init__(self, geo_class, options=[], args=None, defaults=None):
         LBMSim.__init__(self, geo_class, options, args, defaults)
         self._set_grid('D2Q9')
