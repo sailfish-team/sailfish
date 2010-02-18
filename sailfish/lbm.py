@@ -83,11 +83,7 @@ class LBMSim(object):
 
         .. warning:: use :meth:`hostsync_dist` before accessing this property
         """
-        if self.iter_ & 1:
-            return self.dist2
-        else:
-            return self.dist1
-        return curr
+        return self.dist1
 
     def _add_options(self, parser, lb_group):
         """Add simulation options common to a class of simulations.
@@ -322,7 +318,6 @@ class LBMSim(object):
         self.geo = self.geo_class(list(reversed(self.shape)), self.options,
                 self.float, self.backend, self)
         self.geo.init_dist(self.dist1)
-        self.dist2 = self.dist1.copy()
         self.geo_params = self.float(self.geo.params)
         # HACK: Prevent this method from being called again.
         self._init_geo = lambda: True
@@ -444,7 +439,7 @@ class LBMSim(object):
 
         # Particle distributions in device memory, A-B access pattern.
         self.gpu_dist1 = self.backend.alloc_buf(like=self.dist1)
-        self.gpu_dist2 = self.backend.alloc_buf(like=self.dist2)
+        self.gpu_dist2 = self.backend.alloc_buf(like=self.dist1)
 
         # Kernel arguments.
         args_tracer2 = [self.gpu_dist1, self.geo.gpu_map] + self.gpu_tracer_loc
