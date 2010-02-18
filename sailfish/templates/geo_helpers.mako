@@ -57,3 +57,6 @@ ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *t
 	*type = nodetype >> ${geo_orientation_shift};
 }
 
+${device_func} inline int encodeNodeType(int orientation, int type) {
+	return orientation | (type << ${geo_orientation_shift});
+}
