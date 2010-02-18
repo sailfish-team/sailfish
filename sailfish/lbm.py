@@ -312,6 +312,7 @@ class LBMSim(object):
         else:
             self.shape = (self.options.lat_nz, self.options.lat_ny, self.options.lat_nx)
 
+        self._init_fields()
         self.dist1 = numpy.zeros([len(self.grid.basis)] + list(self.shape), self.float)
 
         # Simulation geometry.
@@ -391,50 +392,71 @@ class LBMSim(object):
 
         self.mod = self.backend.build(src)
 
-    def _init_lbm(self):
-        self._timed_print('Preparing the initial conditions for the simulation.')
-        # Velocity.
+    def _init_fields(self):
+        """Initialize the data fields used in the simulation.
+
+        All the data field arrays are first allocated on the host, and filled with
+        default values.  These can then be overridden when the distributions for the
+        simulation are initialized.  Afterwards, the fields are copied to the compute
+        unit in :meth:`_init_compute`.
+        """
+        self._timed_print('Preparing the data fields.')
         self.vx = numpy.zeros(self.shape, self.float)
         self.vy = numpy.zeros(self.shape, self.float)
         self.velocity = [self.vx, self.vy]
-        self.gpu_vx = self.backend.alloc_buf(like=self.vx)
-        self.gpu_vy = self.backend.alloc_buf(like=self.vy)
-        self.gpu_velocity = [self.gpu_vx, self.gpu_vy]
 
         if self.grid.dim == 3:
             self.vz = numpy.zeros(self.shape, self.float)
-            self.gpu_vz = self.backend.alloc_buf(like=self.vz)
             self.velocity.append(self.vz)
-            self.gpu_velocity.append(self.gpu_vz)
 
-        # Density.
         self.rho = numpy.zeros(self.shape, self.float)
-        self.gpu_rho = self.backend.alloc_buf(like=self.rho)
-
-        aux_kernel_args = []
 
         # Auxiliary floating-point fields.
         for field in self.float_fields:
             setattr(self, field, numpy.zeros(self.shape, self.float))
-            gpu_field = self.backend.alloc_buf(like=getattr(self, field))
-            setattr(self, 'gpu_%s' % field, gpu_field)
-            aux_kernel_args.append(gpu_field)
 
         # Tracer particles.
         if self.num_tracers:
             self.tracer_x = numpy.random.random_sample(self.num_tracers).astype(self.float) * self.options.lat_nx
             self.tracer_y = numpy.random.random_sample(self.num_tracers).astype(self.float) * self.options.lat_ny
             self.tracer_loc = [self.tracer_x, self.tracer_y]
+            if self.grid.dim == 3:
+                self.tracer_z = numpy.random.random_sample(self.num_tracers).astype(self.float) * self.options.lat_nz
+                self.tracer_loc.append(self.tracer_z)
+
+        else:
+            self.tracer_loc = []
+
+    def _init_compute(self):
+        self._timed_print('Preparing the compute unit data fields.')
+        # Velocity.
+        self.gpu_vx = self.backend.alloc_buf(like=self.vx)
+        self.gpu_vy = self.backend.alloc_buf(like=self.vy)
+        self.gpu_velocity = [self.gpu_vx, self.gpu_vy]
+
+        if self.grid.dim == 3:
+            self.gpu_vz = self.backend.alloc_buf(like=self.vz)
+            self.gpu_velocity.append(self.gpu_vz)
+
+        # Density.
+        self.gpu_rho = self.backend.alloc_buf(like=self.rho)
+
+        aux_kernel_args = []
+        # Auxiliary floating-point fields.
+        for field in self.float_fields:
+            gpu_field = self.backend.alloc_buf(like=getattr(self, field))
+            setattr(self, 'gpu_%s' % field, gpu_field)
+            aux_kernel_args.append(gpu_field)
+
+        # Tracer particles.
+        if self.num_tracers:
             self.gpu_tracer_x = self.backend.alloc_buf(like=self.tracer_x)
             self.gpu_tracer_y = self.backend.alloc_buf(like=self.tracer_y)
             self.gpu_tracer_loc = [self.gpu_tracer_x, self.gpu_tracer_y]
             if self.grid.dim == 3:
-                self.tracer_z = numpy.random.random_sample(self.num_tracers).astype(self.float) * self.options.lat_nz
                 self.gpu_tracer_z = self.backend.alloc_buf(like=self.tracer_z)
-                self.tracer_loc.append(self.tracer_z)
                 self.gpu_tracer_loc.append(self.gpu_tracer_z)
         else:
-            self.tracer_loc = []
             self.gpu_tracer_loc = []
 
         # Particle distributions in device memory, A-B access pattern.
@@ -677,7 +699,7 @@ class LBMSim(object):
         self._init_geo()
         self._init_vis()
         self._init_code()
-        self._init_lbm()
+        self._init_compute()
         self._init_output()
 
         self._timed_print('Starting the simulation...')

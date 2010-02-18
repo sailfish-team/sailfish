@@ -306,6 +306,20 @@ class LBMGeo(object):
         for i, lambda_eq in enumerate(self.lambda_equilibrium):
             dist[i][loc] = lambda_eq(rho, *velocity)
 
+        for i, v_component in enumerate(velocity):
+            self.sim.velocity[i][loc] = v_component
+
+        self.sim.rho[loc] = rho
+
+    def set_field(self, name, location, value):
+        if type(location) is tuple or type(location) is list:
+            loc = tuple(reversed(location))
+        else:
+            loc = location
+
+        fld = getattr(self.sim, name)
+        fld[loc] = value
+
     def _postprocess_nodes(self, nodes=None):
         """Detect types of wall nodes and mark them appropriately.
 
