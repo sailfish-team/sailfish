@@ -47,7 +47,7 @@ class Fluid2DVisPresentation(vis2d.Fluid2DVis):
         self._vscale = 0.005
         self._vismode = 4
 
-    def _draw_field(self, field, srf, b, vismode, width, height):
+    def _draw_field(self, field, srf, b, unused_map, vismode, width, height):
         # Rotate the field to the correct position.
         field = numpy.rot90(field.astype(numpy.float32), 3)
         a = pygame.surfarray.pixels3d(srf)
@@ -119,7 +119,8 @@ class LPresSim(lbm.FluidLBMSim):
 
     def _init_vis_2d(self):
         self.vis = Fluid2DVisPresentation(self, self.options.scr_w, self.options.scr_h,
-                                          self.options.scr_depth, self.options.lat_nx, self.options.lat_ny)
+                                          self.options.scr_depth, self.options.lat_nx, self.options.lat_ny,
+                                          self.options.scr_scale)
 
 if __name__ == '__main__':
     sim = LPresSim(LBMGeoPoiseuille)
