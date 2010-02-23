@@ -427,7 +427,7 @@ class LBMSim(object):
         else:
             self.tracer_loc = []
 
-    def _init_compute(self):
+    def _init_compute_fields(self):
         self._timed_print('Preparing the compute unit data fields.')
         # Velocity.
         self.gpu_vx = self.backend.alloc_buf(like=self.vx)
@@ -441,12 +441,10 @@ class LBMSim(object):
         # Density.
         self.gpu_rho = self.backend.alloc_buf(like=self.rho)
 
-        aux_kernel_args = []
         # Auxiliary floating-point fields.
         for field in self.float_fields:
             gpu_field = self.backend.alloc_buf(like=getattr(self, field))
             setattr(self, 'gpu_%s' % field, gpu_field)
-            aux_kernel_args.append(gpu_field)
 
         # Tracer particles.
         if self.num_tracers:
@@ -463,6 +461,19 @@ class LBMSim(object):
         self.gpu_dist1 = self.backend.alloc_buf(like=self.dist1)
         self.gpu_dist2 = self.backend.alloc_buf(like=self.dist1)
 
+    def _kernel_block_size(self):
+        if self.grid.dim == 2:
+            return (self.block_size, 1)
+        else:
+            return (self.block_size, 1, 1)
+
+    def _init_compute_kernels(self):
+        self._timed_print('Preparing the compute unit kernels.')
+
+        aux_kernel_args = []
+        for field in self.float_fields:
+            aux_kernel_args.append(getattr(self, 'gpu_%s' % field))
+
         # Kernel arguments.
         args_tracer2 = [self.gpu_dist1, self.geo.gpu_map] + self.gpu_tracer_loc
         args_tracer1 = [self.gpu_dist2, self.geo.gpu_map] + self.gpu_tracer_loc
@@ -478,10 +489,7 @@ class LBMSim(object):
         args2v = ([self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho] + self.gpu_velocity +
                   [numpy.uint32(1)] + aux_kernel_args)
 
-        if self.grid.dim == 2:
-            k_block_size = (self.block_size, 1)
-        else:
-            k_block_size = (self.block_size, 1, 1)
+        k_block_size = self._kernel_block_size()
 
         kern_cnp1 = self.backend.get_kernel(self.mod, self.kernel_name,
                     args=args1,
@@ -521,7 +529,22 @@ class LBMSim(object):
         else:
             self.kern_grid_size = (self.options.lat_nx/self.block_size * self.options.lat_ny, self.options.lat_nz)
 
-    def sim_step(self, tracers=True, get_data=False):
+    def _lbm_step(self, get_data, **kwargs):
+        kerns = self.kern_map[self.iter_ & 1]
+
+        if get_data:
+            self.backend.run_kernel(kerns[1], self.kern_grid_size)
+            if kwargs.get('tracers'):
+                self.backend.run_kernel(kerns[2], (self.num_tracers,))
+                self.hostsync_tracers()
+            self.hostsync_velocity()
+            self.hostsync_density()
+        else:
+            self.backend.run_kernel(kerns[0], self.kern_grid_size)
+            if kwargs.get('tracers'):
+                self.backend.run_kernel(kerns[2], (self.num_tracers,))
+
+    def sim_step(self, tracers=False, get_data=False, **kwargs):
         """Perform a single step of the simulation.
 
         :param tracers: if ``True``, the position of tracer particles will be updated
@@ -529,24 +552,17 @@ class LBMSim(object):
           and made available as properties of this class
         """
         i = self.iter_
-        kerns = self.kern_map[i & 1]
 
         if (not self.options.benchmark and (not self.options.batch or
             (self.options.batch and self.options.output)) and
             i % self.options.every == 0) or get_data:
-            self.backend.run_kernel(kerns[1], self.kern_grid_size)
-            if tracers:
-                self.backend.run_kernel(kerns[2], (self.num_tracers,))
-                self.hostsync_tracers()
-            self.hostsync_velocity()
-            self.hostsync_density()
+
+            self._lbm_step(True, tracers=tracers, **kwargs)
 
             if self.options.output and i % self.options.every == 0:
                 self._output_data(i)
         else:
-            self.backend.run_kernel(kerns[0], self.kern_grid_size)
-            if tracers:
-                self.backend.run_kernel(kerns[2], (self.num_tracers,))
+            self._lbm_step(False, tracers=tracers, **kwargs)
 
         self.iter_ += 1
 
@@ -699,7 +715,8 @@ class LBMSim(object):
         self._init_geo()
         self._init_vis()
         self._init_code()
-        self._init_compute()
+        self._init_compute_fields()
+        self._init_compute_kernels()
         self._init_output()
 
         self._timed_print('Starting the simulation...')
