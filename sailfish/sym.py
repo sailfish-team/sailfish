@@ -3,6 +3,7 @@ import math
 import numpy
 import sympy
 from sympy import Matrix, Rational, Symbol, Poly
+from sympy.printing.ccode import CCodePrinter
 import re
 
 #
@@ -13,7 +14,6 @@ import re
 #
 
 class DxQy(object):
-    rho = Symbol('rho')
     vx = Symbol('vx')
     vy = Symbol('vy')
     vz = Symbol('vz')
@@ -21,15 +21,6 @@ class DxQy(object):
     my = Symbol('my')
     mz = Symbol('mz')
     visc = Symbol('visc')
-
-    # For incompressible models, this symbol is replaced with the average
-    # density, usually 1.0.  For compressible models, it is the same as
-    # the density rho.
-    #
-    # The incompressible model is described in:
-    #   X. He, L.-S. Luo, Lattice Boltzmann model for the incompressible Navier-Stokes
-    #   equation, J. Stat. Phys. 88 (1997) 927-944
-    rho0 = Symbol('rho0')
 
     # Square of the sound velocity.
     # TODO: Before we can ever start using different values of the sound speed,
@@ -118,12 +109,12 @@ class D2Q9(DxQy):
             vec_e = cls.mrt_matrix[i,:]
             if name == 'en':
                 t = (Rational(1, vec_e.dot(vec_e)) *
-                        (-8*vec_rho.dot(vec_rho)*cls.rho +
+                        (-8*vec_rho.dot(vec_rho)*S.rho +
                             18*(vec_mx.dot(vec_mx)*cls.mx**2 + vec_my.dot(vec_my)*cls.my**2)))
             elif name == 'ens':
                 # The 4 and -18 below are freely adjustable parameters.
                 t = (Rational(1, vec_e.dot(vec_e)) *
-                        (4*vec_rho.dot(vec_rho)*cls.rho +
+                        (4*vec_rho.dot(vec_rho)*S.rho +
                             -18*(vec_mx.dot(vec_mx)*cls.mx**2 + vec_my.dot(vec_my)*cls.my**2)))
             elif name == 'ex':
                 t = Rational(1, vec_e.dot(vec_e)) * (c1 * vec_mx.dot(vec_mx)*cls.mx)
@@ -197,12 +188,12 @@ class D3Q13(DxQy):
             'm3x': 0,
             'm3y': 0,
             'm3z': 0,
-            'pxy': 1/cls.rho0 * (cls.mx * cls.my),
-            'pyz': 1/cls.rho0 * (cls.my * cls.mz),
-            'pzx': 1/cls.rho0 * (cls.mx * cls.mz),
-            'pxx': 1/cls.rho0 * (2 * cls.mx**2 - cls.my**2 - cls.mz**2),
-            'pww': 1/cls.rho0 * (cls.my**2 - cls.mz**2),
-            'en': 3*cls.rho*(13*cls.cssq - 8)/2 + 13/(2 * cls.rho0)*(cls.mx**2 + cls.my**2 + cls.mz**2),
+            'pxy': 1/S.rho0 * (cls.mx * cls.my),
+            'pyz': 1/S.rho0 * (cls.my * cls.mz),
+            'pzx': 1/S.rho0 * (cls.mx * cls.mz),
+            'pxx': 1/S.rho0 * (2 * cls.mx**2 - cls.my**2 - cls.mz**2),
+            'pww': 1/S.rho0 * (cls.my**2 - cls.mz**2),
+            'en': 3*S.rho*(13*cls.cssq - 8)/2 + 13/(2 * S.rho0)*(cls.mx**2 + cls.my**2 + cls.mz**2),
         }
 
         for i, name in enumerate(cls.mrt_names):
@@ -268,16 +259,16 @@ class D3Q15(DxQy):
         # Form of the equilibrium functions follows that from
         # dHumieres, PhilTranA, 2002.
         mrt_eq = {
-            'en':  -cls.rho + 1/cls.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
-            'ens': -cls.rho,
+            'en':  -S.rho + 1/S.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
+            'ens': -S.rho,
             'ex':  -Rational(7,3)*cls.mx,
             'ey':  -Rational(7,3)*cls.my,
             'ez':  -Rational(7,3)*cls.mz,
-            'pxx': 1/cls.rho0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
-            'pww': 1/cls.rho0 * (cls.my**2 - cls.mz**2),
-            'pxy': 1/cls.rho0 * (cls.mx * cls.my),
-            'pyz': 1/cls.rho0 * (cls.my * cls.mz),
-            'pzx': 1/cls.rho0 * (cls.mx * cls.mz),
+            'pxx': 1/S.rho0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
+            'pww': 1/S.rho0 * (cls.my**2 - cls.mz**2),
+            'pxy': 1/S.rho0 * (cls.mx * cls.my),
+            'pyz': 1/S.rho0 * (cls.my * cls.mz),
+            'pzx': 1/S.rho0 * (cls.mx * cls.mz),
             'mxyz': 0
         }
 
@@ -350,16 +341,16 @@ class D3Q19(DxQy):
         # Form of the equilibrium functions follows that from
         # dHumieres, PhilTranA, 2002.
         mrt_eq = {
-            'en':  -11 * cls.rho + 19/cls.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
-            'ens': -Rational(475,63)/cls.rho0*(cls.mx**2 + cls.my**2 + cls.mz**2),
+            'en':  -11 * S.rho + 19/S.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
+            'ens': -Rational(475,63)/S.rho0*(cls.mx**2 + cls.my**2 + cls.mz**2),
             'ex':  -Rational(2,3)*cls.mx,
             'ey':  -Rational(2,3)*cls.my,
             'ez':  -Rational(2,3)*cls.mz,
-            'pxx': 1/cls.rho0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
-            'pww': 1/cls.rho0 * (cls.my**2 - cls.mz**2),
-            'pxy': 1/cls.rho0 * (cls.mx * cls.my),
-            'pyz': 1/cls.rho0 * (cls.my * cls.mz),
-            'pzx': 1/cls.rho0 * (cls.mx * cls.mz),
+            'pxx': 1/S.rho0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
+            'pww': 1/S.rho0 * (cls.my**2 - cls.mz**2),
+            'pxy': 1/S.rho0 * (cls.mx * cls.my),
+            'pyz': 1/S.rho0 * (cls.my * cls.mz),
+            'pzx': 1/S.rho0 * (cls.mx * cls.mz),
             'm3x': 0,
             'm3y': 0,
             'm3z': 0,
@@ -407,7 +398,7 @@ def bgk_equilibrium(grid):
 
     for i, ei in enumerate(grid.basis):
         t = (grid.weights[i] * (
-                    (grid.rho + grid.rho0 * poly_factorize(
+                    (S.rho + S.rho0 * poly_factorize(
                         3*ei.dot(grid.v) +
                         Rational(9, 2) * (ei.dot(grid.v))**2 -
                         Rational(3, 2) * grid.v.dot(grid.v)))))
@@ -426,9 +417,9 @@ def lambdify_equilibrium(sim):
     subs={}
 
     if hasattr(sim, 'incompressible') and sim.incompressible:
-        subs[sim.grid.rho0] = 1
+        subs[S.rho0] = 1
     else:
-        subs[sim.grid.rho0] = sim.grid.rho
+        subs[S.rho0] = S.rho
 
     if hasattr(sim, 'gravity'):
         subs[sim.grid.gravity] = sim.gravity
@@ -436,9 +427,9 @@ def lambdify_equilibrium(sim):
     ret = []
 
     if sim.grid.dim == 2:
-        args = (sim.grid.rho, sim.grid.vx, sim.grid.vy)
+        args = (S.rho, sim.grid.vx, sim.grid.vy)
     else:
-        args = (sim.grid.rho, sim.grid.vx, sim.grid.vy, sim.grid.vz)
+        args = (S.rho, sim.grid.vx, sim.grid.vy, sim.grid.vz)
 
     for eq_expr, dist_name in sim.equilibrium:
         ret.append(sympy.lambdify(args, eq_expr.subs(subs), numpy))
@@ -524,9 +515,9 @@ def ex_rho(grid, distp, incompressible, missing_dir=None):
     # quantities and cancelling out the unknown distributions so as to get an
     # expression for rho using only known quantities.
     if incompressible:
-        return grid.rho + grid.rho0 * grid.dir_to_vec(missing_dir).dot(grid.v)
+        return S.rho + S.rho0 * grid.dir_to_vec(missing_dir).dot(grid.v)
     else:
-        return grid.rho / (1 - grid.dir_to_vec(missing_dir).dot(grid.v))
+        return S.rho / (1 - grid.dir_to_vec(missing_dir).dot(grid.v))
 
 def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=None):
     """Express velocity as a function of the distributions.
@@ -552,7 +543,7 @@ def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=Non
             ret += grid.basis[i][comp] * sym
 
         if not momentum:
-            ret = ret / grid.rho0
+            ret = ret / S.rho0
     else:
         prho = Symbol(par_rho)
 
@@ -561,7 +552,7 @@ def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=Non
             if sp <= 0:
                 ret = 1
 
-        ret = ret * (grid.rho - prho)
+        ret = ret * (S.rho - prho)
         ret *= -grid.dir_to_vec(missing_dir)[comp]
         if not momentum:
             ret = ret / prho
@@ -753,7 +744,22 @@ def use_pointers(str):
 def make_float(t):
     return re.sub(r'([0-9]+\.[0-9]*)', r'\1f', str(t))
 
-def cexpr(grid, incompressible, pointers, ex, rho):
+class KernelCodePrinter(CCodePrinter):
+
+    def _print_Pow(self, expr):
+        PREC = precedence(expr)
+        if expr.exp is S.NegativeOne:
+            return '1.0/%s' % (self.parenthesize(expr.base, PREC))
+        # For the kernel code, it's better to calculate the power
+        # here explicitly by multiplication.
+        elif expr.exp == 2:
+            return '(%s)*(%s)' % (self.parenthesize(exp.base, PREC),
+                                  self.parenthesize(exp.base, PREC))
+        else:
+            return 'pow(%s,%s)' % (self.parenthesize(expr.base, PREC),
+                                   self.parenthesize(expr.exp, PREC))
+
+def cexpr(grid, incompressible, pointers, ex, rho, aliases=True):
     """Convert a SymPy expression into a string containing valid C code.
 
     :param grid: the grid class
@@ -774,14 +780,18 @@ def cexpr(grid, incompressible, pointers, ex, rho):
 
     if type(rho) is str:
         rho = Symbol(rho)
-        t = t.subs(grid.rho, rho)
+        t = t.subs(S.rho, rho)
     if rho is None:
-        rho = grid.rho
+        rho = S.rho
 
     if incompressible:
-        t = t.subs(grid.rho0, 1)
+        t = t.subs(S.rho0, 1)
     else:
-        t = t.subs(grid.rho0, rho)
+        t = t.subs(S.rho0, rho)
+
+    if aliases:
+        for src, dst in S.aliases.iteritems():
+            t = t.subs(src, dst)
 
     t = str(t)
     t = expand_powers(t)
@@ -903,6 +913,61 @@ def _prepare_grids():
             grid.mrt_matrix = Matrix([x.transpose().tolist()[0] for x in orthogonalize(*grid.mrt_basis)])
             grid._init_mrt_equilibrium()
 
+# A container class for all commonly used sympy symbols.  Not to be instantiated.
+class S(object):
+    aliases = {}
+
+    @classmethod
+    def alias(cls, sym_dst, sym_src):
+        setattr(cls, sym_dst, getattr(cls, sym_src.name))
+        cls.aliases[sym_src] = sym_dst
+
+def _prepare_symbols():
+    comp_map = {0: 'x', 1: 'y', 2: 'z'}
+
+    # Up to 9 grids.
+    for grid_num in range(0, 9):
+        # 0th moment
+        name = 'g%sm0' % grid_num
+        setattr(S, name, Symbol(name))
+        # Laplacian.
+        name = 'g%sd2m0' % grid_num
+        setattr(S, name, Symbol(name))
+        # Gradient.
+        name = 'g%sd1m0' % grid_num
+        for comp in ('x', 'y', 'z'):
+            setattr(S, name + comp, Symbol(name + comp))
+
+        # 1st moment
+        name = 'g%sm1' % grid_num
+        for comp in ('x', 'y', 'z'):
+            setattr(S, name + comp, Symbol(name + comp))
+
+        # 2nd moment
+        name = 'g%sm2' % grid_num
+        for c1 in range(0, 3):
+            for c2 in range(c1, 3):
+                n = name + comp_map[c1] + comp_map[c2]
+                setattr(S, n, Symbol(n))
+
+    # Commonly used aliases.
+    S.alias('vx', S.g0m1x)
+    S.alias('vy', S.g0m1y)
+    S.alias('vz', S.g0m1z)
+    S.alias('rho', S.g0m0)
+
+    # For incompressible models, this symbol is replaced with the average
+    # density, usually 1.0.  For compressible models, it is the same as
+    # the density rho.
+    #
+    # The incompressible model is described in:
+    #   X. He, L.-S. Luo, Lattice Boltzmann model for the incompressible Navier-Stokes
+    #   equation, J. Stat. Phys. 88 (1997) 927-944
+    S.rho0 = Symbol('rho0')
+
+    S.gravity = Symbol('gravity')
+
 KNOWN_GRIDS = (D2Q9, D3Q13, D3Q15, D3Q19)
 
+_prepare_symbols()
 _prepare_grids()
