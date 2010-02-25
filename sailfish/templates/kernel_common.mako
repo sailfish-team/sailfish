@@ -1,11 +1,9 @@
-<%def name="kernel_args()">
-	${global_ptr} int *map, ${global_ptr} float *dist_in,
-	${global_ptr} float *dist_out, ${global_ptr} float *orho, ${global_ptr} float *ovx,
-	${global_ptr} float *ovy,
+<%def name="kernel_args_1st_moment(name)">
+	${global_ptr} float *${name}x,
+	${global_ptr} float *${name}y,
 %if dim == 3:
-	${global_ptr} float *ovz,
+	${global_ptr} float *${name}z,
 %endif
-	int save_macro
 </%def>
 
 <%def name="local_indices()">
@@ -30,4 +28,27 @@
 		int gi = gx + gy*${lat_nx} + ${lat_nx*lat_ny}*gz;
 	%endif
 </%def>
+
+#define BLOCK_SIZE ${block_size}
+#define DIST_SIZE ${dist_size}
+#define GEO_FLUID ${geo_fluid}
+#define GEO_BCV ${geo_bcv}
+#define GEO_BCP ${geo_bcp}
+
+#define DT 1.0f
+
+${const_var} float geo_params[${num_params+1}] = {
+% for param in geo_params:
+	${param}f,
+% endfor
+0};		// geometry parameters
+
+<%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
+<%namespace file="boundary.mako" import="*" name="boundary"/>
+<%namespace file="relaxation.mako" import="*" name="relaxation"/>
+
+${opencl_compat.body()}
+<%include file="geo_helpers.mako"/>
+${boundary.body()}
+${relaxation.body()}
 

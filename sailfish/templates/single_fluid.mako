@@ -2,41 +2,31 @@
     from sailfish import sym
 %>
 
-#define BLOCK_SIZE ${block_size}
-#define DIST_SIZE ${dist_size}
-#define GEO_FLUID ${geo_fluid}
-#define GEO_BCV ${geo_bcv}
-#define GEO_BCP ${geo_bcp}
-
-#define DT 1.0f
-
 %if 'gravity' in context.keys():
 	${const_var} float gravity = ${gravity}f;
 %endif
 
 ${const_var} float tau = ${tau}f;		// relaxation time
 ${const_var} float visc = ${visc}f;		// viscosity
-${const_var} float geo_params[${num_params+1}] = {
-% for param in geo_params:
-	${param}f,
-% endfor
-0};		// geometry parameters
+
+<%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
+${kernel_common.body()}
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
-<%namespace file="kernel_common.mako" import="*"/>
-<%namespace file="tracers.mako" import="*"/>
+<%namespace file="code_common.mako" import="*"/>
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 <%namespace file="propagation.mako" import="*"/>
 
-${opencl_compat.body()}
-<%include file="geo_helpers.mako"/>
-${boundary.body()}
-${relaxation.body()}
-
 <%include file="tracers.mako"/>
 
-${kernel} void LBMCollideAndPropagate(${kernel_args()})
+${kernel} void CollideAndPropagate(
+	${global_ptr} int *map,
+	${global_ptr} float *dist_in,
+	${global_ptr} float *dist_out,
+	${global_ptr} float *orho,
+	${kernel_args_1st_moment('ov')}
+	int save_macro)
 {
 	${local_indices()}
 

@@ -61,8 +61,8 @@ class LBMSim(object):
                   r"sed -i -e 's/}}/}}\n\n/g' {file} ; indent -linux -sob -l120 {file} ; "
                   r"sed -i -e '/^$/{{N; s/\n\([\t ]*}}\)$/\1/}}' -e '/{{$/{{N; s/{{\n$/{{/}}' {file}")
 
-    #: Kernel function name
-    kernel_name = 'LBMCollideAndPropagate'
+    #: File name of the mako template containing the kernel code.
+    kernel_file = 'single_fluid.mako'
 
     @property
     def time(self):
@@ -336,7 +336,7 @@ class LBMSim(object):
 
         lookup = TemplateLookup(directories=sys.path,
                 module_directory='/tmp/sailfish_modules-%s' % (pwd.getpwuid(os.getuid())[0]))
-        lbm_tmpl = lookup.get_template('sailfish/templates/lbm.mako')
+        lbm_tmpl = lookup.get_template(os.path.join('sailfish/templates', self.kernel_file))
 
         self.tau = self.get_tau()
         ctx = {}
@@ -490,20 +490,21 @@ class LBMSim(object):
                   [numpy.uint32(1)] + aux_kernel_args)
 
         k_block_size = self._kernel_block_size()
+        kernel_name = 'CollideAndPropagate'
 
-        kern_cnp1 = self.backend.get_kernel(self.mod, self.kernel_name,
+        kern_cnp1 = self.backend.get_kernel(self.mod, kernel_name,
                     args=args1,
                     args_format='P'*(len(args1)-1)+'i',
                     block=k_block_size)
-        kern_cnp2 = self.backend.get_kernel(self.mod, self.kernel_name,
+        kern_cnp2 = self.backend.get_kernel(self.mod, kernel_name,
                     args=args2,
                     args_format='P'*(len(args2)-1)+'i',
                     block=k_block_size)
-        kern_cnp1s = self.backend.get_kernel(self.mod, self.kernel_name,
+        kern_cnp1s = self.backend.get_kernel(self.mod, kernel_name,
                     args=args1v,
                     args_format='P'*(len(args1v)-1)+'i',
                     block=k_block_size)
-        kern_cnp2s = self.backend.get_kernel(self.mod, self.kernel_name,
+        kern_cnp2s = self.backend.get_kernel(self.mod, kernel_name,
                     args=args2v,
                     args_format='P'*(len(args2v)-1)+'i',
                     block=k_block_size)

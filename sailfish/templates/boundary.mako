@@ -106,12 +106,33 @@ ${device_func} inline void bounce_back(Dist *fi)
 	%endfor
 }
 
+// Compute the 0th moment of the distributions, i.e. density.
+${device_func} inline void compute_0th_moment(Dist *fi, float *out)
+{
+	*out = ${sym.ex_rho(grid, 'fi', incompressible)};
+}
+
+// Compute the 1st moments of the distributions, i.e. momentum.
+${device_func} inline void compute_1st_moment(Dist *fi, float *out)
+{
+	%for d in range(0, grid.dim):
+		out[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, momentum=True), pointers=True)};
+	%endfor
+}
+
+// Compute the 1st moments of the distributions and divide it by the 0-th moment
+// i.e. compute velocity.
+${device_func} inline void compute_1st_div_0th(Dist *fi, float *out, float zero)
+{
+	%for d in range(0, grid.dim):
+		out[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d), pointers=True, rho='zero')};
+	%endfor
+}
+
 ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 {
-	*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-	%for d in range(0, grid.dim):
-		v[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d), pointers=True)};
-	%endfor
+	compute_0th_moment(fi, rho);
+	compute_1st_div_0th(fi, v, *rho);
 }
 
 %if bc_wall == 'zouhe' or bc_velocity == 'zouhe' or bc_pressure == 'zouhe':
@@ -153,6 +174,13 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
 	}
 }
 %endif
+
+## TODO integrate it via mako with the function below
+
+${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation, float *out)
+{
+	compute_0th_moment(fi, out);
+}
 
 //
 // Get macroscopic density rho and velocity v given a distribution fi, and
