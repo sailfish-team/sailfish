@@ -67,6 +67,6 @@ ${kernel} void CollideAndPropagate(
 	}
 
 	${relaxate()}
-	${propagate()}
+	${propagate('dist_out')}
 }
 
