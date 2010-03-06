@@ -820,6 +820,9 @@ def use_vectors(str):
 def make_float(t):
     return re.sub(r'([0-9]+\.[0-9]*)', r'\1f', str(t))
 
+def int2float(t):
+    return re.sub(r'([0-9]+)([^\.])', r'\1.0\2', str(t))
+
 class KernelCodePrinter(CCodePrinter):
 
     def _print_Pow(self, expr):
@@ -832,8 +835,8 @@ class KernelCodePrinter(CCodePrinter):
             return '%s*%s' % (self.parenthesize(expr.base, PREC),
                               self.parenthesize(expr.base, PREC))
         else:
-            return 'pow(%s,%s)' % (self.parenthesize(expr.base, PREC),
-                                   self.parenthesize(expr.exp, PREC))
+            return int2float('powf(%s,%s)' % (self.parenthesize(expr.base, PREC),
+                                              self.parenthesize(expr.exp, PREC)))
 
 def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False):
     """Convert a SymPy expression into a string containing valid C code.
