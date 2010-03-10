@@ -163,6 +163,9 @@ class LBMSim(object):
         group.add_option('--noformat_src', dest='format_src', help='do not format the generated source code', action='store_false', default=True)
         group.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
         group.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat', 'vtk'], default='h5flat')
+        group.add_option('--use_mako_cache', dest='mako_cache',
+                help='cache the generated Mako templates in /tmp/sailfish_modules-$USER', action='store_true',
+                default=False)
         parser.add_option_group(group)
 
         if class_options is not None:
@@ -343,8 +346,12 @@ class LBMSim(object):
         import locale
         locale.setlocale(locale.LC_ALL, 'C')
 
-        lookup = TemplateLookup(directories=sys.path,
-                module_directory='/tmp/sailfish_modules-%s' % (pwd.getpwuid(os.getuid())[0]))
+        if self.options.mako_cache:
+            lookup = TemplateLookup(directories=sys.path,
+                    module_directory='/tmp/sailfish_modules-%s' % (pwd.getpwuid(os.getuid())[0]))
+        else:
+            lookup = TemplateLookup(directories=sys.path)
+
         lbm_tmpl = lookup.get_template(os.path.join('sailfish/templates', self.kernel_file))
 
         self.tau = self.get_tau()
