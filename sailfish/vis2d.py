@@ -14,6 +14,7 @@ from scipy import signal
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
 
+
 def hsv_to_rgb(a):
     t = a[:,:,0]*6.0
     i = t.astype(numpy.uint8)
@@ -39,33 +40,36 @@ def hsv_to_rgb(a):
 
     return numpy.choose(i, choices)
 
-def _vis_hsv(drw, width, height):
-    drw = numpy.abs(drw)
-    drw = drw.reshape((width, height, 1)) * numpy.float32([1.0, 1.0, 1.0])
+def _cmap_hsv(drw):
+    drw = drw.reshape((drw.shape[0], drw.shape[1], 1)) * numpy.float32([1.0, 1.0, 1.0])
     drw[:,:,2] = 1.0
     drw[:,:,1] = 1.0
     drw = hsv_to_rgb(drw) * 255.0
     return drw.astype(numpy.uint8)
 
-def _vis_std(drw, width, height):
-    drw = numpy.abs(drw)
-    return (drw.reshape((width, height, 1)) * 255.0).astype(numpy.uint8) * numpy.uint8([1,1,0])
+def _cmap_std(drw):
+    return (drw.reshape((drw.shape[0], drw.shape[1], 1)) * 255.0).astype(numpy.uint8) * numpy.uint8([1,1,0])
 
-def _vis_2col(drw, width, height):
-    drw = ((drw*(drw>0).astype(int)).reshape((width, height, 1)) * numpy.uint8([255, 0, 0])
-        - ( drw*(drw<0).astype(int)).reshape((width, height, 1)) * numpy.uint8([0, 0, 255]))
+def _cmap_2col(drw):
+    drw = ((drw*(drw>0).astype(int)).reshape((drw.shape[0], drw.shape[1], 1)) * numpy.uint8([255, 0, 0])
+        - ( drw*(drw<0).astype(int)).reshape((drw.shape[0], drw.shape[1], 1)) * numpy.uint8([0, 0, 255]))
     drw[drw>255] = 255
     drw[drw<-255] = -255
     return drw.astype(numpy.uint8)
 
-def _vis_rgb1(drw, width, height):
-    """This is the default color palette from gnuplot."""
-    drw = numpy.abs(drw)
+def _cmap_rgb1(drw):
+    """Default color palette from gnuplot."""
     r = numpy.sqrt(drw)
     g = numpy.power(drw, 3)
     b = numpy.sin(drw * math.pi)
 
     return (numpy.dstack([r,g,b]) * 250.0).astype(numpy.uint8)
+
+def _cmap_bin_red_blue(a, b):
+    """Two fields, mapped to the red and blue components, respectively."""
+    g = a.copy()
+    g[:] = 0.0
+    return (numpy.dstack([a,g,b]) * 255.0).astype(numpy.uint8)
 
 def gauss_kernel(size, sizey=None):
     """Return a normalized 2D gauss kernel array for convolutions"""
@@ -78,17 +82,26 @@ def gauss_kernel(size, sizey=None):
     g = numpy.exp(-(x**2/float(size) + y**2/float(sizey)))
     return g / g.sum()
 
-vis_map = {
-    'std': _vis_std,
-    'rgb1': _vis_rgb1,
-    'hsv': _vis_hsv,
-    '2col': _vis_2col,
+cmaps = {
+    1: {
+        'std': _cmap_std,
+        'rgb1': _cmap_rgb1,
+        'hsv': _cmap_hsv,
+        '2col': _cmap_2col,
+        },
+    2: {
+        'rb': _cmap_bin_red_blue,
+        }
     }
 
 class Fluid2DVis(object):
 
     _color_unused = (128, 128, 128)
     _color_wall = (255, 255, 255)
+
+    VIS_LINEAR = 0
+    VIS_FLUCTUATION = 1
+    VIS_TYPES = [VIS_LINEAR, VIS_FLUCTUATION]
 
     def __init__(self, sim, width, height, depth, lat_nx, lat_ny, scale):
         # If the size of the window has not been explicitly defined, automatically adjust it
@@ -100,7 +113,9 @@ class Fluid2DVis(object):
             height = int(lat_ny * scale)
 
         self.depth = depth
-        self._vismode = 0
+        self._visfield = 0
+        self._vistype = self.VIS_LINEAR
+        self._cmap = [None, 'std', 'rb']
         self._convolve = False
         self._font = pygame.font.SysFont('Liberation Mono', 14)
         self.set_mode(width, height)
@@ -132,12 +147,6 @@ class Fluid2DVis(object):
         self._vscale = 0.005
 
     @property
-    def velocity_norm(self):
-        return self.sim.geo.mask_array_by_fluid(
-                numpy.sqrt(numpy.add(numpy.square(self.vx),
-                    numpy.square(self.vy))))
-
-    @property
     def vx(self):
         return self.sim.vx
 
@@ -146,56 +155,67 @@ class Fluid2DVis(object):
         return self.sim.vy
 
     @property
-    def density(self):
-        return self.sim.rho
+    def field(self):
+        return self.sim.vis_fields[self._visfield]
 
     @property
     def geo_map(self):
         return self.sim.geo.map
 
-    def _visualize(self, tx, ty, vismode):
-        height, width = self.vx.shape
-        srf = pygame.Surface((width, height))
+    def get_field_vals(self, field):
+        v = []
+        for f in field.vals:
+            v.append(f())
+        return v
 
-        maxv = numpy.max(self.velocity_norm)
+    def _visualize(self, tx, ty):
+        height, width = self.lat_ny, self.lat_nx
+        srf = pygame.Surface((width, height))
         ret = []
 
-        # Record the highest velocity seen to this moment.
-        if self._maxv is None or maxv > self._maxv:
-            self._maxv = maxv
-
-        ret.append('max_v: %.3f' % maxv)
-        ret.append('rho_avg: %.3f' % numpy.average(self.density))
-
         dec_map = self.sim.geo._decode_node_type(self.geo_map)
-        wall_map = (dec_map == geo.LBMGeo.NODE_WALL)
-        unused_map = (dec_map == geo.LBMGeo.NODE_UNUSED)
+        wall_map = (dec_map == self.sim.geo.NODE_WALL)
+        unused_map = (dec_map == self.sim.geo.NODE_UNUSED)
 
-        if self._vismode == 0:
-            drw = self.velocity_norm / self._maxv
-        elif self._vismode == 1:
-            drw = self.vx / self._maxv
-        elif self._vismode == 2:
-            drw = self.vy / self._maxv
-        elif self._vismode == 3:
-            mrho = numpy.ma.array(self.density, mask=(wall_map))
-            rho_min = numpy.min(mrho)
-            rho_max = numpy.max(mrho)
-            drw = ((self.density - rho_min) / (rho_max - rho_min))
-        elif self._vismode == 4:
-            self.curl_v = (numpy.hstack( (self.vy[:,1:]-self.vy[:,:-1],numpy.zeros((height,1))))
-                    - numpy.vstack( (self.vx[1:,:]-self.vx[:-1,:],numpy.zeros((1,width)))))
-            drw = -(self.curl_v) / self._vscale
-            if self._convolve:
-                g = gauss_kernel(2, sizey=2)
-                drw = signal.convolve(drw,g, mode='same')
+        field = self.field
+        ret.append('%s' % field.name)
+        fs = []
 
-        srf2 = self._draw_field(drw, srf, wall_map, unused_map, vismode, width, height)
+        for i, fv in enumerate(self.get_field_vals(field)):
+#            fv = numpy.ma.array(f(), mask=(numpy.logical_or(wall_map, unused_map)))
+            if self._vistype == self.VIS_LINEAR:
+                if field.ranges is not None:
+                    rng = field.ranges[i]
+                else:
+                    rng = (numpy.min(fv), numpy.max(fv))
+
+                # If negative values are allowed, map the field to
+                # [-1;1], otherwise map it to [0;1]
+                if field.negative:
+                    fv[fv < 0] /= -rng[0]
+                    fv[fv > 0] /= rng[1]
+                    fs.append(fv)
+                else:
+                    fs.append((fv - rng[0]) / (rng[1] - rng[0]))
+            elif self._vistype == self.VIS_FLUCTUATION:
+                max_ = numpy.max(fv)
+                min_ = numpy.min(fv)
+                avg_ = numpy.average(fv)
+                fs.append((fv - avg_) / (max_ - min_))
+
+        if self._convolve:
+            g = gauss_kernel(2, sizey=2)
+            fs = map(lambda x: signal.convolve(x, g, mode='same'), fs)
+
+#           drw = -(self.curl_v) / self._vscale
+
+        srf2 = self._draw_field(fs, srf, wall_map, unused_map, width, height)
         pygame.transform.scale(srf2, self._screen.get_size(), self._screen)
         sw, sh = self._screen.get_size()
 
         # Draw the velocity field
         if self._velocity:
+            maxv = numpy.max(numpy.sqrt(numpy.square(self.vx) + numpy.square(self.vy)))
             vfsp = 21
             scale = 0.8 * max(sh, sw)/(vfsp-1) / maxv
 
@@ -212,20 +232,26 @@ class Fluid2DVis(object):
         self._draw_tracers(tx, ty, sw, sh, width, height)
         return ret
 
-    def _draw_field(self, field, srf, wall_map, unused_map, vismode, width, height):
+    def _draw_field(self, fields, srf, wall_map, unused_map, width, height):
+        fv = []
+
         # Rotate the field to the correct position.
-        field = numpy.rot90(field.astype(numpy.float32), 3)
+        for field in fields:
+            fv.append(numpy.rot90(field.astype(numpy.float32), 3))
+
         a = pygame.surfarray.pixels3d(srf)
+
         wall_map = numpy.rot90(wall_map, 3)
         unused_map = numpy.rot90(unused_map, 3)
+
         # Draw the walls.
         a[wall_map] = self._color_wall
         a[unused_map] = self._color_unused
 
-        # Draw the data field for all sites which are not marked as a wall.
-        wall_map = numpy.logical_not(numpy.logical_or(wall_map, unused_map))
-        field = vis_map[vismode](field, width, height)
-        a[wall_map] = field[wall_map]
+        n = len(fields)
+        fluid_map = numpy.logical_not(numpy.logical_or(wall_map, unused_map))
+        field = cmaps[n][self._cmap[n]](*fv)
+        a[fluid_map] = field[fluid_map]
 
         # Unlock the surface and put the picture on screen.
         del a
@@ -270,16 +296,22 @@ class Fluid2DVis(object):
                 if self._drawing:
                     self._draw_wall(event)
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_0:
-                    self._vismode = 0
-                elif event.key == pygame.K_1:
-                    self._vismode = 1
-                elif event.key == pygame.K_2:
-                    self._vismode = 2
-                elif event.key == pygame.K_3:
-                    self._vismode = 3
-                elif event.key == pygame.K_4:
-                    self._vismode = 4
+                if event.key == pygame.K_MINUS:
+                    self._visfield -= 1
+                    self._visfield %= self.sim.num_fields
+                elif event.key == pygame.K_EQUALS:
+                    self._visfield += 1
+                    self._visfield %= self.sim.num_fields
+                elif event.key == pygame.K_LEFTBRACKET:
+                    n = len(self.field.vals)
+                    idx = cmaps[n].keys().index(self._cmap[n]) - 1
+                    idx %= len(cmaps[n].keys())
+                    self._cmap[n] = cmaps[n].keys()[idx]
+                elif event.key == pygame.K_RIGHTBRACKET:
+                    n = len(self.field.vals)
+                    idx = cmaps[n].keys().index(self._cmap[n]) + 1
+                    idx %= len(cmaps[n].keys())
+                    self._cmap[n] = cmaps[n].keys()[idx]
                 elif event.key == pygame.K_v:
                     self._velocity = not self._velocity
                 elif event.key == pygame.K_t:
@@ -324,36 +356,42 @@ class Fluid2DVis(object):
 
             self._process_misc_event(event)
 
+    def _update_display(self, i, avg_mlups, mlups):
+        ret = self._visualize(self.sim.tracer_x, self.sim.tracer_y)
+
+        if self._show_info:
+            self._screen.blit(self._font.render('itr: %dk' % (i / 1000), True, (0, 255, 0)), (12, 12))
+            self._screen.blit(self._font.render('tim: %.4f' % self.sim.time, True, (0, 255, 0)), (12, 24))
+            self._screen.blit(self._font.render('c/a: %.2f / %.2f MLUPS' % (mlups, avg_mlups), True, (0, 255, 0)), (12, 36))
+
+            y = 48
+            for info in ret:
+                tmp = self._font.render(info, True, (0, 255, 0))
+                self._screen.blit(tmp, (12, y))
+                y += 12
+
+        pygame.display.flip()
+
     def main(self):
+        self._reset()
         t_prev = time.time()
         avg_mlups = 0.0
+        mlups = 0.0
 
         while 1:
             self._process_events()
+            i = self.sim.iter_
 
             if self._paused:
+                self._update_display(i, avg_mlups, mlups)
+                pygame.time.wait(50)
                 continue
 
-            i = self.sim.iter_
             self.sim.sim_step(self._tracers)
 
             if i % self.sim.options.every == 0 and i:
                 avg_mlups, mlups = self.sim.get_mlups(time.time() - t_prev)
-
-                ret = self._visualize(self.sim.tracer_x, self.sim.tracer_y, self.sim.options.vismode)
-
-                if self._show_info:
-                    self._screen.blit(self._font.render('itr: %dk' % (i / 1000), True, (0, 255, 0)), (12, 12))
-                    self._screen.blit(self._font.render('tim: %.4f' % self.sim.time, True, (0, 255, 0)), (12, 24))
-                    self._screen.blit(self._font.render('c/a: %.2f / %.2f MLUPS' % (mlups, avg_mlups), True, (0, 255, 0)), (12, 36))
-
-                    y = 48
-                    for info in ret:
-                        tmp = self._font.render(info, True, (0, 255, 0))
-                        self._screen.blit(tmp, (12, y))
-                        y += 12
-
-                pygame.display.flip()
+                self._update_display(i, avg_mlups, mlups)
                 t_prev = time.time()
 
 class Fluid3DVisCutplane(Fluid2DVis):
@@ -378,11 +416,14 @@ class Fluid3DVisCutplane(Fluid2DVis):
                 args.append(slice(None))
         return args
 
-    @property
-    def velocity_norm(self):
-        # FIXME: This should be masked by fluid.
-        return numpy.sqrt(numpy.add(numpy.add(numpy.square(self.vx),
-            numpy.square(self.vy)), numpy.square(self.vz)))
+    def get_field_vals(self, field):
+        v = []
+        for f in field.vals:
+            a = f()[self._slice_args]
+            if not field.negative:
+                a = numpy.abs(a)
+            v.append(a)
+        return v
 
     @property
     def vx(self):
@@ -391,14 +432,6 @@ class Fluid3DVisCutplane(Fluid2DVis):
     @property
     def vy(self):
         return self.sim.velocity[self._dims[1]][self._slice_args]
-
-    @property
-    def vz(self):
-        return self.sim.velocity[self._cut_dim][self._slice_args]
-
-    @property
-    def density(self):
-        return self.sim.rho[self._slice_args]
 
     @property
     def geo_map(self):
@@ -452,8 +485,8 @@ class Fluid3DVisCutplane(Fluid2DVis):
                 if self._cut_pos[self._cut_dim] > 0:
                     self._cut_pos[self._cut_dim] -= 1
 
-    def _visualize(self, tx, ty, vismode):
-        ret = Fluid2DVis._visualize(self, tx, ty, vismode)
+    def _visualize(self, tx, ty):
+        ret = Fluid2DVis._visualize(self, tx, ty)
         dim_names = ('X', 'Y', 'Z')
         ret.append('cut {0} @ {1}'.format(dim_names[self._cut_dim], self._cut_pos[self._cut_dim]))
         return ret

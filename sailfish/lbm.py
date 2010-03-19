@@ -51,11 +51,24 @@ def _convert_to_double(src):
     t = t.replace('powf(', 'pow(')
     return t
 
+
+class Field(object):
+    def __init__(self, name, values, negative=False, ranges=None):
+        self.name = name
+        if type(values) is tuple or type(values) is list:
+            self.vals = values
+        else:
+            self.vals = (values,)
+
+        self.negative = negative
+        self.ranges = ranges
+
+        if ranges is not None and len(ranges) != len(values):
+            raise ValueError('A range has to be specified for every component of the field.')
+
+
 class LBMSim(object):
     """Base class for LBM simulations. Descendant classes should be declared for specific simulations."""
-
-    #: Additional floating-point fields.
-    float_fields = []
 
     #: The filename base for screenshots.
     filename = 'lbm_sim'
@@ -195,6 +208,9 @@ class LBMSim(object):
         # value and device capabilities.
         self.block_size = 64
 
+        self.vis_fields = []
+
+        # Whether to use the macroscopic fields to set the initial distributions.
         self.ic_fields = False
         self.num_tracers = 0
         self.iter_ = 0
@@ -475,6 +491,18 @@ class LBMSim(object):
 
         self.rho = self.make_field()
 
+        self.add_vis_field(lambda: numpy.sqrt(numpy.square(self.vx) + numpy.square(self.vy)),
+                'velocity magnitude')
+        self.add_vis_field(self.vx, 'X velocity component', True)
+        self.add_vis_field(self.vy, 'Y velocity component', True)
+        if self.grid.dim == 3:
+            self.add_vis_field(self.vz, 'Z velocity component', True)
+
+        self.add_vis_field(lambda:
+                (numpy.roll(self.vy, 1, 1) - numpy.roll(self.vy, -1, 1)) -
+                (numpy.roll(self.vx, 1, 0) - numpy.roll(self.vx, -1, 0)),
+                'vorticity from the X and Y velocity components', True)
+
         # Tracer particles.
         if self.num_tracers:
             self.tracer_x = numpy.random.random_sample(self.num_tracers).astype(self.float) * self.options.lat_nx
@@ -500,11 +528,6 @@ class LBMSim(object):
 
         # Density.
         self.gpu_rho = self.backend.alloc_buf(like=self.rho)
-
-        # Auxiliary floating-point fields.
-        for field in self.float_fields:
-            gpu_field = self.backend.alloc_buf(like=getattr(self, field))
-            setattr(self, 'gpu_%s' % field, gpu_field)
 
         # Tracer particles.
         if self.num_tracers:
@@ -814,6 +837,19 @@ class LBMSim(object):
         else:
             self.vis.main()
 
+    def add_vis_field(self, field, description, negative=False):
+        if type(field) is list or type(field) is tuple:
+            self.vis_fields.append(Field(description, field, negative))
+        else:
+            if callable(field):
+                self.vis_fields.append(Field(description, field, negative))
+            else:
+                self.vis_fields.append(Field(description, lambda: field, negative))
+
+    @property
+    def num_fields(self):
+        return len(self.vis_fields)
+
 
 class FluidLBMSim(LBMSim):
 
@@ -850,6 +886,10 @@ class FluidLBMSim(LBMSim):
         self.num_tracers = self.options.tracers
         self.incompressible = self.options.incompressible
         self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
+
+    def _init_fields(self):
+        super(FluidLBMSim, self)._init_fields()
+        self.add_vis_field(self.rho, 'density', True)
 
     def _update_ctx(self, ctx):
         ctx['incompressible'] = self.incompressible
@@ -903,7 +943,6 @@ class FluidLBMSim(LBMSim):
         group.add_option('--scr_depth', dest='scr_depth', help='screen color depth', type='int', action='store',
                          default=0)
         group.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
-        group.add_option('--vismode', dest='vismode', help='visualization mode', type='choice', choices=vis2d.vis_map.keys(), action='store', default='rgb1')
         group.add_option('--vis3d', dest='vis3d', help='3D visualization engine', type='choice', choices=['mayavi', 'cutplane'], action='store', default='cutplane')
 
         return [group]
@@ -933,7 +972,7 @@ class TwoPhaseBase(FluidLBMSim):
         self.S.alias('phi', self.S.g1m0)
 
     def _init_fields(self):
-        super(TwoPhaseBase, self)._init_fields()
+        LBMSim._init_fields(self)
         self.phi = self.make_field()
         self.dist2 = self.make_dist(self.grid)
 
@@ -1139,6 +1178,10 @@ class BinaryFluidFreeEnergy(TwoPhaseBase):
             self.S.T = Symbol('temp')
             self.S.wi = [3 - x.dot(x) for x in sym.D2Q9.basis[1:]]
 
+    def _init_fields(self):
+        super(BinaryFluidFreeEnergy, self)._init_fields()
+        self.add_vis_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
+
 class ShanChen(TwoPhaseBase):
     @property
     def constants(self):
@@ -1152,6 +1195,10 @@ class ShanChen(TwoPhaseBase):
 
         # FIXME
         self.options.tau_phi = self.get_tau()
+
+    def _init_fields(self):
+        super(ShanChen, self)._init_fields()
+        self.add_vis_field((lambda: self.rho, lambda: self.phi), 'density')
 
     def _add_options(self, parser, lb_group):
         super(ShanChen, self)._add_options(parser, lb_group)
@@ -1169,12 +1216,7 @@ class ShanChen(TwoPhaseBase):
         ctx['tau_phi'] = self.options.tau_phi
         ctx['simtype'] = 'shan-chen'
 
-class SinglePhaseFreeSurfaceLBMSim(FluidLBMSim):
-    float_fields = ['mass', 'eps']
-    kernel_name = 'LBMCollideAndPropagateSinglePhase'
-
 class FreeSurfaceLBMSim(LBMSim):
-
     @property
     def sim_info(self):
         ret = LBMSim.sim_info.fget(self)
