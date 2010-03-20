@@ -58,7 +58,8 @@ class OpenCLBackend(object):
                 cl.enqueue_read_buffer(self.queue, cl_buf, target)
 
     def build(self, source):
-        return cl.Program(self.ctx, source).build('-cl-single-precision-constant -cl-fast-relaxed-math')
+        preamble = '#pragma OPENCL EXTENSION cl_khr_fp64: enable\n'
+        return cl.Program(self.ctx, preamble + source).build('-cl-single-precision-constant -cl-fast-relaxed-math')
 
     def get_kernel(self, prog, name, block, args, args_format, shared=0):
         kern = getattr(prog, name)
