@@ -116,6 +116,7 @@ class Fluid2DVis(object):
         self._visfield = 0
         self._vistype = self.VIS_LINEAR
         self._cmap = [None, 'std', 'rb']
+        self._cmap_scale_lock = False
         self._convolve = False
         self._font = pygame.font.SysFont('Liberation Mono', 14)
         self.set_mode(width, height)
@@ -128,8 +129,8 @@ class Fluid2DVis(object):
         self._drawing = False
         self._paused = False
         self._draw_type = 1
-        self._reset()
         self.sim = sim
+        self._reset()
 
         pygame.key.set_repeat(100,50)
         pygame.display.set_caption('Sailfish v0.1-alpha1')
@@ -143,8 +144,7 @@ class Fluid2DVis(object):
                     pygame.RESIZABLE)
 
     def _reset(self):
-        self._maxv = 0.000001
-        self._vscale = 0.005
+        self._cmap_scale = [1.0] * self.sim.num_fields
 
     @property
     def vx(self):
@@ -182,21 +182,36 @@ class Fluid2DVis(object):
         fs = []
 
         for i, fv in enumerate(self.get_field_vals(field)):
-#            fv = numpy.ma.array(f(), mask=(numpy.logical_or(wall_map, unused_map)))
+            fv = numpy.ma.array(fv, mask=(numpy.logical_or(wall_map, unused_map)))
+
             if self._vistype == self.VIS_LINEAR:
-                if field.ranges is not None:
-                    rng = field.ranges[i]
+
+                # Scale the field eithr manually, or automatically.
+                if self._cmap_scale_lock:
+                    a = self._cmap_scale[self._visfield]
+                    if field.negative:
+                        rng = (-a, a)
+                    else:
+                        rng = (0.0, a)
                 else:
-                    rng = (numpy.min(fv), numpy.max(fv))
+                    if field.ranges is not None:
+                        rng = field.ranges[i]
+                    else:
+                        rng = (numpy.min(fv), numpy.max(fv))
 
                 # If negative values are allowed, map the field to
                 # [-1;1], otherwise map it to [0;1]
                 if field.negative:
                     fv[fv < 0] /= -rng[0]
                     fv[fv > 0] /= rng[1]
-                    fs.append(fv)
+                    fv[fv > 1.0] = 1.0
+                    fv[fv < -1.0] = -1.0
                 else:
-                    fs.append((fv - rng[0]) / (rng[1] - rng[0]))
+                    fv = (fv - rng[0]) / (rng[1] - rng[0])
+                    fv[fv > 1.0] = 1.0
+
+                fs.append(fv)
+
             elif self._vistype == self.VIS_FLUCTUATION:
                 max_ = numpy.max(fv)
                 min_ = numpy.min(fv)
@@ -206,8 +221,6 @@ class Fluid2DVis(object):
         if self._convolve:
             g = gauss_kernel(2, sizey=2)
             fs = map(lambda x: signal.convolve(x, g, mode='same'), fs)
-
-#           drw = -(self.curl_v) / self._vscale
 
         srf2 = self._draw_field(fs, srf, wall_map, unused_map, width, height)
         pygame.transform.scale(srf2, self._screen.get_size(), self._screen)
@@ -312,6 +325,8 @@ class Fluid2DVis(object):
                     idx = cmaps[n].keys().index(self._cmap[n]) + 1
                     idx %= len(cmaps[n].keys())
                     self._cmap[n] = cmaps[n].keys()[idx]
+                elif event.key == pygame.K_m:
+                    self._cmap_scale_lock = not self._cmap_scale_lock
                 elif event.key == pygame.K_v:
                     self._velocity = not self._velocity
                 elif event.key == pygame.K_t:
@@ -344,15 +359,9 @@ class Fluid2DVis(object):
                 elif event.key == pygame.K_i:
                     self._show_info = not self._show_info
                 elif event.key == pygame.K_COMMA:
-                    if self._vismode == 4:
-                        self._vscale /= 1.1
-                    else:
-                        self._maxv /= 1.1
+                    self._cmap_scale[self._visfield] = self._cmap_scale[self._visfield] / 1.1
                 elif event.key == pygame.K_PERIOD:
-                    if self._vismode == 4:
-                        self._vscale *= 1.1
-                    else:
-                        self._maxv *= 1.1
+                    self._cmap_scale[self._visfield] = self._cmap_scale[self._visfield] * 1.1
 
             self._process_misc_event(event)
 
@@ -420,8 +429,6 @@ class Fluid3DVisCutplane(Fluid2DVis):
         v = []
         for f in field.vals:
             a = f()[self._slice_args]
-            if not field.negative:
-                a = numpy.abs(a)
             v.append(a)
         return v
 
