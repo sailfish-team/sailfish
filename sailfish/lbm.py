@@ -961,7 +961,7 @@ class FluidLBMSim(LBMSim):
                                                 self.options.scr_depth, self.options.scr_scale)
 
 class TwoPhaseBase(FluidLBMSim):
-    kernel_file = 'two_phase.mako'
+    kernel_file = 'binary_fluid.mako'
 
     def __init__(self, geo_class, options=[], args=None, defaults=None):
         super(TwoPhaseBase, self).__init__(geo_class, options, args, defaults)
