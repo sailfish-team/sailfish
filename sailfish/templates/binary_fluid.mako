@@ -8,11 +8,7 @@
 </%def>
 
 <%def name="bgk_args_decl_fe()">
-	%if dim == 3:
-		float rho, float phi, float lap1, float *v0, float *grad0, float *grad1
-	%else:
-		float rho, float phi, float lap1, float *v0, float *grad1
-	%endif
+	float rho, float phi, float lap1, float *v0, float *grad1
 </%def>
 
 %if 'gravity' in context.keys():
@@ -38,7 +34,7 @@ ${const_var} float visc = ${visc}f;		// viscosity
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 <%namespace file="propagation.mako" import="*"/>
 
-<%include file="finite_difference_simple.mako"/>
+<%include file="finite_difference_optimized.mako"/>
 <%include file="tracers.mako"/>
 
 <%def name="bgk_args_sc()">
@@ -46,11 +42,7 @@ ${const_var} float visc = ${visc}f;		// viscosity
 </%def>
 
 <%def name="bgk_args_fe()">
-	%if dim == 3:
-		rho, phi, lap1, v, grad0, grad1
-	%else:
-		rho, phi, lap1, v, grad1
-	%endif
+	rho, phi, lap1, v, grad1
 </%def>
 
 
@@ -66,10 +58,7 @@ ${kernel} void SetInitialConditions(
 	${local_indices()}
 
 	%if simtype == 'free-energy':
-		float lap0, grad0[${dim}];
 		float lap1, grad1[${dim}];
-
-		laplacian_and_grad(irho, gi, &lap0, grad0, gx, gy, gz);
 		laplacian_and_grad(iphi, gi, &lap1, grad1, gx, gy, gz);
 	%endif
 
@@ -156,24 +145,16 @@ ${kernel} void CollideAndPropagate(
 
 	%if simtype == 'free-energy':
 		float lap1, grad1[${dim}];
-		float lap0, grad0[${dim}];
 
 		if (gx == 0 || gx == ${lat_nx-1}) {
-			lap0 = 0.0f;
 			lap1 = 0.0f;
-			grad0[0] = 0.0f;
 			grad1[0] = 0.0f;
-			grad0[1] = 0.0f;
 			grad1[1] = 0.0f;
 			%if dim == 3:
-				grad0[2] = 0.0f;
 				grad1[2] = 0.0f;
 			%endif
 		} else {
 			if (!isWallNode(type)) {
-				%if dim == 3:
-					laplacian_and_grad(irho, gi, &lap0, grad0, gx, gy, gz);
-				%endif
 				laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy, gz);
 			}
 		}
@@ -219,7 +200,7 @@ ${kernel} void CollideAndPropagate(
 	${barrier()}
 
 	// only save the macroscopic quantities if requested to do so
-	if (save_macro == 1) {
+	if (save_macro == 1 && !isWallNode(type)) {
 		ovx[gi] = v[0];
 		ovy[gi] = v[1];
 		%if dim == 3:

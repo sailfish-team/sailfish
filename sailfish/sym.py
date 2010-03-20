@@ -437,6 +437,8 @@ def binary_liquid_equilibrium_3d(sim):
     S = sim.S
     pb = Symbol('pb')
     mu = Symbol('mu')
+
+    # This is zero for grids with square of sound speed = 1/3.
     lambda_ = S.visc * (1 - grid.cssq * 3)
 
     out = []
@@ -609,7 +611,6 @@ def free_energy_mrt_matrix(grid):
         else:
             return 0
 
-#    return Matrix(grid.Q, grid.Q, matrix_constructor)
     return grid.mrt_matrix.inv() * Matrix(grid.Q, grid.Q, matrix_constructor) * grid.mrt_matrix
 
 
