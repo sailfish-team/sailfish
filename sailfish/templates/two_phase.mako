@@ -38,6 +38,7 @@ ${const_var} float visc = ${visc}f;		// viscosity
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 <%namespace file="propagation.mako" import="*"/>
 
+<%include file="finite_difference_simple.mako"/>
 <%include file="tracers.mako"/>
 
 <%def name="bgk_args_sc()">
