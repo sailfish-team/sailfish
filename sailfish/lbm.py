@@ -960,11 +960,11 @@ class FluidLBMSim(LBMSim):
             self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)),
                                                 self.options.scr_depth, self.options.scr_scale)
 
-class TwoPhaseBase(FluidLBMSim):
+class BinaryFluidBase(FluidLBMSim):
     kernel_file = 'binary_fluid.mako'
 
     def __init__(self, geo_class, options=[], args=None, defaults=None):
-        super(TwoPhaseBase, self).__init__(geo_class, options, args, defaults)
+        super(BinaryFluidBase, self).__init__(geo_class, options, args, defaults)
         self._prepare_symbols()
 
     def _prepare_symbols(self):
@@ -977,7 +977,7 @@ class TwoPhaseBase(FluidLBMSim):
         self.dist2 = self.make_dist(self.grid)
 
     def _init_compute_fields(self):
-        super(TwoPhaseBase, self)._init_compute_fields()
+        super(BinaryFluidBase, self)._init_compute_fields()
         self.gpu_phi = self.backend.alloc_buf(like=self.phi)
         self.gpu_dist2a = self.backend.alloc_buf(like=self.dist2)
         self.gpu_dist2b = self.backend.alloc_buf(like=self.dist2)
@@ -1068,7 +1068,7 @@ class TwoPhaseBase(FluidLBMSim):
         else:
             self.backend.run_kernel(kerns[1], self.kern_grid_size)
 
-class BinaryFluidFreeEnergy(TwoPhaseBase):
+class BinaryFluidFreeEnergy(BinaryFluidBase):
     @property
     def constants(self):
         return [('Gamma', self.options.Gamma), ('A', self.options.A), ('kappa', self.options.kappa),
@@ -1182,7 +1182,7 @@ class BinaryFluidFreeEnergy(TwoPhaseBase):
         super(BinaryFluidFreeEnergy, self)._init_fields()
         self.add_vis_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
 
-class ShanChen(TwoPhaseBase):
+class ShanChen(BinaryFluidBase):
     @property
     def constants(self):
         return [('SCG', self.options.G)]
