@@ -151,7 +151,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
 	%endfor
 
-	%if not shan_chen:
+	%if simtype == 'free-energy':
 		float tau0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) / 2.0f;
 		if (phi < -1.0f) {
 			tau0 = tau_b;
@@ -161,11 +161,11 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 	%endif
 
 	%for i, eq in enumerate(bgk_equilibrium):
-		%if shan_chen:
+		%if simtype == 'shan-chen':
 			%for j in range(0, dim):
 				v0[${j}] += tau${i} * ea${i}[${j}];
 			%endfor
-		%else:
+		%elif simtype == 'free-energy':
 			%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0) and i == 1:
 				%for j in range(0, dim):
 					v0[${j}] += 0.5f * ea0[${j}] / rho;
@@ -177,7 +177,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			feq${i}.${idx} = ${cex(feq, vectors=True)};
 		%endfor
 
-		%if shan_chen:
+		%if simtype == 'shan-chen':
 			%for j in range(0, dim):
 				v0[${j}] -= tau${i} * ea${i}[${j}];
 			%endfor
@@ -189,7 +189,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			d${i}->${idx} += (feq${i}.${idx} - d${i}->${idx}) / tau${i};
 		%endfor
 
-		%if shan_chen:
+		%if simtype == 'shan-chen':
 			if (!isWallNode(node_type))
 			{
 				float pref = ${sym.bgk_external_force_pref(grid_num=i)};
@@ -206,7 +206,6 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 				%endfor
 			}
 		%elif simtype == 'free-energy':
-			#define ea1 ea0
 			%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0) and i == 0:
 				if (!isWallNode(node_type))
 				{
@@ -215,17 +214,17 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 					%endfor
 				}
 			%endif
+		%else:
+			%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0):
+				if (!isWallNode(node_type))
+				{
+					float pref = ${sym.bgk_external_force_pref(grid_num=i)};
+					%for val, idx in sym.bgk_external_force(grid, grid_num=i):
+						d${i}->${idx} += ${cex(val, vectors=True)};
+					%endfor
+				}
+			%endif
 		%endif
-
-##		%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0) and i == 0:
-##			if (!isWallNode(node_type))
-##			{
-##				float pref = ${sym.bgk_external_force_pref(grid_num=i)};
-##				%for val, idx in sym.bgk_external_force(grid, grid_num=i):
-##					d${i}->${idx} += ${cex(val, vectors=True)};
-##				%endfor
-##			}
-##		%endif
 	%endfor
 }
 %endif

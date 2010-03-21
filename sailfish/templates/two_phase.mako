@@ -20,7 +20,7 @@
 %endif
 
 // In the free-energy model, the relaxation time is a local quantity.
-%if shan_chen:
+%if simtype == 'shan-chen':
 	${const_var} float tau0 = ${tau}f;		// relaxation time
 %endif
 ${const_var} float tau1 = ${tau_phi}f;		// relaxation time for the order parameter
@@ -28,9 +28,9 @@ ${const_var} float visc = ${visc}f;		// viscosity
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
-%if shan_chen:
+%if simtype == 'shan-chen':
 	${kernel_common.body(bgk_args_decl_sc)}
-%else:
+%elif simtype == 'free-energy':
 	${kernel_common.body(bgk_args_decl_fe)}
 %endif
 <%namespace file="code_common.mako" import="*"/>
@@ -64,7 +64,7 @@ ${kernel} void SetInitialConditions(
 {
 	${local_indices()}
 
-	%if not shan_chen:
+	%if simtype == 'free-energy':
 		float lap0, grad0[${dim}];
 		float lap1, grad1[${dim}];
 
@@ -153,7 +153,7 @@ ${kernel} void CollideAndPropagate(
 	if (isUnusedNode(type))
 		return;
 
-	%if not shan_chen:
+	%if simtype == 'free-energy':
 		float lap1, grad1[${dim}];
 		float lap0, grad0[${dim}];
 
@@ -176,7 +176,7 @@ ${kernel} void CollideAndPropagate(
 				laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy, gz);
 			}
 		}
-	%else:
+	%elif simtype == 'shan-chen':
 		float sca1[${dim}], sca2[${dim}];
 
 		if (!isWallNode(type)) {
@@ -192,10 +192,10 @@ ${kernel} void CollideAndPropagate(
 	// macroscopic quantities for the current cell
 	float rho, v[${dim}], phi;
 
-	%if not shan_chen:
+	%if simtype == 'free-energy':
 		getMacro(&d0, type, orientation, &rho, v);
 		get0thMoment(&d1, type, orientation, &phi);
-	%else:
+	%elif simtype == 'shan-chen':
 		float total_dens;
 		get0thMoment(&d0, type, orientation, &rho);
 		get0thMoment(&d1, type, orientation, &phi);
@@ -226,9 +226,9 @@ ${kernel} void CollideAndPropagate(
 		%endif
 	}
 
-	%if shan_chen:
+	%if simtype == 'shan-chen':
 		${relaxate(bgk_args_sc)}
-	%else:
+	%elif simtype == 'free-energy':
 		${relaxate(bgk_args_fe)}
 	%endif
 	${propagate('dist1_out', 'd0')}

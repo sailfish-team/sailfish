@@ -351,32 +351,32 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
 //
-${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, float *rho, float *v)
+${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, float *rho, float *v0)
 {
 	if (isFluidOrWallNode(node_type) || orientation == ${geo_dir_other}) {
-		compute_macro_quant(fi, rho, v);
+		compute_macro_quant(fi, rho, v0);
 		if (isWallNode(node_type)) {
-			v[0] = 0.0f;
-			v[1] = 0.0f;
+			v0[0] = 0.0f;
+			v0[1] = 0.0f;
 			%if dim == 3:
-				v[2] = 0.0f;
+				v0[2] = 0.0f;
 			%endif
 			%if bc_wall == 'zouhe':
-				zouhe_bb(fi, orientation, rho, v);
+				zouhe_bb(fi, orientation, rho, v0);
 			%endif
 		}
 	} else if (isVelocityNode(node_type)) {
 		%if bc_velocity == 'zouhe':
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
-			zouhe_bb(fi, orientation, rho, v);
+			${get_boundary_velocity('node_type', 'v0[0]', 'v0[1]', 'v0[2]')}
+			zouhe_bb(fi, orientation, rho, v0);
 		// We're dealing with a boundary node, for which some of the distributions
 		// might be meaningless.  Fill them with the values of the opposite
 		// distributions.
 		%elif bc_velocity == 'equilibrium':
 			${fill_missing_distributions()}
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
+			${get_boundary_velocity('node_type', 'v0[0]', 'v0[1]', 'v0[2]')}
 
 			switch (orientation) {
 				%for i in range(1, grid.dim*2+1):
@@ -399,7 +399,7 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 				%for i in range(1, grid.dim*2+1):
 					case ${i}: {
 						%for d in range(0, grid.dim):
-							v[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, missing_dir=i, par_rho='par_rho'), pointers=True)};
+							v0[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, missing_dir=i, par_rho='par_rho'), pointers=True)};
 						%endfor
 						break;
 					 }
@@ -407,12 +407,12 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 			}
 
 			%if bc_pressure == 'zouhe':
-				zouhe_bb(fi, orientation, &par_rho, v);
-				compute_macro_quant(fi, rho, v);
+				zouhe_bb(fi, orientation, &par_rho, v0);
+				compute_macro_quant(fi, rho, v0);
 			%endif
 			*rho = par_rho;
 		%else:
-			compute_macro_quant(fi, rho, v);
+			compute_macro_quant(fi, rho, v0);
 		%endif
 	}
 
@@ -421,7 +421,7 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 	%endif
 }
 
-${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orientation, float *rho, float *v)
+${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orientation, float *rho, float *v0)
 {
 	%if bc_wall == 'fullbb':
 		if (isWallNode(node_type)) {
@@ -432,7 +432,7 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 	%if bc_velocity == 'fullbb':
 		if (isVelocityNode(node_type)) {
 			bounce_back(fi);
-			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
+			${get_boundary_velocity('node_type', 'v0[0]', 'v0[1]', 'v0[2]')}
 			%for i, ve in enumerate(grid.basis):
 				fi->${grid.idx_name[i]} += ${cex(
 					sim.S.rho0 * 2 * grid.weights[i] * grid.v.dot(ve) / grid.cssq, pointers=True)};

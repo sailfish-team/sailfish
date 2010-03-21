@@ -14,7 +14,7 @@
 		int gx = get_global_id(0);
 		int gy = get_group_id(1);
 		int gz = 0;
-		int gi = gx + ${lat_nx}*gy;
+		int gi = gx + ${arr_nx}*gy;
 	%else:
 		// This is a workaround for the limitations of current CUDA devices.
 		// We would like the grid to be 3 dimensional, but only 2 dimensions
@@ -25,11 +25,19 @@
 		//
 		// This works fine, as x is relatively small, since:
 		//   x = x_sim / block_size.
-		int gx = get_global_id(0) % ${lat_nx};
-		int gy = get_global_id(0) / ${lat_nx};
+		int gx = get_global_id(0) % ${arr_nx};
+		int gy = get_global_id(0) / ${arr_nx};
 		int gz = get_global_id(1);
-		int gi = gx + gy*${lat_nx} + ${lat_nx*lat_ny}*gz;
+
+		## FIXME: there should be a single mako function for calculating the
+		## global index.
+		int gi = gx + gy*${arr_nx} + ${arr_nx*arr_ny}*gz;
 	%endif
+
+	// Nothing to do if we're outside of the simulation domain.
+	if (gx > ${lat_nx-1}) {
+		return;
+	}
 </%def>
 
 #define BLOCK_SIZE ${block_size}

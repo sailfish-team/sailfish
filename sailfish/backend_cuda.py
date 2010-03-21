@@ -31,8 +31,15 @@ class CUDABackend(object):
 
     def alloc_buf(self, size=None, like=None):
         if like is not None:
-            buf = cuda.mem_alloc(like.size * like.dtype.itemsize)
-            self.buffers[buf] = like
+            # When calculating the total array size, take into account
+            # any striding.
+            buf = cuda.mem_alloc(like.shape[0] * like.strides[0])
+
+            if like.base is not None:
+                self.buffers[buf] = like.base
+            else:
+                self.buffers[buf] = like
+
             self.to_buf(buf)
         else:
             buf = cuda.mem_alloc(size)
@@ -46,7 +53,10 @@ class CUDABackend(object):
             else:
                 raise ValueError('Unknown compute buffer and source not specified.')
         else:
-            cuda.memcpy_htod(cl_buf, source)
+            if source.base is not None:
+                cuda.memcpy_htod(cl_buf, source.base)
+            else:
+                cuda.memcpy_htod(cl_buf, source)
 
     def from_buf(self, cl_buf, target=None):
         if target is None:
@@ -55,7 +65,10 @@ class CUDABackend(object):
             else:
                 raise ValueError('Unknown compute buffer and target not specified.')
         else:
-            cuda.memcpy_dtoh(target, cl_buf)
+            if target.base is not None:
+                cuda.memcpy_dtoh(target.base, cl_buf)
+            else:
+                cuda.memcpy_dtoh(target, cl_buf)
 
     def build(self, source):
         return pycuda.compiler.SourceModule(source) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])

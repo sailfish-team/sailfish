@@ -191,14 +191,9 @@ class LBMSim(object):
                 if k not in self.options.specified:
                     setattr(self.options, k, v)
 
-        # Adjust workgroup size if necessary to ensure that we will be able to
-        # successfully execute the main LBM kernel.
-        if self.options.lat_nx < 64:
-            self.block_size = self.options.lat_nx
-        else:
-            # TODO: This should be dynamically adjusted based on both the lat_nx
-            # value and device capabilities.
-            self.block_size = 64
+        # TODO: This should be dynamically adjusted based on both the lat_nx
+        # value and device capabilities.
+        self.block_size = 64
 
         self.ic_fields = False
         self.num_tracers = 0
@@ -311,7 +306,7 @@ class LBMSim(object):
         return self.float((6.0 * self.options.visc + 1.0)/2.0)
 
     def get_dist_size(self):
-        return self.options.lat_nx * self.options.lat_ny * self.options.lat_nz
+        return self.arr_nx * self.arr_ny * self.arr_nz
 
     def _timed_print(self, info):
         if self.options.verbose:
@@ -319,6 +314,10 @@ class LBMSim(object):
 
     def _init_geo(self):
         self._timed_print('Initializing geometry.')
+
+        self.arr_nx = int(math.ceil(float(self.options.lat_nx) / self.block_size)) * self.block_size
+        self.arr_ny = self.options.lat_ny
+        self.arr_nz = self.options.lat_nz
 
         # Particle distributions in host memory.
         if self.grid.dim == 2:
@@ -359,9 +358,16 @@ class LBMSim(object):
         ctx = {}
         ctx['dim'] = self.grid.dim
         ctx['block_size'] = self.block_size
+
+        # Size of the lattice.
         ctx['lat_ny'] = self.options.lat_ny
         ctx['lat_nx'] = self.options.lat_nx
         ctx['lat_nz'] = self.options.lat_nz
+
+        # Actual size of the array, including any padding.
+        ctx['arr_nx'] = self.arr_nx
+        ctx['arr_ny'] = self.arr_ny
+        ctx['arr_nz'] = self.arr_nz
         ctx['periodic_x'] = int(self.options.periodic_x)
         ctx['periodic_y'] = int(self.options.periodic_y)
         ctx['periodic_z'] = int(self.options.periodic_z)
@@ -373,10 +379,10 @@ class LBMSim(object):
         ctx['dist_size'] = self.get_dist_size()
         ctx['pbc_offsets'] = [{-1: self.options.lat_nx,
                                 1: -self.options.lat_nx},
-                              {-1: self.options.lat_ny*self.options.lat_nx,
-                                1: -self.options.lat_ny*self.options.lat_nx},
-                              {-1: self.options.lat_nz*self.options.lat_ny*self.options.lat_nx,
-                                1: -self.options.lat_nz*self.options.lat_ny*self.options.lat_nx}]
+                              {-1: self.options.lat_ny*self.arr_nx,
+                                1: -self.options.lat_ny*self.arr_nx},
+                              {-1: self.options.lat_nz*self.arr_ny*self.arr_nx,
+                                1: -self.options.lat_nz*self.arr_ny*self.arr_nx}]
         ctx['bnd_limits'] = [self.options.lat_nx, self.options.lat_ny, self.options.lat_nz]
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['periodicity'] = [int(self.options.periodic_x), int(self.options.periodic_y),
@@ -388,6 +394,8 @@ class LBMSim(object):
         ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
         ctx['constants'] = self.constants
         ctx['grids'] = [self.grid]
+
+        ctx['simtype'] = 'lbm'
 
         self._update_ctx(ctx)
         ctx.update(self.geo.get_defines())
@@ -413,6 +421,38 @@ class LBMSim(object):
 
         self.mod = self.backend.build(src)
 
+    def _get_strides(self, type_):
+        t = type_().nbytes
+        if self.grid.dim == 3:
+            strides = (self.arr_ny * self.arr_nx * t, self.arr_nx * t, t)
+            size = self.arr_nx * self.arr_ny * self.arr_nz
+        else:
+            strides = (self.arr_nx * t, t)
+            size = self.arr_nx * self.arr_ny
+        return (strides, size)
+
+    def make_field(self):
+        """Create a new numpy array represting a scalar field used in the simulation.
+
+        This method automatically takes care of the field type, shape and strides.
+        """
+        strides, size = self._get_strides(self.float)
+        return numpy.ndarray(self.shape, buffer=numpy.zeros(size, dtype=self.float),
+                             dtype=self.float, strides=strides)
+
+    def make_int_field(self):
+        strides, size = self._get_strides(numpy.uint32)
+        return numpy.ndarray(self.shape, buffer=numpy.zeros(size, dtype=numpy.uint32),
+                             dtype=numpy.uint32, strides=strides)
+
+    def make_dist(self, grid):
+        strides, size = self._get_strides(self.float)
+        shape = [len(grid.basis)] + list(self.shape)
+        strides = [strides[-1]*size] + list(strides)
+        size *= len(grid.basis)
+        return numpy.ndarray(shape, buffer=numpy.zeros(size, dtype=self.float),
+                             dtype=self.float, strides=strides)
+
     def _init_fields(self):
         """Initialize the data fields used in the simulation.
 
@@ -423,16 +463,17 @@ class LBMSim(object):
         """
         self._timed_print('Preparing the data fields.')
 
-        self.dist1 = numpy.zeros([len(self.grid.basis)] + list(self.shape), self.float)
-        self.vx = numpy.zeros(self.shape, self.float)
-        self.vy = numpy.zeros(self.shape, self.float)
+        self.dist1 = self.make_dist(self.grid)
+
+        self.vx = self.make_field()
+        self.vy = self.make_field()
         self.velocity = [self.vx, self.vy]
 
         if self.grid.dim == 3:
-            self.vz = numpy.zeros(self.shape, self.float)
+            self.vz = self.make_field()
             self.velocity.append(self.vz)
 
-        self.rho = numpy.zeros(self.shape, self.float)
+        self.rho = self.make_field()
 
         # Tracer particles.
         if self.num_tracers:
@@ -564,9 +605,9 @@ class LBMSim(object):
         }
 
         if self.grid.dim == 2:
-            self.kern_grid_size = (self.options.lat_nx/self.block_size, self.options.lat_ny)
+            self.kern_grid_size = (self.arr_nx/self.block_size, self.arr_ny)
         else:
-            self.kern_grid_size = (self.options.lat_nx/self.block_size * self.options.lat_ny, self.options.lat_nz)
+            self.kern_grid_size = (self.arr_nx/self.block_size * self.arr_ny, self.arr_nz)
 
     def _lbm_step(self, get_data, **kwargs):
         kerns = self.kern_map[self.iter_ & 1]
@@ -830,6 +871,7 @@ class FluidLBMSim(LBMSim):
         ctx['bc_wall_'] = geo.get_bc(self.options.bc_wall)
         ctx['bc_velocity_'] = geo.get_bc(self.options.bc_velocity)
         ctx['bc_pressure_'] = geo.get_bc(self.options.bc_pressure)
+        ctx['simtype'] = 'fluid'
 
     def _add_options(self, parser, lb_group):
         grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == self.geo_class.dim]
@@ -892,8 +934,8 @@ class TwoPhaseBase(FluidLBMSim):
 
     def _init_fields(self):
         super(TwoPhaseBase, self)._init_fields()
-        self.phi = numpy.zeros(self.shape, self.float)
-        self.dist2 = numpy.zeros([len(self.grid.basis)] + list(self.shape), self.float)
+        self.phi = self.make_field()
+        self.dist2 = self.make_dist(self.grid)
 
     def _init_compute_fields(self):
         super(TwoPhaseBase, self)._init_compute_fields()
@@ -944,9 +986,9 @@ class TwoPhaseBase(FluidLBMSim):
         }
 
         if self.grid.dim == 2:
-            self.kern_grid_size = (self.options.lat_nx/self.block_size, self.options.lat_ny)
+            self.kern_grid_size = (self.arr_nx/self.block_size, self.arr_ny)
         else:
-            self.kern_grid_size = (self.options.lat_nx/self.block_size * self.options.lat_ny, self.options.lat_nz)
+            self.kern_grid_size = (self.arr_nx/self.block_size * self.arr_ny, self.arr_nz)
 
     def _init_compute_ic(self):
         if not self.ic_fields:
@@ -1032,7 +1074,7 @@ class BinaryFluidFreeEnergy(TwoPhaseBase):
         super(BinaryFluidFreeEnergy, self)._update_ctx(ctx)
         ctx['grids'] = [self.grid, self.grid]
         ctx['tau_phi'] = self.options.tau_phi
-        ctx['shan_chen'] = False
+        ctx['simtype'] = 'free-energy'
 
     def _prepare_symbols(self):
         """Additional symbols and coefficients for the free-energy binary liquid model."""
@@ -1125,7 +1167,7 @@ class ShanChen(TwoPhaseBase):
         super(ShanChen, self)._update_ctx(ctx)
         ctx['grids'] = [self.grid, self.grid]
         ctx['tau_phi'] = self.options.tau_phi
-        ctx['shan_chen'] = True
+        ctx['simtype'] = 'shan-chen'
 
 class SinglePhaseFreeSurfaceLBMSim(FluidLBMSim):
     float_fields = ['mass', 'eps']

@@ -68,7 +68,7 @@ class LBMGeo(object):
         self.shape = shape
         self.options = options
         self.backend = backend
-        self.map = numpy.zeros(shape, numpy.int32)
+        self.map = sim.make_int_field()
         self.gpu_map = backend.alloc_buf(like=self.map)
         self.float = float
         self.lambda_equilibrium = sym.lambdify_equilibrium(sim)
@@ -121,7 +121,7 @@ class LBMGeo(object):
 
     def _clear_state(self):
         self._params = None
-        self.map = numpy.zeros(tuple(reversed(self.shape)), numpy.int32)
+        self.map[:] = 0
         self._velocity_map = numpy.ma.array(numpy.zeros(shape=([self.dim] + list(self.map.shape)), dtype=self.float),
                 mask=True)
         self._pressure_map = numpy.ma.array(numpy.zeros(shape=self.map.shape, dtype=self.float), mask=True)
@@ -154,7 +154,7 @@ class LBMGeo(object):
 
     def _update_map(self):
         """Copy the node map to the compute unit."""
-        self.backend.to_buf(self.gpu_map, self.map)
+        self.backend.to_buf(self.gpu_map)
 
     def set_geo(self, location, type_, val=None, update=False):
         """Set the type of a grid node.

@@ -11,7 +11,7 @@
 </%def>
 
 <%def name="bgk_args()">
-	rho, phi
+	rho, v
 </%def>
 
 ${const_var} float tau0 = ${tau}f;		// relaxation time
@@ -54,14 +54,14 @@ ${kernel} void CollideAndPropagate(
 		return;
 
 	// cache the distributions in local variables
-	Dist d1;
-	getDist(&d1, dist_in, gi);
+	Dist d0;
+	getDist(&d0, dist_in, gi);
 
 	// macroscopic quantities for the current cell
 	float rho, v[${dim}];
 
-	getMacro(&d1, type, orientation, &rho, v);
-	boundaryConditions(&d1, type, orientation, &rho, v);
+	getMacro(&d0, type, orientation, &rho, v);
+	boundaryConditions(&d0, type, orientation, &rho, v);
 	${barrier()}
 
 	// only save the macroscopic quantities if requested to do so
@@ -75,6 +75,6 @@ ${kernel} void CollideAndPropagate(
 	}
 
 	${relaxate(bgk_args)}
-	${propagate('dist_out', 'd1')}
+	${propagate('dist_out', 'd0')}
 }
 

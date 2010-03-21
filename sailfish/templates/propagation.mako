@@ -71,9 +71,9 @@
 
 <%def name="rel_offset(x, y, z)">
 	%if grid.dim == 2:
-		${x + y * lat_nx}
+		${x + y * arr_nx}
 	%else:
-		${x + lat_nx * (y + lat_ny*z)}
+		${x + arr_nx * (y + arr_ny*z)}
 	%endif
 </%def>
 
@@ -94,13 +94,15 @@
 	${dist_out}[gi] = ${dist_in}.fC;
 
 	// E propagation in shared memory
-	if (lx < ${block_size-1}) {
-		%for i in sym.get_prop_dists(grid, 1):
-			prop_${grid.idx_name[i]}[lx+1] = ${dist_in}.${grid.idx_name[i]};
-		%endfor
-	// E propagation in global memory (at right block boundary)
-	} else if (gx < ${lat_nx-1}) {
-		${prop_block_bnd(dist_out, dist_in, 1, 'prop_global')}
+	if (gx < ${lat_nx-1}) {
+		if (lx < ${block_size-1}) {
+			%for i in sym.get_prop_dists(grid, 1):
+				prop_${grid.idx_name[i]}[lx+1] = ${dist_in}.${grid.idx_name[i]};
+			%endfor
+		// E propagation in global memory (at right block boundary)
+		} else {
+			${prop_block_bnd(dist_out, dist_in, 1, 'prop_global')}
+		}
 	}
 	%if periodic_x:
 	// periodic boundary conditions in the X direction
@@ -129,7 +131,7 @@
 
 	// Save locally propagated distributions into global memory.
 	// The leftmost thread is not updated in this block.
-	if (lx > 0) {
+	if (lx > 0 && gx < ${lat_nx}) {
 		${prop_block_bnd(dist_out, dist_in, 1, 'prop_local')}
 	}
 
@@ -137,7 +139,7 @@
 	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
 
 	// The rightmost thread is not updated in this block.
-	if (lx < ${block_size-1}) {
+	if (lx < ${block_size-1} && gx < ${lat_nx-1}) {
 		${prop_block_bnd(dist_out, dist_in, -1, 'prop_local')}
 	}
 </%def>

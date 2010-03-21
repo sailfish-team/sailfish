@@ -21,7 +21,12 @@ class OpenCLBackend(object):
         mf = cl.mem_flags
         if like is not None:
             buf = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=like)
-            self.buffers[buf] = like
+
+            if like.base is not None:
+                self.buffers[buf] = like.base
+            else:
+                self.buffers[buf] = like
+
             self.to_buf(buf)
         else:
             buf = cl.Buffer(self.ctx, mf.READ_WRITE, size)
@@ -35,7 +40,10 @@ class OpenCLBackend(object):
             else:
                 raise ValueError('Unknown compute buffer and source not specified.')
         else:
-            cl.enqueue_write_buffer(self.queue, cl_buf, source)
+            if source.base is not None:
+                cl.enqueue_write_buffer(self.queue, cl_buf, source.base)
+            else:
+                cl.enqueue_write_buffer(self.queue, cl_buf, source)
 
     def from_buf(self, cl_buf, target=None):
         if target is None:
@@ -44,7 +52,10 @@ class OpenCLBackend(object):
             else:
                 raise ValueError('Unknown compute buffer and target not specified.')
         else:
-            cl.enqueue_read_buffer(self.queue, cl_buf, target)
+            if target.base is not None:
+                cl.enqueue_read_buffer(self.queue, cl_buf, target.base)
+            else:
+                cl.enqueue_read_buffer(self.queue, cl_buf, target)
 
     def build(self, source):
         return cl.Program(self.ctx, source).build('-cl-single-precision-constant -cl-fast-relaxed-math')
