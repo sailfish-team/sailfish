@@ -1193,9 +1193,6 @@ class ShanChen(BinaryFluidBase):
         eq2, _ = sym.bgk_equilibrium(self.grid, self.S.phi, self.S.phi)
         self.equilibrium.append(eq2[0])
 
-        # FIXME
-        self.options.tau_phi = self.get_tau()
-
     def _init_fields(self):
         super(ShanChen, self)._init_fields()
         self.add_vis_field((lambda: self.rho, lambda: self.phi), 'density')

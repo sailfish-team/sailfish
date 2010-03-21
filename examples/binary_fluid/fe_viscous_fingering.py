@@ -1,0 +1,45 @@
+#!/usr/bin/python
+
+import numpy
+from sailfish import lbm
+from sailfish import geo
+
+import optparse
+from optparse import OptionGroup, OptionParser, OptionValueError
+
+class GeoFEFinger(geo.LBMGeo3D):
+
+    def define_nodes(self):
+        self.set_geo((0,0,0), self.NODE_WALL)
+        self.fill_geo((0,0,0), (slice(None), slice(None), 0))
+        self.fill_geo((0,0,0), (slice(None), slice(None), self.lat_nz-1))
+
+    def init_dist(self, dist):
+
+        hz, hy, hx = numpy.mgrid[0:self.lat_nz, 0:self.lat_ny, 0:self.lat_nx]
+
+        a = 100.0 - 8.0 * numpy.cos(2.0 * numpy.pi * hy / self.lat_ny)
+        b = 200.0 - 8.0 * numpy.cos(2.0 * numpy.pi * hy / self.lat_ny)
+
+        self.sim.rho[:] = 1.0
+        self.sim.phi[:] = 1.0
+        self.sim.phi[numpy.logical_or(hx <= a, hx >= b)] = -1.0
+
+        self.sim.ic_fields = True
+
+class FEFingerSim(lbm.BinaryFluidFreeEnergy):
+
+    filename = 'fe_fingering'
+
+    def __init__(self, geo_class):
+        lbm.BinaryFluidFreeEnergy.__init__(self, geo_class, options=[],
+                              defaults={'bc_velocity': 'equilibrium', 'verbose': True, 'lat_nx': 640,
+                                        'lat_ny': 101, 'lat_nz': 37, 'grid': 'D3Q19',
+                                        'tau_a': 4.5, 'tau_b': 0.6, 'tau_phi': 1.0, 'kappa': 9.18e-5,
+                                        'Gamma': 25.0, 'A': 1.41e-4, 'lambda_': 0.0, 'model': 'femrt',
+                                        'periodic_x': True, 'periodic_y': True, 'scr_scale': 1,
+                                        'periodic_z': True, 'accel_x': 3.0e-5})
+
+if __name__ == '__main__':
+    sim = FEFingerSim(GeoFEFinger)
+    sim.run()
