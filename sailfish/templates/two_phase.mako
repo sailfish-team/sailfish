@@ -12,7 +12,11 @@ ${const_var} float tau1 = ${tau_phi}f;		// relaxation time for the order paramet
 ${const_var} float visc = ${visc}f;		// viscosity
 
 <%def name="bgk_args_decl()">
+%if dim == 3:
 	float rho, float phi, float lap1, float *v0, float *grad0
+%else:
+	float rho, float phi, float lap1, float *v0, float *grad1
+%endif
 </%def>
 
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
@@ -27,8 +31,13 @@ ${kernel_common.body(bgk_args_decl)}
 <%include file="tracers.mako"/>
 
 <%def name="bgk_args()">
+%if dim == 3:
 	rho, phi, lap1, v, grad0
+%else:
+	rho, phi, lap1, v, grad1
+%endif
 </%def>
+
 
 
 // A kernel to set the node distributions using the equilibrium distributions
@@ -91,9 +100,9 @@ ${kernel} void PrepareMacroFields(
 
 	// cache the distributions in local variables
 	Dist fi;
-	getDist(&fi, dist1_in, gi);
-
 	float out;
+
+	getDist(&fi, dist1_in, gi);
 	get0thMoment(&fi, type, orientation, &out);
 	orho[gi] = out;
 
@@ -147,11 +156,13 @@ ${kernel} void CollideAndPropagate(
 		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
 	%endfor
 
-	float lap0, grad0[${dim}];
 	float lap1, grad1[${dim}];
 
 	${laplacian_grad_idx()}
+%if dim == 3:
+	float lap0, grad0[${dim}];
 	laplacian_and_grad(irho, lap_i, &lap0, grad0);
+%endif
 	laplacian_and_grad(ipsi, lap_i, &lap1, grad1);
 
 	int type, orientation;

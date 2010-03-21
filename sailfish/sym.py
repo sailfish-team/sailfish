@@ -385,7 +385,48 @@ def equilibrium_expr(eq, eq_vars):
             ret.append((i.subs(subs), name))
     return ret
 
-def binary_liquid_equilibrium(sim):
+
+def binary_liquid_equilibrium_2d(sim):
+    grid = sim.grid
+    if grid.dim != 2 or grid.Q != 9:
+        raise TypeError('The binary liquid model requires the D2Q9 grid.')
+
+    S = sim.S
+    p0 = Symbol('p0')
+    mu = Symbol('mu')
+
+    out1 = []
+    lvars = []
+    lvars.append(Eq(mu, (-S.lambda_ / 2) * S.phi / S.rho + S.T / 2 * sympy.ln((S.rho + S.phi) / (S.rho - S.phi)) -
+                    S.kappa * S.g1d2m0))
+    lvars.append(Eq(p0, S.rho * S.T + S.phi * mu + S.kappa / 2 * S.grad1.dot(S.grad1) - S.kappa * S.g1d2m0 * S.phi))
+
+    out1.append((S.rho - Rational(12,8) * p0 - Rational(3,4) * S.rho * grid.v.dot(grid.v), grid.idx_name[0]))
+
+    # TOOD: use simplify or poly_factorize here.
+
+    for i, ei in enumerate(grid.basis[1:]):
+        t = S.wi[i] * (p0/8 + S.wi[i] * S.rho/12*ei.dot(grid.v)
+                       -S.rho/16 * grid.v.dot(grid.v) +
+                       S.wi[i] * S.rho/8 * ei.dot(grid.v)**2 +
+                       S.wi[i] * S.kappa/16 * (S.g1d1m0x**2 - S.g1d1m0y**2) * ei[0]*ei[0] +
+                       S.wi[i] * S.kappa/16 * (S.g1d1m0y**2 - S.g1d1m0x**2) * ei[1]*ei[1] +
+                       2*S.wi[i] * S.kappa/8 * S.g1d1m0x * S.g1d1m0y * ei[0]*ei[1])
+        out1.append((t, grid.idx_name[i+1]))
+
+    out2 = []
+    out2.append((S.phi - Rational(12,8) * S.Gamma * mu, grid.idx_name[0]))
+
+    for i, ei in enumerate(grid.basis[1:]):
+        t = S.wi[i] * (S.Gamma/8 * mu +
+                       S.wi[i] * S.phi/12 * ei.dot(grid.v)
+                       -S.phi/16*grid.v.dot(grid.v) +
+                       S.wi[i] * S.phi/8 * ei.dot(grid.v)**2)
+        out2.append((t, grid.idx_name[i+1]))
+
+    return ([out1, out2], lvars)
+
+def binary_liquid_equilibrium_3d(sim):
     grid = sim.grid
     if grid.dim != 3 or grid.Q != 19:
         raise TypeError('The binary liquid model requires the D3Q19 grid.')
@@ -837,6 +878,12 @@ class KernelCodePrinter(CCodePrinter):
         else:
             return int2float('powf(%s,%s)' % (self.parenthesize(expr.base, PREC),
                                               self.parenthesize(expr.exp, PREC)))
+
+    def _print_Function(self, expr):
+        if expr.func.__name__ == 'log':
+            return 'logf(%s)' % self.stringify(expr.args, ', ')
+        else:
+            return super(KernelCodePrinter, self)._print_Function(expr)
 
 def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False):
     """Convert a SymPy expression into a string containing valid C code.

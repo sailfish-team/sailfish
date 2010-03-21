@@ -876,12 +876,18 @@ class TwoPhase(FluidLBMSim):
 
     @property
     def constants(self):
-        return [('Gamma', self.options.Gamma), ('A', self.options.A), ('kappa', self.options.kappa)]
+        return [('Gamma', self.options.Gamma), ('A', self.options.A), ('kappa', self.options.kappa),
+                ('temp', self.options.T), ('lambda_', self.options.lambda_)]
 
     def __init__(self, geo_class, options=[], args=None, defaults=None):
         super(TwoPhase, self).__init__(geo_class, options, args, defaults)
         self._prepare_symbols()
-        self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium(self)
+
+        if self.grid.dim == 3:
+            self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium_3d(self)
+        else:
+            self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium_2d(self)
+            self.options.tau_phi = self.get_tau()
 
     def _add_options(self, parser, lb_group):
         super(TwoPhase, self)._add_options(parser, lb_group)
@@ -894,6 +900,12 @@ class TwoPhase(FluidLBMSim):
             default=0.5)
         lb_group.add_option('--A', dest='A',
             help='A parameter', action='store', type='float',
+            default=0.5)
+        lb_group.add_option('--T', dest='T',
+            help='temperature (2D only)', action='store', type='float',
+            default=0.5)
+        lb_group.add_option('--lambda', dest='lambda_',
+            help='interaction strength (2D only)', action='store', type='float',
             default=0.5)
         lb_group.add_option('--tau_phi', dest='tau_phi', help='relaxation time for the phi field',
                             action='store', type='float', default=1.0)
@@ -908,59 +920,64 @@ class TwoPhase(FluidLBMSim):
         """Additional symbols and coefficients for the free-energy binary liquid model."""
         from sympy import Symbol, Matrix, Rational
 
-        self.S.A = Symbol('A')
         self.S.Gamma = Symbol('Gamma')
         self.S.kappa = Symbol('kappa')
         self.S.alias('phi', self.S.g1m0)
         self.S.alias('lap0', self.S.g0d2m0)
         self.S.alias('lap1', self.S.g1d2m0)
         self.S.make_vector('grad0', self.grid.dim, self.S.g0d1m0x, self.S.g0d1m0y, self.S.g0d1m0z)
+        self.S.make_vector('grad1', self.grid.dim, self.S.g1d1m0x, self.S.g1d1m0y, self.S.g1d1m0z)
 
-        self.S.wxy = [x[0]*x[1]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
-        self.S.wyz = [x[1]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
-        self.S.wxz = [x[0]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
-        self.S.wi = []
-        self.S.wxx = []
-        self.S.wyy = []
-        self.S.wzz = []
+        if self.grid.dim == 3:
+            self.S.A = Symbol('A')
+            self.S.wxy = [x[0]*x[1]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
+            self.S.wyz = [x[1]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
+            self.S.wxz = [x[0]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
+            self.S.wi = []
+            self.S.wxx = []
+            self.S.wyy = []
+            self.S.wzz = []
 
-        for x in sym.D3Q19.basis[1:]:
-            if x.dot(x) == 1:
-                self.S.wi.append(Rational(1,6))
+            for x in sym.D3Q19.basis[1:]:
+                if x.dot(x) == 1:
+                    self.S.wi.append(Rational(1,6))
 
-                if abs(x[0]) == 1:
-                    self.S.wxx.append(Rational(5,12))
-                else:
-                    self.S.wxx.append(-Rational(1,3))
+                    if abs(x[0]) == 1:
+                        self.S.wxx.append(Rational(5,12))
+                    else:
+                        self.S.wxx.append(-Rational(1,3))
 
-                if abs(x[1]) == 1:
-                    self.S.wyy.append(Rational(5,12))
-                else:
-                    self.S.wyy.append(-Rational(1,3))
+                    if abs(x[1]) == 1:
+                        self.S.wyy.append(Rational(5,12))
+                    else:
+                        self.S.wyy.append(-Rational(1,3))
 
-                if abs(x[2]) == 1:
-                    self.S.wzz.append(Rational(5,12))
-                else:
-                    self.S.wzz.append(-Rational(1,3))
+                    if abs(x[2]) == 1:
+                        self.S.wzz.append(Rational(5,12))
+                    else:
+                        self.S.wzz.append(-Rational(1,3))
 
-            elif x.dot(x) == 2:
-                self.S.wi.append(Rational(1,12))
+                elif x.dot(x) == 2:
+                    self.S.wi.append(Rational(1,12))
 
-                if abs(x[0]) == 1:
-                    self.S.wxx.append(-Rational(1,24))
-                else:
-                    self.S.wxx.append(Rational(1,12))
+                    if abs(x[0]) == 1:
+                        self.S.wxx.append(-Rational(1,24))
+                    else:
+                        self.S.wxx.append(Rational(1,12))
 
-                if abs(x[1]) == 1:
-                    self.S.wyy.append(-Rational(1,24))
-                else:
-                    self.S.wyy.append(Rational(1,12))
+                    if abs(x[1]) == 1:
+                        self.S.wyy.append(-Rational(1,24))
+                    else:
+                        self.S.wyy.append(Rational(1,12))
 
-                if abs(x[2]) == 1:
-                    self.S.wzz.append(-Rational(1,24))
-                else:
-                    self.S.wzz.append(Rational(1,12))
-
+                    if abs(x[2]) == 1:
+                        self.S.wzz.append(-Rational(1,24))
+                    else:
+                        self.S.wzz.append(Rational(1,12))
+        else:
+            self.S.lambda_ = Symbol('lambda_')
+            self.S.T = Symbol('temp')
+            self.S.wi = [3 - x.dot(x) for x in sym.D2Q9.basis[1:]]
 
     def _init_fields(self):
         super(TwoPhase, self)._init_fields()
