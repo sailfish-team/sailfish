@@ -45,7 +45,7 @@ class Values(optparse.Values):
 
 def _convert_to_double(src):
     import re
-    return re.sub('([0-9]+\.[0-9]*)f', '\\1', src.replace('float', 'double'))
+    return re.sub('([0-9]+\.[0-9]*)f([^a-zA-Z0-9\.])', '\\1\\2', src.replace('float', 'double'))
 
 class LBMSim(object):
     """Base class for LBM simulations. Descendant classes should be declared for specific simulations."""
@@ -84,6 +84,10 @@ class LBMSim(object):
         .. warning:: use :meth:`hostsync_dist` before accessing this property
         """
         return self.dist1
+
+    @property
+    def constants(self):
+        return []
 
     def _add_options(self, parser, lb_group):
         """Add simulation options common to a class of simulations.
@@ -189,6 +193,7 @@ class LBMSim(object):
             # value and device capabilities.
             self.block_size = 64
 
+        self.ic_fields = False
         self.num_tracers = 0
         self.iter_ = 0
         self._mlups_calls = 0
@@ -202,6 +207,8 @@ class LBMSim(object):
             self.float = numpy.float32
         else:
             self.float = numpy.float64
+
+        self.S = sym.S()
 
     def _set_grid(self, name):
         for x in sym.KNOWN_GRIDS:
@@ -221,9 +228,9 @@ class LBMSim(object):
         The distributions are then available in :attr:`dist`.
         """
         if self.iter_ & 1:
-            self.backend.from_buf(self.gpu_dist2)
+            self.backend.from_buf(self.gpu_dist1b)
         else:
-            self.backend.from_buf(self.gpu_dist1)
+            self.backend.from_buf(self.gpu_dist1a)
         self.backend.sync()
 
     def hostsync_velocity(self):
@@ -313,7 +320,6 @@ class LBMSim(object):
             self.shape = (self.options.lat_nz, self.options.lat_ny, self.options.lat_nx)
 
         self._init_fields()
-        self.dist1 = numpy.zeros([len(self.grid.basis)] + list(self.shape), self.float)
 
         # Simulation geometry.
         self.geo = self.geo_class(list(reversed(self.shape)), self.options,
@@ -365,8 +371,12 @@ class LBMSim(object):
         ctx['periodicity'] = [int(self.options.periodic_x), int(self.options.periodic_y),
                             int(self.options.periodic_z)]
         ctx['grid'] = self.grid
+        ctx['sim'] = self
         ctx['model'] = self.lbm_model
         ctx['bgk_equilibrium'] = self.equilibrium
+        ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
+        ctx['constants'] = self.constants
+        ctx['grids'] = [self.grid]
 
         self._update_ctx(ctx)
         ctx.update(self.geo.get_defines())
@@ -401,6 +411,8 @@ class LBMSim(object):
         unit in :meth:`_init_compute`.
         """
         self._timed_print('Preparing the data fields.')
+
+        self.dist1 = numpy.zeros([len(self.grid.basis)] + list(self.shape), self.float)
         self.vx = numpy.zeros(self.shape, self.float)
         self.vy = numpy.zeros(self.shape, self.float)
         self.velocity = [self.vx, self.vy]
@@ -410,10 +422,6 @@ class LBMSim(object):
             self.velocity.append(self.vz)
 
         self.rho = numpy.zeros(self.shape, self.float)
-
-        # Auxiliary floating-point fields.
-        for field in self.float_fields:
-            setattr(self, field, numpy.zeros(self.shape, self.float))
 
         # Tracer particles.
         if self.num_tracers:
@@ -458,8 +466,31 @@ class LBMSim(object):
             self.gpu_tracer_loc = []
 
         # Particle distributions in device memory, A-B access pattern.
-        self.gpu_dist1 = self.backend.alloc_buf(like=self.dist1)
-        self.gpu_dist2 = self.backend.alloc_buf(like=self.dist1)
+        self.gpu_dist1a = self.backend.alloc_buf(like=self.dist1)
+        self.gpu_dist1b = self.backend.alloc_buf(like=self.dist1)
+
+    def _init_compute_ic(self):
+        if not self.ic_fields:
+            # Nothing to do, the initial distributions have already been
+            # set and copied to the GPU in _init_compute_fields.
+            return
+
+        args1 = [self.gpu_dist1a] + self.gpu_velocity + [self.gpu_rho]
+        args2 = [self.gpu_dist1b] + self.gpu_velocity + [self.gpu_rho]
+
+        kern1 = self.backend.get_kernel(self.mod, 'SetInitialConditions',
+                    args=args1,
+                    args_format='P'*len(args1),
+                    block=self._kernel_block_size())
+
+        kern2 = self.backend.get_kernel(self.mod, 'SetInitialConditions',
+                    args=args1,
+                    args_format='P'*len(args2),
+                    block=self._kernel_block_size())
+
+        self.backend.run_kernel(kern1, self.kern_grid_size)
+        self.backend.run_kernel(kern2, self.kern_grid_size)
+        self.backend.sync()
 
     def _kernel_block_size(self):
         if self.grid.dim == 2:
@@ -470,24 +501,20 @@ class LBMSim(object):
     def _init_compute_kernels(self):
         self._timed_print('Preparing the compute unit kernels.')
 
-        aux_kernel_args = []
-        for field in self.float_fields:
-            aux_kernel_args.append(getattr(self, 'gpu_%s' % field))
-
         # Kernel arguments.
-        args_tracer2 = [self.gpu_dist1, self.geo.gpu_map] + self.gpu_tracer_loc
-        args_tracer1 = [self.gpu_dist2, self.geo.gpu_map] + self.gpu_tracer_loc
-        args1 = ([self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, self.gpu_rho] + self.gpu_velocity +
-                 [numpy.uint32(0)] + aux_kernel_args)
-        args2 = ([self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho] + self.gpu_velocity +
-                 [numpy.uint32(0)] + aux_kernel_args)
+        args_tracer2 = [self.gpu_dist1a, self.geo.gpu_map] + self.gpu_tracer_loc
+        args_tracer1 = [self.gpu_dist1b, self.geo.gpu_map] + self.gpu_tracer_loc
+        args1 = ([self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_rho] + self.gpu_velocity +
+                 [numpy.uint32(0)])
+        args2 = ([self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_rho] + self.gpu_velocity +
+                 [numpy.uint32(0)])
 
         # Special argument list for the case where macroscopic quantities data is to be
         # saved in global memory, i.e. a visualization step.
-        args1v = ([self.geo.gpu_map, self.gpu_dist1, self.gpu_dist2, self.gpu_rho] + self.gpu_velocity +
-                  [numpy.uint32(1)] + aux_kernel_args)
-        args2v = ([self.geo.gpu_map, self.gpu_dist2, self.gpu_dist1, self.gpu_rho] + self.gpu_velocity +
-                  [numpy.uint32(1)] + aux_kernel_args)
+        args1v = ([self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_rho] + self.gpu_velocity +
+                  [numpy.uint32(1)])
+        args2v = ([self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_rho] + self.gpu_velocity +
+                  [numpy.uint32(1)])
 
         k_block_size = self._kernel_block_size()
         kernel_name = 'CollideAndPropagate'
@@ -718,6 +745,7 @@ class LBMSim(object):
         self._init_code()
         self._init_compute_fields()
         self._init_compute_kernels()
+        self._init_compute_ic()
         self._init_output()
 
         self._timed_print('Starting the simulation...')
@@ -769,7 +797,7 @@ class FluidLBMSim(LBMSim):
 
         self.num_tracers = self.options.tracers
         self.incompressible = self.options.incompressible
-        self.equilibrium = sym.bgk_equilibrium(self.grid)
+        self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
 
     def _update_ctx(self, ctx):
         ctx['incompressible'] = self.incompressible
@@ -840,6 +868,190 @@ class FluidLBMSim(LBMSim):
             self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)),
                                                 self.options.scr_depth, self.options.scr_scale)
 
+class TwoPhase(FluidLBMSim):
+    kernel_file = 'two_phase.mako'
+
+    @property
+    def constants(self):
+        return [('Gamma', self.options.Gamma), ('A', self.options.A), ('kappa', self.options.kappa)]
+
+    def __init__(self, geo_class, options=[], args=None, defaults=None):
+        super(TwoPhase, self).__init__(geo_class, options, args, defaults)
+        self._prepare_symbols()
+        self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium(self)
+
+    def _add_options(self, parser, lb_group):
+        super(TwoPhase, self)._add_options(parser, lb_group)
+
+        lb_group.add_option('--Gamma', dest='Gamma',
+            help='Gamma parameter', action='store', type='float',
+            default=0.5)
+        lb_group.add_option('--kappa', dest='kappa',
+            help='kappa parameter', action='store', type='float',
+            default=0.5)
+        lb_group.add_option('--A', dest='A',
+            help='A parameter', action='store', type='float',
+            default=0.5)
+        lb_group.add_option('--tau_phi', dest='tau_phi', help='relaxation time for the phi field',
+                            action='store', type='float', default=1.0)
+        return None
+
+    def _update_ctx(self, ctx):
+        super(TwoPhase, self)._update_ctx(ctx)
+        ctx['grids'] = [self.grid, self.grid]
+        ctx['tau_phi'] = self.options.tau_phi
+
+    def _prepare_symbols(self):
+        """Additional symbols and coefficients for the free-energy binary liquid model."""
+        from sympy import Symbol, Matrix, Rational
+
+        self.S.A = Symbol('A')
+        self.S.Gamma = Symbol('Gamma')
+        self.S.kappa = Symbol('kappa')
+        self.S.alias('phi', self.S.g1m0)
+        self.S.alias('lap0', self.S.g0d2m0)
+        self.S.alias('lap1', self.S.g1d2m0)
+        self.S.make_vector('grad0', self.grid.dim, self.S.g0d1m0x, self.S.g0d1m0y, self.S.g0d1m0z)
+
+        self.S.wxy = [x[0]*x[1]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
+        self.S.wyz = [x[1]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
+        self.S.wxz = [x[0]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
+        self.S.wi = []
+        self.S.wxx = []
+        self.S.wyy = []
+        self.S.wzz = []
+
+        for x in sym.D3Q19.basis[1:]:
+            if x.dot(x) == 1:
+                self.S.wi.append(Rational(1,6))
+
+                if abs(x[0]) == 1:
+                    self.S.wxx.append(Rational(5,12))
+                else:
+                    self.S.wxx.append(-Rational(1,3))
+
+                if abs(x[1]) == 1:
+                    self.S.wyy.append(Rational(5,12))
+                else:
+                    self.S.wyy.append(-Rational(1,3))
+
+                if abs(x[2]) == 1:
+                    self.S.wzz.append(Rational(5,12))
+                else:
+                    self.S.wzz.append(-Rational(1,3))
+
+            elif x.dot(x) == 2:
+                self.S.wi.append(Rational(1,12))
+
+                if abs(x[0]) == 1:
+                    self.S.wxx.append(-Rational(1,24))
+                else:
+                    self.S.wxx.append(Rational(1,12))
+
+                if abs(x[1]) == 1:
+                    self.S.wyy.append(-Rational(1,24))
+                else:
+                    self.S.wyy.append(Rational(1,12))
+
+                if abs(x[2]) == 1:
+                    self.S.wzz.append(-Rational(1,24))
+                else:
+                    self.S.wzz.append(Rational(1,12))
+
+
+    def _init_fields(self):
+        super(TwoPhase, self)._init_fields()
+        self.phi = numpy.zeros(self.shape, self.float)
+        self.dist2 = numpy.zeros([len(self.grid.basis)] + list(self.shape), self.float)
+
+    def _init_compute_fields(self):
+        super(TwoPhase, self)._init_compute_fields()
+        self.gpu_phi = self.backend.alloc_buf(like=self.phi)
+        self.gpu_dist2a = self.backend.alloc_buf(like=self.dist2)
+        self.gpu_dist2b = self.backend.alloc_buf(like=self.dist2)
+
+    def _init_compute_kernels(self):
+        cnp_args1n = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_dist2a,
+                      self.gpu_dist2b, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [numpy.uint32(0)]
+        cnp_args1s = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_dist2a,
+                      self.gpu_dist2b, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [numpy.uint32(1)]
+        cnp_args2n = [self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_dist2b,
+                      self.gpu_dist2a, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [numpy.uint32(0)]
+        cnp_args2s = [self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_dist2b,
+                      self.gpu_dist2a, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [numpy.uint32(1)]
+
+        macro_args1 = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist2a, self.gpu_rho, self.gpu_phi]
+        macro_args2 = [self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist2b, self.gpu_rho, self.gpu_phi]
+
+        k_block_size = self._kernel_block_size()
+        cnp_name = 'CollideAndPropagate'
+        macro_name = 'PrepareMacroFields'
+
+        kern_cnp1n = self.backend.get_kernel(self.mod, cnp_name,
+                         args=cnp_args1n, args_format='P'*(len(cnp_args1n)-1)+'i',
+                         block=k_block_size)
+        kern_cnp1s = self.backend.get_kernel(self.mod, cnp_name,
+                         args=cnp_args1s, args_format='P'*(len(cnp_args1n)-1)+'i',
+                         block=k_block_size)
+        kern_cnp2n = self.backend.get_kernel(self.mod, cnp_name,
+                         args=cnp_args2n, args_format='P'*(len(cnp_args1n)-1)+'i',
+                         block=k_block_size)
+        kern_cnp2s = self.backend.get_kernel(self.mod, cnp_name,
+                         args=cnp_args2s, args_format='P'*(len(cnp_args1n)-1)+'i',
+                         block=k_block_size)
+        kern_mac1 = self.backend.get_kernel(self.mod, macro_name,
+                         args=macro_args1, args_format='P'*len(macro_args1),
+                         block=k_block_size)
+        kern_mac2 = self.backend.get_kernel(self.mod, macro_name,
+                         args=macro_args2, args_format='P'*len(macro_args2),
+                         block=k_block_size)
+
+        # Map: iteration parity -> kernel arguments to use.
+        self.kern_map = {
+            0: (kern_mac1, kern_cnp1n, kern_cnp1s),
+            1: (kern_mac2, kern_cnp2n, kern_cnp2s),
+        }
+
+        if self.grid.dim == 2:
+            self.kern_grid_size = (self.options.lat_nx/self.block_size, self.options.lat_ny)
+        else:
+            self.kern_grid_size = (self.options.lat_nx/self.block_size * self.options.lat_ny, self.options.lat_nz)
+
+    def _init_compute_ic(self):
+        if not self.ic_fields:
+            # Nothing to do, the initial distributions have already been
+            # set and copied to the GPU in _init_compute_fields.
+            return
+
+        args1 = [self.gpu_dist1a, self.gpu_dist2a] + self.gpu_velocity + [self.gpu_rho, self.gpu_phi]
+        args2 = [self.gpu_dist1b, self.gpu_dist2b] + self.gpu_velocity + [self.gpu_rho, self.gpu_phi]
+
+        kern1 = self.backend.get_kernel(self.mod, 'SetInitialConditions',
+                    args=args1,
+                    args_format='P'*len(args1),
+                    block=self._kernel_block_size())
+
+        kern2 = self.backend.get_kernel(self.mod, 'SetInitialConditions',
+                    args=args2,
+                    args_format='P'*len(args2),
+                    block=self._kernel_block_size())
+
+        self.backend.run_kernel(kern1, self.kern_grid_size)
+        self.backend.run_kernel(kern2, self.kern_grid_size)
+        self.backend.sync()
+
+    def _lbm_step(self, get_data, **kwargs):
+        kerns = self.kern_map[self.iter_ & 1]
+
+        self.backend.run_kernel(kerns[0], self.kern_grid_size)
+        self.backend.sync()
+
+        if get_data:
+            self.backend.run_kernel(kerns[2], self.kern_grid_size)
+            self.hostsync_velocity()
+            self.hostsync_density()
+        else:
+            self.backend.run_kernel(kerns[1], self.kern_grid_size)
 
 class SinglePhaseFreeSurfaceLBMSim(FluidLBMSim):
     float_fields = ['mass', 'eps']
@@ -857,7 +1069,7 @@ class FreeSurfaceLBMSim(LBMSim):
         LBMSim.__init__(self, geo_class, options, args, defaults)
         self._set_grid('D2Q9')
         self._set_model('bgk')
-        self.equilibrium = sym.shallow_water_equilibrium(self.grid)
+        self.equilibrium, self.equilibrium_vars = sym.shallow_water_equilibrium(self.grid)
         self.gravity = self.options.gravity
 
     def _add_options(self, parser, lb_group):

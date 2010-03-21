@@ -6,7 +6,7 @@
 	${const_var} float gravity = ${gravity}f;
 %endif
 
-${const_var} float tau = ${tau}f;		// relaxation time
+${const_var} float tau0 = ${tau}f;		// relaxation time
 ${const_var} float visc = ${visc}f;		// viscosity
 
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
@@ -46,14 +46,14 @@ ${kernel} void CollideAndPropagate(
 		return;
 
 	// cache the distributions in local variables
-	Dist fi;
-	getDist(&fi, dist_in, gi);
+	Dist d1;
+	getDist(&d1, dist_in, gi);
 
 	// macroscopic quantities for the current cell
 	float rho, v[${dim}];
 
-	getMacro(&fi, type, orientation, &rho, v);
-	boundaryConditions(&fi, type, orientation, &rho, v);
+	getMacro(&d1, type, orientation, &rho, v);
+	boundaryConditions(&d1, type, orientation, &rho, v);
 	${barrier()}
 
 	// only save the macroscopic quantities if requested to do so
@@ -67,6 +67,6 @@ ${kernel} void CollideAndPropagate(
 	}
 
 	${relaxate()}
-	${propagate('dist_out')}
+	${propagate('dist_out', 'd1')}
 }
 

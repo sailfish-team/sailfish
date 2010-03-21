@@ -1,3 +1,5 @@
+<%page args="bgk_args_decl"/>
+
 <%def name="kernel_args_1st_moment(name)">
 	${global_ptr} float *${name}x,
 	${global_ptr} float *${name}y,
@@ -37,10 +39,14 @@
 
 #define DT 1.0f
 
+%for name, val in constants:
+	${const_var} float ${name} = ${val}f;
+%endfor
+
 ${const_var} float geo_params[${num_params+1}] = {
-% for param in geo_params:
+%for param in geo_params:
 	${param}f,
-% endfor
+%endfor
 0};		// geometry parameters
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
@@ -50,5 +56,5 @@ ${const_var} float geo_params[${num_params+1}] = {
 ${opencl_compat.body()}
 <%include file="geo_helpers.mako"/>
 ${boundary.body()}
-${relaxation.body()}
+${relaxation.body(bgk_args_decl)}
 

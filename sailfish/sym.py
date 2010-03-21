@@ -2,8 +2,10 @@ from operator import itemgetter
 import math
 import numpy
 import sympy
-from sympy import Matrix, Rational, Symbol, Poly
+from sympy import Matrix, Rational, Symbol, Poly, Eq
+from sympy.core import basic
 from sympy.printing.ccode import CCodePrinter
+from sympy.printing.precedence import precedence, PRECEDENCE
 import re
 
 #
@@ -20,7 +22,6 @@ class DxQy(object):
     mx = Symbol('mx')
     my = Symbol('my')
     mz = Symbol('mz')
-    visc = Symbol('visc')
 
     # Square of the sound velocity.
     # TODO: Before we can ever start using different values of the sound speed,
@@ -91,7 +92,7 @@ class D2Q9(DxQy):
         for i, name in enumerate(cls.mrt_names):
             n2i[name] = i
 
-        cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + cls.visc * Rational(12, 2-c1))
+        cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + S.visc * Rational(12, 2-c1))
         cls.mrt_collision[n2i['pxy']] = cls.mrt_collision[n2i['pxx']]
 
         vec_rho = cls.mrt_matrix[n2i['rho'],:]
@@ -175,9 +176,9 @@ class D3Q13(DxQy):
         for i, name in enumerate(cls.mrt_names):
             n2i[name] = i
 
-        cls.mrt_collision[n2i['pxx']] = 2 / (8 * cls.visc + 1)
+        cls.mrt_collision[n2i['pxx']] = 2 / (8 * S.visc + 1)
         cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx']]
-        cls.mrt_collision[n2i['pxy']] = 2 / (4 * cls.visc + 1)
+        cls.mrt_collision[n2i['pxy']] = 2 / (4 * S.visc + 1)
         cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxy']]
         cls.mrt_collision[n2i['pzx']] = cls.mrt_collision[n2i['pxy']]
 
@@ -250,7 +251,7 @@ class D3Q15(DxQy):
         for i, name in enumerate(cls.mrt_names):
             n2i[name] = i
 
-        cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + 3*cls.visc)
+        cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + 3*S.visc)
         cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx']]
         cls.mrt_collision[n2i['pxy']] = cls.mrt_collision[n2i['pxx']]
         cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxx']]
@@ -332,7 +333,7 @@ class D3Q19(DxQy):
         for i, name in enumerate(cls.mrt_names):
             n2i[name] = i
 
-        cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + 3*cls.visc)
+        cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + 3*S.visc)
         cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx']]
         cls.mrt_collision[n2i['pxy']] = cls.mrt_collision[n2i['pxx']]
         cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxx']]
@@ -364,6 +365,74 @@ class D3Q19(DxQy):
             else:
                 cls.mrt_equilibrium.append(mrt_eq[name])
 
+def equilibrium_expr(eq, eq_vars):
+    """Substitute any additional variables directly into the expressions for the equilibrium distribution.
+
+    Equilibrium distributions can use additional local variables, which are stored in the
+    form of sympy equalities in the second element of the equilibrium pair.  If the abliity
+    to directly evalute the equilibrium distribution is required, this function will substitute
+    the local variables into the expressions.
+    """
+    if not eq_vars:
+        subs = {}
+    else:
+        subs = dict([(sym_eq.lhs, sym_eq.rhs) for sym_eq in eq_vars])
+
+    ret = []
+
+    for ieq in eq:
+        for i, name in ieq:
+            ret.append((i.subs(subs), name))
+    return ret
+
+def binary_liquid_equilibrium(sim):
+    grid = sim.grid
+    if grid.dim != 3 or grid.Q != 19:
+        raise TypeError('The binary liquid model requires the D3Q19 grid.')
+
+    S = sim.S
+    pb = Symbol('pb')
+    mu = Symbol('mu')
+    lambda_ = S.visc * (1 - grid.cssq * 3)
+
+    out = []
+    lvars = []
+    lvars.append(Eq(pb, S.rho / 3 + S.A * (S.phi**2 / 2 + Rational(3,4) * S.phi**4)))
+    lvars.append(Eq(mu, S.A * (-S.phi + S.phi**3) - S.kappa * S.g1d2m0))
+
+    t_sum = 0
+
+    for i, ei in enumerate(grid.basis[1:]):
+        t = (S.wi[i] * (pb - S.kappa * S.phi * S.g1d2m0 + S.rho * ei.dot(grid.v) +
+            Rational(3,2) * (
+                (ei.dot(grid.v))**2 * S.rho + lambda_ *
+                    (2 * ei.dot(grid.v) * ei.dot(S.grad0) + ei.dot(ei) * grid.v.dot(S.grad0))
+                 - Rational(1,3) * (S.rho * grid.v.dot(grid.v) + lambda_ * 3 * grid.v.dot(S.grad0))
+            )) +
+            S.kappa * (S.wxx[i] * S.g0d1m0x**2 + S.wyy[i] * S.g0d1m0y**2 + S.wxy[i] * S.g0d1m0z**2 +
+                       S.wyz[i] * S.g0d1m0y * S.g0d1m0z +
+                       S.wxy[i] * S.g0d1m0x * S.g0d1m0y +
+                       S.wxz[i] * S.g0d1m0x * S.g0d1m0z))
+
+        t_sum += t
+        out.append((t, grid.idx_name[i+1]))
+
+    # The first term is chosen so that rho is conserved.
+    out1 = [(sympy.simplify(S.rho - t_sum), grid.idx_name[0])] + out
+
+    out = []
+    t_sum = 0
+    for i, ei in enumerate(grid.basis[1:]):
+        t = S.wi[i] * (S.Gamma * mu + ei.dot(grid.v) * S.phi + Rational(3,2) * S.phi * (
+                Rational(1,3) * grid.v.dot(grid.v) + ei.dot(grid.v)**2))
+
+        t_sum += t
+        out.append((t, grid.idx_name[i+1]))
+
+    # The first term is chosen so that the order parameter is conserved.
+    out = [(sympy.simplify(S.phi - t_sum), grid.idx_name[0])] + out
+    return ([out1, out], lvars)
+
 def shallow_water_equilibrium(grid):
     """Get expressions for the BGK equilibrium distribution for the shallow
     water equation."""
@@ -372,20 +441,20 @@ def shallow_water_equilibrium(grid):
         raise TypeError('Shallow water equation requires the D2Q9 grid.')
 
     out = []
-    out.append((grid.rho - grid.weights[0] * grid.rho * (Rational(15, 8) *
-        grid.gravity * grid.rho - 3 * grid.v.dot(grid.v)), grid.idx_name[0]))
+    out.append((S.rho - grid.weights[0] * S.rho * (Rational(15, 8) *
+        S.gravity * S.rho - 3 * grid.v.dot(grid.v)), grid.idx_name[0]))
 
     for i, ei in enumerate(grid.basis):
         if i == 0:
             continue
 
         t = (grid.weights[i] * (
-                grid.rho * poly_factorize(Rational(3,2) * grid.rho * grid.gravity + 3*ei.dot(grid.v) +
+                S.rho * poly_factorize(Rational(3,2) * S.rho * S.gravity + 3*ei.dot(grid.v) +
                     Rational(9,2) * (ei.dot(grid.v))**2 - Rational(3, 2) * grid.v.dot(grid.v))))
 
         out.append((t, grid.idx_name[i]))
 
-    return out
+    return ([out], [])
 
 def bgk_equilibrium(grid):
     """Get expressions for the BGK equilibrium distribution.
@@ -405,7 +474,7 @@ def bgk_equilibrium(grid):
 
         out.append((t, grid.idx_name[i]))
 
-    return out
+    return ([out], [])
 
 def lambdify_equilibrium(sim):
     """Get a lambdified version of the equilibrium distribution.
@@ -431,7 +500,7 @@ def lambdify_equilibrium(sim):
     else:
         args = (S.rho, sim.grid.vx, sim.grid.vy, sim.grid.vz)
 
-    for eq_expr, dist_name in sim.equilibrium:
+    for eq_expr, dist_name in equilibrium_expr(sim.equilibrium, sim.equilibrium_vars):
         ret.append(sympy.lambdify(args, eq_expr.subs(subs), numpy))
 
     return ret
@@ -597,7 +666,7 @@ def noneq_bb(grid, orientation):
     known, unknown = _get_known_dists(grid, normal)
     ret = []
 
-    eq = bgk_equilibrium(grid)
+    eq = bgk_equilibrium(grid)[0][0]
 
     # Bounce-back of the non-equilibrium parts.
     for i in unknown:
@@ -736,9 +805,16 @@ def expand_powers(t):
 
 def use_pointers(str):
     ret = re.sub(r'([^_a-z0-9A-Z]|^)rho', r'\1(*rho)', str)
-    ret = ret.replace('vx', 'v[0]')
-    ret = ret.replace('vy', 'v[1]')
-    ret = ret.replace('vz', 'v[2]')
+    return ret
+
+def use_vectors(str):
+    ret = str.replace('vx', 'v0[0]').replace('vy', 'v0[1]').replace('vz', 'v0[2]')
+
+    for dist in range(0, 9):
+        ret = ret.replace('g%sd1m0x' % dist, 'grad%s[0]' % dist)
+        ret = ret.replace('g%sd1m0y' % dist, 'grad%s[1]' % dist)
+        ret = ret.replace('g%sd1m0z' % dist, 'grad%s[2]' % dist)
+
     return ret
 
 def make_float(t):
@@ -748,21 +824,21 @@ class KernelCodePrinter(CCodePrinter):
 
     def _print_Pow(self, expr):
         PREC = precedence(expr)
-        if expr.exp is S.NegativeOne:
+        if expr.exp is basic.S.NegativeOne:
             return '1.0/%s' % (self.parenthesize(expr.base, PREC))
         # For the kernel code, it's better to calculate the power
         # here explicitly by multiplication.
         elif expr.exp == 2:
-            return '(%s)*(%s)' % (self.parenthesize(exp.base, PREC),
-                                  self.parenthesize(exp.base, PREC))
+            return '%s*%s' % (self.parenthesize(expr.base, PREC),
+                              self.parenthesize(expr.base, PREC))
         else:
             return 'pow(%s,%s)' % (self.parenthesize(expr.base, PREC),
                                    self.parenthesize(expr.exp, PREC))
 
-def cexpr(grid, incompressible, pointers, ex, rho, aliases=True):
+def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False):
     """Convert a SymPy expression into a string containing valid C code.
 
-    :param grid: the grid class
+    :param sim: the main simulation class (descendant of :class:`LBMSim`)
     :param incompressible: if ``True``, use the incompressible model
     :param pointers: if ``True``, macroscopic variables (density and velocities)
         will be converted to pointers in the output
@@ -774,6 +850,7 @@ def cexpr(grid, incompressible, pointers, ex, rho, aliases=True):
     """
 
     t = ex
+    S = sim.S
 
     if type(t) is int:
         return str(t)
@@ -793,10 +870,15 @@ def cexpr(grid, incompressible, pointers, ex, rho, aliases=True):
         for src, dst in S.aliases.iteritems():
             t = t.subs(src, dst)
 
-    t = str(t)
+    t = KernelCodePrinter().doprint(t)
     t = expand_powers(t)
     if pointers:
         t = use_pointers(t)
+        t = use_vectors(t)  # FIXME
+
+    if vectors:
+        t = use_vectors(t)
+
     t = make_float(t)
     return t
 
@@ -913,14 +995,21 @@ def _prepare_grids():
             grid.mrt_matrix = Matrix([x.transpose().tolist()[0] for x in orthogonalize(*grid.mrt_basis)])
             grid._init_mrt_equilibrium()
 
-# A container class for all commonly used sympy symbols.  Not to be instantiated.
+# A container class for all commonly used sympy symbols.
 class S(object):
     aliases = {}
 
     @classmethod
     def alias(cls, sym_dst, sym_src):
-        setattr(cls, sym_dst, getattr(cls, sym_src.name))
+        setattr(cls, sym_dst, sym_src)
         cls.aliases[sym_src] = sym_dst
+
+    @classmethod
+    def make_vector(cls, sym_dst, dim, *syms):
+        if dim == 3:
+            setattr(cls, sym_dst, Matrix(([syms[0], syms[1], syms[2]],)))
+        else:
+            setattr(cls, sym_dst, Matrix(([syms[0], syms[1]],)))
 
 def _prepare_symbols():
     comp_map = {0: 'x', 1: 'y', 2: 'z'}
@@ -964,8 +1053,10 @@ def _prepare_symbols():
     #   X. He, L.-S. Luo, Lattice Boltzmann model for the incompressible Navier-Stokes
     #   equation, J. Stat. Phys. 88 (1997) 927-944
     S.rho0 = Symbol('rho0')
-
+    S.visc = Symbol('visc')
     S.gravity = Symbol('gravity')
+
+
 
 KNOWN_GRIDS = (D2Q9, D3Q13, D3Q15, D3Q19)
 

@@ -2,6 +2,7 @@
     from sailfish import sym
 %>
 
+<%page args="bgk_args_decl"/>
 <%namespace file="code_common.mako" import="*"/>
 <%namespace file="boundary.mako" import="external_force"/>
 
@@ -74,70 +75,79 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 // Performs the relaxation step in the BGK model given the density rho,
 // the velocity v and the distribution fi.
 //
-${device_func} void BGK_relaxate(float rho, float *v, Dist *fi, int node_type)
+${device_func} void BGK_relaxate(${bgk_args_decl()},
+%for i in range(0, len(grids)):
+	Dist *d${i},
+%endfor
+	 int node_type)
 {
-	Dist feq;
-
-	#define vx v[0]
-	#define vy v[1]
-	#define vz v[2]
-
-	%for feq, idx in bgk_equilibrium:
-		feq.${idx} = ${cex(feq)};
+	%for i in range(0, len(grids)):
+		Dist feq${i};
 	%endfor
 
-	%for idx in grid.idx_name:
-		fi->${idx} += (feq.${idx} - fi->${idx}) / tau;
+	%for local_var in bgk_equilibrium_vars:
+		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
 	%endfor
 
-	%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
-		if (!isWallNode(node_type))
-		{
-			// External acceleration.
-			#define eax ${'%.20ff' % ext_accel_x}
-			#define eay ${'%.20ff' % ext_accel_y}
-			#define eaz ${'%.20ff' % ext_accel_z}
-			float pref = ${sym.bgk_external_force_pref()};
+	%for i, eq in enumerate(bgk_equilibrium):
+		%for feq, idx in eq:
+			feq${i}.${idx} = ${cex(feq, vectors=True)};
+		%endfor
+	%endfor
 
-			%for val, idx in sym.bgk_external_force(grid):
-				fi->${idx} += ${cex(val)};
-			%endfor
-		}
-	%endif
+	%for i in range(0, len(grids)):
+		%for idx in grid.idx_name:
+			d${i}->${idx} += (feq${i}.${idx} - d${i}->${idx}) / tau${i};
+		%endfor
 
-	#undef vx
-	#undef vy
-	#undef vz
+		%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
+			if (!isWallNode(node_type))
+			{
+				// External acceleration.
+				#define eax ${'%.20ff' % ext_accel_x}
+				#define eay ${'%.20ff' % ext_accel_y}
+				#define eaz ${'%.20ff' % ext_accel_z}
+				float pref = ${sym.bgk_external_force_pref()};
+
+				%for val, idx in sym.bgk_external_force(grid):
+					d${i}->${idx} += ${cex(val)};
+				%endfor
+			}
+		%endif
+	%endfor
 }
 %endif
 
-<%def name="_relaxate()">
+<%def name="_relaxate(bgk_args)">
 	%if model == 'bgk':
-		BGK_relaxate(rho, v, &fi, type);
+		BGK_relaxate(${bgk_args()},
+%for i in range(0, len(grids)):
+	&d${i},
+%endfor
+	type);
 	%else:
-		MS_relaxate(&fi, type);
+		MS_relaxate(&d1, type);
 	%endif
 </%def>
 
 ## TODO: This could be optimized.
-<%def name="relaxate()">
+<%def name="relaxate(bgk_args)">
 	if (isFluidNode(type)) {
-		${_relaxate()}
+		${_relaxate(bgk_args)}
 	}
 	%if bc_wall_.wet_nodes:
 		else if (isWallNode(type)) {
-			${_relaxate()}
+			${_relaxate(bgk_args)}
 		}
 	%endif
 	%if bc_velocity_.wet_nodes:
 		else if (isVelocityNode(type)) {
-			${_relaxate()}
+			${_relaxate(bgk_args)}
 		}
 	%endif
 	%if bc_pressure_.wet_nodes:
 		else if (isPressureNode(type)) {
-			${_relaxate()}
+			${_relaxate(bgk_args)}
 		}
 	%endif
 </%def>
-

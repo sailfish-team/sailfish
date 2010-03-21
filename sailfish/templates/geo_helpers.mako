@@ -1,7 +1,7 @@
 typedef struct Dist {
-	%for i, dname in enumerate(grid.idx_name):
-		float ${dname};
-	%endfor
+%for i, dname in enumerate(grid.idx_name):
+	float ${dname};
+%endfor
 } Dist;
 
 %if model == 'mrt':

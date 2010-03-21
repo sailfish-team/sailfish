@@ -3,6 +3,7 @@
 %>
 
 <%namespace file="code_common.mako" import="*"/>
+<%namespace file="propagation.mako" import="rel_offset"/>
 
 <%def name="noneq_bb(orientation)">
 	case ${orientation}:
@@ -106,6 +107,72 @@ ${device_func} inline void bounce_back(Dist *fi)
 	%endfor
 }
 
+##<%doc>
+${device_func} inline void laplacian_and_grad(float *field, int i, float *laplacian, float *grad)
+{
+	float fe = field[i + ${rel_offset(+1, 0, 0)}];
+	float fw = field[i + ${rel_offset(-1, 0, 0)}];
+	float fn = field[i + ${rel_offset(0, +1, 0)}];
+	float fs = field[i + ${rel_offset(0, -1, 0)}];
+%if dim == 3:
+	float ft = field[i + ${rel_offset(0, 0, +1)}];
+	float fb = field[i + ${rel_offset(0, 0, -1)}];
+%endif
+
+%if dim == 2:
+	laplacian[0] = fe + fw + fn + fs - 4.0f * field[i];
+%else:
+	laplacian[0] = fe + fw + fn + fs + ft + fb - 6.0f * field[i];
+%endif
+
+	grad[0] = (fe - fw) / 2.0f;
+	grad[1] = (fn - fs) / 2.0f;
+%if dim == 3:
+	grad[2] = (ft - fb) / 2.0f;
+%endif
+}
+##</%doc>
+
+<%doc>
+// More sophisticated finite difference formulas optimized to minimize spurious velocities
+// at the surface of a spherical drop.  Fomulas taken from:
+//   PRE 77, 046702 (2008)
+${device_func} inline void laplacian_and_grad(float *field, int i, float *laplacian, float *grad)
+{
+	float fe = field[i + ${rel_offset(+1, 0, 0)}];
+	float fw = field[i + ${rel_offset(-1, 0, 0)}];
+	float fn = field[i + ${rel_offset(0, +1, 0)}];
+	float fs = field[i + ${rel_offset(0, -1, 0)}];
+
+	float fne = field[i + ${rel_offset(+1, +1, 0)}];
+	float fnw = field[i + ${rel_offset(-1, +1, 0)}];
+	float fse = field[i + ${rel_offset(+1, -1, 0)}];
+	float fsw = field[i + ${rel_offset(-1, -1, 0)}];
+
+%if dim == 3:
+	float ft = field[i + ${rel_offset(0, 0, +1)}];
+	float fb = field[i + ${rel_offset(0, 0, -1)}];
+	float fte = field[i + ${rel_offset(+1, 0, +1)}];
+	float ftw = field[i + ${rel_offset(-1, 0, +1)}];
+	float fbe = field[i + ${rel_offset(+1, 0, -1)}];
+	float fbw = field[i + ${rel_offset(-1, 0, -1)}];
+	float ftn = field[i + ${rel_offset(0, +1, +1)}];
+	float fts = field[i + ${rel_offset(0, -1, +1)}];
+	float fbn = field[i + ${rel_offset(0, +1, -1)}];
+	float fbs = field[i + ${rel_offset(0, -1, -1)}];
+
+	grad[0] = (-fnw - fsw - ftw - fbw + fse + fne + fte + fbe) / 12.0f + (fe - fw) / 6.0f;
+	grad[1] = (-fse - fsw - fts - fbs + fne + fnw + ftn + fbn) / 12.0f + (fn - fs) / 6.0f;
+	grad[2] = (-fbe - fbw - fbn - fbs + fte + ftw + ftn + fts) / 12.0f + (ft - fb) / 6.0f;
+	laplacian[0] = (fnw + fne + fse + fsw + fte + ftw + ftn + fts + fbe + fbw + fbn + fbn) / 6.0f  + (ft + fb + fe + fw + fn + fs) / 3.0f - 4.0f * field[i];
+%else:
+	grad[0] = (-fnw - fsw + fse + fne) / 12.0f + (fe - fw) / 3.0f;
+	grad[1] = (-fse - fsw + fne + fnw) / 12.0f + (fn - fs) / 3.0f;
+	laplacian[0] = fnw + fne + fsw + fse + 4.0f * (fe + fw + fn + fs) - 20.0f * field[0];
+%endif
+}
+</%doc>
+
 // Compute the 0th moment of the distributions, i.e. density.
 ${device_func} inline void compute_0th_moment(Dist *fi, float *out)
 {
@@ -136,7 +203,7 @@ ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 }
 
 %if bc_wall == 'zouhe' or bc_velocity == 'zouhe' or bc_pressure == 'zouhe':
-${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
+${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v0)
 {
 	// Bounce-back of the non-equilibrium parts.
 	switch (orientation) {
@@ -161,10 +228,10 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v)
 	%endif
 
 	// Compute momentum difference.
-	nvx = *rho * v[0] - nvx;
-	nvy = *rho * v[1] - nvy;
+	nvx = *rho * v0[0] - nvx;
+	nvy = *rho * v0[1] - nvy;
 	%if dim == 3:
-		nvz = *rho * v[2] - nvz;
+		nvz = *rho * v0[2] - nvz;
 	%endif
 
 	switch (orientation) {
@@ -268,24 +335,34 @@ ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orien
 			${get_boundary_velocity('node_type', 'v[0]', 'v[1]', 'v[2]')}
 			%for i, ve in enumerate(grid.basis):
 				fi->${grid.idx_name[i]} += ${cex(
-					grid.rho0 * 2 * grid.weights[i] * grid.v.dot(ve) / grid.cssq, pointers=True)};
+					sim.S.rho0 * 2 * grid.weights[i] * grid.v.dot(ve) / grid.cssq, pointers=True)};
 			%endfor
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
 		}
 	%endif
 
+	%if bc_velocity == 'equilibrium' or bc_pressure == 'equilibrium':
+		%for local_var in bgk_equilibrium_vars:
+			float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
+		%endfor
+	%endif
+
 	%if bc_velocity == 'equilibrium':
 		if (isVelocityNode(node_type)) {
-			%for feq, idx in bgk_equilibrium:
-				fi->${idx} = ${cex(feq, pointers=True)};
+			%for eq in bgk_equilibrium:
+				%for feq, idx in eq:
+					fi->${idx} = ${cex(feq, pointers=True)};
+				%endfor
 			%endfor
 		}
 	%endif
 
 	%if bc_pressure == 'equilibrium':
 		if (isPressureNode(node_type)) {
-			%for feq, idx in bgk_equilibrium:
-				fi->${idx} = ${cex(feq, pointers=True)};
+			%for eq in bgk_equilibrium:
+				%for feq, idx in eq:
+					fi->${idx} = ${cex(feq, pointers=True)};
+				%endfor
 			%endfor
 		}
 	%endif

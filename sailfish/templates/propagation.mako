@@ -4,7 +4,7 @@
 
 <%namespace file="opencl_compat.mako" import="*"/>
 
-<%def name="prop_bnd(dist_out, effective_dir, i, di, local, offset)">
+<%def name="prop_bnd(dist_out, dist_in, effective_dir, i, di, local, offset)">
 ## Generate the propagation code for a specific base direction.
 ##
 ## This is a generic function which should work for any dimensionality and grid
@@ -19,9 +19,9 @@
 	## This is the final dimension, generate the actual propagation code.
 	%if di == dim:
 		%if dim == 2:
-			${set_odist(dist_out, i, effective_dir, grid.basis[i][1], 0, offset, local)}
+			${set_odist(dist_out, dist_in, i, effective_dir, grid.basis[i][1], 0, offset, local)}
 		%else:
-			${set_odist(dist_out, i, effective_dir, grid.basis[i][1], grid.basis[i][2], offset, local)}
+			${set_odist(dist_out, dist_in, i, effective_dir, grid.basis[i][1], grid.basis[i][2], offset, local)}
 		%endif
 	## Make a recursive call to prop_bnd to process the remaining dimensions.
 	## The recursive calls are done to generate checks for out-of-domain
@@ -34,7 +34,7 @@
 			if (${loc_names[di]} > 0) { \
 		%endif
 			## Recursive call for the next dimension.
-			${prop_bnd(dist_out, effective_dir, i, di+1, local, offset)}
+			${prop_bnd(dist_out, dist_in, effective_dir, i, di+1, local, offset)}
 		%if grid.basis[i][di] != 0:
 			} \
 		%endif
@@ -45,7 +45,7 @@
 		## pbc_offsets and proceed to the following dimension.
 		%if periodicity[di] and grid.basis[i][di] != 0:
 			else {
-				${prop_bnd(dist_out, effective_dir, i, di+1, local, offset+pbc_offsets[di][int(grid.basis[i][di])])}
+				${prop_bnd(dist_out, dist_in, effective_dir, i, di+1, local, offset+pbc_offsets[di][int(grid.basis[i][di])])}
 			}
 		%endif
 	%endif
@@ -53,7 +53,7 @@
 
 ## Propagate eastwards or westwards knowing that there is an east/westward
 ## node layer to propagate to.
-<%def name="prop_block_bnd(dist_out, dir, dist_source, offset=0)">
+<%def name="prop_block_bnd(dist_out, dist_in, dir, dist_source, offset=0)">
 ## Generate the propagation code for all directions with a X component.  The X component
 ## is special as shared-memory propogation is done in the X direction.
 ##
@@ -62,9 +62,9 @@
 ##
 	%for i in sym.get_prop_dists(grid, dir):
 		%if dist_source == 'prop_local':
-			${prop_bnd(dist_out, 0, i, 1, True, offset)}
+			${prop_bnd(dist_out, dist_in, 0, i, 1, True, offset)}
 		%else:
-			${prop_bnd(dist_out, dir, i, 1, False, offset)}
+			${prop_bnd(dist_out, dist_in, dir, i, 1, False, offset)}
 		%endif
 	%endfor
 </%def>
@@ -81,47 +81,47 @@
 	${dist_out}[gi + ${dist_size*idir + offset} + ${rel_offset(xoff, yoff, zoff)}]
 </%def>
 
-<%def name="set_odist(dist_out, idir, xoff, yoff, zoff, offset, local)">
+<%def name="set_odist(dist_out, dist_in, idir, xoff, yoff, zoff, offset, local)">
 	%if local:
 		${get_odist(dist_out, idir, xoff, yoff, zoff, offset)} = prop_${grid.idx_name[idir]}[lx];
 	%else:
-		${get_odist(dist_out, idir, xoff, yoff, zoff, offset)} = fi.${grid.idx_name[idir]};
+		${get_odist(dist_out, idir, xoff, yoff, zoff, offset)} = ${dist_in}.${grid.idx_name[idir]};
 	%endif
 </%def>
 
-<%def name="propagate(dist_out)">
+<%def name="propagate(dist_out, dist_in='fi')">
 	// update the 0-th direction distribution
-	${dist_out}[gi] = fi.fC;
+	${dist_out}[gi] = ${dist_in}.fC;
 
 	// E propagation in shared memory
 	if (lx < ${block_size-1}) {
 		%for i in sym.get_prop_dists(grid, 1):
-			prop_${grid.idx_name[i]}[lx+1] = fi.${grid.idx_name[i]};
+			prop_${grid.idx_name[i]}[lx+1] = ${dist_in}.${grid.idx_name[i]};
 		%endfor
 	// E propagation in global memory (at right block boundary)
 	} else if (gx < ${lat_nx-1}) {
-		${prop_block_bnd(dist_out, 1, 'prop_global')}
+		${prop_block_bnd(dist_out, dist_in, 1, 'prop_global')}
 	}
 	%if periodic_x:
 	// periodic boundary conditions in the X direction
 	else {
-		${prop_block_bnd(dist_out, 1, 'prop_global', pbc_offsets[0][1])}
+		${prop_block_bnd(dist_out, dist_in, 1, 'prop_global', pbc_offsets[0][1])}
 	}
 	%endif
 
 	// W propagation in shared memory
 	if (lx > 0) {
 		%for i in sym.get_prop_dists(grid, -1):
-			prop_${grid.idx_name[i]}[lx-1] = fi.${grid.idx_name[i]};
+			prop_${grid.idx_name[i]}[lx-1] = ${dist_in}.${grid.idx_name[i]};
 		%endfor
 	// W propagation in global memory (at left block boundary)
 	} else if (gx > 0) {
-		${prop_block_bnd(dist_out, -1, 'prop_global')}
+		${prop_block_bnd(dist_out, dist_in, -1, 'prop_global')}
 	}
 	%if periodic_x:
 	// periodic boundary conditions in the X direction
 	else {
-		${prop_block_bnd(dist_out, -1, 'prop_global', pbc_offsets[0][-1])}
+		${prop_block_bnd(dist_out, dist_in, -1, 'prop_global', pbc_offsets[0][-1])}
 	}
 	%endif
 
@@ -130,15 +130,15 @@
 	// Save locally propagated distributions into global memory.
 	// The leftmost thread is not updated in this block.
 	if (lx > 0) {
-		${prop_block_bnd(dist_out, 1, 'prop_local')}
+		${prop_block_bnd(dist_out, dist_in, 1, 'prop_local')}
 	}
 
 	// Propagation in directions orthogonal to the X axis (global memory)
-	${prop_block_bnd(dist_out, 0, 'prop_global')}
+	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
 
 	// The rightmost thread is not updated in this block.
 	if (lx < ${block_size-1}) {
-		${prop_block_bnd(dist_out, -1, 'prop_local')}
+		${prop_block_bnd(dist_out, dist_in, -1, 'prop_local')}
 	}
 </%def>
 
