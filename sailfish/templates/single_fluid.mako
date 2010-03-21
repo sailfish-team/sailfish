@@ -6,11 +6,19 @@
 	${const_var} float gravity = ${gravity}f;
 %endif
 
+<%def name="bgk_args_decl()">
+	float rho, float *v0
+</%def>
+
+<%def name="bgk_args()">
+	rho, phi
+</%def>
+
 ${const_var} float tau0 = ${tau}f;		// relaxation time
 ${const_var} float visc = ${visc}f;		// viscosity
 
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
-${kernel_common.body()}
+${kernel_common.body(bgk_args_decl)}
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="code_common.mako" import="*"/>
@@ -66,7 +74,7 @@ ${kernel} void CollideAndPropagate(
 		%endif
 	}
 
-	${relaxate()}
+	${relaxate(bgk_args)}
 	${propagate('dist_out', 'd1')}
 }
 

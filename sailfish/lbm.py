@@ -48,6 +48,7 @@ def _convert_to_double(src):
     t = re.sub('([0-9]+\.[0-9]*)f([^a-zA-Z0-9\.])', '\\1\\2', src.replace('float', 'double'))
     t = t.replace('logf(', 'log(')
     t = t.replace('expf(', 'exp(')
+    t = t.replace('powf(', 'pow(')
     return t
 
 class LBMSim(object):
@@ -990,7 +991,8 @@ class BinaryFluidFreeEnergy(TwoPhaseBase):
     @property
     def constants(self):
         return [('Gamma', self.options.Gamma), ('A', self.options.A), ('kappa', self.options.kappa),
-                ('temp', self.options.T), ('lambda_', self.options.lambda_)]
+                ('temp', self.options.T), ('lambda_', self.options.lambda_), ('tau_a', self.options.tau_a),
+                ('tau_b', self.options.tau_b)]
 
     def __init__(self, geo_class, options=[], args=None, defaults=None):
         super(BinaryFluidFreeEnergy, self).__init__(geo_class, options, args, defaults)
@@ -999,7 +1001,6 @@ class BinaryFluidFreeEnergy(TwoPhaseBase):
             self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium_3d(self)
         else:
             self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium_2d(self)
-            self.options.tau_phi = self.get_tau()
 
     def _add_options(self, parser, lb_group):
         super(BinaryFluidFreeEnergy, self)._add_options(parser, lb_group)
@@ -1020,6 +1021,10 @@ class BinaryFluidFreeEnergy(TwoPhaseBase):
             help='interaction strength (2D only)', action='store', type='float',
             default=0.5)
         lb_group.add_option('--tau_phi', dest='tau_phi', help='relaxation time for the phi field',
+                            action='store', type='float', default=1.0)
+        lb_group.add_option('--tau_a', dest='tau_a', help='relaxation time for the A component',
+                            action='store', type='float', default=1.0)
+        lb_group.add_option('--tau_b', dest='tau_b', help='relaxation time for the B component',
                             action='store', type='float', default=1.0)
         return None
 

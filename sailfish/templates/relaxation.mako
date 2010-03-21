@@ -70,6 +70,68 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 }
 % endif	## model == mrt
 
+%if model == 'femrt':
+${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
+%for i in range(0, len(grids)):
+	Dist *d${i},
+%endfor
+	 int node_type)
+{
+	%for i in range(0, len(grids)):
+		Dist feq${i};
+	%endfor
+
+	%for local_var in bgk_equilibrium_vars:
+		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
+	%endfor
+
+	float tau0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) / 2.0f;
+
+	if (phi < -1.0f) {
+		tau0 = tau_b;
+	} else if (phi > 1.0f) {
+		tau0 = tau_a;
+	}
+
+	%for i, eq in enumerate(bgk_equilibrium):
+		%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0) and i == 1:
+			%for j in range(0, dim):
+				v0[${j}] += 0.5f * ea0[${j}] / rho;
+			%endfor
+		%endif
+
+		%for feq, idx in eq:
+			feq${i}.${idx} = ${cex(feq, vectors=True)};
+		%endfor
+	%endfor
+
+	#define ea1 ea0
+
+	%for i in range(0, len(grids)):
+		%for idx in grid.idx_name:
+			%if i == 1:
+				d${i}->${idx} += (feq${i}.${idx} - d${i}->${idx}) / tau${i};
+			%else:
+				feq${i}.${idx} = d${i}->${idx} - feq${i}.${idx};
+			%endif
+		%endfor
+	%endfor
+
+	%for dst, src in sym.free_energy_mrt(sim.grid, 'd0', 'feq0'):
+		${dst} -= ${sym.make_float(src)};
+	%endfor
+
+	%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0):
+		if (!isWallNode(node_type))
+		{
+			%for val, idx in sym.free_energy_external_force(sim, grid_num=0):
+				d0->${idx} += ${cex(val, vectors=True)};
+			%endfor
+		}
+	%endif
+}
+%endif  ## model == femrt
+
 % if model == 'bgk':
 //
 // Performs the relaxation step in the BGK model given the density rho,
@@ -89,11 +151,26 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
 	%endfor
 
+	%if not shan_chen:
+		float tau0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) / 2.0f;
+		if (phi < -1.0f) {
+			tau0 = tau_b;
+		} else if (phi > 1.0f) {
+			tau0 = tau_a;
+		}
+	%endif
+
 	%for i, eq in enumerate(bgk_equilibrium):
 		%if shan_chen:
 			%for j in range(0, dim):
 				v0[${j}] += tau${i} * ea${i}[${j}];
 			%endfor
+		%else:
+			%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0) and i == 1:
+				%for j in range(0, dim):
+					v0[${j}] += 0.5f * ea0[${j}] / rho;
+				%endfor
+			%endif
 		%endif
 
 		%for feq, idx in eq:
@@ -112,19 +189,43 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			d${i}->${idx} += (feq${i}.${idx} - d${i}->${idx}) / tau${i};
 		%endfor
 
-		%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
+		%if shan_chen:
 			if (!isWallNode(node_type))
 			{
-				float pref = ${sym.bgk_external_force_pref()};
-				// External acceleration.
-				#define eax ${'%.20ff' % ext_accel_x}
-				#define eay ${'%.20ff' % ext_accel_y}
-				#define eaz ${'%.20ff' % ext_accel_z}
-				%for val, idx in sym.bgk_external_force(grid):
-					d${i}->${idx} += ${cex(val)};
+				float pref = ${sym.bgk_external_force_pref(grid_num=i)};
+				%for j in range(0, dim):
+					v0[${j}] += 0.5f * ea${i}[${j}];
+				%endfor
+
+				%for val, idx in sym.bgk_external_force(grid, grid_num=i):
+					d${i}->${idx} += ${cex(val, vectors=True)};
+				%endfor
+
+				%for j in range(0, dim):
+					v0[${j}] -= 0.5f * ea${i}[${j}];
 				%endfor
 			}
+		%elif simtype == 'free-energy':
+			#define ea1 ea0
+			%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0) and i == 0:
+				if (!isWallNode(node_type))
+				{
+					%for val, idx in sym.free_energy_external_force(sim, grid_num=i):
+						d${i}->${idx} += ${cex(val, vectors=True)};
+					%endfor
+				}
+			%endif
 		%endif
+
+##		%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0) and i == 0:
+##			if (!isWallNode(node_type))
+##			{
+##				float pref = ${sym.bgk_external_force_pref(grid_num=i)};
+##				%for val, idx in sym.bgk_external_force(grid, grid_num=i):
+##					d${i}->${idx} += ${cex(val, vectors=True)};
+##				%endfor
+##			}
+##		%endif
 	%endfor
 }
 %endif
@@ -132,6 +233,12 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 <%def name="_relaxate(bgk_args)">
 	%if model == 'bgk':
 		BGK_relaxate(${bgk_args()},
+%for i in range(0, len(grids)):
+	&d${i},
+%endfor
+	type);
+	%elif model == 'femrt':
+		FE_MRT_relaxate(${bgk_args()},
 %for i in range(0, len(grids)):
 	&d${i},
 %endfor

@@ -107,16 +107,39 @@ ${device_func} inline void bounce_back(Dist *fi)
 	%endfor
 }
 
-##<%doc>
-${device_func} inline void laplacian_and_grad(float *field, int i, float *laplacian, float *grad)
+<%def name="get_field_off(xoff, yoff, zoff)">
+	off = ${rel_offset(xoff, yoff, zoff)};
+	nx = x + ${xoff};
+	ny = y + ${yoff};
+	nz = z + ${zoff};
+
+	%if periodicity[0] and xoff != 0:
+		if (nx < 0 || nx > ${lat_nx-1})
+			off += ${pbc_offsets[0][int(xoff)]};
+	%endif
+
+	%if periodicity[1] and yoff != 0:
+		if (ny < 0 || ny > ${lat_ny-1})
+			off += ${pbc_offsets[1][int(yoff)]};
+	%endif
+
+	%if periodicity[2] and zoff != 0:
+		if (nz < 0 || nz > ${lat_nz-1})
+			off += ${pbc_offsets[2][int(zoff)]};
+	%endif
+</%def>
+
+${device_func} inline void laplacian_and_grad(${global_ptr} float *field, int i, float *laplacian, float *grad, int x, int y, int z)
 {
-	float fe = field[i + ${rel_offset(+1, 0, 0)}];
-	float fw = field[i + ${rel_offset(-1, 0, 0)}];
-	float fn = field[i + ${rel_offset(0, +1, 0)}];
-	float fs = field[i + ${rel_offset(0, -1, 0)}];
+	int off, nx, ny, nz;
+
+	${get_field_off(+1, 0, 0)}	float fe = field[i + off];
+	${get_field_off(-1, 0, 0)}	float fw = field[i + off];
+	${get_field_off(0, +1, 0)}	float fn = field[i + off];
+	${get_field_off(0, -1, 0)}	float fs = field[i + off];
 %if dim == 3:
-	float ft = field[i + ${rel_offset(0, 0, +1)}];
-	float fb = field[i + ${rel_offset(0, 0, -1)}];
+	${get_field_off(0, 0, +1)}	float ft = field[i + off];
+	${get_field_off(0, 0, -1)}	float fb = field[i + off];
 %endif
 
 %if dim == 2:
@@ -131,40 +154,40 @@ ${device_func} inline void laplacian_and_grad(float *field, int i, float *laplac
 	grad[2] = (ft - fb) / 2.0f;
 %endif
 }
-##</%doc>
 
 <%doc>
 // More sophisticated finite difference formulas optimized to minimize spurious velocities
 // at the surface of a spherical drop.  Fomulas taken from:
 //   PRE 77, 046702 (2008)
-${device_func} inline void laplacian_and_grad(float *field, int i, float *laplacian, float *grad)
+${device_func} inline void laplacian_and_grad(${global_ptr} float *field, int i, float *laplacian, float *grad, int x, int y, int z)
 {
-	float fe = field[i + ${rel_offset(+1, 0, 0)}];
-	float fw = field[i + ${rel_offset(-1, 0, 0)}];
-	float fn = field[i + ${rel_offset(0, +1, 0)}];
-	float fs = field[i + ${rel_offset(0, -1, 0)}];
+	int off, nx, ny, nz;
 
-	float fne = field[i + ${rel_offset(+1, +1, 0)}];
-	float fnw = field[i + ${rel_offset(-1, +1, 0)}];
-	float fse = field[i + ${rel_offset(+1, -1, 0)}];
-	float fsw = field[i + ${rel_offset(-1, -1, 0)}];
+	${get_field_off(+1, 0, 0)}	float fe = field[i + off];
+	${get_field_off(-1, 0, 0)}	float fw = field[i + off];
+	${get_field_off(0, +1, 0)}	float fn = field[i + off];
+	${get_field_off(0, -1, 0)}	float fs = field[i + off];
+	${get_field_off(+1, +1, 0)}	float fne = field[i + off];
+	${get_field_off(-1, +1, 0)}	float fnw = field[i + off];
+	${get_field_off(+1, -1, 0)}	float fse = field[i + off];
+	${get_field_off(-1, -1, 0)}	float fsw = field[i + off];
 
 %if dim == 3:
-	float ft = field[i + ${rel_offset(0, 0, +1)}];
-	float fb = field[i + ${rel_offset(0, 0, -1)}];
-	float fte = field[i + ${rel_offset(+1, 0, +1)}];
-	float ftw = field[i + ${rel_offset(-1, 0, +1)}];
-	float fbe = field[i + ${rel_offset(+1, 0, -1)}];
-	float fbw = field[i + ${rel_offset(-1, 0, -1)}];
-	float ftn = field[i + ${rel_offset(0, +1, +1)}];
-	float fts = field[i + ${rel_offset(0, -1, +1)}];
-	float fbn = field[i + ${rel_offset(0, +1, -1)}];
-	float fbs = field[i + ${rel_offset(0, -1, -1)}];
+	${get_field_off(0, 0, +1)}	float ft = field[i + off];
+	${get_field_off(0, 0, -1)}	float fb = field[i + off];
+	${get_field_off(+1, 0, +1)}	float fte = field[i + off];
+	${get_field_off(-1, 0, +1)}	float ftw = field[i + off];
+	${get_field_off(+1, 0, -1)}	float fbe = field[i + off];
+	${get_field_off(-1, 0, -1)}	float fbw = field[i + off];
+	${get_field_off(0, +1, +1)}	float ftn = field[i + off];
+	${get_field_off(0, -1, +1)}	float fts = field[i + off];
+	${get_field_off(0, +1, -1)}	float fbn = field[i + off];
+	${get_field_off(0, -1, -1)}	float fbs = field[i + off];
 
 	grad[0] = (-fnw - fsw - ftw - fbw + fse + fne + fte + fbe) / 12.0f + (fe - fw) / 6.0f;
 	grad[1] = (-fse - fsw - fts - fbs + fne + fnw + ftn + fbn) / 12.0f + (fn - fs) / 6.0f;
 	grad[2] = (-fbe - fbw - fbn - fbs + fte + ftw + ftn + fts) / 12.0f + (ft - fb) / 6.0f;
-	laplacian[0] = (fnw + fne + fse + fsw + fte + ftw + ftn + fts + fbe + fbw + fbn + fbn) / 6.0f  + (ft + fb + fe + fw + fn + fs) / 3.0f - 4.0f * field[i];
+	laplacian[0] = (fnw + fne + fse + fsw + fte + ftw + ftn + fts + fbe + fbw + fbn + fbs) / 6.0f  + (ft + fb + fe + fw + fn + fs) / 3.0f - 4.0f * field[i];
 %else:
 	grad[0] = (-fnw - fsw + fse + fne) / 12.0f + (fe - fw) / 3.0f;
 	grad[1] = (-fse - fsw + fne + fnw) / 12.0f + (fn - fs) / 3.0f;
@@ -173,15 +196,12 @@ ${device_func} inline void laplacian_and_grad(float *field, int i, float *laplac
 }
 </%doc>
 
-##<%def name="sc_potential(comp)">
-##	1.0f - exp(-f${comp}[i + off]
-##</%def>
-
 <%def name="sc_potential(comp)">
 	f${comp}[i + off]
+##	1.0f - exp(-f${comp}[i + off])
 </%def>
 
-%if shan_chen:
+%if simtype == 'shan-chen':
 ${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${global_ptr} float *f2, float *a1, float *a2, int x, int y)
 {
 	float t1, t2;
@@ -366,7 +386,7 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 				%endfor
 			}
 		%else:
-			compute_macro_quant(fi, rho, v);
+			compute_macro_quant(fi, rho, v0);
 		%endif
 	} else if (isPressureNode(node_type)) {
 		%if bc_pressure == 'zouhe' or bc_pressure == 'equilibrium':
@@ -396,7 +416,9 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 		%endif
 	}
 
-	${external_force('node_type', 'v[0]', 'v[1]', 'v[2]')}
+	%if simtype == 'fluid':
+		${external_force('node_type', 'v0[0]', 'v0[1]', 'v0[2]')}
+	%endif
 }
 
 ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orientation, float *rho, float *v)

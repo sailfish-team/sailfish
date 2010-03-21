@@ -287,8 +287,9 @@ class D3Q19(DxQy):
                 [(0,0,0),
                 (1,0,0), (-1,0,0), (0,1,0), (0,-1,0), (0,0,1), (0,0,-1),
                 (1,1,0), (-1,1,0), (1,-1,0), (-1,-1,0),
+                (0,1,1), (0,-1,1), (0,1,-1), (0,-1,-1),
                 (1,0,1), (-1,0,1), (1,0,-1), (-1,0,-1),
-                (0,1,1), (0,-1,1), (0,1,-1), (0,-1,-1)])
+                ])
 
     weights = map(lambda x: Rational(*x),
             [(1,3), (1,18), (1,18), (1,18), (1,18), (1,18), (1,18),
@@ -313,10 +314,12 @@ class D3Q19(DxQy):
             [x[1] * x.dot(x) for x in cls.basis],
             [x[2] for x in cls.basis],
             [x[2] * x.dot(x) for x in cls.basis],
+            [3*x[0]*x[0] - x.dot(x) for x in cls.basis],
+#            [x[1]*x[1] - x[2]*x[2] for x in cls.basis],
+            [(3*x.dot(x) - 5) * (3*x[0]*x[0] - x.dot(x)) for x in cls.basis],
             [x[1]*x[1] - x[2]*x[2] for x in cls.basis],
-            [x.dot(x) * (x[1]*x[1] - x[2]*x[2]) for x in cls.basis],
-            [x[0]*x[0] - x[1]*x[1] for x in cls.basis],
-            [x.dot(x) * (x[0]*x[0] - x[1]*x[1]) for x in cls.basis],
+#            [x[0]*x[0] - x[1]*x[1] for x in cls.basis],
+            [(3*x.dot(x) - 5) * (x[1]*x[1] - x[2]*x[2]) for x in cls.basis],
             [x[0]*x[1] for x in cls.basis],
             [x[1]*x[2] for x in cls.basis],
             [x[0]*x[2] for x in cls.basis],
@@ -438,7 +441,7 @@ def binary_liquid_equilibrium_3d(sim):
 
     out = []
     lvars = []
-    lvars.append(Eq(pb, S.rho / 3 + S.A * (S.phi**2 / 2 + Rational(3,4) * S.phi**4)))
+    lvars.append(Eq(pb, S.rho / 3 + S.A * (- (S.phi**2) / 2 + Rational(3,4) * S.phi**4)))
     lvars.append(Eq(mu, S.A * (-S.phi + S.phi**3) - S.kappa * S.g1d2m0))
 
     t_sum = 0
@@ -450,10 +453,10 @@ def binary_liquid_equilibrium_3d(sim):
                     (2 * ei.dot(grid.v) * ei.dot(S.grad0) + ei.dot(ei) * grid.v.dot(S.grad0))
                  - Rational(1,3) * (S.rho * grid.v.dot(grid.v) + lambda_ * 3 * grid.v.dot(S.grad0))
             )) +
-            S.kappa * (S.wxx[i] * S.g0d1m0x**2 + S.wyy[i] * S.g0d1m0y**2 + S.wxy[i] * S.g0d1m0z**2 +
-                       S.wyz[i] * S.g0d1m0y * S.g0d1m0z +
-                       S.wxy[i] * S.g0d1m0x * S.g0d1m0y +
-                       S.wxz[i] * S.g0d1m0x * S.g0d1m0z))
+            S.kappa * (S.wxx[i] * S.g1d1m0x**2 + S.wyy[i] * S.g1d1m0y**2 + S.wzz[i] * S.g1d1m0z**2 +
+                       S.wyz[i] * S.g1d1m0y * S.g1d1m0z +
+                       S.wxy[i] * S.g1d1m0x * S.g1d1m0y +
+                       S.wxz[i] * S.g1d1m0x * S.g1d1m0z))
 
         t_sum += t
         out.append((t, grid.idx_name[i+1]))
@@ -465,7 +468,7 @@ def binary_liquid_equilibrium_3d(sim):
     t_sum = 0
     for i, ei in enumerate(grid.basis[1:]):
         t = S.wi[i] * (S.Gamma * mu + ei.dot(grid.v) * S.phi + Rational(3,2) * S.phi * (
-                Rational(1,3) * grid.v.dot(grid.v) + ei.dot(grid.v)**2))
+                -Rational(1,3) * grid.v.dot(grid.v) + (ei.dot(grid.v))**2))
 
         t_sum += t
         out.append((t, grid.idx_name[i+1]))
@@ -552,15 +555,7 @@ def lambdify_equilibrium(sim):
 
     return ret
 
-def bgk_external_force(grid, grid_num=0):
-    """Get expressions for the external body force correction in the BGK model.
-
-    :param grid: the grid class to be used
-
-    :rtype: list of sympy expressions (in the same order as the current grid's basis)
-    """
-    pref = Symbol('pref')
-
+def accel_vector(grid, grid_num):
     eax = getattr(S, 'g%seax' % grid_num)
     eay = getattr(S, 'g%seay' % grid_num)
     eaz = getattr(S, 'g%seaz' % grid_num)
@@ -571,6 +566,63 @@ def bgk_external_force(grid, grid_num=0):
     else:
         ea = Matrix(([eax, eay, eaz],))
 
+    return ea
+
+def free_energy_external_force(sim, grid_num=0):
+    grid = sim.grid
+    ea = accel_vector(grid, grid_num)
+    ret = []
+    sum_ = 0
+
+    tau0 = Symbol('tau0')
+
+    S = sim.S
+
+    if grid_num == 0:
+        rho = S.rho
+    else:
+        rho = S.phi
+
+    for i, ei in enumerate(grid.basis[1:]):
+#        t = S.wi[i] * (ea.dot(ei) * (1 + 3 * ei.dot(grid.v)) - ea.dot(grid.v)) * (1 - 1 / (2 * tau0))
+        t = S.wi[i] * (ea.dot(ei) + Rational(3,2) * (ei.dot(grid.v) * ei.dot(ea) * 2 - Rational(1,3) * ea.dot(grid.v) *
+            2))
+        #* (1 - 1 / (2 * tau0))
+        sum_ += t
+        ret.append((t, grid.idx_name[i+1]))
+
+    ret = [(sympy.simplify(-sum_), grid.idx_name[0])] + ret
+    return ret
+
+def free_energy_mrt_matrix(grid):
+    tau0 = Symbol('tau0')
+
+    def matrix_constructor(i, j):
+        if i == j:
+            if type(grid.mrt_collision[i]) is float:
+                if grid.mrt_collision[i] == 0.0:
+                    return 0.0
+                else:
+                    return 1.0
+            else:
+                return 1.0 / tau0
+        else:
+            return 0
+
+#    return Matrix(grid.Q, grid.Q, matrix_constructor)
+    return grid.mrt_matrix.inv() * Matrix(grid.Q, grid.Q, matrix_constructor) * grid.mrt_matrix
+
+
+def bgk_external_force(grid, grid_num=0):
+    """Get expressions for the external body force correction in the BGK model.
+
+    :param grid: the grid class to be used
+
+    :rtype: list of sympy expressions (in the same order as the current grid's basis)
+    """
+    pref = Symbol('pref')
+
+    ea = accel_vector(grid, grid_num)
     ret = []
 
     for i, ei in enumerate(grid.basis):
@@ -683,6 +735,18 @@ def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=Non
         ret *= -grid.dir_to_vec(missing_dir)[comp]
         if not momentum:
             ret = ret / prho
+
+    return ret
+
+def free_energy_mrt(grid, dest_dist, src_dist):
+    src_syms = Matrix([Symbol('%s.%s' % (src_dist, x)) for x in grid.idx_name])
+    dst_syms = [Symbol('%s->%s' % (dest_dist, x)) for x in grid.idx_name]
+    ret = []
+
+    mtx = free_energy_mrt_matrix(grid)
+
+    for i, rhs in enumerate(mtx * src_syms):
+        ret.append((dst_syms[i], rhs))
 
     return ret
 
@@ -857,10 +921,6 @@ def poly_factorize(poly):
 
     return ret_poly / denom
 
-def expand_powers(t):
-    # FIXME: This should work for powers other than 2.
-    return re.sub('([a-z]+)\*\*2', '\\1*\\1', t)
-
 def use_pointers(str):
     ret = re.sub(r'([^_a-z0-9A-Z]|^)rho', r'\1(*rho)', str)
     return ret
@@ -878,7 +938,7 @@ def use_vectors(str):
     return ret
 
 def make_float(t):
-    return re.sub(r'([0-9]+\.[0-9]*)', r'\1f', str(t))
+    return re.sub(r'([^a-zA-Z][0-9]+\.[0-9]*)', r'\1f', str(t))
 
 def int2float(t):
     return re.sub(r'([0-9]+)([^\.])', r'\1.0\2', str(t))
@@ -940,7 +1000,6 @@ def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False):
             t = t.subs(src, dst)
 
     t = KernelCodePrinter().doprint(t)
-    t = expand_powers(t)
     if pointers:
         t = use_pointers(t)
         t = use_vectors(t)  # FIXME

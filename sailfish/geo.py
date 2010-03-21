@@ -601,7 +601,7 @@ class LBMGeo3D(LBMGeo):
                 if cnode_type != self.NODE_FLUID:
                     self._set_map(loc, self._encode_node(self.NODE_DIR_OTHER, cnode_type))
 
-
+#
 # Boundary conditions
 #
 class LBMBC(object):

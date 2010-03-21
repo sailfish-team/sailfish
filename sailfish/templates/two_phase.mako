@@ -3,35 +3,36 @@
     import sympy
 %>
 
-%if 'gravity' in context.keys():
-	${const_var} float gravity = ${gravity}f;
-%endif
-
-${const_var} float tau0 = ${tau}f;		// relaxation time
-${const_var} float tau1 = ${tau_phi}f;		// relaxation time for the order parameter
-${const_var} float visc = ${visc}f;		// viscosity
-
 <%def name="bgk_args_decl_sc()">
 	float rho, float phi, float *v0, float *ea0, float *ea1
 </%def>
 
 <%def name="bgk_args_decl_fe()">
 	%if dim == 3:
-		float rho, float phi, float lap1, float *v0, float *grad0
+		float rho, float phi, float lap1, float *v0, float *grad0, float *grad1
 	%else:
 		float rho, float phi, float lap1, float *v0, float *grad1
 	%endif
 </%def>
 
-<%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
+%if 'gravity' in context.keys():
+	${const_var} float gravity = ${gravity}f;
+%endif
 
+// In the free-energy model, the relaxation time is a local quantity.
+%if shan_chen:
+	${const_var} float tau0 = ${tau}f;		// relaxation time
+%endif
+${const_var} float tau1 = ${tau_phi}f;		// relaxation time for the order parameter
+${const_var} float visc = ${visc}f;		// viscosity
+
+<%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
+<%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
 %if shan_chen:
 	${kernel_common.body(bgk_args_decl_sc)}
 %else:
 	${kernel_common.body(bgk_args_decl_fe)}
 %endif
-
-<%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="code_common.mako" import="*"/>
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
@@ -45,7 +46,7 @@ ${const_var} float visc = ${visc}f;		// viscosity
 
 <%def name="bgk_args_fe()">
 	%if dim == 3:
-		rho, phi, lap1, v, grad0
+		rho, phi, lap1, v, grad0, grad1
 	%else:
 		rho, phi, lap1, v, grad1
 	%endif
@@ -67,9 +68,8 @@ ${kernel} void SetInitialConditions(
 		float lap0, grad0[${dim}];
 		float lap1, grad1[${dim}];
 
-		${laplacian_grad_idx()}
-		laplacian_and_grad(irho, lap_i, &lap0, grad0);
-		laplacian_and_grad(iphi, lap_i, &lap1, grad1);
+		laplacian_and_grad(irho, gi, &lap0, grad0, gx, gy, gz);
+		laplacian_and_grad(iphi, gi, &lap1, grad1, gx, gy, gz);
 	%endif
 
 	// Cache macroscopic fields in local variables.
@@ -112,20 +112,6 @@ ${kernel} void PrepareMacroFields(
 	if (isUnusedNode(type))
 		return;
 
-	%if shan_chen:
-		// FIXME: Hackety-hack, should be done properly!
-		if (isWallNode(type)) {
-			if (gy == 0) {
-				orho[gi] = 1.0f;
-				ophi[gi] = 0.0f;
-			} else {
-				orho[gi] = 0.0f;
-				ophi[gi] = 1.0f;
-			}
-			return;
-		}
-	%endif
-
 	// cache the distributions in local variables
 	Dist fi;
 	float out;
@@ -138,30 +124,6 @@ ${kernel} void PrepareMacroFields(
 	get0thMoment(&fi, type, orientation, &out);
 	ophi[gi] = out;
 }
-
-<%def name="laplacian_grad_idx()">
-	int lap_i = gi;
-
-	if (gx == 0) {
-		lap_i += 1;
-	} else if (gx == ${lat_nx-1}) {
-		lap_i -= 1;
-	}
-
-	if (gy == 0) {
-		lap_i += ${lat_nx};
-	} else if (gy == ${lat_ny-1}) {
-		lap_i -= ${lat_nx};
-	}
-
-	%if dim == 3:
-		if (gz == 0) {
-			lap_i += ${lat_nx}*${lat_ny};
-		} else if (gz == ${lat_nz-1}) {
-			lap_i -= ${lat_nx}*${lat_ny};
-		}
-	%endif
-</%def>
 
 ${kernel} void CollideAndPropagate(
 	${global_ptr} int *map,
@@ -184,26 +146,43 @@ ${kernel} void CollideAndPropagate(
 		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
 	%endfor
 
-	%if not shan_chen:
-		${laplacian_grad_idx()}
-		float lap1, grad1[${dim}];
-
-		%if dim == 3:
-			float lap0, grad0[${dim}];
-			laplacian_and_grad(irho, lap_i, &lap0, grad0);
-		%endif
-		laplacian_and_grad(ipsi, lap_i, &lap1, grad1);
-	%else:
-		float sca1[${dim}], sca2[${dim}];
-		shan_chen_accel(gi, irho, ipsi, sca1, sca2, gx, gy);
-	%endif
-
 	int type, orientation;
 	decodeNodeType(map[gi], &orientation, &type);
 
 	// Unused nodes do not participate in the simulation.
 	if (isUnusedNode(type))
 		return;
+
+	%if not shan_chen:
+		float lap1, grad1[${dim}];
+		float lap0, grad0[${dim}];
+
+		if (gx == 0 || gx == ${lat_nx-1}) {
+			lap0 = 0.0f;
+			lap1 = 0.0f;
+			grad0[0] = 0.0f;
+			grad1[0] = 0.0f;
+			grad0[1] = 0.0f;
+			grad1[1] = 0.0f;
+			%if dim == 3:
+				grad0[2] = 0.0f;
+				grad1[2] = 0.0f;
+			%endif
+		} else {
+			if (!isWallNode(type)) {
+				%if dim == 3:
+					laplacian_and_grad(irho, gi, &lap0, grad0, gx, gy, gz);
+				%endif
+				laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy, gz);
+			}
+		}
+	%else:
+		float sca1[${dim}], sca2[${dim}];
+
+		if (!isWallNode(type)) {
+			shan_chen_accel(gi, irho, ipsi, sca1, sca2, gx, gy);
+		}
+	%endif
 
 	// cache the distributions in local variables
 	Dist d0, d1;
@@ -231,9 +210,7 @@ ${kernel} void CollideAndPropagate(
 		%endfor
 
 		// FIXME: hack to add a body force acting on one of the components
-		sca2[1] -= 0.15f / ${lat_ny};
-
-
+	//	sca2[1] -= 0.15f / ${lat_ny};
 	%endif
 
 	boundaryConditions(&d0, type, orientation, &rho, v);

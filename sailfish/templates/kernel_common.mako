@@ -13,6 +13,7 @@
 	%if dim == 2:
 		int gx = get_global_id(0);
 		int gy = get_group_id(1);
+		int gz = 0;
 		int gi = gx + ${lat_nx}*gy;
 	%else:
 		// This is a workaround for the limitations of current CUDA devices.
@@ -38,6 +39,16 @@
 #define GEO_BCP ${geo_bcp}
 
 #define DT 1.0f
+
+%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
+	${const_var} float ea0[${dim}] = {
+		${'%.20ff' % ext_accel_x},
+		${'%.20ff' % ext_accel_y}
+	%if dim == 3:
+		,${'%.20ff' % ext_accel_z}
+	%endif
+};
+%endif
 
 %for name, val in constants:
 	${const_var} float ${name} = ${val}f;
