@@ -14,6 +14,10 @@ class DummyOptions(object):
     force = False
     incompressible = False
 
+def update_options(target, src):
+    for x in filter(lambda x: x[0] != '_', dir(src)):
+        setattr(target, x, getattr(src, x))
+
 class TestGeo3D(geo.LBMGeo3D):
     def define_nodes(self):
         # Create a box of wall nodes.
@@ -50,7 +54,11 @@ class Test3DForce(unittest.TestCase):
         backend = backend_dummy.DummyBackend()
         options = DummyOptions()
         options.force = True
-        self.sim = lbm.FluidLBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True})
+        self.sim = lbm.FluidLBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True,
+            'lat_nx': self.shape[0], 'lat_ny': self.shape[1], 'lat_nz': self.shape[2]})
+        self.sim._init_shape()
+        update_options(self.sim.options, options)
+        self.sim._init_geo()
         self.geo = TestGeo3D(self.shape, options, float=numpy.float32, backend=backend,
                 sim=self.sim)
 
@@ -89,18 +97,6 @@ class Test3DForce(unittest.TestCase):
             (numpy.array([10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13]),
              numpy.array([11, 12, 13, 14, 11, 12, 13, 14, 11, 12, 13, 14, 11, 12, 13, 14]),
              numpy.array([101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101])),
-            (numpy.array([ 9,  9,  9,  9, 10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12]),
-             numpy.array([10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13]),
-             numpy.array([99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99])),
-            (numpy.array([ 9,  9,  9,  9, 10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12]),
-             numpy.array([10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13]),
-             numpy.array([101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101])),
-            (numpy.array([11, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14]),
-             numpy.array([10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13]),
-             numpy.array([99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99])),
-            (numpy.array([11, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14]),
-             numpy.array([10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13]),
-             numpy.array([101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101])),
             (numpy.array([ 9,  9,  9,  9, 10, 11, 12]),
              numpy.array([ 9, 10, 11, 12,  9,  9,  9]),
              numpy.array([100, 100, 100, 100, 100, 100, 100])),
@@ -112,7 +108,19 @@ class Test3DForce(unittest.TestCase):
              numpy.array([100, 100, 100, 100, 100, 100, 100])),
             (numpy.array([11, 12, 13, 14, 14, 14, 14]),
              numpy.array([14, 14, 14, 11, 12, 13, 14]),
-             numpy.array([100, 100, 100, 100, 100, 100, 100]))]
+             numpy.array([100, 100, 100, 100, 100, 100, 100])),
+            (numpy.array([ 9,  9,  9,  9, 10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12]),
+             numpy.array([10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13]),
+             numpy.array([99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99])),
+            (numpy.array([ 9,  9,  9,  9, 10, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12]),
+             numpy.array([10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13]),
+             numpy.array([101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101])),
+            (numpy.array([11, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14]),
+             numpy.array([10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13]),
+             numpy.array([99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99])),
+            (numpy.array([11, 11, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14]),
+             numpy.array([10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13, 10, 11, 12, 13]),
+             numpy.array([101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101, 101]))]
 
         for i in range(1, self.sim.grid.Q):
             for j in range(0, 3):
@@ -123,7 +131,11 @@ class Test3DNodeProcessing(unittest.TestCase):
 
     def setUp(self):
         backend = backend_dummy.DummyBackend()
-        self.sim = lbm.FluidLBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True})
+        self.sim = lbm.FluidLBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True,
+            'lat_nx': self.shape[0], 'lat_ny': self.shape[1], 'lat_nz': self.shape[2]})
+        self.sim._init_shape()
+        update_options(self.sim.options, DummyOptions())
+        self.sim._init_geo()
         self.geo = TestGeo3D(self.shape, options=DummyOptions(), float=numpy.float32,
                 backend=backend, sim=self.sim)
 
