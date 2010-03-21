@@ -578,6 +578,8 @@ class LBMGeo3D(LBMGeo):
 
             # Detect unused nodes.
             cnt = numpy.zeros_like(self.map).astype(numpy.int32)
+            orientation = numpy.empty(shape=self.map.shape, dtype=numpy.int32)
+            orientation[:] = self.NODE_DIR_OTHER
 
             for i, vec in enumerate(self.sim.grid.basis):
                 a = numpy.roll(self.map, -vec[0], axis=2)
@@ -586,11 +588,15 @@ class LBMGeo3D(LBMGeo):
 
                 cnt[(a == self.NODE_WALL)] += 1
 
+                # FIXME: Only process the primary 6 directions for now.
+                if vec.dot(vec) == 1:
+                    orientation[
+                            numpy.logical_and(self.map == self.NODE_FLUID,
+                                a == self.NODE_WALL)] = self.sim.grid.vec_to_dir(list(vec))
+
             self.map[(cnt == self.sim.grid.Q)] = self.NODE_UNUSED
 
             # Postprocess the whole domain here.
-            orientation = numpy.empty(shape=self.map.shape, dtype=numpy.int32)
-            orientation[:,:,:] = self.NODE_DIR_OTHER
             self.map = self._encode_node(orientation, self.map)
         else:
             nodes_ = nodes

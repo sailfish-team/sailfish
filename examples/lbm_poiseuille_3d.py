@@ -170,9 +170,9 @@ class LPoiSim(lbm.FluidLBMSim):
 
         lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
+    def _init_post_geo(self):
         if self.options.drive == 'force':
-            self._init_geo()
-            accel = geo_class.maxv * (16.0 * self.options.visc) / (self.geo.get_chan_width()**2)
+            accel = self.geo.maxv * (16.0 * self.options.visc) / (self.geo.get_chan_width()**2)
 
             if self.options.along_z:
                 self.options.periodic_z = True

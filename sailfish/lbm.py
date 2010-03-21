@@ -316,9 +316,7 @@ class LBMSim(object):
         if self.options.verbose:
             print '[{0:07.2f}] {1}'.format(time.time() - self._t_start, info)
 
-    def _init_geo(self):
-        self._timed_print('Initializing geometry.')
-
+    def _init_shape(self):
         self.arr_nx = int(math.ceil(float(self.options.lat_nx) / self.block_size)) * self.block_size
         self.arr_ny = self.options.lat_ny
         self.arr_nz = self.options.lat_nz
@@ -329,6 +327,8 @@ class LBMSim(object):
         else:
             self.shape = (self.options.lat_nz, self.options.lat_ny, self.options.lat_nx)
 
+    def _init_geo(self):
+        self._timed_print('Initializing geometry.')
         self._init_fields()
 
         # Simulation geometry.
@@ -336,8 +336,9 @@ class LBMSim(object):
                 self.float, self.backend, self)
         self.geo.init_dist(self.dist1)
         self.geo_params = self.float(self.geo.params)
-        # HACK: Prevent this method from being called again.
-        self._init_geo = lambda: True
+
+    def _init_post_geo(self):
+        pass
 
     def _update_ctx(self, ctx):
         pass
@@ -803,8 +804,10 @@ class LBMSim(object):
             raise ValueError('The LBM model "%s" is not supported with '
                     'grid type %s' % (self.lbm_model, self.grid.__name__))
 
+        self._init_shape()
         self._init_vis()
         self._init_geo()
+        self._init_post_geo()
         self._init_code()
         self._init_compute_fields()
         self._init_compute_kernels()
