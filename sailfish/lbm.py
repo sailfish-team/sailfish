@@ -871,121 +871,24 @@ class FluidLBMSim(LBMSim):
             self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)),
                                                 self.options.scr_depth, self.options.scr_scale)
 
-class TwoPhase(FluidLBMSim):
+class TwoPhaseBase(FluidLBMSim):
     kernel_file = 'two_phase.mako'
 
-    @property
-    def constants(self):
-        return [('Gamma', self.options.Gamma), ('A', self.options.A), ('kappa', self.options.kappa),
-                ('temp', self.options.T), ('lambda_', self.options.lambda_)]
-
     def __init__(self, geo_class, options=[], args=None, defaults=None):
-        super(TwoPhase, self).__init__(geo_class, options, args, defaults)
+        super(TwoPhaseBase, self).__init__(geo_class, options, args, defaults)
         self._prepare_symbols()
 
-        if self.grid.dim == 3:
-            self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium_3d(self)
-        else:
-            self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium_2d(self)
-            self.options.tau_phi = self.get_tau()
-
-    def _add_options(self, parser, lb_group):
-        super(TwoPhase, self)._add_options(parser, lb_group)
-
-        lb_group.add_option('--Gamma', dest='Gamma',
-            help='Gamma parameter', action='store', type='float',
-            default=0.5)
-        lb_group.add_option('--kappa', dest='kappa',
-            help='kappa parameter', action='store', type='float',
-            default=0.5)
-        lb_group.add_option('--A', dest='A',
-            help='A parameter', action='store', type='float',
-            default=0.5)
-        lb_group.add_option('--T', dest='T',
-            help='temperature (2D only)', action='store', type='float',
-            default=0.5)
-        lb_group.add_option('--lambda', dest='lambda_',
-            help='interaction strength (2D only)', action='store', type='float',
-            default=0.5)
-        lb_group.add_option('--tau_phi', dest='tau_phi', help='relaxation time for the phi field',
-                            action='store', type='float', default=1.0)
-        return None
-
-    def _update_ctx(self, ctx):
-        super(TwoPhase, self)._update_ctx(ctx)
-        ctx['grids'] = [self.grid, self.grid]
-        ctx['tau_phi'] = self.options.tau_phi
-
     def _prepare_symbols(self):
-        """Additional symbols and coefficients for the free-energy binary liquid model."""
         from sympy import Symbol, Matrix, Rational
-
-        self.S.Gamma = Symbol('Gamma')
-        self.S.kappa = Symbol('kappa')
         self.S.alias('phi', self.S.g1m0)
-        self.S.alias('lap0', self.S.g0d2m0)
-        self.S.alias('lap1', self.S.g1d2m0)
-        self.S.make_vector('grad0', self.grid.dim, self.S.g0d1m0x, self.S.g0d1m0y, self.S.g0d1m0z)
-        self.S.make_vector('grad1', self.grid.dim, self.S.g1d1m0x, self.S.g1d1m0y, self.S.g1d1m0z)
-
-        if self.grid.dim == 3:
-            self.S.A = Symbol('A')
-            self.S.wxy = [x[0]*x[1]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
-            self.S.wyz = [x[1]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
-            self.S.wxz = [x[0]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
-            self.S.wi = []
-            self.S.wxx = []
-            self.S.wyy = []
-            self.S.wzz = []
-
-            for x in sym.D3Q19.basis[1:]:
-                if x.dot(x) == 1:
-                    self.S.wi.append(Rational(1,6))
-
-                    if abs(x[0]) == 1:
-                        self.S.wxx.append(Rational(5,12))
-                    else:
-                        self.S.wxx.append(-Rational(1,3))
-
-                    if abs(x[1]) == 1:
-                        self.S.wyy.append(Rational(5,12))
-                    else:
-                        self.S.wyy.append(-Rational(1,3))
-
-                    if abs(x[2]) == 1:
-                        self.S.wzz.append(Rational(5,12))
-                    else:
-                        self.S.wzz.append(-Rational(1,3))
-
-                elif x.dot(x) == 2:
-                    self.S.wi.append(Rational(1,12))
-
-                    if abs(x[0]) == 1:
-                        self.S.wxx.append(-Rational(1,24))
-                    else:
-                        self.S.wxx.append(Rational(1,12))
-
-                    if abs(x[1]) == 1:
-                        self.S.wyy.append(-Rational(1,24))
-                    else:
-                        self.S.wyy.append(Rational(1,12))
-
-                    if abs(x[2]) == 1:
-                        self.S.wzz.append(-Rational(1,24))
-                    else:
-                        self.S.wzz.append(Rational(1,12))
-        else:
-            self.S.lambda_ = Symbol('lambda_')
-            self.S.T = Symbol('temp')
-            self.S.wi = [3 - x.dot(x) for x in sym.D2Q9.basis[1:]]
 
     def _init_fields(self):
-        super(TwoPhase, self)._init_fields()
+        super(TwoPhaseBase, self)._init_fields()
         self.phi = numpy.zeros(self.shape, self.float)
         self.dist2 = numpy.zeros([len(self.grid.basis)] + list(self.shape), self.float)
 
     def _init_compute_fields(self):
-        super(TwoPhase, self)._init_compute_fields()
+        super(TwoPhaseBase, self)._init_compute_fields()
         self.gpu_phi = self.backend.alloc_buf(like=self.phi)
         self.gpu_dist2a = self.backend.alloc_buf(like=self.dist2)
         self.gpu_dist2b = self.backend.alloc_buf(like=self.dist2)
@@ -1068,10 +971,149 @@ class TwoPhase(FluidLBMSim):
 
         if get_data:
             self.backend.run_kernel(kerns[2], self.kern_grid_size)
+            self.backend.sync()
             self.hostsync_velocity()
             self.hostsync_density()
+            self.backend.from_buf(self.gpu_phi)
+            self.backend.sync()
         else:
             self.backend.run_kernel(kerns[1], self.kern_grid_size)
+
+class BinaryFluidFreeEnergy(TwoPhaseBase):
+    @property
+    def constants(self):
+        return [('Gamma', self.options.Gamma), ('A', self.options.A), ('kappa', self.options.kappa),
+                ('temp', self.options.T), ('lambda_', self.options.lambda_)]
+
+    def __init__(self, geo_class, options=[], args=None, defaults=None):
+        super(BinaryFluidFreeEnergy, self).__init__(geo_class, options, args, defaults)
+
+        if self.grid.dim == 3:
+            self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium_3d(self)
+        else:
+            self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium_2d(self)
+            self.options.tau_phi = self.get_tau()
+
+    def _add_options(self, parser, lb_group):
+        super(BinaryFluidFreeEnergy, self)._add_options(parser, lb_group)
+
+        lb_group.add_option('--Gamma', dest='Gamma',
+            help='Gamma parameter', action='store', type='float',
+            default=0.5)
+        lb_group.add_option('--kappa', dest='kappa',
+            help='kappa parameter', action='store', type='float',
+            default=0.5)
+        lb_group.add_option('--A', dest='A',
+            help='A parameter', action='store', type='float',
+            default=0.5)
+        lb_group.add_option('--T', dest='T',
+            help='temperature (2D only)', action='store', type='float',
+            default=0.5)
+        lb_group.add_option('--lambda', dest='lambda_',
+            help='interaction strength (2D only)', action='store', type='float',
+            default=0.5)
+        lb_group.add_option('--tau_phi', dest='tau_phi', help='relaxation time for the phi field',
+                            action='store', type='float', default=1.0)
+        return None
+
+    def _update_ctx(self, ctx):
+        super(BinaryFluidFreeEnergy, self)._update_ctx(ctx)
+        ctx['grids'] = [self.grid, self.grid]
+        ctx['tau_phi'] = self.options.tau_phi
+        ctx['shan_chen'] = False
+
+    def _prepare_symbols(self):
+        """Additional symbols and coefficients for the free-energy binary liquid model."""
+        super(BinaryFluidFreeEnergy, self)._prepare_symbols()
+        from sympy import Symbol, Matrix, Rational
+
+        self.S.Gamma = Symbol('Gamma')
+        self.S.kappa = Symbol('kappa')
+        self.S.alias('lap0', self.S.g0d2m0)
+        self.S.alias('lap1', self.S.g1d2m0)
+        self.S.make_vector('grad0', self.grid.dim, self.S.g0d1m0x, self.S.g0d1m0y, self.S.g0d1m0z)
+        self.S.make_vector('grad1', self.grid.dim, self.S.g1d1m0x, self.S.g1d1m0y, self.S.g1d1m0z)
+
+        if self.grid.dim == 3:
+            self.S.A = Symbol('A')
+            self.S.wxy = [x[0]*x[1]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
+            self.S.wyz = [x[1]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
+            self.S.wxz = [x[0]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
+            self.S.wi = []
+            self.S.wxx = []
+            self.S.wyy = []
+            self.S.wzz = []
+
+            for x in sym.D3Q19.basis[1:]:
+                if x.dot(x) == 1:
+                    self.S.wi.append(Rational(1,6))
+
+                    if abs(x[0]) == 1:
+                        self.S.wxx.append(Rational(5,12))
+                    else:
+                        self.S.wxx.append(-Rational(1,3))
+
+                    if abs(x[1]) == 1:
+                        self.S.wyy.append(Rational(5,12))
+                    else:
+                        self.S.wyy.append(-Rational(1,3))
+
+                    if abs(x[2]) == 1:
+                        self.S.wzz.append(Rational(5,12))
+                    else:
+                        self.S.wzz.append(-Rational(1,3))
+
+                elif x.dot(x) == 2:
+                    self.S.wi.append(Rational(1,12))
+
+                    if abs(x[0]) == 1:
+                        self.S.wxx.append(-Rational(1,24))
+                    else:
+                        self.S.wxx.append(Rational(1,12))
+
+                    if abs(x[1]) == 1:
+                        self.S.wyy.append(-Rational(1,24))
+                    else:
+                        self.S.wyy.append(Rational(1,12))
+
+                    if abs(x[2]) == 1:
+                        self.S.wzz.append(-Rational(1,24))
+                    else:
+                        self.S.wzz.append(Rational(1,12))
+        else:
+            self.S.lambda_ = Symbol('lambda_')
+            self.S.T = Symbol('temp')
+            self.S.wi = [3 - x.dot(x) for x in sym.D2Q9.basis[1:]]
+
+class ShanChen(TwoPhaseBase):
+    @property
+    def constants(self):
+        return [('SCG', self.options.G)]
+
+    def __init__(self, geo_class, options=[], args=None, defaults=None):
+        super(ShanChen, self).__init__(geo_class, options, args, defaults)
+        self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
+        eq2, _ = sym.bgk_equilibrium(self.grid, self.S.phi, self.S.phi)
+        self.equilibrium.append(eq2[0])
+
+        # FIXME
+        self.options.tau_phi = self.get_tau()
+
+    def _add_options(self, parser, lb_group):
+        super(ShanChen, self)._add_options(parser, lb_group)
+
+        lb_group.add_option('--G', dest='G',
+            help='Shan-Chen interaction strength', action='store', type='float',
+            default=1.0)
+        lb_group.add_option('--tau_phi', dest='tau_phi', help='relaxation time for the phi field',
+                            action='store', type='float', default=1.0)
+        return None
+
+    def _update_ctx(self, ctx):
+        super(ShanChen, self)._update_ctx(ctx)
+        ctx['grids'] = [self.grid, self.grid]
+        ctx['tau_phi'] = self.options.tau_phi
+        ctx['shan_chen'] = True
 
 class SinglePhaseFreeSurfaceLBMSim(FluidLBMSim):
     float_fields = ['mass', 'eps']

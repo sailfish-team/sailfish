@@ -173,6 +173,78 @@ ${device_func} inline void laplacian_and_grad(float *field, int i, float *laplac
 }
 </%doc>
 
+##<%def name="sc_potential(comp)">
+##	1.0f - exp(-f${comp}[i + off]
+##</%def>
+
+<%def name="sc_potential(comp)">
+	f${comp}[i + off]
+</%def>
+
+%if shan_chen:
+${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${global_ptr} float *f2, float *a1, float *a2, int x, int y)
+{
+	float t1, t2;
+
+	%for i in range(0, dim):
+		a1[${i}] = 0.0f;
+		a2[${i}] = 0.0f;
+	%endfor
+
+	int off, nx, ny;
+
+	%for i, ve in enumerate(grid.basis):
+		%if dim == 3:
+			t1 = 1.0f - expf(-f1[i + ${rel_offset(ve[0], ve[1], ve[2])}]);
+			t2 = 1.0f - expf(-f2[i + ${rel_offset(ve[0], ve[1], ve[2])}]);
+		%else:
+
+			off = ${rel_offset(ve[0], ve[1], 0)};
+			nx = x + ${ve[0]};
+			ny = y + ${ve[1]};
+
+			%if periodicity[0] and ve[0] != 0:
+				if (nx < 0 || nx > ${lat_nx-1}) {
+					off += ${pbc_offsets[0][int(ve[0])]};
+				}
+			%endif
+
+			%if periodicity[1] and ve[1] != 0:
+				if (ny < 0 || ny > ${lat_ny-1}) {
+					off += ${pbc_offsets[1][int(ve[1])]};
+				}
+			%endif
+
+			t1 = ${sc_potential(1)};
+			t2 = ${sc_potential(2)};
+		%endif
+
+		%if ve[0] != 0:
+			a1[0] += t2 * ${ve[0] * grid.weights[i]};
+			a2[0] += t1 * ${ve[0] * grid.weights[i]};
+		%endif
+		%if ve[1] != 0:
+			a1[1] += t2 * ${ve[1] * grid.weights[i]};
+			a2[1] += t1 * ${ve[1] * grid.weights[i]};
+		%endif
+		%if dim == 3 and ve[2] != 0:
+			a1[2] += t2 * ${ve[2] * grid.weights[i]};
+			a2[2] += t1 * ${ve[2] * grid.weights[i]};
+		%endif
+	%endfor
+
+	off = 0;
+
+	t1 = ${sc_potential(1)};
+	t2 = ${sc_potential(2)};
+
+	%for i in range(0, dim):
+		a1[${i}] *= t1 * SCG;
+		a2[${i}] *= t2 * SCG;
+	%endfor
+}
+%endif
+
 // Compute the 0th moment of the distributions, i.e. density.
 ${device_func} inline void compute_0th_moment(Dist *fi, float *out)
 {
@@ -180,11 +252,17 @@ ${device_func} inline void compute_0th_moment(Dist *fi, float *out)
 }
 
 // Compute the 1st moments of the distributions, i.e. momentum.
-${device_func} inline void compute_1st_moment(Dist *fi, float *out)
+${device_func} inline void compute_1st_moment(Dist *fi, float *out, int add, float factor)
 {
-	%for d in range(0, grid.dim):
-		out[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, momentum=True), pointers=True)};
-	%endfor
+	if (add) {
+		%for d in range(0, grid.dim):
+			out[${d}] += factor * (${cex(sym.ex_velocity(grid, 'fi', d, momentum=True), pointers=True)});
+		%endfor
+	} else {
+		%for d in range(0, grid.dim):
+			out[${d}] = factor * (${cex(sym.ex_velocity(grid, 'fi', d, momentum=True), pointers=True)});
+		%endfor
+	}
 }
 
 // Compute the 1st moments of the distributions and divide it by the 0-th moment

@@ -11,16 +11,25 @@ ${const_var} float tau0 = ${tau}f;		// relaxation time
 ${const_var} float tau1 = ${tau_phi}f;		// relaxation time for the order parameter
 ${const_var} float visc = ${visc}f;		// viscosity
 
-<%def name="bgk_args_decl()">
-%if dim == 3:
-	float rho, float phi, float lap1, float *v0, float *grad0
-%else:
-	float rho, float phi, float lap1, float *v0, float *grad1
-%endif
+<%def name="bgk_args_decl_sc()">
+	float rho, float phi, float *v0, float *ea0, float *ea1
+</%def>
+
+<%def name="bgk_args_decl_fe()">
+	%if dim == 3:
+		float rho, float phi, float lap1, float *v0, float *grad0
+	%else:
+		float rho, float phi, float lap1, float *v0, float *grad1
+	%endif
 </%def>
 
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
-${kernel_common.body(bgk_args_decl)}
+
+%if shan_chen:
+	${kernel_common.body(bgk_args_decl_sc)}
+%else:
+	${kernel_common.body(bgk_args_decl_fe)}
+%endif
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="code_common.mako" import="*"/>
@@ -30,14 +39,17 @@ ${kernel_common.body(bgk_args_decl)}
 
 <%include file="tracers.mako"/>
 
-<%def name="bgk_args()">
-%if dim == 3:
-	rho, phi, lap1, v, grad0
-%else:
-	rho, phi, lap1, v, grad1
-%endif
+<%def name="bgk_args_sc()">
+	rho, phi, v, sca1, sca2
 </%def>
 
+<%def name="bgk_args_fe()">
+	%if dim == 3:
+		rho, phi, lap1, v, grad0
+	%else:
+		rho, phi, lap1, v, grad1
+	%endif
+</%def>
 
 
 // A kernel to set the node distributions using the equilibrium distributions
@@ -51,12 +63,14 @@ ${kernel} void SetInitialConditions(
 {
 	${local_indices()}
 
-	float lap0, grad0[${dim}];
-	float lap1, grad1[${dim}];
+	%if not shan_chen:
+		float lap0, grad0[${dim}];
+		float lap1, grad1[${dim}];
 
-	${laplacian_grad_idx()}
-	laplacian_and_grad(irho, lap_i, &lap0, grad0);
-	laplacian_and_grad(iphi, lap_i, &lap1, grad1);
+		${laplacian_grad_idx()}
+		laplacian_and_grad(irho, lap_i, &lap0, grad0);
+		laplacian_and_grad(iphi, lap_i, &lap1, grad1);
+	%endif
 
 	// Cache macroscopic fields in local variables.
 	float rho = irho[gi];
@@ -65,9 +79,9 @@ ${kernel} void SetInitialConditions(
 
 	v0[0] = ivx[gi];
 	v0[1] = ivy[gi];
-%if dim == 3:
-	v0[2] = ivz[gi];
-%endif
+	%if dim == 3:
+		v0[2] = ivz[gi];
+	%endif
 
 	%for local_var in bgk_equilibrium_vars:
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
@@ -98,6 +112,20 @@ ${kernel} void PrepareMacroFields(
 	if (isUnusedNode(type))
 		return;
 
+	%if shan_chen:
+		// FIXME: Hackety-hack, should be done properly!
+		if (isWallNode(type)) {
+			if (gy == 0) {
+				orho[gi] = 1.0f;
+				ophi[gi] = 0.0f;
+			} else {
+				orho[gi] = 0.0f;
+				ophi[gi] = 1.0f;
+			}
+			return;
+		}
+	%endif
+
 	// cache the distributions in local variables
 	Dist fi;
 	float out;
@@ -126,13 +154,13 @@ ${kernel} void PrepareMacroFields(
 		lap_i -= ${lat_nx};
 	}
 
-%if dim == 3:
-	if (gz == 0) {
-		lap_i += ${lat_nx}*${lat_ny};
-	} else if (gz == ${lat_nz-1}) {
-		lap_i -= ${lat_nx}*${lat_ny};
-	}
-%endif
+	%if dim == 3:
+		if (gz == 0) {
+			lap_i += ${lat_nx}*${lat_ny};
+		} else if (gz == ${lat_nz-1}) {
+			lap_i -= ${lat_nx}*${lat_ny};
+		}
+	%endif
 </%def>
 
 ${kernel} void CollideAndPropagate(
@@ -156,14 +184,19 @@ ${kernel} void CollideAndPropagate(
 		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
 	%endfor
 
-	float lap1, grad1[${dim}];
+	%if not shan_chen:
+		${laplacian_grad_idx()}
+		float lap1, grad1[${dim}];
 
-	${laplacian_grad_idx()}
-%if dim == 3:
-	float lap0, grad0[${dim}];
-	laplacian_and_grad(irho, lap_i, &lap0, grad0);
-%endif
-	laplacian_and_grad(ipsi, lap_i, &lap1, grad1);
+		%if dim == 3:
+			float lap0, grad0[${dim}];
+			laplacian_and_grad(irho, lap_i, &lap0, grad0);
+		%endif
+		laplacian_and_grad(ipsi, lap_i, &lap1, grad1);
+	%else:
+		float sca1[${dim}], sca2[${dim}];
+		shan_chen_accel(gi, irho, ipsi, sca1, sca2, gx, gy);
+	%endif
 
 	int type, orientation;
 	decodeNodeType(map[gi], &orientation, &type);
@@ -180,10 +213,31 @@ ${kernel} void CollideAndPropagate(
 	// macroscopic quantities for the current cell
 	float rho, v[${dim}], phi;
 
-	getMacro(&d0, type, orientation, &rho, v);
-	get0thMoment(&d1, type, orientation, &phi);
+	%if not shan_chen:
+		getMacro(&d0, type, orientation, &rho, v);
+		get0thMoment(&d1, type, orientation, &phi);
+	%else:
+		float total_dens;
+		get0thMoment(&d0, type, orientation, &rho);
+		get0thMoment(&d1, type, orientation, &phi);
+
+		compute_1st_moment(&d0, v, 0, 1.0f/tau0);
+		compute_1st_moment(&d1, v, 1, 1.0f/tau1);
+		total_dens = rho / tau0 + phi / tau1;
+		%for i in range(0, dim):
+			sca1[${i}] /= rho;
+			sca2[${i}] /= phi;
+			v[${i}] /= total_dens;
+		%endfor
+
+		// FIXME: hack to add a body force acting on one of the components
+		sca2[1] -= 0.15f / ${lat_ny};
+
+
+	%endif
 
 	boundaryConditions(&d0, type, orientation, &rho, v);
+	boundaryConditions(&d1, type, orientation, &phi, v);
 	${barrier()}
 
 	// only save the macroscopic quantities if requested to do so
@@ -195,7 +249,11 @@ ${kernel} void CollideAndPropagate(
 		%endif
 	}
 
-	${relaxate(bgk_args)}
+	%if shan_chen:
+		${relaxate(bgk_args_sc)}
+	%else:
+		${relaxate(bgk_args_fe)}
+	%endif
 	${propagate('dist1_out', 'd0')}
 	${barrier()}
 	${propagate('dist2_out', 'd1')}

@@ -497,7 +497,7 @@ def shallow_water_equilibrium(grid):
 
     return ([out], [])
 
-def bgk_equilibrium(grid):
+def bgk_equilibrium(grid, rho=None, rho0=None):
     """Get expressions for the BGK equilibrium distribution.
 
     :param grid: the grid class to be used
@@ -506,9 +506,15 @@ def bgk_equilibrium(grid):
     """
     out = []
 
+    if rho is None:
+        rho = S.rho
+
+    if rho0 is None:
+        rho0 = S.rho0
+
     for i, ei in enumerate(grid.basis):
         t = (grid.weights[i] * (
-                    (S.rho + S.rho0 * poly_factorize(
+                    (rho + rho0 * poly_factorize(
                         3*ei.dot(grid.v) +
                         Rational(9, 2) * (ei.dot(grid.v))**2 -
                         Rational(3, 2) * grid.v.dot(grid.v)))))
@@ -546,18 +552,20 @@ def lambdify_equilibrium(sim):
 
     return ret
 
-def bgk_external_force(grid):
+def bgk_external_force(grid, grid_num=0):
     """Get expressions for the external body force correction in the BGK model.
 
     :param grid: the grid class to be used
 
     :rtype: list of sympy expressions (in the same order as the current grid's basis)
     """
-    eax = Symbol('eax')
-    eay = Symbol('eay')
-    eaz = Symbol('eaz')
     pref = Symbol('pref')
 
+    eax = getattr(S, 'g%seax' % grid_num)
+    eay = getattr(S, 'g%seay' % grid_num)
+    eaz = getattr(S, 'g%seaz' % grid_num)
+
+    # TODO: Move this block to another function.
     if grid.dim == 2:
         ea = Matrix(([eax, eay],))
     else:
@@ -571,9 +579,18 @@ def bgk_external_force(grid):
 
     return ret
 
-def bgk_external_force_pref():
+def bgk_external_force_pref(grid_num=0):
     # This includes a factor of c_s^2.
-    return 'rho * (3.0f - 3.0f/(2.0f * tau))'
+
+    # FIXMe
+    rho = getattr(S, 'g%sm0' % grid_num)
+
+    if grid_num == 0:
+        rho = 'rho'
+    else:
+        rho = 'phi'
+
+    return '%s * (3.0f - 3.0f/(2.0f * tau%s))' % (rho, grid_num)
 
 def bb_swap_pairs(grid):
     """Get a set of indices which have to be swapped for a full bounce-back."""
@@ -850,6 +867,8 @@ def use_pointers(str):
 
 def use_vectors(str):
     ret = str.replace('vx', 'v0[0]').replace('vy', 'v0[1]').replace('vz', 'v0[2]')
+    ret = ret.replace('g1eax', 'ea1[0]').replace('g1eay', 'ea1[1]').replace('g1eaz', 'ea1[2]')
+    ret = ret.replace('eax', 'ea0[0]').replace('eay', 'ea0[1]').replace('eaz', 'ea0[2]')
 
     for dist in range(0, 9):
         ret = ret.replace('g%sd1m0x' % dist, 'grad%s[0]' % dist)
@@ -1089,11 +1108,20 @@ def _prepare_symbols():
                 n = name + comp_map[c1] + comp_map[c2]
                 setattr(S, n, Symbol(n))
 
+        # External acceleration.
+        name = 'g%sea' % grid_num
+        for comp in ('x', 'y', 'z'):
+            setattr(S, name + comp, Symbol(name + comp))
+
     # Commonly used aliases.
     S.alias('vx', S.g0m1x)
     S.alias('vy', S.g0m1y)
     S.alias('vz', S.g0m1z)
     S.alias('rho', S.g0m0)
+
+    S.alias('eax', S.g0eax)
+    S.alias('eay', S.g0eay)
+    S.alias('eaz', S.g0eaz)
 
     # For incompressible models, this symbol is replaced with the average
     # density, usually 1.0.  For compressible models, it is the same as

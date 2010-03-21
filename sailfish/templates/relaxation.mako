@@ -75,7 +75,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 // Performs the relaxation step in the BGK model given the density rho,
 // the velocity v and the distribution fi.
 //
-${device_func} void BGK_relaxate(${bgk_args_decl()},
+${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 %for i in range(0, len(grids)):
 	Dist *d${i},
 %endfor
@@ -90,9 +90,21 @@ ${device_func} void BGK_relaxate(${bgk_args_decl()},
 	%endfor
 
 	%for i, eq in enumerate(bgk_equilibrium):
+		%if shan_chen:
+			%for j in range(0, dim):
+				v0[${j}] += tau${i} * ea${i}[${j}];
+			%endfor
+		%endif
+
 		%for feq, idx in eq:
 			feq${i}.${idx} = ${cex(feq, vectors=True)};
 		%endfor
+
+		%if shan_chen:
+			%for j in range(0, dim):
+				v0[${j}] -= tau${i} * ea${i}[${j}];
+			%endfor
+		%endif
 	%endfor
 
 	%for i in range(0, len(grids)):
@@ -103,12 +115,11 @@ ${device_func} void BGK_relaxate(${bgk_args_decl()},
 		%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
 			if (!isWallNode(node_type))
 			{
+				float pref = ${sym.bgk_external_force_pref()};
 				// External acceleration.
 				#define eax ${'%.20ff' % ext_accel_x}
 				#define eay ${'%.20ff' % ext_accel_y}
 				#define eaz ${'%.20ff' % ext_accel_z}
-				float pref = ${sym.bgk_external_force_pref()};
-
 				%for val, idx in sym.bgk_external_force(grid):
 					d${i}->${idx} += ${cex(val)};
 				%endfor
