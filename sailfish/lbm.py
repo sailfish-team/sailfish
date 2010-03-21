@@ -5,6 +5,7 @@ import pwd
 import sys
 import time
 from sailfish import geo
+from sailfish import vis
 from sailfish import vis2d
 
 import optparse
@@ -50,21 +51,6 @@ def _convert_to_double(src):
     t = t.replace('expf(', 'exp(')
     t = t.replace('powf(', 'pow(')
     return t
-
-
-class Field(object):
-    def __init__(self, name, values, negative=False, ranges=None):
-        self.name = name
-        if type(values) is tuple or type(values) is list:
-            self.vals = values
-        else:
-            self.vals = (values,)
-
-        self.negative = negative
-        self.ranges = ranges
-
-        if ranges is not None and len(ranges) != len(values):
-            raise ValueError('A range has to be specified for every component of the field.')
 
 
 class LBMSim(object):
@@ -208,8 +194,6 @@ class LBMSim(object):
         # value and device capabilities.
         self.block_size = 64
 
-        self.vis_fields = []
-
         # Whether to use the macroscopic fields to set the initial distributions.
         self.ic_fields = False
         self.num_tracers = 0
@@ -230,6 +214,7 @@ class LBMSim(object):
         self.forces = {}
         self._force_couplings = {}
         self._force_term_for_eq = {}
+        self.vis = vis.FluidVis()
 
     def _set_grid(self, name):
         for x in sym.KNOWN_GRIDS:
@@ -497,14 +482,14 @@ class LBMSim(object):
 
         self.rho = self.make_field()
 
-        self.add_vis_field(lambda: numpy.sqrt(numpy.square(self.vx) + numpy.square(self.vy)),
+        self.vis.add_field(lambda: numpy.sqrt(numpy.square(self.vx) + numpy.square(self.vy)),
                 'velocity magnitude')
-        self.add_vis_field(self.vx, 'X velocity component', True)
-        self.add_vis_field(self.vy, 'Y velocity component', True)
+        self.vis.add_field(self.vx, 'X velocity component', True)
+        self.vis.add_field(self.vy, 'Y velocity component', True)
         if self.grid.dim == 3:
-            self.add_vis_field(self.vz, 'Z velocity component', True)
+            self.vis.add_field(self.vz, 'Z velocity component', True)
 
-        self.add_vis_field(lambda:
+        self.vis.add_field(lambda:
                 (numpy.roll(self.vy, 1, 1) - numpy.roll(self.vy, -1, 1)) -
                 (numpy.roll(self.vx, 1, 0) - numpy.roll(self.vx, -1, 0)),
                 'vorticity from the X and Y velocity components', True)
@@ -818,8 +803,8 @@ class LBMSim(object):
             raise ValueError('The LBM model "%s" is not supported with '
                     'grid type %s' % (self.lbm_model, self.grid.__name__))
 
-        self._init_geo()
         self._init_vis()
+        self._init_geo()
         self._init_code()
         self._init_compute_fields()
         self._init_compute_kernels()
@@ -839,20 +824,6 @@ class LBMSim(object):
             self._run_batch()
         else:
             self.vis.main()
-
-    # TODO: Ideally, this should be moved to the visualization classes.
-    def add_vis_field(self, field, description, negative=False):
-        if type(field) is list or type(field) is tuple:
-            self.vis_fields.append(Field(description, field, negative))
-        else:
-            if callable(field):
-                self.vis_fields.append(Field(description, field, negative))
-            else:
-                self.vis_fields.append(Field(description, lambda: field, negative))
-
-    @property
-    def num_vis_fields(self):
-        return len(self.vis_fields)
 
     def add_body_force(self, force, grid=0, accel=True):
         """Add a constant global force field acting on the fluid.
@@ -909,7 +880,7 @@ class FluidLBMSim(LBMSim):
 
     def _init_fields(self):
         super(FluidLBMSim, self)._init_fields()
-        self.add_vis_field(self.rho, 'density', True)
+        self.vis.add_field(self.rho, 'density', True)
 
     def _update_ctx(self, ctx):
         ctx['incompressible'] = self.incompressible
@@ -1194,7 +1165,7 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
 
     def _init_fields(self):
         super(BinaryFluidFreeEnergy, self)._init_fields()
-        self.add_vis_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
+        self.vis.add_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
 
 class ShanChen(BinaryFluidBase):
     @property
@@ -1210,7 +1181,7 @@ class ShanChen(BinaryFluidBase):
 
     def _init_fields(self):
         super(ShanChen, self)._init_fields()
-        self.add_vis_field((lambda: self.rho, lambda: self.phi), 'density')
+        self.vis.add_field((lambda: self.rho, lambda: self.phi), 'density')
 
     def _add_options(self, parser, lb_group):
         super(ShanChen, self)._add_options(parser, lb_group)

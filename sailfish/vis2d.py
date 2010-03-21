@@ -8,6 +8,7 @@ import time
 
 from sailfish import geo
 from sailfish import sym
+from sailfish import vis
 
 from scipy import signal
 
@@ -94,8 +95,7 @@ cmaps = {
         }
     }
 
-class Fluid2DVis(object):
-
+class Fluid2DVis(vis.FluidVis):
     _color_unused = (128, 128, 128)
     _color_wall = (255, 255, 255)
 
@@ -104,6 +104,8 @@ class Fluid2DVis(object):
     VIS_TYPES = [VIS_LINEAR, VIS_FLUCTUATION]
 
     def __init__(self, sim, width, height, depth, lat_nx, lat_ny, scale):
+        super(Fluid2DVis, self).__init__()
+
         # If the size of the window has not been explicitly defined, automatically adjust it
         # based on the size of the grid,
         if width == 0:
@@ -144,7 +146,7 @@ class Fluid2DVis(object):
                     pygame.RESIZABLE)
 
     def _reset(self):
-        self._cmap_scale = [1.0] * self.sim.num_vis_fields
+        self._cmap_scale = [1.0] * self.num_fields
 
     @property
     def vx(self):
@@ -156,7 +158,7 @@ class Fluid2DVis(object):
 
     @property
     def field(self):
-        return self.sim.vis_fields[self._visfield]
+        return self.vis_fields[self._visfield]
 
     @property
     def geo_map(self):
@@ -226,9 +228,11 @@ class Fluid2DVis(object):
         pygame.transform.scale(srf2, self._screen.get_size(), self._screen)
         sw, sh = self._screen.get_size()
 
+        maxv = numpy.max(numpy.sqrt(numpy.square(self.vx) + numpy.square(self.vy)))
+        ret.append('maxv: %.3f' % maxv)
+
         # Draw the velocity field
         if self._velocity:
-            maxv = numpy.max(numpy.sqrt(numpy.square(self.vx) + numpy.square(self.vy)))
             vfsp = 21
             scale = 0.8 * max(sh, sw)/(vfsp-1) / maxv
 
@@ -242,7 +246,11 @@ class Fluid2DVis(object):
                                      (ox + self.vx[height*j/vfsp][width*i/vfsp] * scale,
                                       oy - self.vy[height*j/vfsp][width*i/vfsp] * scale))
 
-        self._draw_tracers(tx, ty, sw, sh, width, height)
+        try:
+            self._draw_tracers(tx, ty, sw, sh, width, height)
+        except ValueError:
+            pass
+
         return ret
 
     def _draw_field(self, fields, srf, wall_map, unused_map, width, height):
@@ -311,10 +319,10 @@ class Fluid2DVis(object):
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_MINUS:
                     self._visfield -= 1
-                    self._visfield %= self.sim.num_vis_fields
+                    self._visfield %= self.num_fields
                 elif event.key == pygame.K_EQUALS:
                     self._visfield += 1
-                    self._visfield %= self.sim.num_vis_fields
+                    self._visfield %= self.num_fields
                 elif event.key == pygame.K_LEFTBRACKET:
                     n = len(self.field.vals)
                     idx = cmaps[n].keys().index(self._cmap[n]) - 1
@@ -376,6 +384,11 @@ class Fluid2DVis(object):
             y = 48
             for info in ret:
                 tmp = self._font.render(info, True, (0, 255, 0))
+                self._screen.blit(tmp, (12, y))
+                y += 12
+
+            for info in self.display_infos:
+                tmp = self._font.render(info(), True, (0, 255, 0))
                 self._screen.blit(tmp, (12, y))
                 y += 12
 

@@ -12,6 +12,7 @@ from OpenGL.arrays import numpymodule
 
 from sailfish import geo
 from sailfish import sym
+from sailfish import vis
 
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
@@ -48,9 +49,10 @@ colormaps = {
     'scl': _vis_scl,
     }
 
-class FluidSurfaceVis(object):
+class FluidSurfaceVis(vis.FluidVis):
 
     def __init__(self, sim, width, height, depth, lat_nx, lat_ny):
+        super(FluidSurfaceVis, self).__init__()
         self._font = pygame.font.SysFont('Liberation Mono', 14)
         self.depth = depth
         self.set_mode(width, height)
