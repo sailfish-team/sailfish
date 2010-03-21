@@ -38,7 +38,7 @@ class SCSim(lbm.ShanChen):
                                 'lat_ny': 400, 'grid': 'D2Q9', 'G': -1.2,
                                 'visc': 0.166666666666, 'periodic_x': True, 'scr_scale': 1})
         self.options.tau_phi = self.get_tau()
-
+        self.add_body_force((0.0, -0.15 / self.options.lat_ny), grid=1)
 
 sim = SCSim(GeoSC)
 sim.run()

@@ -7,7 +7,7 @@
 %endif
 
 <%def name="bgk_args_decl()">
-	float rho, float *v0
+	float rho, float *iv0
 </%def>
 
 <%def name="bgk_args()">

@@ -68,34 +68,6 @@
 	}
 </%def>
 
-<%def name="external_force(node_type, vx, vy, vz, rho=0, momentum=False)">
-	%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
-		if (!isWallNode(${node_type})) {
-			%if momentum:
-				%if ext_accel_x != 0.0:
-					${vx} += ${rho} * ${'%.20ff' % (0.5 * ext_accel_x)};
-				%endif
-				%if ext_accel_y != 0.0:
-					${vy} += ${rho} * ${'%.20ff' % (0.5 * ext_accel_y)};
-				%endif
-				%if dim == 3 and ext_accel_z != 0.0:
-					${vz} += ${rho} * ${'%.20ff' % (0.5 * ext_accel_z)};
-				%endif
-			%else:
-				%if ext_accel_x != 0.0:
-					${vx} += ${'%.20ff' % (0.5 * ext_accel_x)};
-				%endif
-				%if ext_accel_y != 0.0:
-					${vy} += ${'%.20ff' % (0.5 * ext_accel_y)};
-				%endif
-				%if dim == 3 and ext_accel_z != 0.0:
-					${vz} += ${'%.20ff' % (0.5 * ext_accel_z)};
-				%endif
-			%endif
-		}
-	%endif
-</%def>
-
 ${device_func} inline void bounce_back(Dist *fi)
 {
 	float t;
@@ -326,10 +298,6 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 			compute_macro_quant(fi, rho, v0);
 		%endif
 	}
-
-	%if simtype == 'fluid':
-		${external_force('node_type', 'v0[0]', 'v0[1]', 'v0[2]')}
-	%endif
 }
 
 ${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orientation, float *rho, float *v0)

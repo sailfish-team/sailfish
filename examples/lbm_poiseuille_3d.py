@@ -176,13 +176,13 @@ class LPoiSim(lbm.FluidLBMSim):
 
             if self.options.along_z:
                 self.options.periodic_z = True
-                self.options.accel_z = accel
+                self.add_body_force((0.0, 0.0, accel))
             elif self.options.along_y:
                 self.options.periodic_y = True
-                self.options.accel_y = accel
+                self.add_body_force((0.0, accel, 0.0))
             else:
                 self.options.periodic_x = True
-                self.options.accel_x = accel
+                self.add_body_force((accel, 0.0, 0.0))
 
     def get_profile(self):
         # NOTE: This only works for the 'along_y' option.

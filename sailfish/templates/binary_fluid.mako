@@ -4,11 +4,19 @@
 %>
 
 <%def name="bgk_args_decl_sc()">
-	float rho, float phi, float *v0, float *ea0, float *ea1
+	float rho, float phi, float *iv0, float *ea0, float *ea1
 </%def>
 
 <%def name="bgk_args_decl_fe()">
-	float rho, float phi, float lap1, float *v0, float *grad1
+	float rho, float phi, float lap1, float *iv0, float *grad1
+</%def>
+
+<%def name="bgk_args_sc()">
+	rho, phi, v, sca1, sca2
+</%def>
+
+<%def name="bgk_args_fe()">
+	rho, phi, lap1, v, grad1
 </%def>
 
 %if 'gravity' in context.keys():
@@ -36,15 +44,6 @@ ${const_var} float visc = ${visc}f;		// viscosity
 
 <%include file="finite_difference_optimized.mako"/>
 <%include file="tracers.mako"/>
-
-<%def name="bgk_args_sc()">
-	rho, phi, v, sca1, sca2
-</%def>
-
-<%def name="bgk_args_fe()">
-	rho, phi, lap1, v, grad1
-</%def>
-
 
 // A kernel to set the node distributions using the equilibrium distributions
 // and the macroscopic fields.
@@ -161,6 +160,7 @@ ${kernel} void CollideAndPropagate(
 	%elif simtype == 'shan-chen':
 		float sca1[${dim}], sca2[${dim}];
 
+		## TODO: Modify this to use force_couplings.
 		if (!isWallNode(type)) {
 			shan_chen_accel(gi, irho, ipsi, sca1, sca2, gx, gy);
 		}
@@ -190,9 +190,6 @@ ${kernel} void CollideAndPropagate(
 			sca2[${i}] /= phi;
 			v[${i}] /= total_dens;
 		%endfor
-
-		// FIXME: hack to add a body force acting on one of the components
-	//	sca2[1] -= 0.15f / ${lat_ny};
 	%endif
 
 	boundaryConditions(&d0, type, orientation, &rho, v);
@@ -200,7 +197,7 @@ ${kernel} void CollideAndPropagate(
 	${barrier()}
 
 	// only save the macroscopic quantities if requested to do so
-	if (save_macro == 1 && !isWallNode(type)) {
+	if (save_macro == 1) {
 		ovx[gi] = v[0];
 		ovy[gi] = v[1];
 		%if dim == 3:

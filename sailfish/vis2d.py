@@ -144,7 +144,7 @@ class Fluid2DVis(object):
                     pygame.RESIZABLE)
 
     def _reset(self):
-        self._cmap_scale = [1.0] * self.sim.num_fields
+        self._cmap_scale = [1.0] * self.sim.num_vis_fields
 
     @property
     def vx(self):
@@ -311,10 +311,10 @@ class Fluid2DVis(object):
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_MINUS:
                     self._visfield -= 1
-                    self._visfield %= self.sim.num_fields
+                    self._visfield %= self.sim.num_vis_fields
                 elif event.key == pygame.K_EQUALS:
                     self._visfield += 1
-                    self._visfield %= self.sim.num_fields
+                    self._visfield %= self.sim.num_vis_fields
                 elif event.key == pygame.K_LEFTBRACKET:
                     n = len(self.field.vals)
                     idx = cmaps[n].keys().index(self._cmap[n]) - 1

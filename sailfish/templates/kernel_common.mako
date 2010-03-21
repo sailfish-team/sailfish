@@ -48,16 +48,6 @@
 
 #define DT 1.0f
 
-%if ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0:
-	${const_var} float ea0[${dim}] = {
-		${'%.20ff' % ext_accel_x},
-		${'%.20ff' % ext_accel_y}
-	%if dim == 3:
-		,${'%.20ff' % ext_accel_z}
-	%endif
-};
-%endif
-
 %for name, val in constants:
 	${const_var} float ${name} = ${val}f;
 %endfor

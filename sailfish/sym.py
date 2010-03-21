@@ -1,3 +1,4 @@
+import operator
 from operator import itemgetter
 import math
 import numpy
@@ -939,7 +940,7 @@ def use_vectors(str):
     return ret
 
 def make_float(t):
-    return re.sub(r'([^a-zA-Z][0-9]+\.[0-9]*)', r'\1f', str(t))
+    return re.sub(r'((^|[^a-zA-Z])[0-9]+\.[0-9]*(e-?[0-9]*)?)', r'\1f', str(t))
 
 def int2float(t):
     return re.sub(r'([0-9]+)([^\.])', r'\1.0\2', str(t))
@@ -982,8 +983,8 @@ def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False):
     t = ex
     S = sim.S
 
-    if type(t) is int:
-        return str(t)
+    if type(t) is int or type(t) is float or isinstance(t, numpy.generic):
+        return make_float(t)
 
     if type(rho) is str:
         rho = Symbol(rho)
@@ -1018,6 +1019,36 @@ def _gcd(a,b):
 
 def gcd(*terms):
     return reduce(lambda a,b: _gcd(a,b), terms)
+
+
+def needs_coupling_accel(i, force_couplings):
+    return (i in
+        reduce(lambda x, y: operator.add(x, [y[0], y[1]]), force_couplings.keys(), []))
+
+def needs_accel(i, forces, force_couplings):
+    return (i in forces) or needs_coupling_accel(i, force_couplings)
+
+def fluid_accel(sim, i, dim, forces, force_couplings):
+    if needs_accel(i, forces, force_couplings):
+        ea = accel_vector(sim.grid, i)
+        return ea[dim]
+    else:
+        return 0.0
+
+def body_force_accel(i, dim, forces):
+    t = 0
+
+    if i in forces:
+        # Force
+        if False in forces[i]:
+            t += forces[i][False][dim] / Symbol('g%dm0' % i)
+
+        # Acceleration
+        if True in forces[i]:
+            t += forces[i][True][dim]
+
+    return t
+
 
 def orthogonalize(*vectors):
     """Ortogonalize a set of vectors.

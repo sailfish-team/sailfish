@@ -132,10 +132,11 @@ class LPoiSim(lbm.FluidLBMSim):
             self._init_geo()
             self.options.periodic_y = not self.options.horizontal
             self.options.periodic_x = self.options.horizontal
+            accel = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
             if self.options.horizontal:
-                self.options.accel_x = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
+                self.add_body_force((accel, 0.0))
             else:
-                self.options.accel_y = geo_class.maxv * (8.0 * self.options.visc) / (self.geo.get_chan_width()**2)
+                self.add_body_force((0.0, accel))
 
     def get_profile(self):
         if geo.get_bc(self.options.bc_wall).wet_nodes:

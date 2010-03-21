@@ -38,7 +38,14 @@ class FEFingerSim(lbm.BinaryFluidFreeEnergy):
                                         'tau_a': 4.5, 'tau_b': 0.6, 'tau_phi': 1.0, 'kappa': 9.18e-5,
                                         'Gamma': 25.0, 'A': 1.41e-4, 'lambda_': 0.0, 'model': 'femrt',
                                         'periodic_x': True, 'periodic_y': True, 'scr_scale': 1,
-                                        'periodic_z': True, 'accel_x': 3.0e-5})
+                                        'periodic_z': True})
+
+        self.add_body_force((3.0e-5, 0.0, 0.0), grid=0, accel=False)
+
+        # Use the fluid velocity in the relaxation of the order parameter field,
+        # and the molecular velocity in the relaxation of the density field.
+        self.use_force_for_eq(None, 0)
+        self.use_force_for_eq(0, 1)
 
 if __name__ == '__main__':
     sim = FEFingerSim(GeoFEFinger)

@@ -4,9 +4,41 @@
 
 <%page args="bgk_args_decl"/>
 <%namespace file="code_common.mako" import="*"/>
-<%namespace file="boundary.mako" import="external_force"/>
 
-% if model == 'mrt':
+<%def name="fluid_momentum(igrid)">
+	%if igrid in force_for_eq and equilibrium:
+		fm.mx += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 0, forces, force_couplings), vectors=True)};
+		fm.my += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 1, forces, force_couplings), vectors=True)};
+		%if dim == 3:
+			fm.mz += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 2, forces, force_couplings), vectors=True)};
+		%endif
+	%else:
+		fm.mx += ${cex(0.5 * sym.fluid_accel(sim, igrid, 0, forces, force_couplings), vectors=True)};
+		fm.my += ${cex(0.5 * sym.fluid_accel(sim, igrid, 1, forces, force_couplings), vectors=True)};
+		%if dim == 3:
+			fm.mz += ${cex(0.5 * sym.fluid_accel(sim, igrid, 2, forces, force_couplings), vectors=True)};
+		%endif
+	%endif
+</%def>
+
+<%def name="body_force()">
+	// Body force acceleration.
+	%for i in range(0, len(grids)):
+		%if sym.needs_accel(i, forces, force_couplings):
+			%if not sym.needs_coupling_accel(i, force_couplings):
+				float ea${i}[${dim}] = {0.0f};
+			%endif
+
+			%for j in range(0, dim):
+				ea${i}[${j}] += ${cex(sym.body_force_accel(i, j, forces), vectors=True)};
+			%endfor
+		%endif
+	%endfor
+</%def>
+
+
+## TODO: support multiple grids with MRT?
+% if model == 'mrt' and simtype == 'fluid':
 //
 // Relaxation in moment space.
 //
@@ -18,7 +50,8 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 		${mrt} = ${val};
 	%endfor
 
-	${external_force('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho', momentum=True)}
+	${body_force()}
+	${fluid_momentum(0)}
 
 	#define mx fm.mx
 	#define my fm.my
@@ -62,7 +95,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	#undef my
 	#undef mz
 
-	${external_force('node_type', 'fm.mx', 'fm.my', 'fm.mz', 'fm.rho', momentum=True)}
+	${fluid_momentum(0)}
 
 	%for bgk, val in sym.mrt_to_bgk(grid, 'fi', 'fm'):
 		${bgk} = ${val};
@@ -70,13 +103,17 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 }
 % endif	## model == mrt
 
-%if model == 'femrt':
-${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
-%for i in range(0, len(grids)):
-	Dist *d${i},
-%endfor
-	 int node_type)
-{
+<%def name="fluid_velocity(igrid, equilibrium=False)">
+	%for j in range(0, dim):
+		%if igrid in force_for_eq and equilibrium:
+			v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], j, forces, force_couplings), vectors=True)};
+		%else:
+			v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
+		%endif
+	%endfor
+</%def>
+
+<%def name="bgk_relaxation_preamble()">
 	%for i in range(0, len(grids)):
 		Dist feq${i};
 	%endfor
@@ -85,30 +122,39 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
 	%endfor
 
-	float tau0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) / 2.0f;
+	float v0[${dim}];
+	${body_force()}
 
-	if (phi < -1.0f) {
-		tau0 = tau_b;
-	} else if (phi > 1.0f) {
-		tau0 = tau_a;
-	}
+	%if simtype == 'free-energy':
+		float tau0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) / 2.0f;
+		if (phi < -1.0f) {
+			tau0 = tau_b;
+		} else if (phi > 1.0f) {
+			tau0 = tau_a;
+		}
+	%endif
 
 	%for i, eq in enumerate(bgk_equilibrium):
-		%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0) and i == 1:
-			%for j in range(0, dim):
-				v0[${j}] += 0.5f * ea0[${j}] / rho;
-			%endfor
-		%endif
+		${fluid_velocity(i, True)};
 
 		%for feq, idx in eq:
 			feq${i}.${idx} = ${cex(feq, vectors=True)};
 		%endfor
 	%endfor
+</%def>
 
-	#define ea1 ea0
+%if model == 'femrt' and simtype == 'free-energy':
+${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
+%for i in range(0, len(grids)):
+	Dist *d${i},
+%endfor
+	int node_type)
+{
+	${bgk_relaxation_preamble()}
 
 	%for i in range(0, len(grids)):
 		%for idx in grid.idx_name:
+			## Use the BGK approximation for the relaxation of the order parameter field.
 			%if i == 1:
 				d${i}->${idx} += (feq${i}.${idx} - d${i}->${idx}) / tau${i};
 			%else:
@@ -121,14 +167,18 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 		${dst} -= ${sym.make_float(src)};
 	%endfor
 
-	%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0):
-		if (!isWallNode(node_type))
-		{
-			%for val, idx in sym.free_energy_external_force(sim, grid_num=0):
-				d0->${idx} += ${cex(val, vectors=True)};
-			%endfor
-		}
-	%endif
+	%for i in range(0, len(grids)):
+		## Is there a force acting on the current grid?
+		%if sym.needs_accel(i, forces, force_couplings):
+			if (!isWallNode(node_type)) {
+				${fluid_velocity(i)};
+
+				%for val, idx in sym.free_energy_external_force(sim, grid_num=i):
+					d${i}->${idx} += ${cex(val, vectors=True)};
+				%endfor
+			}
+		%endif
+	%endfor
 }
 %endif  ## model == femrt
 
@@ -141,89 +191,36 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 %for i in range(0, len(grids)):
 	Dist *d${i},
 %endfor
-	 int node_type)
+	int node_type)
 {
-	%for i in range(0, len(grids)):
-		Dist feq${i};
-	%endfor
-
-	%for local_var in bgk_equilibrium_vars:
-		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
-	%endfor
-
-	%if simtype == 'free-energy':
-		float tau0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) / 2.0f;
-		if (phi < -1.0f) {
-			tau0 = tau_b;
-		} else if (phi > 1.0f) {
-			tau0 = tau_a;
-		}
-	%endif
-
-	%for i, eq in enumerate(bgk_equilibrium):
-		%if simtype == 'shan-chen':
-			%for j in range(0, dim):
-				v0[${j}] += tau${i} * ea${i}[${j}];
-			%endfor
-		%elif simtype == 'free-energy':
-			%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0) and i == 1:
-				%for j in range(0, dim):
-					v0[${j}] += 0.5f * ea0[${j}] / rho;
-				%endfor
-			%endif
-		%endif
-
-		%for feq, idx in eq:
-			feq${i}.${idx} = ${cex(feq, vectors=True)};
-		%endfor
-
-		%if simtype == 'shan-chen':
-			%for j in range(0, dim):
-				v0[${j}] -= tau${i} * ea${i}[${j}];
-			%endfor
-		%endif
-	%endfor
+	${bgk_relaxation_preamble()}
 
 	%for i in range(0, len(grids)):
 		%for idx in grid.idx_name:
 			d${i}->${idx} += (feq${i}.${idx} - d${i}->${idx}) / tau${i};
 		%endfor
 
-		%if simtype == 'shan-chen':
-			if (!isWallNode(node_type))
-			{
-				float pref = ${sym.bgk_external_force_pref(grid_num=i)};
-				%for j in range(0, dim):
-					v0[${j}] += 0.5f * ea${i}[${j}];
-				%endfor
+		## Is there a force acting on the current grid?
+		%if sym.needs_accel(i, forces, force_couplings):
+			if (!isWallNode(node_type)) {
+				${fluid_velocity(i)};
 
-				%for val, idx in sym.bgk_external_force(grid, grid_num=i):
-					d${i}->${idx} += ${cex(val, vectors=True)};
-				%endfor
-
-				%for j in range(0, dim):
-					v0[${j}] -= 0.5f * ea${i}[${j}];
-				%endfor
-			}
-		%elif simtype == 'free-energy':
-			%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0) and i == 0:
-				if (!isWallNode(node_type))
-				{
-					%for val, idx in sym.free_energy_external_force(sim, grid_num=i):
-						d${i}->${idx} += ${cex(val, vectors=True)};
-					%endfor
-				}
-			%endif
-		%else:
-			%if (ext_accel_x != 0.0 or ext_accel_y != 0.0 or ext_accel_z != 0.0):
-				if (!isWallNode(node_type))
-				{
+				%if simtype == 'shan-chen':
 					float pref = ${sym.bgk_external_force_pref(grid_num=i)};
 					%for val, idx in sym.bgk_external_force(grid, grid_num=i):
 						d${i}->${idx} += ${cex(val, vectors=True)};
 					%endfor
-				}
-			%endif
+				%elif simtype == 'free-energy':
+					%for val, idx in sym.free_energy_external_force(sim, grid_num=i):
+						d${i}->${idx} += ${cex(val, vectors=True)};
+					%endfor
+				%else:
+					float pref = ${sym.bgk_external_force_pref(grid_num=i)};
+					%for val, idx in sym.bgk_external_force(grid, grid_num=i):
+						d${i}->${idx} += ${cex(val, vectors=True)};
+					%endfor
+				%endif
+			}
 		%endif
 	%endfor
 }
@@ -243,7 +240,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 %endfor
 	type);
 	%else:
-		MS_relaxate(&d1, type);
+		MS_relaxate(&d0, type);
 	%endif
 </%def>
 

@@ -227,6 +227,9 @@ class LBMSim(object):
             self.float = numpy.float64
 
         self.S = sym.S()
+        self.forces = {}
+        self._force_couplings = {}
+        self._force_term_for_eq = {}
 
     def _set_grid(self, name):
         for x in sym.KNOWN_GRIDS:
@@ -412,6 +415,9 @@ class LBMSim(object):
         ctx['grids'] = [self.grid]
 
         ctx['simtype'] = 'lbm'
+        ctx['forces'] = self.forces
+        ctx['force_couplings'] = self._force_couplings
+        ctx['force_for_eq'] = self._force_term_for_eq
 
         self._update_ctx(ctx)
         ctx.update(self.geo.get_defines())
@@ -740,9 +746,6 @@ class LBMSim(object):
             self.h5file = tables.openFile(self.options.output, mode='w')
             self.h5grp = self.h5file.createGroup('/', 'results', 'simulation results')
             self.h5file.setNodeAttr(self.h5grp, 'viscosity', self.options.visc)
-            self.h5file.setNodeAttr(self.h5grp, 'accel_x', self.options.accel_x)
-            self.h5file.setNodeAttr(self.h5grp, 'accel_y', self.options.accel_y)
-            self.h5file.setNodeAttr(self.h5grp, 'accel_z', self.options.accel_z)
             self.h5file.setNodeAttr(self.h5grp, 'sample_rate', self.options.every)
             self.h5file.setNodeAttr(self.h5grp, 'model', self.lbm_model)
 
@@ -837,6 +840,7 @@ class LBMSim(object):
         else:
             self.vis.main()
 
+    # TODO: Ideally, this should be moved to the visualization classes.
     def add_vis_field(self, field, description, negative=False):
         if type(field) is list or type(field) is tuple:
             self.vis_fields.append(Field(description, field, negative))
@@ -847,9 +851,30 @@ class LBMSim(object):
                 self.vis_fields.append(Field(description, lambda: field, negative))
 
     @property
-    def num_fields(self):
+    def num_vis_fields(self):
         return len(self.vis_fields)
 
+    def add_body_force(self, force, grid=0, accel=True):
+        """Add a constant global force field acting on the fluid.
+
+        :param force: n-vector of the force values
+        :param grid: grid number on which this force is acting
+        :param accel: if ``True``, the added field is an acceleration field, otherwise
+            it is an actual force field
+        """
+        if len(force) != self.grid.dim:
+            raise ValueError('The dimensionality of the force vector needs to be the same as that of the grid.')
+
+        if grid not in self.forces:
+            self.forces[grid] = {}
+
+        self.forces.setdefault(grid, {}).setdefault(
+                accel, numpy.zeros(self.grid.dim, dtype=self.float))
+        a = self.forces[grid][accel] + self.float(force)
+        self.forces[grid][accel] = a
+
+    def use_force_for_eq(self, force, grid=0):
+        self._force_term_for_eq[grid] = force
 
 class FluidLBMSim(LBMSim):
 
@@ -861,11 +886,6 @@ class FluidLBMSim(LBMSim):
         ret['bc_wall'] = self.options.bc_wall
         ret['bc_velocity'] = self.options.bc_velocity
         ret['bc_pressure'] = self.options.bc_pressure
-
-        if self.grid.dim == 2:
-            ret['accel'] = (self.options.accel_x, self.options.accel_y)
-        else:
-            ret['accel'] = (self.options.accel_x, self.options.accel_y, self.options.accel_z)
 
         if hasattr(self.geo, 'get_reynolds'):
             ret['Re'] = self.geo.get_reynolds(self.options.visc)
@@ -893,9 +913,6 @@ class FluidLBMSim(LBMSim):
 
     def _update_ctx(self, ctx):
         ctx['incompressible'] = self.incompressible
-        ctx['ext_accel_x'] = self.options.accel_x
-        ctx['ext_accel_y'] = self.options.accel_y
-        ctx['ext_accel_z'] = self.options.accel_z
         ctx['bc_wall'] = self.options.bc_wall
 
         if self.geo.has_velocity_nodes:
@@ -920,9 +937,6 @@ class FluidLBMSim(LBMSim):
         lb_group.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
         lb_group.add_option('--incompressible', dest='incompressible', help='whether to use the incompressible model of Luo and He', action='store_true', default=False)
         lb_group.add_option('--grid', dest='grid', help='grid type to use', type='choice', choices=grids, default=default_grid)
-        lb_group.add_option('--accel_x', dest='accel_x', help='y component of the external acceleration', action='store', type='float', default=0.0)
-        lb_group.add_option('--accel_y', dest='accel_y', help='x component of the external acceleration', action='store', type='float', default=0.0)
-        lb_group.add_option('--accel_z', dest='accel_z', help='z component of the external acceleration', action='store', type='float', default=0.0)
         lb_group.add_option('--bc_wall', dest='bc_wall', help='boundary condition implementation to use for wall nodes', type='choice',
                 choices=[x.name for x in geo.SUPPORTED_BCS if
                     geo.LBMGeo.NODE_WALL in x.supported_types and
@@ -1192,6 +1206,7 @@ class ShanChen(BinaryFluidBase):
         self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
         eq2, _ = sym.bgk_equilibrium(self.grid, self.S.phi, self.S.phi)
         self.equilibrium.append(eq2[0])
+        self.add_force_coupling(0, 1, 'SCG')
 
     def _init_fields(self):
         super(ShanChen, self)._init_fields()
@@ -1212,6 +1227,9 @@ class ShanChen(BinaryFluidBase):
         ctx['grids'] = [self.grid, self.grid]
         ctx['tau_phi'] = self.options.tau_phi
         ctx['simtype'] = 'shan-chen'
+
+    def add_force_coupling(self, i, j, g):
+        self._force_couplings[(i,j)] = g
 
 class FreeSurfaceLBMSim(LBMSim):
     @property
@@ -1244,9 +1262,6 @@ class FreeSurfaceLBMSim(LBMSim):
 
     def _update_ctx(self, ctx):
         ctx['gravity'] = self.gravity
-        ctx['ext_accel_x'] = 0.0
-        ctx['ext_accel_y'] = 0.0
-        ctx['ext_accel_z'] = 0.0
         ctx['bc_wall'] = 'fullbb'
         ctx['bc_velocity'] = None
         ctx['bc_pressure'] = None
