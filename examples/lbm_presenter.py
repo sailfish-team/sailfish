@@ -38,32 +38,15 @@ class Fluid2DVisPresentation(vis2d.Fluid2DVis):
         self.im_number = 0
         self.im = load_image('slides/sailfish-0.png')
         self.im_maxnumber = len(glob.glob('slides/sailfish-*.png'))
-        self._set_wall_from_image()
         self._show_info = False
         pygame.display.set_caption('Sailfish v0.1-alpha1 (presentation mode)')
 
-    def _reset(self):
-        self._maxv = 0.04
-        self._vscale = 0.005
-        self._vismode = 4
-
-    def _draw_field(self, field, srf, b, unused_map, vismode, width, height):
-        # Rotate the field to the correct position.
-        field = numpy.rot90(field.astype(numpy.float32), 3)
-        a = pygame.surfarray.pixels3d(srf)
-        b = numpy.rot90(b, 3)
-
-        # Draw the data field for all sites which are not marked as a wall.
-        b = numpy.logical_not(b)
-        field = vis2d.vis_map[vismode](field, width, height)
-        a[b] = field[b]
-
-        # Unlock the surface and put the picture on screen.
-        del a
+    def _draw_field(self, fields, srf, wall_map, unused_map, width, height):
+        srf = super(Fluid2DVisPresentation, self)._draw_field(
+                fields, srf, wall_map, unused_map, width, height)
 
         srf2 = pygame.transform.scale(srf, self._screen.get_size())
         srf2.set_alpha(256)
-        #        self._screen.blit(srf2, (0,0))
 
         im2 = pygame.transform.scale(self.im[0], self._screen.get_size())
         im2.set_colorkey(0)
@@ -98,6 +81,10 @@ class Fluid2DVisPresentation(vis2d.Fluid2DVis):
         a = pygame.surfarray.pixels3d(srf2)
         a = a.sum(axis=-1)>0
         self.sim.geo.set_geo_from_bool_array(numpy.flipud(a.transpose()), update=True)
+
+    def main(self):
+        self._set_wall_from_image()
+        super(Fluid2DVisPresentation, self).main()
 
 class LPresSim(lbm.FluidLBMSim):
     filename = 'Sailfish_Presentation'
