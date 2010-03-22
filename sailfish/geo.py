@@ -549,6 +549,10 @@ class LBMGeo3D(LBMGeo):
 
     dim = 3
 
+    NODE_TYPE_MASK = 0xfffffff8
+    NODE_ORIENTATION_SHIFT = 3
+    NODE_ORIENTATION_MASK = 0x7
+
     def __init__(self, shape, *args, **kwargs):
         self.lat_nx, self.lat_ny, self.lat_nz = shape
         LBMGeo.__init__(self, shape, *args, **kwargs)
@@ -591,8 +595,8 @@ class LBMGeo3D(LBMGeo):
                 # FIXME: Only process the primary 6 directions for now.
                 if vec.dot(vec) == 1:
                     orientation[
-                            numpy.logical_and(self.map == self.NODE_FLUID,
-                                a == self.NODE_WALL)] = self.sim.grid.vec_to_dir(list(vec))
+                            numpy.logical_and(self.map == self.NODE_WALL,
+                                a == self.NODE_FLUID)] = self.sim.grid.vec_to_dir(list(vec))
 
             self.map[(cnt == self.sim.grid.Q)] = self.NODE_UNUSED
 

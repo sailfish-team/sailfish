@@ -20,6 +20,10 @@ def update_options(target, src):
 
 class TestGeo3D(geo.LBMGeo3D):
     def define_nodes(self):
+        # Create a small box of wall nodes for use in testing of direction detection.
+        self.set_geo((5, 5, 5), self.NODE_WALL)
+        self.fill_geo((5, 5, 5), (slice(5, 8), slice(5, 8), slice(5, 8)))
+
         # Create a box of wall nodes.
         self.set_geo((14, 15, 16), self.NODE_WALL)
         self.fill_geo((14, 15, 16), (slice(14, 22), slice(15, 23), slice(16, 24)))
@@ -143,12 +147,26 @@ class Test3DNodeProcessing(unittest.TestCase):
         self.geo._clear_state()
         self.geo.define_nodes()
         self.geo._postprocess_nodes()
+
         self.assertEqual(
-                self.geo._decode_node(self.geo._get_map((14, 15, 16))),
-                (self.geo.NODE_DIR_OTHER, self.geo.NODE_WALL))
+                self.geo._decode_node(self.geo._get_map((6, 6, 5))),
+                (self.sim.grid.vec_to_dir((0,0,-1)), self.geo.NODE_WALL))
         self.assertEqual(
-                self.geo._decode_node(self.geo._get_map((21, 22, 23))),
-                (self.geo.NODE_DIR_OTHER, self.geo.NODE_WALL))
+                self.geo._decode_node(self.geo._get_map((6, 6, 7))),
+                (self.sim.grid.vec_to_dir((0,0,1)), self.geo.NODE_WALL))
+        self.assertEqual(
+                self.geo._decode_node(self.geo._get_map((5, 6, 6))),
+                (self.sim.grid.vec_to_dir((-1,0,0)), self.geo.NODE_WALL))
+        self.assertEqual(
+                self.geo._decode_node(self.geo._get_map((7, 6, 6))),
+                (self.sim.grid.vec_to_dir((1,0,0)), self.geo.NODE_WALL))
+        self.assertEqual(
+                self.geo._decode_node(self.geo._get_map((6, 5, 6))),
+                (self.sim.grid.vec_to_dir((0,-1,0)), self.geo.NODE_WALL))
+        self.assertEqual(
+                self.geo._decode_node(self.geo._get_map((6, 7, 6))),
+                (self.sim.grid.vec_to_dir((0,1,0)), self.geo.NODE_WALL))
+
 
     def testVelocityNodes(self):
         self.geo._clear_state()
