@@ -6,7 +6,6 @@ import sys
 import time
 from sailfish import geo
 from sailfish import vis
-from sailfish import vis2d
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
@@ -133,6 +132,7 @@ class LBMSim(object):
 
         group = OptionGroup(parser, 'LB engine settings')
         group.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
+        group.add_option('--block_size', dest='block_size', help='size of the block of threds', type='int', action='store', default=64)
         group.add_option('--lat_nx', dest='lat_nx', help='lattice width', type='int', action='store', default=128)
         group.add_option('--lat_ny', dest='lat_ny', help='lattice height', type='int', action='store', default=128)
         group.add_option('--lat_nz', dest='lat_nz', help='lattice depth', type='int', action='store', default=1)
@@ -189,10 +189,6 @@ class LBMSim(object):
             for k, v in defaults.iteritems():
                 if k not in self.options.specified:
                     setattr(self.options, k, v)
-
-        # TODO: This should be dynamically adjusted based on both the lat_nx
-        # value and device capabilities.
-        self.block_size = 64
 
         # Whether to use the macroscopic fields to set the initial distributions.
         self.ic_fields = False
@@ -285,6 +281,7 @@ class LBMSim(object):
 
         if not self.options.benchmark and not self.options.batch:
             if self.grid.dim == 2:
+                from sailfish import vis2d
                 self._init_vis_2d()
             elif self.grid.dim == 3:
                 self._init_vis_3d()
@@ -317,7 +314,7 @@ class LBMSim(object):
             print '[{0:07.2f}] {1}'.format(time.time() - self._t_start, info)
 
     def _init_shape(self):
-        self.arr_nx = int(math.ceil(float(self.options.lat_nx) / self.block_size)) * self.block_size
+        self.arr_nx = int(math.ceil(float(self.options.lat_nx) / self.options.block_size)) * self.options.block_size
         self.arr_ny = self.options.lat_ny
         self.arr_nz = self.options.lat_nz
 
@@ -362,7 +359,7 @@ class LBMSim(object):
         self.tau = self.get_tau()
         ctx = {}
         ctx['dim'] = self.grid.dim
-        ctx['block_size'] = self.block_size
+        ctx['block_size'] = self.options.block_size
 
         # Size of the lattice.
         ctx['lat_ny'] = self.options.lat_ny
@@ -561,9 +558,9 @@ class LBMSim(object):
 
     def _kernel_block_size(self):
         if self.grid.dim == 2:
-            return (self.block_size, 1)
+            return (self.options.block_size, 1)
         else:
-            return (self.block_size, 1, 1)
+            return (self.options.block_size, 1, 1)
 
     def _init_compute_kernels(self):
         self._timed_print('Preparing the compute unit kernels.')
@@ -620,9 +617,9 @@ class LBMSim(object):
         }
 
         if self.grid.dim == 2:
-            self.kern_grid_size = (self.arr_nx/self.block_size, self.arr_ny)
+            self.kern_grid_size = (self.arr_nx/self.options.block_size, self.arr_ny)
         else:
-            self.kern_grid_size = (self.arr_nx/self.block_size * self.arr_ny, self.arr_nz)
+            self.kern_grid_size = (self.arr_nx/self.options.block_size * self.arr_ny, self.arr_nz)
 
     def _lbm_step(self, get_data, **kwargs):
         kerns = self.kern_map[self.iter_ & 1]
@@ -1013,9 +1010,9 @@ class BinaryFluidBase(FluidLBMSim):
         }
 
         if self.grid.dim == 2:
-            self.kern_grid_size = (self.arr_nx/self.block_size, self.arr_ny)
+            self.kern_grid_size = (self.arr_nx/self.options.block_size, self.arr_ny)
         else:
-            self.kern_grid_size = (self.arr_nx/self.block_size * self.arr_ny, self.arr_nz)
+            self.kern_grid_size = (self.arr_nx/self.options.block_size * self.arr_ny, self.arr_nz)
 
     def _init_compute_ic(self):
         if not self.ic_fields:
