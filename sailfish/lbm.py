@@ -46,7 +46,7 @@ class Values(optparse.Values):
 
 def _convert_to_double(src):
     import re
-    t = re.sub('([0-9]+\.[0-9]*)f([^a-zA-Z0-9\.])', '\\1\\2', src.replace('float', 'double'))
+    t = re.sub('([0-9]+\.[0-9]*(e-?[0-9]*)?)f([^a-zA-Z0-9\.])', '\\1\\3', src.replace('float', 'double'))
     t = t.replace('logf(', 'log(')
     t = t.replace('expf(', 'exp(')
     t = t.replace('powf(', 'pow(')
