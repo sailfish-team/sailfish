@@ -939,9 +939,10 @@ class FluidLBMSim(LBMSim):
 
     def _init_vis_3d(self):
         if self.options.vis3d == 'mayavi':
-            import vis3d
+            from sailfish import vis3d
             self.vis = vis3d.Fluid3DVis(self)
         else:
+            from sailfish import vis2d
             self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)),
                                                 self.options.scr_depth, self.options.scr_scale)
 
