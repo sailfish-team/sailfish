@@ -297,8 +297,8 @@ class D3Q19(DxQy):
                 (1,36), (1,36), (1,36), (1,36), (1,36), (1,36),
                 (1,36), (1,36), (1,36), (1,36), (1,36), (1,36)])
 
-    mrt_names = ['rho', 'en', 'ens', 'mx', 'ex', 'my', 'ey', 'mz', 'ez',
-                 'pww', 'piww', 'pxx', 'pixx', 'pxy', 'pyz', 'pzx', 'm3x', 'm3y', 'm3z']
+    mrt_names = ['rho', 'en', 'eps', 'mx', 'ex', 'my', 'ey', 'mz', 'ez',
+                 'pxx3', 'pixx3', 'pww', 'piww', 'pxy', 'pyz', 'pzx', 'm3x', 'm3y', 'm3z']
 
     mrt_collision = [0.0, 1.19, 1.4, 0.0, 1.2, 0.0, 1.2, 0.0, 1.2,
                 -1, 1.4, -1, 1.4, -1, -1, -1, 1.98, 1.98, 1.98]
@@ -316,10 +316,8 @@ class D3Q19(DxQy):
             [x[2] for x in cls.basis],
             [x[2] * x.dot(x) for x in cls.basis],
             [3*x[0]*x[0] - x.dot(x) for x in cls.basis],
-#            [x[1]*x[1] - x[2]*x[2] for x in cls.basis],
             [(3*x.dot(x) - 5) * (3*x[0]*x[0] - x.dot(x)) for x in cls.basis],
             [x[1]*x[1] - x[2]*x[2] for x in cls.basis],
-#            [x[0]*x[0] - x[1]*x[1] for x in cls.basis],
             [(3*x.dot(x) - 5) * (x[1]*x[1] - x[2]*x[2]) for x in cls.basis],
             [x[0]*x[1] for x in cls.basis],
             [x[1]*x[2] for x in cls.basis],
@@ -337,21 +335,21 @@ class D3Q19(DxQy):
         for i, name in enumerate(cls.mrt_names):
             n2i[name] = i
 
-        cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + 3*S.visc)
-        cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx']]
-        cls.mrt_collision[n2i['pxy']] = cls.mrt_collision[n2i['pxx']]
-        cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxx']]
-        cls.mrt_collision[n2i['pzx']] = cls.mrt_collision[n2i['pxx']]
+        cls.mrt_collision[n2i['pxx3']] = 1 / (0.5 + 3*S.visc)
+        cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx3']]
+        cls.mrt_collision[n2i['pxy']] = cls.mrt_collision[n2i['pxx3']]
+        cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxx3']]
+        cls.mrt_collision[n2i['pzx']] = cls.mrt_collision[n2i['pxx3']]
 
         # Form of the equilibrium functions follows that from
         # dHumieres, PhilTranA, 2002.
         mrt_eq = {
             'en':  -11 * S.rho + 19/S.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
-            'ens': -Rational(475,63)/S.rho0*(cls.mx**2 + cls.my**2 + cls.mz**2),
+            'eps': -Rational(475,63)/S.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
             'ex':  -Rational(2,3)*cls.mx,
             'ey':  -Rational(2,3)*cls.my,
             'ez':  -Rational(2,3)*cls.mz,
-            'pxx': 1/S.rho0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
+            'pxx3': 1/(S.rho0) * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
             'pww': 1/S.rho0 * (cls.my**2 - cls.mz**2),
             'pxy': 1/S.rho0 * (cls.mx * cls.my),
             'pyz': 1/S.rho0 * (cls.my * cls.mz),
@@ -359,7 +357,7 @@ class D3Q19(DxQy):
             'm3x': 0,
             'm3y': 0,
             'm3z': 0,
-            'pixx': 0,
+            'pixx3': 0,
             'piww': 0,
         }
 
