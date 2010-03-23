@@ -52,6 +52,103 @@ def _convert_to_double(src):
     return t
 
 
+class HDF5FlatOutput(object):
+    format_name='h5flat'
+
+    def __init__(self, fname, sim):
+        self.sim = sim
+        import tables
+        self.h5file = tables.openFile(fname, mode='w')
+        self.h5grp = self.h5file.createGroup('/', 'results', 'simulation results')
+        self.h5file.setNodeAttr(self.h5grp, 'viscosity', sim.options.visc)
+        self.h5file.setNodeAttr(self.h5grp, 'sample_rate', sim.options.every)
+        self.h5file.setNodeAttr(self.h5grp, 'model', sim.lbm_model)
+
+    def save(self, i):
+        h5t = self.h5file.createGroup(self.h5grp, 'iter%d' % i, 'iteration %d' % i)
+        self.h5file.createArray(h5t, 'v', numpy.dstack(self.sim.velocity), 'velocity')
+        self.h5file.createArray(h5t, 'rho', self.sim.rho, 'density')
+
+class HDF5NestedOutput(HDF5FlatOutput):
+    format_name='h5nexted'
+
+    def __init__(self, fname, sim):
+        super(HDF5OutputNested, self).__init__(fname, sim)
+        import tables
+        desc = {
+            'iter': tables.Float32Col(pos=0),
+            'vx': tables.Float32Col(pos=1, shape=sim.vx.shape),
+            'vy': tables.Float32Col(pos=2, shape=sim.vy.shape),
+            'rho': tables.Float32Col(pos=4, shape=sim.rho.shape)
+        }
+
+        if sim.grid.dim == 3:
+            desc['vz'] = tables.Float32Col(pos=2, shape=sim.vz.shape)
+
+        self.h5tbl = self.h5file.createTable(self.h5grp, 'results', desc, 'results')
+
+    def save(self, i):
+        record = self.h5tbl.row
+        record['iter'] = i
+        record['vx'] = self.sim.vx
+        record['vy'] = self.sim.vy
+        if self.sim.grid.dim == 3:
+            record['vz'] = self.sim.vz
+        record['rho'] = self.sim.rho
+        record.append()
+        self.h5tbl.flush()
+
+
+class VTKOutput(object):
+    format_name='vtk'
+
+    def __init__(self, fname, sim):
+        self.fname = fname
+        self.sim = sim
+
+    def save(self, i):
+        from enthought.tvtk.api import tvtk
+        id = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
+        id.point_data.scalars = self.sim.rho.flatten()
+        id.point_data.scalars.name = 'density'
+        if self.sim.grid.dim == 3:
+            id.point_data.vectors = numpy.c_[self.sim.vx.flatten(), self.sim.vy.flatten(), self.sim.vz.flatten()]
+        else:
+            id.point_data.vectors = numpy.c_[self.sim.vx.flatten(), self.sim.vy.flatten(), numpy.zeros_like(self.sim.vx).flatten()]
+        id.point_data.vectors.name = 'velocity'
+        if self.sim.grid.dim == 3:
+            id.dimensions = list(reversed(self.sim.rho.shape))
+        else:
+            id.dimensions = list(reversed(self.sim.rho.shape)) + [1]
+        w = tvtk.XMLPImageDataWriter(input=id, file_name='%s%05d.xml' % (self.fname, i))
+        w.write()
+
+class NPYOutput(object):
+    format_name='npy'
+
+    def __init__(self, fname, sim):
+        self.fname = fname
+        self.sim = sim
+
+    def save(self, i):
+        pass
+
+class MatlabOutput(object):
+    format_name='mat'
+
+    def __init__(self, fname, sim):
+        self.fname = fname
+        self.sim = sim
+
+    def save(self, i):
+        pass
+
+OUTPUTS = [NPYOutput, HDF5FlatOutput, HDF5NestedOutput, VTKOutput, MatlabOutput]
+
+format_name_to_cls = {}
+for output_class in OUTPUTS:
+    format_name_to_cls[output_class.format_name] = output_class
+
 class LBMSim(object):
     """Base class for LBM simulations. Descendant classes should be declared for specific simulations."""
 
@@ -162,7 +259,8 @@ class LBMSim(object):
         group.add_option('--use_src', dest='use_src', help='CUDA/OpenCL source to use instead of the automatically generated one', action='store', type='string', default='')
         group.add_option('--noformat_src', dest='format_src', help='do not format the generated source code', action='store_false', default=True)
         group.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
-        group.add_option('--output_format', dest='output_format', help='output format', type='choice', choices=['h5nested', 'h5flat', 'vtk'], default='h5flat')
+        group.add_option('--output_format', dest='output_format', help='output format', type='choice',
+                choices=format_name_to_cls.keys(), default='npy')
         group.add_option('--use_mako_cache', dest='mako_cache',
                 help='cache the generated Mako templates in /tmp/sailfish_modules-$USER', action='store_true',
                 default=False)
@@ -281,7 +379,6 @@ class LBMSim(object):
 
         if not self.options.benchmark and not self.options.batch:
             if self.grid.dim == 2:
-                from sailfish import vis2d
                 self._init_vis_2d()
             elif self.grid.dim == 3:
                 self._init_vis_3d()
@@ -652,11 +749,15 @@ class LBMSim(object):
             self._lbm_step(True, tracers=tracers, **kwargs)
 
             if self.options.output and i % self.options.every == 0:
-                self._output_data(i)
+                self.output.save(i)
         else:
             self._lbm_step(False, tracers=tracers, **kwargs)
 
         self.iter_ += 1
+
+    def _init_output(self):
+        if self.options.output:
+            self.output = format_name_to_cls[self.options.output_format](self.options.output, self)
 
     def get_mlups(self, tdiff, iters=None):
         if iters is not None:
@@ -669,6 +770,7 @@ class LBMSim(object):
         self._mlups_calls += 1
         return (self._mlups, mlups)
 
+    # TODO: Move this to a separate class.
     def output_ascii(self, file):
         if self.grid.dim == 3:
             rho = self.geo.mask_array_by_fluid(self.rho)
@@ -690,60 +792,6 @@ class LBMSim(object):
                 for x in range(0, vx.shape[1]):
                     print >>file, rho[y,x], vx[y,x], vy[y,x]
                 print >>file, ''
-
-    def _output_data(self, i):
-        if self.options.output_format == 'h5flat':
-            h5t = self.h5file.createGroup(self.h5grp, 'iter%d' % i, 'iteration %d' % i)
-            self.h5file.createArray(h5t, 'v', numpy.dstack(self.velocity), 'velocity')
-            self.h5file.createArray(h5t, 'rho', self.rho, 'density')
-        elif self.options.output_format == 'vtk':
-            from enthought.tvtk.api import tvtk
-            id = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
-            id.point_data.scalars = self.rho.flatten()
-            id.point_data.scalars.name = 'density'
-            if self.grid.dim == 3:
-                id.point_data.vectors = numpy.c_[self.vx.flatten(), self.vy.flatten(), self.vz.flatten()]
-            else:
-                id.point_data.vectors = numpy.c_[self.vx.flatten(), self.vy.flatten(), numpy.zeros_like(self.vx).flatten()]
-            id.point_data.vectors.name = 'velocity'
-            if self.grid.dim == 3:
-                id.dimensions = list(reversed(self.rho.shape))
-            else:
-                id.dimensions = list(reversed(self.rho.shape)) + [1]
-            w = tvtk.XMLPImageDataWriter(input=id, file_name='%s%05d.xml' % (self.options.output, i))
-            w.write()
-        else:
-            record = self.h5tbl.row
-            record['iter'] = i
-            record['vx'] = self.vx
-            record['vy'] = self.vy
-            if self.grid.dim == 3:
-                record['vz'] = self.vz
-            record['rho'] = self.rho
-            record.append()
-            self.h5tbl.flush()
-
-    def _init_output(self):
-        if self.options.output and self.options.output_format != 'vtk':
-            import tables
-            self.h5file = tables.openFile(self.options.output, mode='w')
-            self.h5grp = self.h5file.createGroup('/', 'results', 'simulation results')
-            self.h5file.setNodeAttr(self.h5grp, 'viscosity', self.options.visc)
-            self.h5file.setNodeAttr(self.h5grp, 'sample_rate', self.options.every)
-            self.h5file.setNodeAttr(self.h5grp, 'model', self.lbm_model)
-
-            if self.options.output_format == 'h5nested':
-                desc = {
-                    'iter': tables.Float32Col(pos=0),
-                    'vx': tables.Float32Col(pos=1, shape=self.vx.shape),
-                    'vy': tables.Float32Col(pos=2, shape=self.vy.shape),
-                    'rho': tables.Float32Col(pos=4, shape=self.rho.shape)
-                }
-
-                if self.grid.dim == 3:
-                    desc['vz'] = tables.Float32Col(pos=2, shape=self.vz.shape)
-
-                self.h5tbl = self.h5file.createTable(self.h5grp, 'results', desc, 'results')
 
     def _run_benchmark(self):
         cycles = self.options.every
@@ -933,6 +981,7 @@ class FluidLBMSim(LBMSim):
         return [group]
 
     def _init_vis_2d(self):
+        from sailfish import vis2d
         self.vis = vis2d.Fluid2DVis(self, self.options.scr_w, self.options.scr_h, self.options.scr_depth,
                                     self.options.lat_nx, self.options.lat_ny,
                                     self.options.scr_scale)
