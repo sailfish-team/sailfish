@@ -940,7 +940,7 @@ def use_vectors(str):
     return ret
 
 def make_float(t):
-    return re.sub(r'((^|[^a-zA-Z])[0-9]+\.[0-9]*(e-?[0-9]*)?)', r'\1f', str(t))
+    return re.sub(r'((^|[^a-zA-Z])[0-9]+\.[0-9]*(e(\+|-)[0-9]*)?)', r'\1f', str(t))
 
 def int2float(t):
     return re.sub(r'([0-9]+)([^\.])', r'\1.0\2', str(t))
@@ -984,6 +984,7 @@ def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False):
     S = sim.S
 
     if type(t) is int or type(t) is float or isinstance(t, numpy.generic):
+        t = '%.20e' % t
         return make_float(t)
 
     if type(rho) is str:
