@@ -43,7 +43,6 @@ ${const_var} float visc = ${visc}f;		// viscosity
 <%namespace file="propagation.mako" import="*"/>
 
 <%include file="finite_difference_optimized.mako"/>
-<%include file="tracers.mako"/>
 
 // A kernel to set the node distributions using the equilibrium distributions
 // and the macroscopic fields.
@@ -101,15 +100,29 @@ ${kernel} void PrepareMacroFields(
 	if (isUnusedNode(type))
 		return;
 
+	int igi = gi;
+
+	%if simtype == 'free-energy':
+		// Assume neutral wetting for all walls.
+		if (isWallNode(type)) {
+			if (0) { ; }
+			%for dir in grid.dir2vecidx.keys():
+				else if (orientation == ${dir}) {
+					igi += ${rel_offset(*(2*grid.dir_to_vec(dir)))};
+				}
+			%endfor
+		}
+	%endif
+
 	// cache the distributions in local variables
 	Dist fi;
 	float out;
 
-	getDist(&fi, dist1_in, gi);
+	getDist(&fi, dist1_in, igi);
 	get0thMoment(&fi, type, orientation, &out);
 	orho[gi] = out;
 
-	getDist(&fi, dist2_in, gi);
+	getDist(&fi, dist2_in, igi);
 	get0thMoment(&fi, type, orientation, &out);
 	ophi[gi] = out;
 }
