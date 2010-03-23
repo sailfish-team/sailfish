@@ -603,7 +603,7 @@ class LBMGeo3D(LBMGeo):
             self.map[(cnt == self.sim.grid.Q)] = self.NODE_UNUSED
 
             # Postprocess the whole domain here.
-            self.map = self._encode_node(orientation, self.map)
+            self.map[:] = self._encode_node(orientation, self.map)
         else:
             nodes_ = nodes
 
