@@ -98,6 +98,11 @@ class HDF5NestedOutput(HDF5FlatOutput):
         record.append()
         self.h5tbl.flush()
 
+def get_fname_digits(max_iters=0):
+    if max_iters:
+        return str(int(math.log10(self.sim.options.max_iters)) + 1)
+    else:
+        return str(7)
 
 class VTKOutput(object):
     format_name='vtk'
@@ -105,11 +110,7 @@ class VTKOutput(object):
     def __init__(self, fname, sim):
         self.fname = fname
         self.sim = sim
-
-        if self.sim.options.max_iters:
-            self.digits = str(int(math.log10(self.sim.options.max_iters)) + 1)
-        else:
-            self.digits = str(7)
+        self.digits = get_fname_digits(sim.options.max_iters)
 
     def save(self, i):
         from enthought.tvtk.api import tvtk
@@ -134,10 +135,7 @@ class NPYOutput(object):
     def __init__(self, fname, sim):
         self.fname = fname
         self.sim = sim
-        if self.sim.options.max_iters:
-            self.digits = str(int(math.log10(self.sim.options.max_iters)) + 1)
-        else:
-            self.digits = str(7)
+        self.digits = get_fname_digits(sim.options.max_iters)
 
     def save(self, i):
         fname = ('%s%0' + self.digits + 'd') % (self.fname, i)
@@ -152,9 +150,15 @@ class MatlabOutput(object):
     def __init__(self, fname, sim):
         self.fname = fname
         self.sim = sim
+        self.digits = get_fname_digits(sim.options.max_iters)
 
     def save(self, i):
-        pass
+        import scipy.io
+        fname = ('%s%0' + self.digits + 'd.mat') % (self.fname, i)
+        data = {}
+        data.update(self.sim.output_fields)
+        data.update(self.sim.output_vectors)
+        scipy.io.savemat(fname, data)
 
 OUTPUTS = [NPYOutput, HDF5FlatOutput, HDF5NestedOutput, VTKOutput, MatlabOutput]
 
