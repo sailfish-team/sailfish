@@ -51,7 +51,7 @@ def _convert_to_double(src):
     t = t.replace('powf(', 'pow(')
     return t
 
-
+# TODO: Correctly process vector and scalar fields in these clases.
 class HDF5FlatOutput(object):
     format_name='h5flat'
 
@@ -106,6 +106,11 @@ class VTKOutput(object):
         self.fname = fname
         self.sim = sim
 
+        if self.sim.options.max_iters:
+            self.digits = str(int(math.log10(self.sim.options.max_iters)) + 1)
+        else:
+            self.digits = str(7)
+
     def save(self, i):
         from enthought.tvtk.api import tvtk
         id = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
@@ -120,7 +125,7 @@ class VTKOutput(object):
             id.dimensions = list(reversed(self.sim.rho.shape))
         else:
             id.dimensions = list(reversed(self.sim.rho.shape)) + [1]
-        w = tvtk.XMLPImageDataWriter(input=id, file_name='%s%05d.xml' % (self.fname, i))
+        w = tvtk.XMLPImageDataWriter(input=id, file_name=('%s%0' + self.digits + 'd.xml') % (self.fname, i))
         w.write()
 
 class NPYOutput(object):
@@ -129,9 +134,17 @@ class NPYOutput(object):
     def __init__(self, fname, sim):
         self.fname = fname
         self.sim = sim
+        if self.sim.options.max_iters:
+            self.digits = str(int(math.log10(self.sim.options.max_iters)) + 1)
+        else:
+            self.digits = str(7)
 
     def save(self, i):
-        pass
+        fname = ('%s%0' + self.digits + 'd') % (self.fname, i)
+        data = {}
+        data.update(self.sim.output_fields)
+        data.update(self.sim.output_vectors)
+        numpy.savez(fname, **data)
 
 class MatlabOutput(object):
     format_name='mat'
@@ -309,6 +322,8 @@ class LBMSim(object):
         self._force_couplings = {}
         self._force_term_for_eq = {}
         self.vis = vis.FluidVis()
+        self.output_fields = {}
+        self.output_vectors = {}
 
     def _set_grid(self, name):
         for x in sym.KNOWN_GRIDS:
@@ -533,14 +548,28 @@ class LBMSim(object):
             size = self.arr_nx * self.arr_ny
         return (strides, size)
 
-    def make_field(self):
+    def make_field(self, name=None, output=False):
         """Create a new numpy array represting a scalar field used in the simulation.
 
         This method automatically takes care of the field type, shape and strides.
         """
         strides, size = self._get_strides(self.float)
-        return numpy.ndarray(self.shape, buffer=numpy.zeros(size, dtype=self.float),
-                             dtype=self.float, strides=strides)
+        field = numpy.ndarray(self.shape, buffer=numpy.zeros(size, dtype=self.float),
+                              dtype=self.float, strides=strides)
+        if output and name is not None:
+            self.output_fields[name] = field
+        return field
+
+    def make_vector_field(self, name=None, output=False):
+        components = []
+
+        for x in range(0, self.grid.dim):
+            components.append(self.make_field())
+
+        if output and name is not None:
+            self.output_vectors[name] = components
+
+        return components
 
     def make_int_field(self):
         strides, size = self._get_strides(numpy.uint32)
@@ -566,16 +595,14 @@ class LBMSim(object):
         self._timed_print('Preparing the data fields.')
 
         self.dist1 = self.make_dist(self.grid)
+        self.velocity = self.make_vector_field('v', True)
 
-        self.vx = self.make_field()
-        self.vy = self.make_field()
-        self.velocity = [self.vx, self.vy]
+        if self.grid.dim == 2:
+            self.vx, self.vy = self.velocity
+        else:
+            self.vx, self.vy, self.vz = self.velocity
 
-        if self.grid.dim == 3:
-            self.vz = self.make_field()
-            self.velocity.append(self.vz)
-
-        self.rho = self.make_field()
+        self.rho = self.make_field('rho', True)
 
         self.vis.add_field(lambda: numpy.sqrt(numpy.square(self.vx) + numpy.square(self.vy)),
                 'velocity magnitude')
@@ -1008,7 +1035,7 @@ class BinaryFluidBase(FluidLBMSim):
 
     def _init_fields(self):
         LBMSim._init_fields(self)
-        self.phi = self.make_field()
+        self.phi = self.make_field('phi', True)
         self.dist2 = self.make_dist(self.grid)
 
     def _init_compute_fields(self):
