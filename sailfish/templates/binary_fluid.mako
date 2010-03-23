@@ -57,7 +57,11 @@ ${kernel} void SetInitialConditions(
 
 	%if simtype == 'free-energy':
 		float lap1, grad1[${dim}];
-		laplacian_and_grad(iphi, gi, &lap1, grad1, gx, gy, gz);
+		%if dim == 2:
+			laplacian_and_grad(iphi, gi, &lap1, grad1, gx, gy);
+		%else:
+			laplacian_and_grad(iphi, gi, &lap1, grad1, gx, gy, gz);
+		%endif
 	%endif
 
 	// Cache macroscopic fields in local variables.
@@ -167,7 +171,11 @@ ${kernel} void CollideAndPropagate(
 			%endif
 		} else {
 			if (!isWallNode(type)) {
-				laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy, gz);
+				%if dim == 2:
+					laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy);
+				%else:
+					laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy, gz);
+				%endif
 			}
 		}
 	%elif simtype == 'shan-chen':
@@ -175,7 +183,11 @@ ${kernel} void CollideAndPropagate(
 
 		## TODO: Modify this to use force_couplings.
 		if (!isWallNode(type)) {
-			shan_chen_accel(gi, irho, ipsi, sca1, sca2, gx, gy);
+			%if dim == 2:
+				shan_chen_accel(gi, irho, ipsi, sca1, sca2, gx, gy);
+			%else:
+				shan_chen_accel(gi, irho, ipsi, sca1, sca2, gx, gy, gz);
+			%endif
 		}
 	%endif
 

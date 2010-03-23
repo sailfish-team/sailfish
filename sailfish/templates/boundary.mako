@@ -4,6 +4,7 @@
 
 <%namespace file="code_common.mako" import="*"/>
 <%namespace file="propagation.mako" import="rel_offset"/>
+<%namespace file="utils.mako" import="get_field_off"/>
 
 <%def name="noneq_bb(orientation)">
 	case ${orientation}:
@@ -85,7 +86,11 @@ ${device_func} inline void bounce_back(Dist *fi)
 </%def>
 
 %if simtype == 'shan-chen':
-${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${global_ptr} float *f2, float *a1, float *a2, int x, int y)
+${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${global_ptr} float *f2, float *a1, float *a2, int x, int y
+%if dim == 3:
+	, int z
+%endif
+)
 {
 	float t1, t2;
 
@@ -95,32 +100,19 @@ ${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${glo
 	%endfor
 
 	int off, nx, ny;
+	%if dim == 3:
+		int nz;
+	%endif
 
 	%for i, ve in enumerate(grid.basis):
 		%if dim == 3:
-			t1 = 1.0f - expf(-f1[i + ${rel_offset(ve[0], ve[1], ve[2])}]);
-			t2 = 1.0f - expf(-f2[i + ${rel_offset(ve[0], ve[1], ve[2])}]);
+			${get_field_off(ve[0], ve[1], ve[2])};
 		%else:
-
-			off = ${rel_offset(ve[0], ve[1], 0)};
-			nx = x + ${ve[0]};
-			ny = y + ${ve[1]};
-
-			%if periodicity[0] and ve[0] != 0:
-				if (nx < 0 || nx > ${lat_nx-1}) {
-					off += ${pbc_offsets[0][int(ve[0])]};
-				}
-			%endif
-
-			%if periodicity[1] and ve[1] != 0:
-				if (ny < 0 || ny > ${lat_ny-1}) {
-					off += ${pbc_offsets[1][int(ve[1])]};
-				}
-			%endif
-
-			t1 = ${sc_potential(1)};
-			t2 = ${sc_potential(2)};
+			${get_field_off(ve[0], ve[1], 0)};
 		%endif
+
+		t1 = ${sc_potential(1)};
+		t2 = ${sc_potential(2)};
 
 		%if ve[0] != 0:
 			a1[0] += t2 * ${ve[0] * grid.weights[i]};

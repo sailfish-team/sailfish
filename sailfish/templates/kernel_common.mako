@@ -13,7 +13,6 @@
 	%if dim == 2:
 		int gx = get_global_id(0);
 		int gy = get_group_id(1);
-		int gz = 0;
 		int gi = gx + ${arr_nx}*gy;
 	%else:
 		// This is a workaround for the limitations of current CUDA devices.
