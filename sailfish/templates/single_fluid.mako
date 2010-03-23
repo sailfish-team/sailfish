@@ -64,6 +64,8 @@ ${kernel} void CollideAndPropagate(
 	boundaryConditions(&d0, type, orientation, &rho, v);
 	${barrier()}
 
+	${relaxate(bgk_args)}
+
 	// only save the macroscopic quantities if requested to do so
 	if (save_macro == 1) {
 		orho[gi] = rho;
@@ -74,7 +76,6 @@ ${kernel} void CollideAndPropagate(
 		%endif
 	}
 
-	${relaxate(bgk_args)}
 	${propagate('dist_out', 'd0')}
 }
 

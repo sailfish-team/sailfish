@@ -221,6 +221,12 @@ ${kernel} void CollideAndPropagate(
 	boundaryConditions(&d1, type, orientation, &phi, v);
 	${barrier()}
 
+	%if simtype == 'shan-chen':
+		${relaxate(bgk_args_sc)}
+	%elif simtype == 'free-energy':
+		${relaxate(bgk_args_fe)}
+	%endif
+
 	// only save the macroscopic quantities if requested to do so
 	if (save_macro == 1) {
 		ovx[gi] = v[0];
@@ -230,11 +236,6 @@ ${kernel} void CollideAndPropagate(
 		%endif
 	}
 
-	%if simtype == 'shan-chen':
-		${relaxate(bgk_args_sc)}
-	%elif simtype == 'free-energy':
-		${relaxate(bgk_args_fe)}
-	%endif
 	${propagate('dist1_out', 'd0')}
 	${barrier()}
 	${propagate('dist2_out', 'd1')}

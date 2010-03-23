@@ -42,7 +42,7 @@
 //
 // Relaxation in moment space.
 //
-${device_func} void MS_relaxate(Dist *fi, int node_type)
+${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 {
 	DistM fm, feq;
 
@@ -100,17 +100,30 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type)
 	%for bgk, val in sym.mrt_to_bgk(grid, 'fi', 'fm'):
 		${bgk} = ${val};
 	%endfor
+
+	if (!isWallNode(node_type)) {
+		${fluid_velocity(0, save=True)}
+	}
 }
 % endif	## model == mrt
 
-<%def name="fluid_velocity(igrid, equilibrium=False)">
-	%for j in range(0, dim):
-		%if igrid in force_for_eq and equilibrium:
-			v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], j, forces, force_couplings), vectors=True)};
-		%else:
-			v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
-		%endif
-	%endfor
+<%def name="fluid_velocity(igrid, equilibrium=False, save=False)">
+	%if save:
+		## For now, we assume a single fluid velocity regardless of the number of
+		## components and grids used.  If this assumption is ever changed, the code
+		## below will have to be extended appropriately.
+		%for j in range(0, dim):
+			iv0[${j}] += ${cex(0.5 * sym.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
+		%endfor
+	%else:
+		%for j in range(0, dim):
+			%if igrid in force_for_eq and equilibrium:
+				v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], j, forces, force_couplings), vectors=True)};
+			%else:
+				v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
+			%endif
+		%endfor
+	%endif
 </%def>
 
 <%def name="bgk_relaxation_preamble()">
@@ -179,6 +192,10 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 			}
 		%endif
 	%endfor
+
+	if (!isWallNode(node_type)) {
+		${fluid_velocity(0, save=True)}
+	}
 }
 %endif  ## model == femrt
 
@@ -223,6 +240,10 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			}
 		%endif
 	%endfor
+
+	if (!isWallNode(node_type)) {
+		${fluid_velocity(0, save=True)}
+	}
 }
 %endif
 
@@ -240,7 +261,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 %endfor
 	type);
 	%else:
-		MS_relaxate(&d0, type);
+		MS_relaxate(&d0, type, v);
 	%endif
 </%def>
 
