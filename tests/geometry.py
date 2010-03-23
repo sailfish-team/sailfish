@@ -24,6 +24,12 @@ class TestGeo3D(geo.LBMGeo3D):
         self.set_geo((5, 5, 5), self.NODE_WALL)
         self.fill_geo((5, 5, 5), (slice(5, 8), slice(5, 8), slice(5, 8)))
 
+        # Wall node plate at the boundary of the simulation domain.
+        self.set_geo((10, 10, 63), self.NODE_WALL)
+        self.set_geo((10, 10, 0), self.NODE_WALL)
+        self.fill_geo((10, 10, 0), (slice(10, 15), slice(10, 15), 0))
+        self.fill_geo((10, 10, 63), (slice(10, 15), slice(10, 15), 63))
+
         # Create a box of wall nodes.
         self.set_geo((14, 15, 16), self.NODE_WALL)
         self.fill_geo((14, 15, 16), (slice(14, 22), slice(15, 23), slice(16, 24)))
@@ -136,7 +142,7 @@ class Test3DNodeProcessing(unittest.TestCase):
     def setUp(self):
         backend = backend_dummy.DummyBackend()
         self.sim = lbm.FluidLBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True,
-            'lat_nx': self.shape[0], 'lat_ny': self.shape[1], 'lat_nz': self.shape[2]})
+            'lat_nx': self.shape[0], 'lat_ny': self.shape[1], 'lat_nz': self.shape[2], 'periodic_z': True})
         self.sim._init_shape()
         update_options(self.sim.options, DummyOptions())
         self.sim._init_geo()
@@ -148,6 +154,7 @@ class Test3DNodeProcessing(unittest.TestCase):
         self.geo.define_nodes()
         self.geo._postprocess_nodes()
 
+        # Primary direction detection on a small box.
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((6, 6, 5))),
                 (self.sim.grid.vec_to_dir((0,0,-1)), self.geo.NODE_WALL))
@@ -166,6 +173,14 @@ class Test3DNodeProcessing(unittest.TestCase):
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((6, 7, 6))),
                 (self.sim.grid.vec_to_dir((0,1,0)), self.geo.NODE_WALL))
+
+        # Orientation detection at domain boundaries.
+        self.assertEqual(
+                self.geo._decode_node(self.geo._get_map((11, 11, 0))),
+                (self.sim.grid.vec_to_dir((0,0,1)), self.geo.NODE_WALL))
+        self.assertEqual(
+                self.geo._decode_node(self.geo._get_map((11, 11, 63))),
+                (self.sim.grid.vec_to_dir((0,0,-1)), self.geo.NODE_WALL))
 
 
     def testVelocityNodes(self):

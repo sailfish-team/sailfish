@@ -41,10 +41,12 @@ class DxQy(object):
 
     @classmethod
     def vec_to_dir(cls, vec):
+        """Convert a primary direction vector (n-tuple) into a direction number."""
         return cls.vecidx2dir[cls.basis.index(Matrix((vec,)))]
 
     @classmethod
     def dir_to_vec(cls, dir):
+        """Convert a direction number into the corresponding n-vector."""
         return cls.basis[cls.dir2vecidx[dir]]
 
 class D2Q9(DxQy):
@@ -1127,6 +1129,8 @@ def _prepare_grids():
             else:
                 raise TypeError('Opposite vector for %s not found.' % ei)
 
+            # Index primary direction vectors.  For cartesian grids, there
+            # are always 2*Q such vectors.
             if ei.dot(ei) == 1:
                 grid.dir2vecidx[dir] = k
                 grid.vecidx2dir[k] = dir

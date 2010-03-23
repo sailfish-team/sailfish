@@ -593,6 +593,8 @@ class LBMGeo3D(LBMGeo):
                 cnt[(a == self.NODE_WALL)] += 1
 
                 # FIXME: Only process the primary 6 directions for now.
+                # This will not work correctly on domain boundaries, if they are not
+                # symmetric.
                 if vec.dot(vec) == 1:
                     orientation[
                             numpy.logical_and(self.map == self.NODE_WALL,
