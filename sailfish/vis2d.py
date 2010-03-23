@@ -416,6 +416,9 @@ class Fluid2DVis(vis.FluidVis):
                 self._update_display(i, avg_mlups, mlups)
                 t_prev = time.time()
 
+            if self.sim.options.max_iters and i >= self.sim.options.max_iters:
+                break
+
 class Fluid3DVisCutplane(Fluid2DVis):
 
     def __init__(self, sim, shape, depth, scr_scale):
