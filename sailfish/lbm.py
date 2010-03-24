@@ -100,7 +100,7 @@ class HDF5NestedOutput(HDF5FlatOutput):
 
 def get_fname_digits(max_iters=0):
     if max_iters:
-        return str(int(math.log10(self.sim.options.max_iters)) + 1)
+        return str(int(math.log10(max_iters)) + 1)
     else:
         return str(7)
 
