@@ -112,7 +112,11 @@ ${kernel} void PrepareMacroFields(
 			if (0) { ; }
 			%for dir in grid.dir2vecidx.keys():
 				else if (orientation == ${dir}) {
-					igi += ${rel_offset(*(2*grid.dir_to_vec(dir)))};
+					%if dim == 3:
+						igi += ${rel_offset(*(2*grid.dir_to_vec(dir)))};
+					%else:
+						igi += ${rel_offset(*(list(2*grid.dir_to_vec(dir)) + [0]))};
+					%endif
 				}
 			%endfor
 		}
