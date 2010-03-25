@@ -40,7 +40,7 @@ here is a simple example code to simulate fluid flow in a lid-driven cavity::
             for i in range(0, self.lat_nx):
                 self.velocity_to_dist((i, self.lat_ny-1), (self.max_v, 0.0), dist)
 
-    class LDCSim(lbm.LBMSim):
+    class LDCSim(lbm.FluidLBMSim):
         pass
 
     sim = LDCSim(LBMGeoLDC)
