@@ -44,9 +44,6 @@ class LSim(lbm.FluidLBMSim):
         new_shape[1] += 2
         new_shape[2] += 2
 
-        # Make sure the x dimension is a multiple of the block size.
-        new_shape[2] = ((new_shape[2] / self.options.block_size) + 1) * self.options.block_size
-
         # Perform funny gymnastics to extend the array to the new shape.  numpy's
         # resize can only be used on the 1st axis if the position of the data in
         # the array is not to be changed.
@@ -58,7 +55,7 @@ class LSim(lbm.FluidLBMSim):
         geo = numpy.resize(geo, (new_shape[2], new_shape[0], new_shape[1]))
         geo = numpy.rollaxis(geo, 0, 3)
 
-        geo[:,:,orig_shape[2]:new_shape[2]] = True
+        geo[:,:,-2:] = True
         geo[:,-2:,:] = True
         geo[-2:,:,:] = True
 
