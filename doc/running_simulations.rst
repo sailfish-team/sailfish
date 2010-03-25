@@ -1,5 +1,5 @@
-Tutorial
-========
+Running simulations
+===================
 
 In this section, we show how to create a simple LBM simulation using Sailfish.
 To keep things simple, we will stick to two dimensions and we will build the
@@ -19,11 +19,11 @@ module contains classes used to describe the geometry of the simulation.  We wil
 with defining the main driver class for our example, and return to the issue of
 geometry later.
 
-Each Sailfish simulation is represented by a class derived from :class:`lbm.LBMSim`.
+Each Sailfish simulation is represented by a class derived from :class:`lbm.FluidLBMSim`.
 In the simplest case, we don't need to define any additional members of that class,
 and a simple definition along the lines of::
 
-    class LDCSim(lbm.LBMSim):
+    class LDCSim(lbm.FluidLBMSim):
         pass
 
 will do just fine.  The part of that class that is of primary interest to the end-user
@@ -162,4 +162,18 @@ are overridable by using a different ``format_cmd`` value in the ``LBMSim``)
 reformat the generated code so that it roughly follows the formatting style
 of the Linux kernel (with longer lines, which can be useful for complex expressions).
 The ``sed`` call removes spurious empty lines.
+
+Troubleshooting
+---------------
+
+My simulation works fine in single precision, but breaks in double precision.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+If your simulation runs in double precision, but generates clearly unphysical results that
+do not appear when it's run in single precision, it's possible that the CUDA optimizing compiler
+is generating broken code.  To check whether this is the case, you need to disable all optimizations
+by editing ``sailfish/backend_cuda.py`` and uncommenting the following code::
+
+    options=['-Xopencc', '-O0']
+
+Note that this will significantly decrease the performance of your simulation.
 
