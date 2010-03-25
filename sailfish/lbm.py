@@ -1138,16 +1138,11 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
     @property
     def constants(self):
         return [('Gamma', self.options.Gamma), ('A', self.options.A), ('kappa', self.options.kappa),
-                ('temp', self.options.T), ('lambda_', self.options.lambda_), ('tau_a', self.options.tau_a),
-                ('tau_b', self.options.tau_b)]
+                ('tau_a', self.options.tau_a), ('tau_b', self.options.tau_b)]
 
     def __init__(self, geo_class, options=[], args=None, defaults=None):
         super(BinaryFluidFreeEnergy, self).__init__(geo_class, options, args, defaults)
-
-        if self.grid.dim == 3:
-            self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium_3d(self)
-        else:
-            self.equilibrium, self.equilibrium_vars = sym.binary_liquid_equilibrium_2d(self)
+        self.equilibrium, self.equilibrium_vars = sym.free_energy_binary_liquid_equilibrium(self)
 
     def _add_options(self, parser, lb_group):
         super(BinaryFluidFreeEnergy, self)._add_options(parser, lb_group)
@@ -1160,12 +1155,6 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
             default=0.5)
         lb_group.add_option('--A', dest='A',
             help='A parameter', action='store', type='float',
-            default=0.5)
-        lb_group.add_option('--T', dest='T',
-            help='temperature (2D only)', action='store', type='float',
-            default=0.5)
-        lb_group.add_option('--lambda', dest='lambda_',
-            help='interaction strength (2D only)', action='store', type='float',
             default=0.5)
         lb_group.add_option('--tau_phi', dest='tau_phi', help='relaxation time for the phi field',
                             action='store', type='float', default=1.0)
@@ -1188,13 +1177,13 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
 
         self.S.Gamma = Symbol('Gamma')
         self.S.kappa = Symbol('kappa')
+        self.S.A = Symbol('A')
         self.S.alias('lap0', self.S.g0d2m0)
         self.S.alias('lap1', self.S.g1d2m0)
         self.S.make_vector('grad0', self.grid.dim, self.S.g0d1m0x, self.S.g0d1m0y, self.S.g0d1m0z)
         self.S.make_vector('grad1', self.grid.dim, self.S.g1d1m0x, self.S.g1d1m0y, self.S.g1d1m0z)
 
         if self.grid.dim == 3:
-            self.S.A = Symbol('A')
             self.S.wxy = [x[0]*x[1]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
             self.S.wyz = [x[1]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
             self.S.wxz = [x[0]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
@@ -1240,9 +1229,32 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
                     else:
                         self.S.wzz.append(Rational(1,12))
         else:
-            self.S.lambda_ = Symbol('lambda_')
-            self.S.T = Symbol('temp')
-            self.S.wi = [3 - x.dot(x) for x in sym.D2Q9.basis[1:]]
+            self.S.wxy = [x[0]*x[1]*Rational(1,4) for x in sym.D2Q9.basis[1:]]
+            self.S.wyz = [0] * 9
+            self.S.wxz = [0] * 9
+            self.S.wzz = [0] * 9
+            self.S.wi = []
+            self.S.wxx = []
+            self.S.wyy = []
+
+            for x in sym.D2Q9.basis[1:]:
+                if x.dot(x) == 1:
+                    self.S.wi.append(Rational(1,3))
+
+                    if abs(x[0]) == 1:
+                        self.S.wxx.append(Rational(1,3))
+                    else:
+                        self.S.wxx.append(-Rational(1,6))
+
+                    if abs(x[1]) == 1:
+                        self.S.wyy.append(Rational(1,3))
+                    else:
+                        self.S.wyy.append(-Rational(1,6))
+                else:
+                    self.S.wi.append(Rational(1,12))
+                    self.S.wxx.append(-Rational(1,24))
+                    self.S.wyy.append(-Rational(1,24))
+
 
     def _init_fields(self):
         super(BinaryFluidFreeEnergy, self)._init_fields()

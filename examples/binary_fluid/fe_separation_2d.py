@@ -28,8 +28,10 @@ class FESim(lbm.BinaryFluidFreeEnergy):
         lbm.BinaryFluidFreeEnergy.__init__(self, geo_class, options=[],
                               defaults={'verbose': True, 'lat_nx': 256,
                                         'lat_ny': 256, 'grid': 'D2Q9',
-                                        'kappa': 0.002, 'lambda_': 0.9, 'Gamma': 2.0, 'T': 0.95/2,
-                                        'visc': 0.1, 'scr_scale': 1, 'periodic_x': True, 'periodic_y': True})
+                                        'kappa': 2e-4, 'Gamma': 25.0, 'A': 1e-4,
+                                        'scr_scale': 2,
+                                        'tau_a': 4.5, 'tau_b': 0.8, 'tau_phi': 1.0,
+                                        'periodic_x': True, 'periodic_y': True})
 
 sim = FESim(GeoFE)
 sim.run()
