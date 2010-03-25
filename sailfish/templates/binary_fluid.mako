@@ -166,21 +166,12 @@ ${kernel} void CollideAndPropagate(
 	%if simtype == 'free-energy':
 		float lap1, grad1[${dim}];
 
-		if (gx == 0 || gx == ${lat_nx-1}) {
-			lap1 = 0.0f;
-			grad1[0] = 0.0f;
-			grad1[1] = 0.0f;
-			%if dim == 3:
-				grad1[2] = 0.0f;
+		if (!isWallNode(type)) {
+			%if dim == 2:
+				laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy);
+			%else:
+				laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy, gz);
 			%endif
-		} else {
-			if (!isWallNode(type)) {
-				%if dim == 2:
-					laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy);
-				%else:
-					laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy, gz);
-				%endif
-			}
 		}
 	%elif simtype == 'shan-chen':
 		float sca1[${dim}], sca2[${dim}];
