@@ -20,13 +20,13 @@ class OpenCLBackend(object):
     def alloc_buf(self, size=None, like=None):
         mf = cl.mem_flags
         if like is not None:
-            buf = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=like)
-
             if like.base is not None:
-                self.buffers[buf] = like.base
+                hbuf = like.base
             else:
-                self.buffers[buf] = like
+                hbuf = like
 
+            buf = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=hbuf)
+            self.buffers[buf] = hbuf
             self.to_buf(buf)
         else:
             buf = cl.Buffer(self.ctx, mf.READ_WRITE, size)
