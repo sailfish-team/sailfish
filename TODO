@@ -53,3 +53,5 @@
   to be simulated at a higher spatial and temporal resolution.
 
 - Add support for heat transfer calculation.
+
+- Add support for the free energy binary liquid model with D3Q15.
