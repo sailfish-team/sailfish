@@ -1,0 +1,13 @@
+A quick'n'dirty hack that makes it possible to use the OpenGL-based Sailfish
+visualization modules remotely over NX
+
+To use:
+
+1) build the module:
+   $ python setup.py build
+
+2) update your PYTHONPATH:
+   $ export PYTHONPATH="$PYTHONPATH:$PWD/build/lib.linux-x86_64-2.6"
+
+   (you will need to adjust the value depending on your system's architecture
+    and Python version; just run `ls build/lib*` to see what the correct path is)

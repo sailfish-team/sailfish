@@ -10,6 +10,12 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.arrays import numpymodule
 
+has_ropengl = True
+try:
+    import ropengl
+except ImportError:
+    has_ropengl = False
+
 from sailfish import geo
 from sailfish import sym
 from sailfish import vis
@@ -175,13 +181,17 @@ class FluidSurfaceVis(vis.FluidVis):
         glRotatef(self._angle_x, 1.0, 0.0, 0.0)
         glRotatef(self._angle_z, 0.0, 0.0, 1.0)
 
-        glEnableClientState(GL_COLOR_ARRAY)
-        glEnableClientState(GL_VERTEX_ARRAY)
-
         vertices, colors = self._gl_arrays()
-        glVertexPointerf(vertices)
-        glColorPointerf(colors)
-        glDrawArrays(GL_QUADS, 0, len(vertices))
+
+        if not has_ropengl:
+            glEnableClientState(GL_COLOR_ARRAY)
+            glEnableClientState(GL_VERTEX_ARRAY)
+
+            glVertexPointerf(vertices)
+            glColorPointerf(colors)
+            glDrawArrays(GL_QUADS, 0, len(vertices))
+        else:
+            ropengl.glVertexColorArray(vertices, colors)
 
         return ret
 
