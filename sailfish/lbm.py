@@ -553,7 +553,7 @@ class LBMSim(object):
         return (strides, size)
 
     def make_field(self, name=None, output=False):
-        """Create a new numpy array represting a scalar field used in the simulation.
+        """Create a new numpy array representing a scalar field used in the simulation.
 
         This method automatically takes care of the field type, shape and strides.
         """
