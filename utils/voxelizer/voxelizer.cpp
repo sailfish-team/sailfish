@@ -1,0 +1,67 @@
+#include <cvmlcpp/base/Matrix>
+#include <cvmlcpp/volume/Geometry>
+#include <cvmlcpp/volume/VolumeIO>
+#include <cvmlcpp/volume/Voxelizer>
+#include <fstream>
+#include <cstdio>
+
+using namespace cvmlcpp;
+using namespace std;
+
+int main(int argc, char **argv)
+{
+	Matrix<int, 3u> voxels;
+	Geometry<float> geometry;
+
+	double resolution = 0.0003;
+
+	if (argc < 2) {
+		cerr << "You need to specify an STL file to voxelize." << endl;
+		return -1;
+	}
+
+	if (argc >= 3) {
+		resolution = atof(argv[2]);
+	}
+
+	readSTL(geometry, argv[1]);
+
+	voxelize(geometry, voxels, resolution);
+	std::cout << voxels.size() << std::endl;
+
+	const long unsigned int *ext = voxels.extents();
+	std::cout << ext[0] << " " << ext[1] << " " << ext[2] << std::endl;
+
+	std::ofstream out("output.npy");
+	out << "\x93NUMPY\x01";
+
+	char buf[128] = {0};
+
+	out.write(buf, 1);
+
+	snprintf(buf, 128, "{'descr': 'bool', 'fortran_order': False, 'shape': (%d, %d, %d)}",
+			ext[0], ext[1], ext[2]);
+
+	int i, len = strlen(buf);
+	unsigned short int dlen = (((len + 10) / 16) + 1) * 16;
+
+	for (i = 0; i < dlen - 10 - len; i++) {
+		buf[len+i] = ' ';
+	}
+	buf[len+i] = 0x0;
+	dlen -= 10;
+
+	std::cout << dlen << std::endl;
+
+	out.write((char*)&dlen, 2);
+	out << buf;
+
+	for (Matrix<int, 3u>::iterator it = voxels.begin(); it != voxels.end(); it++) {
+		char c = *it;
+		out.write(&c, 1);
+	}
+
+	out.close();
+
+	return 0;
+}

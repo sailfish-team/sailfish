@@ -1,0 +1,8 @@
+A simple program to voxelize STL files into numpy boolean arrays that can
+be loaded in Sailfish.  You will need the Common Versatile Multi-purpose
+Library for C++ in order to compile this program.  You can download it from:
+
+http://tech.unige.ch/cvmlcpp/
+
+Once you get the archive, unpack it so that the library is in the cvmlcpp
+directory.
