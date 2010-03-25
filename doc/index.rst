@@ -55,13 +55,11 @@ Contents
 ========
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
    intro
    installation
    tutorial
-   simulations
-   results
    models
    testcases
    regtest
