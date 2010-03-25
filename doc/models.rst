@@ -3,16 +3,23 @@ Supported models, grids and boundary conditions
 
 The Sailfish solver currently supports the following Lattice-Boltzmann models and grids:
 
-* two-dimensional: D2Q9 (BGK, MRT models)
-* three-dimensional: D3Q13 (MRT), D3Q15, D3Q19 (BGK, MRT models)
+* single fluid
 
-The models are implemented in both the incompressible and weakly compressible version, the
+  * two-dimensional: D2Q9 (BGK, MRT models)
+  * three-dimensional: D3Q13 (MRT), D3Q15, D3Q19 (BGK, MRT models)
+
+* binary fluid
+
+  * two-dimensional: Shan-Chen (D2Q9), free-energy (D2Q9, BGK, MRT) [PRE78]_
+  * three-dimensional: Shan-Chen, free-energy (D3Q19, BGK, MRT)
+
+.. [PRE78] Contact line dynamics in binary lattice Boltzmann simulations, Phys. Rev. E 78, 056709 (2008). DOI: 10.1103/PhysRevE.78.056709
+
+The single fluid models are implemented in both the incompressible and weakly compressible version, the
 latter of which is the default.  To turn on the incompressible model, use the ``--incompressible``
 command line switch.
 
-An external force field (body force) can be enabled in all models.  The force field
-is defined as accelerations using the ``--accel_x``, ``--accel_y``, and ``--accel_z``
-parameters.  The field is uniform and acts globally in the whole simulation domain.
+An external force field (body force) can be enabled in all models.
 
 A general overview of the Lattice-Boltzmann method
 --------------------------------------------------
