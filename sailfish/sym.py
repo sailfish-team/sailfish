@@ -838,6 +838,9 @@ def poly_factorize(poly):
     can be evaluated efficently."""
     max_deg = {}
 
+    if 'horner' in dir(sympy):
+        return sympy.horner(poly)
+
     if not isinstance(poly, Poly):
         poly = Poly(sympy.expand(poly), *poly.atoms(Symbol))
 
