@@ -410,14 +410,14 @@ class LBMGeo(object):
             mask[location[1]:location[1]+size[1],location[0]:location[0]+size[0]] = 0
 
             for i, vec in enumerate(self.sim.grid.basis):
-                a = numpy.roll(self.map, -vec[0], axis=1)
-                a = numpy.roll(a, -vec[1], axis=0)
+                a = numpy.roll(self.map, int(-vec[0]), axis=1)
+                a = numpy.roll(a, int(-vec[1]), axis=0)
 
                 b = numpy.logical_and((self.map == self.NODE_FLUID), (a == self.NODE_WALL))
                 b = numpy.ma.masked_array(b, mask)
 
-                c = numpy.roll(b, vec[0], axis=1)
-                c = numpy.roll(c, vec[1], axis=0)
+                c = numpy.roll(b, int(vec[0]), axis=1)
+                c = numpy.roll(c, int(vec[1]), axis=0)
 
                 self._force_nodes[obj_id].append((numpy.nonzero(b), numpy.nonzero(c)))
         else:
@@ -425,16 +425,16 @@ class LBMGeo(object):
             mask[location[2]:location[2]+size[2],location[1]:location[1]+size[1],location[0]:location[0]+size[0]] = 0
 
             for i, vec in enumerate(self.sim.grid.basis):
-                a = numpy.roll(self.map, -vec[0], axis=2)
-                a = numpy.roll(a, -vec[1], axis=1)
-                a = numpy.roll(a, -vec[2], axis=0)
+                a = numpy.roll(self.map, int(-vec[0]), axis=2)
+                a = numpy.roll(a, int(-vec[1]), axis=1)
+                a = numpy.roll(a, int(-vec[2]), axis=0)
 
                 b = numpy.logical_and((self.map == self.NODE_FLUID), (a == self.NODE_WALL))
                 b = numpy.ma.masked_array(b, mask)
 
-                c = numpy.roll(b, vec[0], axis=2)
-                c = numpy.roll(c, vec[1], axis=1)
-                c = numpy.roll(c, vec[2], axis=0)
+                c = numpy.roll(b, int(vec[0]), axis=2)
+                c = numpy.roll(c, int(vec[1]), axis=1)
+                c = numpy.roll(c, int(vec[2]), axis=0)
 
                 # For each diretion, save a map of source (fluid, b array) nodes and
                 # target (solid, c array) nodes.
@@ -508,8 +508,8 @@ class LBMGeo2D(LBMGeo):
             cnt = numpy.zeros_like(self.map).astype(numpy.int32)
 
             for i, vec in enumerate(self.sim.grid.basis):
-                a = numpy.roll(self.map, -vec[0], axis=1)
-                a = numpy.roll(a, -vec[1], axis=0)
+                a = numpy.roll(self.map, int(-vec[0]), axis=1)
+                a = numpy.roll(a, int(-vec[1]), axis=0)
 
                 cnt[(a == self.NODE_WALL)] += 1
 
@@ -586,9 +586,9 @@ class LBMGeo3D(LBMGeo):
             orientation[:] = self.NODE_DIR_OTHER
 
             for i, vec in enumerate(self.sim.grid.basis):
-                a = numpy.roll(self.map, -vec[0], axis=2)
-                a = numpy.roll(a, -vec[1], axis=1)
-                a = numpy.roll(a, -vec[2], axis=0)
+                a = numpy.roll(self.map, int(-vec[0]), axis=2)
+                a = numpy.roll(a, int(-vec[1]), axis=1)
+                a = numpy.roll(a, int(-vec[2]), axis=0)
 
                 cnt[(a == self.NODE_WALL)] += 1
 
