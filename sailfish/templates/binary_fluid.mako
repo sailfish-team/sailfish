@@ -19,10 +19,6 @@
 	rho, phi, lap1, v, grad1
 </%def>
 
-%if 'gravity' in context.keys():
-	${const_var} float gravity = ${gravity}f;
-%endif
-
 // In the free-energy model, the relaxation time is a local quantity.
 %if simtype == 'shan-chen':
 	${const_var} float tau0 = ${tau}f;		// relaxation time
