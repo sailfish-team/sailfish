@@ -92,8 +92,54 @@ ${device_func} inline void bounce_back(Dist *fi)
 	${self.template.get_def(sc_pseudopotential).render(comp)}
 </%def>
 
+<%def name="sc_calculate_accel()">
+##
+## Declare and evaluate the Shan-Chen accelerations.
+##
+	%for x in set(sum(force_couplings.keys(), ())):
+		float sca${x}[${dim}];
+	%endfor
+
+	if (!isWallNode(type)) {
+		%for dists, coupling_const in force_couplings.iteritems():
+			%if dim == 2:
+				shan_chen_accel(gi, gg${dists[0]}m0, gg${dists[1]}m0,
+					${coupling_const}, sca${dists[0]}, sca${dists[1]}, gx, gy);
+			%else:
+				shan_chen_accel(gi, gg${dists[0]}m0, gg${dists[1]}m0,
+					${coupling_const}, sca${dists[0]}, sca${dists[i]}, gx, gy, gz);
+			%endif
+		%endfor
+	}
+</%def>
+
+<%def name="sc_macro_fields()">
+##
+## Calculate the density and velocity for the Shan-Chen coupled fields.
+##
+	float total_dens;
+
+	%for i, x in enumerate(set(sum(force_couplings.keys(), ()))):
+		get0thMoment(&d${x}, type, orientation, &g${x}m0);
+		compute_1st_moment(&d${x}, v, ${i}, 1.0f/tau${x});
+	%endfor
+
+	total_dens = 0.0f;
+	%for x in set(sum(force_couplings.keys(), ())):
+		total_dens += g${x}m0 / tau${x};
+	%endfor
+
+	%for i in range(0, dim):
+		%for x in set(sum(force_couplings.keys(), ())):
+			sca${x}[${i}] /= g${x}m0;
+		%endfor
+		v[${i}] /= total_dens;
+	%endfor
+</%def>
+
 %if simtype == 'shan-chen':
-${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${global_ptr} float *f2, float *a1, float *a2, int x, int y
+${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${global_ptr} float *f2,
+float cc, float *a1, float *a2, int x, int y
 %if dim == 3:
 	, int z
 %endif
@@ -141,8 +187,8 @@ ${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${glo
 	t2 = ${sc_ppot(2)};
 
 	%for i in range(0, dim):
-		a1[${i}] *= t1 * SCG;
-		a2[${i}] *= t2 * SCG;
+		a1[${i}] *= t1 * cc;
+		a2[${i}] *= t2 * cc;
 	%endfor
 }
 %endif

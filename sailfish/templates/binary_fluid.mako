@@ -12,11 +12,11 @@
 </%def>
 
 <%def name="bgk_args_sc()">
-	rho, phi, v, sca1, sca2
+	g0m0, g1m0, v, sca0, sca1
 </%def>
 
 <%def name="bgk_args_fe()">
-	rho, phi, lap1, v, grad1
+	g0m0, g1m0, lap1, v, grad1
 </%def>
 
 // In the free-energy model, the relaxation time is a local quantity.
@@ -137,8 +137,8 @@ ${kernel} void CollideAndPropagate(
 	${global_ptr} float *dist1_out,
 	${global_ptr} float *dist2_in,
 	${global_ptr} float *dist2_out,
-	${global_ptr} float *irho,
-	${global_ptr} float *ipsi,
+	${global_ptr} float *gg0m0,
+	${global_ptr} float *gg1m0,
 	${kernel_args_1st_moment('ov')}
 	int save_macro)
 {
@@ -164,22 +164,13 @@ ${kernel} void CollideAndPropagate(
 
 		if (!isWallNode(type)) {
 			%if dim == 2:
-				laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy);
+				laplacian_and_grad(gg1m0, gi, &lap1, grad1, gx, gy);
 			%else:
-				laplacian_and_grad(ipsi, gi, &lap1, grad1, gx, gy, gz);
+				laplacian_and_grad(gg1m0, gi, &lap1, grad1, gx, gy, gz);
 			%endif
 		}
 	%elif simtype == 'shan-chen':
-		float sca1[${dim}], sca2[${dim}];
-
-		## TODO: Modify this to use force_couplings.
-		if (!isWallNode(type)) {
-			%if dim == 2:
-				shan_chen_accel(gi, irho, ipsi, sca1, sca2, gx, gy);
-			%else:
-				shan_chen_accel(gi, irho, ipsi, sca1, sca2, gx, gy, gz);
-			%endif
-		}
+		${sc_calculate_accel()}
 	%endif
 
 	// cache the distributions in local variables
@@ -188,28 +179,17 @@ ${kernel} void CollideAndPropagate(
 	getDist(&d1, dist2_in, gi);
 
 	// macroscopic quantities for the current cell
-	float rho, v[${dim}], phi;
+	float g0m0, v[${dim}], g1m0;
 
 	%if simtype == 'free-energy':
-		getMacro(&d0, type, orientation, &rho, v);
-		get0thMoment(&d1, type, orientation, &phi);
+		getMacro(&d0, type, orientation, &g0m0, v);
+		get0thMoment(&d1, type, orientation, &g1m0);
 	%elif simtype == 'shan-chen':
-		float total_dens;
-		get0thMoment(&d0, type, orientation, &rho);
-		get0thMoment(&d1, type, orientation, &phi);
-
-		compute_1st_moment(&d0, v, 0, 1.0f/tau0);
-		compute_1st_moment(&d1, v, 1, 1.0f/tau1);
-		total_dens = rho / tau0 + phi / tau1;
-		%for i in range(0, dim):
-			sca1[${i}] /= rho;
-			sca2[${i}] /= phi;
-			v[${i}] /= total_dens;
-		%endfor
+		${sc_macro_fields()}
 	%endif
 
-	boundaryConditions(&d0, type, orientation, &rho, v);
-	boundaryConditions(&d1, type, orientation, &phi, v);
+	boundaryConditions(&d0, type, orientation, &g0m0, v);
+	boundaryConditions(&d1, type, orientation, &g1m0, v);
 	${barrier()}
 
 	%if simtype == 'shan-chen':
