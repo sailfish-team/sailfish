@@ -80,9 +80,16 @@ ${device_func} inline void bounce_back(Dist *fi)
 	%endfor
 }
 
-<%def name="sc_potential(comp)">
+<%def name="sc_ppot_lin(comp)">
 	f${comp}[i + off]
-##	1.0f - exp(-f${comp}[i + off])
+</%def>
+
+<%def name="sc_ppot_exp(comp)">
+	1.0f - exp(-f${comp}[i + off])
+</%def>
+
+<%def name="sc_ppot(comp)">
+	${self.template.get_def(sc_pseudopotential).render(comp)}
 </%def>
 
 %if simtype == 'shan-chen':
@@ -111,8 +118,8 @@ ${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${glo
 			${get_field_off(ve[0], ve[1], 0)};
 		%endif
 
-		t1 = ${sc_potential(1)};
-		t2 = ${sc_potential(2)};
+		t1 = ${sc_ppot(1)};
+		t2 = ${sc_ppot(2)};
 
 		%if ve[0] != 0:
 			a1[0] += t2 * ${ve[0] * grid.weights[i]};
@@ -130,8 +137,8 @@ ${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${glo
 
 	off = 0;
 
-	t1 = ${sc_potential(1)};
-	t2 = ${sc_potential(2)};
+	t1 = ${sc_ppot(1)};
+	t2 = ${sc_ppot(2)};
 
 	%for i in range(0, dim):
 		a1[${i}] *= t1 * SCG;

@@ -1291,6 +1291,7 @@ class ShanChen(BinaryFluidBase):
         ctx['grids'] = [self.grid, self.grid]
         ctx['tau_phi'] = self.options.tau_phi
         ctx['simtype'] = 'shan-chen'
+        ctx['sc_pseudopotential'] = 'sc_ppot_lin'
 
     def add_force_coupling(self, i, j, g):
         self._force_couplings[(i,j)] = g
