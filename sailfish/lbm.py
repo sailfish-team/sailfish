@@ -1,7 +1,6 @@
 import math
 import numpy
 import os
-import pwd
 import sys
 import time
 from sailfish import geo
@@ -465,6 +464,7 @@ class LBMSim(object):
         locale.setlocale(locale.LC_ALL, 'C')
 
         if self.options.mako_cache:
+            import pwd
             lookup = TemplateLookup(directories=sys.path,
                     module_directory='/tmp/sailfish_modules-%s' % (pwd.getpwuid(os.getuid())[0]))
         else:
