@@ -102,12 +102,23 @@ ${device_func} inline void bounce_back(Dist *fi)
 
 	if (!isWallNode(type)) {
 		%for dists, coupling_const in force_couplings.iteritems():
-			%if dim == 2:
-				shan_chen_accel(gi, gg${dists[0]}m0, gg${dists[1]}m0,
-					${coupling_const}, sca${dists[0]}, sca${dists[1]}, gx, gy);
+
+			// Interaction between two components.
+			%if dists[0] != dists[1]:
+				%if dim == 2:
+					shan_chen_accel(gi, gg${dists[0]}m0, gg${dists[1]}m0,
+						${coupling_const}, sca${dists[0]}, sca${dists[1]}, gx, gy);
+				%else:
+					shan_chen_accel(gi, gg${dists[0]}m0, gg${dists[1]}m0,
+						${coupling_const}, sca${dists[0]}, sca${dists[i]}, gx, gy, gz);
+				%endif
+			// Self-interaction of a singel component.
 			%else:
-				shan_chen_accel(gi, gg${dists[0]}m0, gg${dists[1]}m0,
-					${coupling_const}, sca${dists[0]}, sca${dists[i]}, gx, gy, gz);
+				%if dim == 2:
+					shan_chen_accel_self(gi, gg${dists[0]}m0, ${coupling_const}, sca${dists[0]}, gx, gy);
+				%else:
+					shan_chen_accel_self(gi, gg${dists[0]}m0, ${coupling_const}, sca${dists[0]}, gx, gy, gz);
+				%endif
 			%endif
 		%endfor
 	}
@@ -138,6 +149,52 @@ ${device_func} inline void bounce_back(Dist *fi)
 </%def>
 
 %if simtype == 'shan-chen':
+${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, float cc, float *a1, int x, int y
+%if dim == 3:
+	, int z
+%endif
+)
+{
+	float t1;
+
+	%for i in range(0, dim):
+		a1[${i}] = 0.0f;
+	%endfor
+
+	int off, nx, ny;
+	%if dim == 3:
+		int nz;
+	%endif
+
+	%for i, ve in enumerate(grid.basis):
+		%if dim == 3:
+			${get_field_off(ve[0], ve[1], ve[2])};
+		%else:
+			${get_field_off(ve[0], ve[1], 0)};
+		%endif
+
+		t1 = ${sc_ppot(1)};
+
+		%if ve[0] != 0:
+			a1[0] += t1 * ${ve[0] * grid.weights[i]};
+		%endif
+		%if ve[1] != 0:
+			a1[1] += t1 * ${ve[1] * grid.weights[i]};
+		%endif
+		%if dim == 3 and ve[2] != 0:
+			a1[2] += t1 * ${ve[2] * grid.weights[i]};
+		%endif
+	%endfor
+
+	off = 0;
+
+	t1 = ${sc_ppot(1)};
+
+	%for i in range(0, dim):
+		a1[${i}] *= t1 * cc;
+	%endfor
+}
+
 ${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${global_ptr} float *f2,
 float cc, float *a1, float *a2, int x, int y
 %if dim == 3:

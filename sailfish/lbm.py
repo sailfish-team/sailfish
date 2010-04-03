@@ -926,6 +926,10 @@ class LBMSim(object):
     def use_force_for_eq(self, force, grid=0):
         self._force_term_for_eq[grid] = force
 
+    def add_force_coupling(self, i, j, g):
+        self._force_couplings[(i,j)] = g
+
+
 class FluidLBMSim(LBMSim):
 
     @property
@@ -1260,6 +1264,115 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
         super(BinaryFluidFreeEnergy, self)._init_fields()
         self.vis.add_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
 
+
+class ShanChenSingle(FluidLBMSim):
+    @property
+    def constants(self):
+        return [('SCG', self.options.G)]
+
+    def __init__(self, geo_class, options=[], args=None, defaults=None):
+        super(ShanChenSingle, self).__init__(geo_class, options, args, defaults)
+        self.add_force_coupling(0, 0, 'SCG')
+
+    def _add_options(self, parser, lb_group):
+        super(ShanChenSingle, self)._add_options(parser, lb_group)
+
+        lb_group.add_option('--G', dest='G',
+            help='Shan-Chen interaction strength', action='store', type='float',
+            default=1.0)
+        return None
+
+    def _init_compute_kernels(self):
+        # Kernel arguments.
+        args_tracer2 = [self.gpu_dist1a, self.geo.gpu_map] + self.gpu_tracer_loc
+        args_tracer1 = [self.gpu_dist1b, self.geo.gpu_map] + self.gpu_tracer_loc
+        args1 = ([self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_rho] + self.gpu_velocity +
+                 [numpy.uint32(0), self.gpu_rho])
+        args2 = ([self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_rho] + self.gpu_velocity +
+                 [numpy.uint32(0), self.gpu_rho])
+
+        # Special argument list for the case where macroscopic quantities data is to be
+        # saved in global memory, i.e. a visualization step.
+        args1v = ([self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_rho] + self.gpu_velocity +
+                  [numpy.uint32(1), self.gpu_rho])
+        args2v = ([self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_rho] + self.gpu_velocity +
+                  [numpy.uint32(1), self.gpu_rho])
+
+        macro_args1 = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_rho]
+        macro_args2 = [self.geo.gpu_map, self.gpu_dist1b, self.gpu_rho]
+
+        k_block_size = self._kernel_block_size()
+        cnp_name = 'CollideAndPropagate'
+        macro_name = 'PrepareMacroFields'
+
+        kern_cnp1 = self.backend.get_kernel(self.mod, cnp_name,
+                    args=args1,
+                    args_format='P'*(len(args1)-2)+'iP',
+                    block=k_block_size)
+        kern_cnp2 = self.backend.get_kernel(self.mod, cnp_name,
+                    args=args2,
+                    args_format='P'*(len(args2)-2)+'iP',
+                    block=k_block_size)
+        kern_cnp1s = self.backend.get_kernel(self.mod, cnp_name,
+                    args=args1v,
+                    args_format='P'*(len(args1v)-2)+'iP',
+                    block=k_block_size)
+        kern_cnp2s = self.backend.get_kernel(self.mod, cnp_name,
+                    args=args2v,
+                    args_format='P'*(len(args2v)-2)+'iP',
+                    block=k_block_size)
+        kern_trac1 = self.backend.get_kernel(self.mod,
+                    'LBMUpdateTracerParticles',
+                    args=args_tracer1,
+                    args_format='P'*len(args_tracer1),
+                    block=(1,))
+        kern_trac2 = self.backend.get_kernel(self.mod,
+                    'LBMUpdateTracerParticles',
+                    args=args_tracer2,
+                    args_format='P'*len(args_tracer2),
+                    block=(1,))
+        kern_mac1 = self.backend.get_kernel(self.mod, macro_name,
+                         args=macro_args1, args_format='P'*len(macro_args1),
+                         block=k_block_size)
+        kern_mac2 = self.backend.get_kernel(self.mod, macro_name,
+                         args=macro_args2, args_format='P'*len(macro_args2),
+                         block=k_block_size)
+
+        # Map: iteration parity -> kernel arguments to use.
+        self.kern_map = {
+            0: (kern_cnp1, kern_cnp1s, kern_trac1, kern_mac1),
+            1: (kern_cnp2, kern_cnp2s, kern_trac2, kern_mac2),
+        }
+
+        if self.grid.dim == 2:
+            self.kern_grid_size = (self.arr_nx/self.options.block_size, self.arr_ny)
+        else:
+            self.kern_grid_size = (self.arr_nx/self.options.block_size * self.arr_ny, self.arr_nz)
+
+    def _lbm_step(self, get_data, **kwargs):
+        kerns = self.kern_map[self.iter_ & 1]
+
+        self.backend.run_kernel(kerns[3], self.kern_grid_size)
+        self.backend.sync()
+
+        if get_data:
+            self.backend.run_kernel(kerns[1], self.kern_grid_size)
+            if kwargs.get('tracers'):
+                self.backend.run_kernel(kerns[2], (self.num_tracers,))
+                self.hostsync_tracers()
+            self.hostsync_velocity()
+            self.hostsync_density()
+        else:
+            self.backend.run_kernel(kerns[0], self.kern_grid_size)
+            if kwargs.get('tracers'):
+                self.backend.run_kernel(kerns[2], (self.num_tracers,))
+
+    def _update_ctx(self, ctx):
+        super(ShanChenSingle, self)._update_ctx(ctx)
+        ctx['simtype'] = 'shan-chen'
+        ctx['sc_pseudopotential'] = 'sc_ppot_exp'
+
+
 class ShanChenBinary(BinaryFluidBase):
     @property
     def constants(self):
@@ -1292,9 +1405,6 @@ class ShanChenBinary(BinaryFluidBase):
         ctx['tau_phi'] = self.options.tau_phi
         ctx['simtype'] = 'shan-chen'
         ctx['sc_pseudopotential'] = 'sc_ppot_lin'
-
-    def add_force_coupling(self, i, j, g):
-        self._force_couplings[(i,j)] = g
 
 class FreeSurfaceLBMSim(LBMSim):
     @property
