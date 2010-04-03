@@ -29,11 +29,11 @@ class GeoSC(geo.LBMGeo2D):
 
         self.sim.ic_fields = True
 
-class SCSim(lbm.ShanChen):
+class SCSim(lbm.ShanChenBinary):
     filename = 'sc_instability_2d'
 
     def __init__(self, geo_class):
-        lbm.ShanChen.__init__(self, geo_class, options=[],
+        lbm.ShanChenBinary.__init__(self, geo_class, options=[],
                               defaults={'bc_velocity': 'equilibrium', 'verbose': True, 'lat_nx': 640, #1280,
                                 'lat_ny': 400, 'grid': 'D2Q9', 'G': -1.2,
                                 'visc': 0.166666666666, 'periodic_x': True, 'scr_scale': 1})

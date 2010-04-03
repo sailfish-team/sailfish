@@ -1260,24 +1260,24 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
         super(BinaryFluidFreeEnergy, self)._init_fields()
         self.vis.add_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
 
-class ShanChen(BinaryFluidBase):
+class ShanChenBinary(BinaryFluidBase):
     @property
     def constants(self):
         return [('SCG', self.options.G)]
 
     def __init__(self, geo_class, options=[], args=None, defaults=None):
-        super(ShanChen, self).__init__(geo_class, options, args, defaults)
+        super(ShanChenBinary, self).__init__(geo_class, options, args, defaults)
         self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
         eq2, _ = sym.bgk_equilibrium(self.grid, self.S.phi, self.S.phi)
         self.equilibrium.append(eq2[0])
         self.add_force_coupling(0, 1, 'SCG')
 
     def _init_fields(self):
-        super(ShanChen, self)._init_fields()
+        super(ShanChenBinary, self)._init_fields()
         self.vis.add_field((lambda: self.rho, lambda: self.phi), 'density')
 
     def _add_options(self, parser, lb_group):
-        super(ShanChen, self)._add_options(parser, lb_group)
+        super(ShanChenBinary, self)._add_options(parser, lb_group)
 
         lb_group.add_option('--G', dest='G',
             help='Shan-Chen interaction strength', action='store', type='float',
@@ -1287,7 +1287,7 @@ class ShanChen(BinaryFluidBase):
         return None
 
     def _update_ctx(self, ctx):
-        super(ShanChen, self)._update_ctx(ctx)
+        super(ShanChenBinary, self)._update_ctx(ctx)
         ctx['grids'] = [self.grid, self.grid]
         ctx['tau_phi'] = self.options.tau_phi
         ctx['simtype'] = 'shan-chen'
