@@ -15,6 +15,12 @@ from scipy import signal
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
 
+def font_name():
+    import platform
+    if platform.system() == 'Windows':
+        return 'Courier New'
+    else:
+        return 'Liberation Mono'
 
 def hsv_to_rgb(a):
     t = a[:,:,0]*6.0
@@ -120,7 +126,7 @@ class Fluid2DVis(vis.FluidVis):
         self._cmap = [None, 'std', 'rb']
         self._cmap_scale_lock = False
         self._convolve = False
-        self._font = pygame.font.SysFont('Liberation Mono', 14)
+        self._font = pygame.font.SysFont(font_name(), 14)
         self.set_mode(width, height)
         self.lat_nx = lat_nx
         self.lat_ny = lat_ny
