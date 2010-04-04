@@ -24,10 +24,14 @@ class CUDABackend(object):
 
     @classmethod
     def add_options(cls, group):
+        group.add_option('--cuda-kernel-stats', dest='cuda_kernel_stats',
+                help='print information about amount of memory and registers used by the kernels', action='store_true', default=False)
         return 0
 
     def __init__(self, options):
         self.buffers = {}
+        self._kern_stats = set()
+        self.options = options
 
     def alloc_buf(self, size=None, like=None):
         if like is not None:
@@ -80,6 +84,11 @@ class CUDABackend(object):
         kern.set_block_shape(*_expand_block(block))
         if shared is not None:
             kern.set_shared_size(shared)
+
+        if self.options.cuda_kernel_stats and name not in self._kern_stats:
+            self._kern_stats.add(name)
+            print '%s: l:%d  s:%d  r:%d' % (name, kern.local_size_bytes, kern.shared_size_bytes, kern.num_regs)
+
         return kern
 
     def run_kernel(self, kernel, grid_size):
