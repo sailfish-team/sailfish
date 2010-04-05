@@ -840,7 +840,10 @@ class LBMSim(object):
             self.backend.sync()
             t_now = time.time()
             print self.iter_,
-            print '%.2f %.2f' % self.get_mlups(t_now - t_prev, cycles)
+
+            avg, curr = self.get_mlups(t_now - t_prev, cycles)
+            print '%.2f %.2f' % (avg, curr)
+            self._bench_avg = avg
 
             if self.options.max_iters <= self.iter_:
                 break

@@ -38,13 +38,15 @@ class LDCSim(lbm.FluidLBMSim):
 
     filename = 'ldc'
 
-    def __init__(self, geo_class):
+    def __init__(self, geo_class, defaults):
         opts = []
         opts.append(optparse.make_option('--test_re100', dest='test_re100', action='store_true', default=False, help='generate test data for Re=100'))
         opts.append(optparse.make_option('--test_re1000', dest='test_re1000', action='store_true', default=False, help='generate test data for Re=1000'))
 
-        lbm.FluidLBMSim.__init__(self, geo_class, options=opts,
-                defaults={'bc_velocity': 'equilibrium', 'verbose': True})
+        settings = {'bc_velocity': 'equilibrium', 'verbose': True}
+        settings.update(defaults)
+
+        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, defaults=settings)
 
         if self.options.test_re100:
             self.options.batch = True
@@ -69,6 +71,6 @@ class LDCSim(lbm.FluidLBMSim):
                                         self.vy[int(self.options.lat_ny/2),:] / self.geo_class.max_v)):
             print float(i) / self.options.lat_ny, x, y
 
-
-sim = LDCSim(LBMGeoLDC)
-sim.run()
+if __name__ == '__main__':
+    sim = LDCSim(LBMGeoLDC)
+    sim.run()

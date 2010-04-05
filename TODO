@@ -7,20 +7,6 @@
   and generate plots comparing the results to data from the literature
   (see also regtest/ldc_golden).
 
-- Automated performance tests.
-  Create a set of short and simple tests to be used to automatically
-  evaluate the performance of the kernels.  Sample cases that might
-  be worth testing:
-  - empty simulation domain
-  - simulation domain filled with randomly distributed wall nodes
-  - simulation domain with areas of velocity and pressure BCs
-
-  Each test should be run for only a few seconds, so that the whole
-  suite could be completed in no more than a few minutes.  The result
-  of the test should be a plot depicting the performance (in MLUPS)
-  as a function of different parameters (e.g. domain size, block size,
-  grid type, model, type of BC, etc).
-
 - BC node direction detection in 3D.
   Add node direction detection for 3D geometries, thus fixing the
   BC and equilibrium boundary conditions in 3D.
