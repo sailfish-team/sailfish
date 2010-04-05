@@ -38,7 +38,7 @@ class LDCSim(lbm.FluidLBMSim):
 
     filename = 'ldc'
 
-    def __init__(self, geo_class, defaults):
+    def __init__(self, geo_class, defaults={}):
         opts = []
         opts.append(optparse.make_option('--test_re100', dest='test_re100', action='store_true', default=False, help='generate test data for Re=100'))
         opts.append(optparse.make_option('--test_re1000', dest='test_re1000', action='store_true', default=False, help='generate test data for Re=1000'))
