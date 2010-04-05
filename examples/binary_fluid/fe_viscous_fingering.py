@@ -31,14 +31,17 @@ class FEFingerSim(lbm.BinaryFluidFreeEnergy):
 
     filename = 'fe_fingering'
 
-    def __init__(self, geo_class):
-        lbm.BinaryFluidFreeEnergy.__init__(self, geo_class, options=[],
-                              defaults={'bc_velocity': 'equilibrium', 'verbose': True, 'lat_nx': 640,
-                                        'lat_ny': 101, 'lat_nz': 37, 'grid': 'D3Q19',
-                                        'tau_a': 4.5, 'tau_b': 0.6, 'tau_phi': 1.0, 'kappa': 9.18e-5,
-                                        'Gamma': 25.0, 'A': 1.41e-4, 'lambda_': 0.0, 'model': 'femrt',
-                                        'periodic_x': True, 'periodic_y': True, 'scr_scale': 1,
-                                        'periodic_z': True})
+    def __init__(self, geo_class, defaults={}):
+
+        settings = {'bc_velocity': 'equilibrium', 'verbose': True, 'lat_nx': 640,
+                    'lat_ny': 101, 'lat_nz': 37, 'grid': 'D3Q19',
+                    'tau_a': 4.5, 'tau_b': 0.6, 'tau_phi': 1.0, 'kappa': 9.18e-5,
+                    'Gamma': 25.0, 'A': 1.41e-4, 'lambda_': 0.0, 'model': 'femrt',
+                    'periodic_x': True, 'periodic_y': True, 'scr_scale': 1,
+                    'periodic_z': True}
+        settings.update(defaults)
+
+        lbm.BinaryFluidFreeEnergy.__init__(self, geo_class, options=[], defaults=settings)
 
         self.add_body_force((3.0e-5, 0.0, 0.0), grid=0, accel=False)
 
