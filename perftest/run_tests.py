@@ -115,7 +115,7 @@ head = repo.commits()[0]
 def run_test(name):
     global tests, defaults, head
 
-    print '* %s', name
+    print '* %s' % name
 
     if name not in tests:
         raise ValueError('Test %s not found' % name)
