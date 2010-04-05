@@ -102,8 +102,8 @@ ${kernel} void CollideAndPropagate(
 	%for i in sym.get_prop_dists(grid, 1):
 		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
 	%endfor
-	%for i in sym.get_prop_dists(grid, -1):
-		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
+	%for i in sym.get_prop_dists(grid, 1):
+		#define prop_${grid.idx_name[grid.idx_opposite[i]]} prop_${grid.idx_name[i]}
 	%endfor
 
 	int type, orientation;

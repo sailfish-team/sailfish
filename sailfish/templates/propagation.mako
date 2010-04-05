@@ -111,6 +111,17 @@
 	}
 	%endif
 
+	${barrier()}
+
+	// Save locally propagated distributions into global memory.
+	// The leftmost thread is not updated in this block.
+	if (lx > 0 && gx < ${lat_nx}) {
+		${prop_block_bnd(dist_out, dist_in, 1, 'prop_local')}
+	}
+
+	// Propagation in directions orthogonal to the X axis (global memory)
+	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
+
 	// W propagation in shared memory
 	if (lx > 0) {
 		%for i in sym.get_prop_dists(grid, -1):
@@ -128,15 +139,6 @@
 	%endif
 
 	${barrier()}
-
-	// Save locally propagated distributions into global memory.
-	// The leftmost thread is not updated in this block.
-	if (lx > 0 && gx < ${lat_nx}) {
-		${prop_block_bnd(dist_out, dist_in, 1, 'prop_local')}
-	}
-
-	// Propagation in directions orthogonal to the X axis (global memory)
-	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
 
 	// The rightmost thread is not updated in this block.
 	if (lx < ${block_size-1} && gx < ${lat_nx-1}) {
