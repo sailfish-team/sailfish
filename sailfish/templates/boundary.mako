@@ -270,6 +270,16 @@ ${device_func} inline void compute_1st_moment(Dist *fi, float *out, int add, flo
 	}
 }
 
+// Compute the 2nd moments of the distributions.  Order of components is:
+// 2D: xx, xy, yy
+// 3D: xx, xy, xz, yy, yz, zz
+${device_func} inline void compute_2nd_moment(Dist *fi, float *out)
+{
+	%for i, (a, b) in enumerate([(x,y) for x in range(0, dim) for y in range(x, dim)]):
+		out[${i}] = ${cex(sym.ex_flux(grid, 'fi', a, b), pointers=True)};
+	%endfor
+}
+
 // Compute the 1st moments of the distributions and divide it by the 0-th moment
 // i.e. compute velocity.
 ${device_func} inline void compute_1st_div_0th(Dist *fi, float *out, float zero)

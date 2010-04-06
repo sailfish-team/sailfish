@@ -700,6 +700,15 @@ def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=Non
 
     return ret
 
+def ex_flux(grid, distp, comp_a, comp_b):
+    syms = [Symbol('%s->%s' % (distp, x)) for x in grid.idx_name]
+    ret = 0
+
+    for i, sym in enumerate(syms):
+        ret += grid.basis[i][comp_a] * grid.basis[i][comp_b] * sym
+
+    return ret
+
 def free_energy_mrt(grid, dest_dist, src_dist):
     src_syms = Matrix([Symbol('%s.%s' % (src_dist, x)) for x in grid.idx_name])
     dst_syms = [Symbol('%s->%s' % (dest_dist, x)) for x in grid.idx_name]
