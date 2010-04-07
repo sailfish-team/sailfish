@@ -29,6 +29,8 @@ class CUDABackend(object):
     def add_options(cls, group):
         group.add_option('--cuda-kernel-stats', dest='cuda_kernel_stats',
                 help='print information about amount of memory and registers used by the kernels', action='store_true', default=False)
+        group.add_option('--cuda-nvcc-opts', dest='cuda_nvcc_opts',
+                help='additional parameters to pass to the CUDA compiler', action='store', type='string', default='')
         return 0
 
     def __init__(self, options):
@@ -78,7 +80,13 @@ class CUDABackend(object):
                 cuda.memcpy_dtoh(target, cl_buf)
 
     def build(self, source):
-        return pycuda.compiler.SourceModule(source) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
+        if self.options.cuda_nvcc_opts:
+            import shlex
+            options = shlex.split(self.options.cuda_nvcc_opts)
+        else:
+            options = []
+
+        return pycuda.compiler.SourceModule(source, options=options) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
 
     def get_kernel(self, prog, name, block, args, args_format, shared=None):
         kern = prog.get_function(name)
