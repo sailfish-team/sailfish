@@ -26,12 +26,15 @@
 	%for i in range(0, len(grids)):
 		%if sym.needs_accel(i, forces, force_couplings):
 			%if not sym.needs_coupling_accel(i, force_couplings):
-				float ea${i}[${dim}] = {0.0f};
+				float ea${i}[${dim}];
+				%for j in range(0, dim):
+					ea${i}[${j}] = ${cex(sym.body_force_accel(i, j, forces), vectors=True)};
+				%endfor
+			%else:
+				%for j in range(0, dim):
+					ea${i}[${j}] += ${cex(sym.body_force_accel(i, j, forces), vectors=True)};
+				%endfor
 			%endif
-
-			%for j in range(0, dim):
-				ea${i}[${j}] += ${cex(sym.body_force_accel(i, j, forces), vectors=True)};
-			%endfor
 		%endif
 	%endfor
 </%def>
