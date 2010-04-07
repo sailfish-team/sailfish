@@ -131,7 +131,6 @@ ${kernel} void CollideAndPropagate(
 	%endif
 
 	boundaryConditions(&d0, type, orientation, &g0m0, v);
-	${barrier()}
 
 	${relaxate(bgk_args)}
 

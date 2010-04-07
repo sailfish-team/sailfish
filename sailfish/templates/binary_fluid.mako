@@ -190,7 +190,6 @@ ${kernel} void CollideAndPropagate(
 
 	boundaryConditions(&d0, type, orientation, &g0m0, v);
 	boundaryConditions(&d1, type, orientation, &g1m0, v);
-	${barrier()}
 
 	%if simtype == 'shan-chen':
 		${relaxate(bgk_args_sc)}
