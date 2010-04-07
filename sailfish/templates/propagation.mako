@@ -89,6 +89,36 @@
 	%endif
 </%def>
 
+<%def name="propagate2(dist_out, dist_in='fi')">
+	// update the 0-th direction distribution
+	${dist_out}[gi] = ${dist_in}.fC;
+
+	// E propagation in shared memory
+	if (gx < ${lat_nx-1}) {
+		${prop_block_bnd(dist_out, dist_in, 1, 'prop_global')}
+	}
+	%if periodic_x:
+	// periodic boundary conditions in the X direction
+	else {
+		${prop_block_bnd(dist_out, dist_in, 1, 'prop_global', pbc_offsets[0][1])}
+	}
+	%endif
+
+	// Propagation in directions orthogonal to the X axis (global memory)
+	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
+
+	// W propagation in shared memory
+	if (gx > 0) {
+		${prop_block_bnd(dist_out, dist_in, -1, 'prop_global')}
+	}
+	%if periodic_x:
+	// periodic boundary conditions in the X direction
+	else {
+		${prop_block_bnd(dist_out, dist_in, -1, 'prop_global', pbc_offsets[0][-1])}
+	}
+	%endif
+</%def>
+
 <%def name="propagate(dist_out, dist_in='fi')">
 	// update the 0-th direction distribution
 	${dist_out}[gi] = ${dist_in}.fC;
