@@ -1,5 +1,8 @@
+import operator
+
 import pycuda.autoinit
 import pycuda.compiler
+import pycuda.tools
 import pycuda.driver as cuda
 
 from struct import calcsize, pack
@@ -87,7 +90,11 @@ class CUDABackend(object):
 
         if self.options.cuda_kernel_stats and name not in self._kern_stats:
             self._kern_stats.add(name)
-            print '%s: l:%d  s:%d  r:%d' % (name, kern.local_size_bytes, kern.shared_size_bytes, kern.num_regs)
+            ddata = pycuda.tools.DeviceData()
+            occ = pycuda.tools.OccupancyRecord(ddata, reduce(operator.mul, block), kern.shared_size_bytes, kern.num_regs)
+
+            print '%s: l:%d  s:%d  r:%d  occ:(%f tb:%d w:%d l:%s)' % (name, kern.local_size_bytes, kern.shared_size_bytes,
+                    kern.num_regs, occ.occupancy, occ.tb_per_mp, occ.warps_per_mp, occ.limited_by)
 
         return kern
 
