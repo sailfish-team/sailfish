@@ -38,7 +38,7 @@
 				nz = 0;
 		%else:
 			if (nz < 0) {
-				nz = ${lat_nz-1}
+				nz = ${lat_nz-1};
 		%endif
 				off += ${pbc_offsets[2][int(zoff)]};
 			}
@@ -54,7 +54,11 @@
 
 <%def name="nonlocal_fld(fld_id)">
 	%if fld_id in image_fields:
-		tex2D(img_f${fld_id}, nx, ny)
+		%if dim == 3:
+			tex3D(img_f${fld_id}, nx, ny, nz)
+		%else:
+			tex2D(img_f${fld_id}, nx, ny)
+		%endif
 	%else:
 		f${fld_id}[idx]
 	%endif

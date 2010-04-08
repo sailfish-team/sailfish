@@ -38,6 +38,7 @@ class CUDABackend(object):
     def __init__(self, options):
         self.buffers = {}
         self._kern_stats = set()
+        self._tex_to_memcpy = {}
         self.options = options
 
     def alloc_buf(self, size=None, like=None):
@@ -60,13 +61,32 @@ class CUDABackend(object):
     def nonlocal_field(self, prog, cl_buf, num, shape, strides):
         # TODO: Make this work in 3D as well.
         # TODO: These do not work in double precision.
-        dsc = cuda.ArrayDescriptor()
-        dsc.width = shape[-1]
-        dsc.height = shape[-2]
-        dsc.format = cuda.array_format.FLOAT
-        dsc.num_channels = 1
-        txt = prog.get_texref('img_f%d' % num)
-        txt.set_address_2d(cl_buf, dsc, strides[-2])
+        if len(shape) == 3:
+            dsc = cuda.ArrayDescriptor3D()
+            dsc.depth, dsc.height, dsc.width = shape
+            dsc.format = cuda.array_format.FLOAT
+            dsc.num_channels = 1
+            ary = cuda.Array(dsc)
+
+            copy = cuda.Memcpy3D()
+            copy.set_src_device(cl_buf)
+            copy.set_dst_array(ary)
+            copy.width_in_bytes = copy.src_pitch = strides[-2]
+            copy.src_height = copy.height = dsc.height
+            copy.depth = dsc.depth
+
+            txt = prog.get_texref('img_f%d' % num)
+            txt.set_array(ary)
+            self._tex_to_memcpy[txt] = copy
+        else:
+            # 2D texture.
+            dsc = cuda.ArrayDescriptor()
+            dsc.width = shape[-1]
+            dsc.height = shape[-2]
+            dsc.format = cuda.array_format.FLOAT
+            dsc.num_channels = 1
+            txt = prog.get_texref('img_f%d' % num)
+            txt.set_address_2d(cl_buf, dsc, strides[-2])
         return txt
 
     def to_buf(self, cl_buf, source=None):
@@ -124,6 +144,9 @@ class CUDABackend(object):
     def run_kernel(self, kernel, grid_size):
         kernel.param_setv(0, pack(kernel.args[1], *kernel.args[0]))
         for img_field in kernel.img_fields:
+            # Copy device buffer to 3D CUDA array if neessary.
+            if img_field in self._tex_to_memcpy:
+                self._tex_to_memcpy[img_field]()
             kernel.param_set_texref(img_field)
         kernel.launch_grid(*_expand_grid(grid_size))
 
