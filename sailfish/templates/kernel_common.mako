@@ -3,7 +3,7 @@
 <%def name="nonlocal_fields_decl()">
 	%if backend == 'cuda':
 		%for i in image_fields:
-			texture<float, ${dim}> img_f${i};
+			texture<float, 2> img_f${i};
 		%endfor
 	%endif
 </%def>

@@ -59,25 +59,37 @@ class CUDABackend(object):
         return buf
 
     def nonlocal_field(self, prog, cl_buf, num, shape, strides):
-        # TODO: Make this work in 3D as well.
-        # TODO: These do not work in double precision.
         if len(shape) == 3:
-            dsc = cuda.ArrayDescriptor3D()
-            dsc.depth, dsc.height, dsc.width = shape
+            dsc = cuda.ArrayDescriptor()
+            dsc.width = strides[-2] / strides[-1]
+            dsc.height = shape[-3]
             dsc.format = cuda.array_format.FLOAT
             dsc.num_channels = 1
-            ary = cuda.Array(dsc)
-
-            copy = cuda.Memcpy3D()
-            copy.set_src_device(cl_buf)
-            copy.set_dst_array(ary)
-            copy.width_in_bytes = copy.src_pitch = strides[-2]
-            copy.src_height = copy.height = dsc.height
-            copy.depth = dsc.depth
-
             txt = prog.get_texref('img_f%d' % num)
-            txt.set_array(ary)
-            self._tex_to_memcpy[txt] = copy
+            txt.set_address_2d(cl_buf, dsc, strides[-3])
+
+            # It turns out that using 3D textures doesn't really make
+            # much sense if it requires copying data around.  We therefore
+            # access the 3D fields via a 2D texture, which still provides
+            # some caching, while not requiring a separate copy of the
+            # data.
+            #
+            # dsc = cuda.ArrayDescriptor3D()
+            # dsc.depth, dsc.height, dsc.width = shape
+            # dsc.format = cuda.array_format.FLOAT
+            # dsc.num_channels = 1
+            # ary = cuda.Array(dsc)
+
+            # copy = cuda.Memcpy3D()
+            # copy.set_src_device(cl_buf)
+            # copy.set_dst_array(ary)
+            # copy.width_in_bytes = copy.src_pitch = strides[-2]
+            # copy.src_height = copy.height = dsc.height
+            # copy.depth = dsc.depth
+
+            # txt = prog.get_texref('img_f%d' % num)
+            # txt.set_array(ary)
+            # self._tex_to_memcpy[txt] = copy
         else:
             # 2D texture.
             dsc = cuda.ArrayDescriptor()
@@ -145,8 +157,8 @@ class CUDABackend(object):
         kernel.param_setv(0, pack(kernel.args[1], *kernel.args[0]))
         for img_field in kernel.img_fields:
             # Copy device buffer to 3D CUDA array if neessary.
-            if img_field in self._tex_to_memcpy:
-                self._tex_to_memcpy[img_field]()
+            # if img_field in self._tex_to_memcpy:
+            #    self._tex_to_memcpy[img_field]()
             kernel.param_set_texref(img_field)
         kernel.launch_grid(*_expand_grid(grid_size))
 
