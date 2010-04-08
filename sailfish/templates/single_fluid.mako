@@ -23,11 +23,8 @@
 ${const_var} float tau0 = ${tau}f;		// relaxation time
 ${const_var} float visc = ${visc}f;		// viscosity
 
-%for i in image_fields:
-	texture<float, 2> img_f${i};
-%endfor
-
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
+${kernel_common.nonlocal_fields_decl()}
 ${kernel_common.body(bgk_args_decl)}
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>

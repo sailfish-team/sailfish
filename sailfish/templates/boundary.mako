@@ -4,7 +4,7 @@
 
 <%namespace file="code_common.mako" import="*"/>
 <%namespace file="propagation.mako" import="rel_offset"/>
-<%namespace file="utils.mako" import="get_field_off"/>
+<%namespace file="utils.mako" import="get_field_off,nonlocal_fld,fld_args"/>
 
 <%def name="noneq_bb(orientation)">
 	case ${orientation}:
@@ -79,14 +79,6 @@ ${device_func} inline void bounce_back(Dist *fi)
 		fi->${grid.idx_name[grid.idx_opposite[i]]} = t;
 	%endfor
 }
-
-<%def name="nonlocal_fld(fld_id)">
-	%if fld_id in image_fields:
-		tex2D(img_f${fld_id}, nx, ny)
-	%else:
-		f${fld_id}[idx]
-	%endif
-</%def>
 
 <%def name="sc_ppot_lin(comp)">
 	${nonlocal_fld(comp)}
@@ -180,12 +172,6 @@ ${device_func} inline float sc_ppot(${global_ptr} float *fx, int fi1, int idx, i
 	return 0.0f;
 }
 
-<%def name="sc_loc_args()">
-	nx, ny
-	%if dim == 3:
-		, nz
-	%endif
-</%def>
 
 ${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, int fi1, float cc, float *a1, int x, int y
 %if dim == 3:
@@ -211,7 +197,7 @@ ${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, 
 			${get_field_off(ve[0], ve[1], 0)};
 		%endif
 
-		t1 = sc_ppot(f1, fi1, i + off, ${sc_loc_args()});
+		t1 = sc_ppot(f1, fi1, i + off, ${fld_args()});
 
 		%if ve[0] != 0:
 			a1[0] += t1 * ${ve[0] * grid.weights[i]};
@@ -231,7 +217,7 @@ ${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, 
 		nz = z;
 	%endif
 
-	t1 = sc_ppot(f1, fi1, i + off, ${sc_loc_args()});
+	t1 = sc_ppot(f1, fi1, i + off, ${fld_args()});
 
 	%for i in range(0, dim):
 		a1[${i}] *= t1 * cc;
@@ -264,8 +250,8 @@ int fi1, int fi2, float cc, float *a1, float *a2, int x, int y
 			${get_field_off(ve[0], ve[1], 0)};
 		%endif
 
-		t1 = sc_ppot(f1, fi1, i + off, ${sc_loc_args()});
-		t2 = sc_ppot(f2, fi2, i + off, ${sc_loc_args()});
+		t1 = sc_ppot(f1, fi1, i + off, ${fld_args()});
+		t2 = sc_ppot(f2, fi2, i + off, ${fld_args()});
 
 		%if ve[0] != 0:
 			a1[0] += t2 * ${ve[0] * grid.weights[i]};
@@ -289,8 +275,8 @@ int fi1, int fi2, float cc, float *a1, float *a2, int x, int y
 	%endif
 
 
-	t1 = sc_ppot(f1, fi1, i + off, ${sc_loc_args()});
-	t2 = sc_ppot(f2, fi2, i + off, ${sc_loc_args()});
+	t1 = sc_ppot(f1, fi1, i + off, ${fld_args()});
+	t2 = sc_ppot(f2, fi2, i + off, ${fld_args()});
 
 	%for i in range(0, dim):
 		a1[${i}] *= t1 * cc;

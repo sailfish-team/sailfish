@@ -45,3 +45,18 @@
 	%endif
 </%def>
 
+<%def name="fld_args()">
+	nx, ny
+	%if dim == 3:
+		, nz
+	%endif
+</%def>
+
+<%def name="nonlocal_fld(fld_id)">
+	%if fld_id in image_fields:
+		tex2D(img_f${fld_id}, nx, ny)
+	%else:
+		f${fld_id}[idx]
+	%endif
+</%def>
+
