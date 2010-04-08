@@ -31,6 +31,8 @@ class CUDABackend(object):
                 help='print information about amount of memory and registers used by the kernels', action='store_true', default=False)
         group.add_option('--cuda-nvcc-opts', dest='cuda_nvcc_opts',
                 help='additional parameters to pass to the CUDA compiler', action='store', type='string', default='')
+        group.add_option('--cuda-keep-temp', dest='cuda_keep_temp',
+                help='keep intermediate CUDA files', action='store_true', default=False)
         return 0
 
     def __init__(self, options):
@@ -98,7 +100,7 @@ class CUDABackend(object):
         else:
             options = []
 
-        return pycuda.compiler.SourceModule(source, options=options) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
+        return pycuda.compiler.SourceModule(source, options=options, keep=self.options.cuda_keep_temp) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
 
     def get_kernel(self, prog, name, block, args, args_format, shared=None, fields=[]):
         kern = prog.get_function(name)
