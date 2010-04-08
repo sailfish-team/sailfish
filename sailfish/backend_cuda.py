@@ -55,6 +55,18 @@ class CUDABackend(object):
 
         return buf
 
+    def nonlocal_field(self, prog, cl_buf, num, shape, strides):
+        # TODO: Make this work in 3D as well.
+        # TODO: These do not work in double precision.
+        dsc = cuda.ArrayDescriptor()
+        dsc.width = shape[-1]
+        dsc.height = shape[-2]
+        dsc.format = cuda.array_format.FLOAT
+        dsc.num_channels = 1
+        txt = prog.get_texref('img_f%d' % num)
+        txt.set_address_2d(cl_buf, dsc, strides[-2])
+        return txt
+
     def to_buf(self, cl_buf, source=None):
         if source is None:
             if cl_buf in self.buffers:
@@ -88,10 +100,11 @@ class CUDABackend(object):
 
         return pycuda.compiler.SourceModule(source, options=options) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
 
-    def get_kernel(self, prog, name, block, args, args_format, shared=None):
+    def get_kernel(self, prog, name, block, args, args_format, shared=None, fields=[]):
         kern = prog.get_function(name)
         kern.param_set_size(calcsize(args_format))
         setattr(kern, 'args', (args, args_format))
+        setattr(kern, 'img_fields', fields)
         kern.set_block_shape(*_expand_block(block))
         if shared is not None:
             kern.set_shared_size(shared)
@@ -108,6 +121,8 @@ class CUDABackend(object):
 
     def run_kernel(self, kernel, grid_size):
         kernel.param_setv(0, pack(kernel.args[1], *kernel.args[0]))
+        for img_field in kernel.img_fields:
+            kernel.param_set_texref(img_field)
         kernel.launch_grid(*_expand_grid(grid_size))
 
     def sync(self):

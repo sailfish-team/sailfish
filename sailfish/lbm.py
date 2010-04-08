@@ -328,6 +328,10 @@ class LBMSim(object):
         self.output_fields = {}
         self.output_vectors = {}
 
+        # Fields accessed via image/texture references to speed-up
+        # non-local data access.
+        self.image_fields = set()
+
     def _set_grid(self, name):
         for x in sym.KNOWN_GRIDS:
             if x.__name__ == name:
@@ -517,11 +521,11 @@ class LBMSim(object):
         ctx['forces'] = self.forces
         ctx['force_couplings'] = self._force_couplings
         ctx['force_for_eq'] = self._force_term_for_eq
+        ctx['image_fields'] = self.image_fields
 
         self._update_ctx(ctx)
         ctx.update(self.geo.get_defines())
         ctx.update(self.backend.get_defines())
-
         src = lbm_tmpl.render(**ctx)
 
         if self._is_double_precision():
@@ -932,6 +936,12 @@ class LBMSim(object):
     def add_force_coupling(self, i, j, g):
         self._force_couplings[(i,j)] = g
 
+    def add_nonlocal_field(self, num):
+        self.image_fields.add(num)
+
+    def bind_nonlocal_field(self, gpu_buf, num):
+        strides, _ = self._get_strides(self.float)
+        return self.backend.nonlocal_field(self.mod, gpu_buf, num, self.shape, strides)
 
 class FluidLBMSim(LBMSim):
 
@@ -1276,6 +1286,7 @@ class ShanChenSingle(FluidLBMSim):
     def __init__(self, geo_class, options=[], args=None, defaults=None):
         super(ShanChenSingle, self).__init__(geo_class, options, args, defaults)
         self.add_force_coupling(0, 0, 'SCG')
+        self.add_nonlocal_field(0)
 
     def _add_options(self, parser, lb_group):
         super(ShanChenSingle, self)._add_options(parser, lb_group)
@@ -1284,6 +1295,10 @@ class ShanChenSingle(FluidLBMSim):
             help='Shan-Chen interaction strength', action='store', type='float',
             default=1.0)
         return None
+
+    def _init_compute_fields(self):
+        super(ShanChenSingle, self)._init_compute_fields()
+        self.img_rho = self.bind_nonlocal_field(self.gpu_rho, 0)
 
     def _init_compute_kernels(self):
         # Kernel arguments.
@@ -1308,22 +1323,24 @@ class ShanChenSingle(FluidLBMSim):
         cnp_name = 'CollideAndPropagate'
         macro_name = 'PrepareMacroFields'
 
+        fields = [self.img_rho]
+
         kern_cnp1 = self.backend.get_kernel(self.mod, cnp_name,
                     args=args1,
                     args_format='P'*(len(args1)-2)+'iP',
-                    block=k_block_size)
+                    block=k_block_size, fields=fields)
         kern_cnp2 = self.backend.get_kernel(self.mod, cnp_name,
                     args=args2,
                     args_format='P'*(len(args2)-2)+'iP',
-                    block=k_block_size)
+                    block=k_block_size, fields=fields)
         kern_cnp1s = self.backend.get_kernel(self.mod, cnp_name,
                     args=args1v,
                     args_format='P'*(len(args1v)-2)+'iP',
-                    block=k_block_size)
+                    block=k_block_size, fields=fields)
         kern_cnp2s = self.backend.get_kernel(self.mod, cnp_name,
                     args=args2v,
                     args_format='P'*(len(args2v)-2)+'iP',
-                    block=k_block_size)
+                    block=k_block_size, fields=fields)
         kern_trac1 = self.backend.get_kernel(self.mod,
                     'LBMUpdateTracerParticles',
                     args=args_tracer1,

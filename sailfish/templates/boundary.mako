@@ -80,16 +80,26 @@ ${device_func} inline void bounce_back(Dist *fi)
 	%endfor
 }
 
+<%def name="nonlocal_fld(fld_id)">
+	%if fld_id in image_fields:
+		tex2D(img_f${fld_id}, nx, ny)
+	%else:
+		f${fld_id}[idx]
+	%endif
+</%def>
+
 <%def name="sc_ppot_lin(comp)">
-	f${comp}[i + off]
+	${nonlocal_fld(comp)}
 </%def>
 
 <%def name="sc_ppot_exp(comp)">
-	1.0f - exp(-f${comp}[i + off])
+	1.0f - exp(-${nonlocal_fld(comp)})
 </%def>
 
 <%def name="sc_ppot(comp)">
-	${self.template.get_def(sc_pseudopotential).render(comp)}
+	<%
+		local.template.get_def(sc_pseudopotential).render_context(context, comp)
+	%>
 </%def>
 
 <%def name="sc_calculate_accel()">
@@ -106,18 +116,18 @@ ${device_func} inline void bounce_back(Dist *fi)
 			// Interaction between two components.
 			%if dists[0] != dists[1]:
 				%if dim == 2:
-					shan_chen_accel(gi, gg${dists[0]}m0, gg${dists[1]}m0,
+					shan_chen_accel(gi, gg${dists[0]}m0, gg${dists[1]}m0, ${dists[0]}, ${dists[1]},
 						${coupling_const}, sca${dists[0]}, sca${dists[1]}, gx, gy);
 				%else:
-					shan_chen_accel(gi, gg${dists[0]}m0, gg${dists[1]}m0,
+					shan_chen_accel(gi, gg${dists[0]}m0, gg${dists[1]}m0, ${dists[0]}, ${dists[1]},
 						${coupling_const}, sca${dists[0]}, sca${dists[i]}, gx, gy, gz);
 				%endif
 			// Self-interaction of a singel component.
 			%else:
 				%if dim == 2:
-					shan_chen_accel_self(gi, gg${dists[0]}m0, ${coupling_const}, sca${dists[0]}, gx, gy);
+					shan_chen_accel_self(gi, gg${dists[0]}m0, ${dists[0]}, ${coupling_const}, sca${dists[0]}, gx, gy);
 				%else:
-					shan_chen_accel_self(gi, gg${dists[0]}m0, ${coupling_const}, sca${dists[0]}, gx, gy, gz);
+					shan_chen_accel_self(gi, gg${dists[0]}m0, ${dists[0]}, ${coupling_const}, sca${dists[0]}, gx, gy, gz);
 				%endif
 			%endif
 		%endfor
@@ -149,7 +159,35 @@ ${device_func} inline void bounce_back(Dist *fi)
 </%def>
 
 %if simtype == 'shan-chen':
-${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, float cc, float *a1, int x, int y
+
+${device_func} inline float sc_ppot(${global_ptr} float *fx, int fi1, int idx, int nx, int ny
+%if dim == 3:
+, int nz
+%endif
+)
+{
+	if (0) { ; }
+
+	%for fld_id in image_fields:
+		else if (fi1 == ${fld_id}) {
+			return ${sc_ppot(fld_id)};
+		}
+	%endfor
+	else {
+		return ${sc_ppot('x')};
+	}
+
+	return 0.0f;
+}
+
+<%def name="sc_loc_args()">
+	nx, ny
+	%if dim == 3:
+		, nz
+	%endif
+</%def>
+
+${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, int fi1, float cc, float *a1, int x, int y
 %if dim == 3:
 	, int z
 %endif
@@ -173,7 +211,7 @@ ${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, 
 			${get_field_off(ve[0], ve[1], 0)};
 		%endif
 
-		t1 = ${sc_ppot(1)};
+		t1 = sc_ppot(f1, fi1, i + off, ${sc_loc_args()});
 
 		%if ve[0] != 0:
 			a1[0] += t1 * ${ve[0] * grid.weights[i]};
@@ -187,8 +225,13 @@ ${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, 
 	%endfor
 
 	off = 0;
+	nx = x;
+	ny = y;
+	%if dim == 3:
+		nz = z;
+	%endif
 
-	t1 = ${sc_ppot(1)};
+	t1 = sc_ppot(f1, fi1, i + off, ${sc_loc_args()});
 
 	%for i in range(0, dim):
 		a1[${i}] *= t1 * cc;
@@ -196,7 +239,7 @@ ${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, 
 }
 
 ${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${global_ptr} float *f2,
-float cc, float *a1, float *a2, int x, int y
+int fi1, int fi2, float cc, float *a1, float *a2, int x, int y
 %if dim == 3:
 	, int z
 %endif
@@ -221,8 +264,8 @@ float cc, float *a1, float *a2, int x, int y
 			${get_field_off(ve[0], ve[1], 0)};
 		%endif
 
-		t1 = ${sc_ppot(1)};
-		t2 = ${sc_ppot(2)};
+		t1 = sc_ppot(f1, fi1, i + off, ${sc_loc_args()});
+		t2 = sc_ppot(f2, fi2, i + off, ${sc_loc_args()});
 
 		%if ve[0] != 0:
 			a1[0] += t2 * ${ve[0] * grid.weights[i]};
@@ -239,9 +282,15 @@ float cc, float *a1, float *a2, int x, int y
 	%endfor
 
 	off = 0;
+	nx = x;
+	ny = y;
+	%if dim == 3:
+		nz = z;
+	%endif
 
-	t1 = ${sc_ppot(1)};
-	t2 = ${sc_ppot(2)};
+
+	t1 = sc_ppot(f1, fi1, i + off, ${sc_loc_args()});
+	t2 = sc_ppot(f2, fi2, i + off, ${sc_loc_args()});
 
 	%for i in range(0, dim):
 		a1[${i}] *= t1 * cc;
