@@ -1049,6 +1049,8 @@ class BinaryFluidBase(FluidLBMSim):
     def __init__(self, geo_class, options=[], args=None, defaults=None):
         super(BinaryFluidBase, self).__init__(geo_class, options, args, defaults)
         self._prepare_symbols()
+        self.add_nonlocal_field(0)
+        self.add_nonlocal_field(1)
 
     def _prepare_symbols(self):
         from sympy import Symbol, Matrix, Rational
@@ -1064,6 +1066,8 @@ class BinaryFluidBase(FluidLBMSim):
         self.gpu_phi = self.backend.alloc_buf(like=self.phi)
         self.gpu_dist2a = self.backend.alloc_buf(like=self.dist2)
         self.gpu_dist2b = self.backend.alloc_buf(like=self.dist2)
+        self.img_rho = self.bind_nonlocal_field(self.gpu_rho, 0)
+        self.img_phi = self.bind_nonlocal_field(self.gpu_phi, 1)
 
     def _init_compute_kernels(self):
         cnp_args1n = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_dist2a,
@@ -1081,19 +1085,20 @@ class BinaryFluidBase(FluidLBMSim):
         k_block_size = self._kernel_block_size()
         cnp_name = 'CollideAndPropagate'
         macro_name = 'PrepareMacroFields'
+        fields = [self.img_rho, self.img_phi]
 
         kern_cnp1n = self.backend.get_kernel(self.mod, cnp_name,
                          args=cnp_args1n, args_format='P'*(len(cnp_args1n)-1)+'i',
-                         block=k_block_size)
+                         block=k_block_size, fields=fields)
         kern_cnp1s = self.backend.get_kernel(self.mod, cnp_name,
                          args=cnp_args1s, args_format='P'*(len(cnp_args1n)-1)+'i',
-                         block=k_block_size)
+                         block=k_block_size, fields=fields)
         kern_cnp2n = self.backend.get_kernel(self.mod, cnp_name,
                          args=cnp_args2n, args_format='P'*(len(cnp_args1n)-1)+'i',
-                         block=k_block_size)
+                         block=k_block_size, fields=fields)
         kern_cnp2s = self.backend.get_kernel(self.mod, cnp_name,
                          args=cnp_args2s, args_format='P'*(len(cnp_args1n)-1)+'i',
-                         block=k_block_size)
+                         block=k_block_size, fields=fields)
         kern_mac1 = self.backend.get_kernel(self.mod, macro_name,
                          args=macro_args1, args_format='P'*len(macro_args1),
                          block=k_block_size)

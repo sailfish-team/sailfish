@@ -28,6 +28,7 @@ ${const_var} float visc = ${visc}f;		// viscosity
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
+${kernel_common.nonlocal_fields_decl()}
 %if simtype == 'shan-chen':
 	${kernel_common.body(bgk_args_decl_sc)}
 %elif simtype == 'free-energy':
@@ -54,9 +55,9 @@ ${kernel} void SetInitialConditions(
 	%if simtype == 'free-energy':
 		float lap1, grad1[${dim}];
 		%if dim == 2:
-			laplacian_and_grad(iphi, gi, &lap1, grad1, gx, gy);
+			laplacian_and_grad(iphi, -1, gi, &lap1, grad1, gx, gy);
 		%else:
-			laplacian_and_grad(iphi, gi, &lap1, grad1, gx, gy, gz);
+			laplacian_and_grad(iphi, -1, gi, &lap1, grad1, gx, gy, gz);
 		%endif
 	%endif
 
@@ -164,9 +165,9 @@ ${kernel} void CollideAndPropagate(
 
 		if (!isWallNode(type)) {
 			%if dim == 2:
-				laplacian_and_grad(gg1m0, gi, &lap1, grad1, gx, gy);
+				laplacian_and_grad(gg1m0, 1, gi, &lap1, grad1, gx, gy);
 			%else:
-				laplacian_and_grad(gg1m0, gi, &lap1, grad1, gx, gy, gz);
+				laplacian_and_grad(gg1m0, 1, gi, &lap1, grad1, gx, gy, gz);
 			%endif
 		}
 	%elif simtype == 'shan-chen':
