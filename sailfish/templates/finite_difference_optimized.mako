@@ -42,7 +42,7 @@ ${device_func} inline void laplacian_and_grad(${global_ptr} float *field, int i,
 %else:
 	grad[0] = (-fnw - fsw + fse + fne) / 12.0f + (fe - fw) / 3.0f;
 	grad[1] = (-fse - fsw + fne + fnw) / 12.0f + (fn - fs) / 3.0f;
-	laplacian[0] = (fnw + fne + fsw + fse + 4.0f * (fe + fw + fn + fs) - 20.0f * field[0]) / 6.0f;
+	laplacian[0] = (fnw + fne + fsw + fse + 4.0f * (fe + fw + fn + fs) - 20.0f * field[i]) / 6.0f;
 %endif
 }
 
