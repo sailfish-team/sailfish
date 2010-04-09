@@ -34,8 +34,14 @@ regtest3d_drag:
 	python -u regtest/drag_coefficient.py --grid=D3Q19 --model=bgk
 	python -u regtest/drag_coefficient.py --grid=D3Q19 --model=mrt
 
+perf_plots:
+	python perftest/make_plots.py perftest/2d_single.pdf perftest/results/GeForce_GTX_285 2d_sc 2d_ldc 2d_poiseuille
+	python perftest/make_plots.py perftest/2d_binary.pdf perftest/results/GeForce_GTX_285 2d_bin
+	python perftest/make_plots.py perftest/3d.pdf perftest/results/GeForce_GTX_285 3d_
+
 clean:
 	rm -f sailfish/*.pyc
+	rm -f perftest/*.pdf
 	rm -rf regtest/results
 
 
