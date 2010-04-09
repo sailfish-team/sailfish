@@ -522,6 +522,7 @@ class LBMSim(object):
         ctx['force_couplings'] = self._force_couplings
         ctx['force_for_eq'] = self._force_term_for_eq
         ctx['image_fields'] = self.image_fields
+        ctx['precision'] = self.options.precision
 
         self._update_ctx(ctx)
         ctx.update(self.geo.get_defines())

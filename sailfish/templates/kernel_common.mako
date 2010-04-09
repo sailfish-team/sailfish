@@ -3,7 +3,11 @@
 <%def name="nonlocal_fields_decl()">
 	%if backend == 'cuda':
 		%for i in image_fields:
-			texture<float, 2> img_f${i};
+			%if precision == 'single':
+				texture<float, 2> img_f${i};
+			%else:
+				texture<int2, 2> img_f${i};
+			%endif
 		%endfor
 	%endif
 </%def>
@@ -68,6 +72,16 @@ ${const_var} float geo_params[${num_params+1}] = {
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
+
+%if precision == 'double':
+${device_func} inline double get_img_field(texture<int2, 2> t, int x, int y)
+{
+	int2 v = tex2D(t, x, y);
+	return __hiloint2double(v.y, v.x);
+}
+%else:
+#define get_img_field(t, x, y) tex2D(t, x, y)
+%endif
 
 ${opencl_compat.body()}
 <%include file="geo_helpers.mako"/>

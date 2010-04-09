@@ -23,6 +23,16 @@ def _expand_grid(grid):
     else:
         return grid
 
+def _set_txt_format(dsc, strides):
+    # float
+    if strides[-1] == 4:
+        dsc.format = cuda.array_format.FLOAT
+        dsc.num_channels = 1
+    # double encoded as int2
+    else:
+        dsc.format = cuda.array_format.UNSIGNED_INT32
+        dsc.num_channels = 2
+
 class CUDABackend(object):
 
     @classmethod
@@ -63,8 +73,8 @@ class CUDABackend(object):
             dsc = cuda.ArrayDescriptor()
             dsc.width = strides[-2] / strides[-1]
             dsc.height = shape[-3]
-            dsc.format = cuda.array_format.FLOAT
-            dsc.num_channels = 1
+            _set_txt_format(dsc, strides)
+
             txt = prog.get_texref('img_f%d' % num)
             txt.set_address_2d(cl_buf, dsc, strides[-3])
 
@@ -95,8 +105,7 @@ class CUDABackend(object):
             dsc = cuda.ArrayDescriptor()
             dsc.width = shape[-1]
             dsc.height = shape[-2]
-            dsc.format = cuda.array_format.FLOAT
-            dsc.num_channels = 1
+            _set_txt_format(dsc, strides)
             txt = prog.get_texref('img_f%d' % num)
             txt.set_address_2d(cl_buf, dsc, strides[-2])
         return txt
@@ -138,7 +147,7 @@ class CUDABackend(object):
         kern = prog.get_function(name)
         kern.param_set_size(calcsize(args_format))
         setattr(kern, 'args', (args, args_format))
-        setattr(kern, 'img_fields', fields)
+        setattr(kern, 'img_fields', [x for x in fields if x is not None])
         kern.set_block_shape(*_expand_block(block))
         if shared is not None:
             kern.set_shared_size(shared)
