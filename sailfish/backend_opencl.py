@@ -1,3 +1,4 @@
+import os
 import pyopencl as cl
 
 class OpenCLBackend(object):
@@ -12,8 +13,19 @@ class OpenCLBackend(object):
         if options.opencl_interactive:
             self.ctx = cl.create_some_context(True)
         else:
-            platform = cl.get_platforms()[0]
-            self.ctx = cl.Context(dev_type=cl.device_type.GPU, properties=[(cl.context_properties.PLATFORM, platform)])
+            if 'OPENCL_PLATFORM' in os.environ:
+                platform_num = int(os.environ['OPENCL_PLATFORM'])
+            else:
+                platform_num = 0
+
+            platform = cl.get_platforms()[platform_num]
+            devices = platform.get_devices(device_type=cl.device_type.GPU)
+
+            if 'OPENCL_DEVICE' in os.environ:
+                device = int(os.environ['OPENCL_DEVICE'])
+                devices = [devices[device]]
+            self.ctx = cl.Context(devices=devices, properties=[(cl.context_properties.PLATFORM, platform)])
+
         self.queue = cl.CommandQueue(self.ctx)
         self.buffers = {}
 
@@ -59,7 +71,7 @@ class OpenCLBackend(object):
 
     def build(self, source):
         preamble = '#pragma OPENCL EXTENSION cl_khr_fp64: enable\n'
-        return cl.Program(self.ctx, preamble + source).build('-cl-single-precision-constant -cl-fast-relaxed-math')
+        return cl.Program(self.ctx, preamble + source).build() #'-cl-single-precision-constant -cl-fast-relaxed-math')
 
     def get_kernel(self, prog, name, block, args, args_format, shared=0, fields=[]):
         kern = getattr(prog, name)
