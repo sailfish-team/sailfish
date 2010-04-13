@@ -938,11 +938,13 @@ class LBMSim(object):
         self._force_couplings[(i,j)] = g
 
     def add_nonlocal_field(self, num):
-        self.image_fields.add(num)
+        if self.options.backend == 'cuda':
+            self.image_fields.add(num)
 
     def bind_nonlocal_field(self, gpu_buf, num):
-        strides, _ = self._get_strides(self.float)
-        return self.backend.nonlocal_field(self.mod, gpu_buf, num, self.shape, strides)
+        if self.options.backend == 'cuda':
+            strides, _ = self._get_strides(self.float)
+            return self.backend.nonlocal_field(self.mod, gpu_buf, num, self.shape, strides)
 
 class FluidLBMSim(LBMSim):
 

@@ -25,7 +25,7 @@ class DummyBackend(object):
     def build(self, source):
         pass
 
-    def get_kernel(self, prog, name, block, args, args_format, shared=None):
+    def get_kernel(self, prog, name, block, args, args_format, shared=None, fields=[]):
         return None
 
     def run_kernel(self, kernel, grid_size):
