@@ -95,7 +95,7 @@ for name, v in sorted(data2.items()):
 plt.gca().yaxis.grid(True)
 plt.gca().xaxis.grid(True)
 
-plt.xlabel('time')
+plt.xlabel('time (arbitrary units, higher values represent newer commits)')
 plt.ylabel('MLUPS')
 plt.legend(loc='upper left', prop=font)
 #plt.show()
