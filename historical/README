@@ -1,0 +1,6 @@
+This is an old CUDA and CPU code implementing a simple 2D LB simulation.
+
+This code is not really a part of the Sailfish project and it is provided
+here just as a self-contained example of how to implement LBM on CUDA.
+For proper Sailfish code, check the sailfish/ directory in the git
+repository.
