@@ -46,8 +46,8 @@ class LDCSim(lbm.FluidLBMSim):
 
     def __init__(self, geo_class):
         opts = []
-        defaults={'lat_nz': 64, 'lat_ny': 64, 'lat_nx': 64, 'grid':
-                'D3Q13', 'verbose': True}
+        defaults={'lat_nz': 64, 'lat_ny': 64, 'lat_nx': 64,
+                'grid': 'D3Q19', 'bc_velocity': 'equilibrium', 'verbose': True}
         lbm.FluidLBMSim.__init__(self, geo_class, options=opts, defaults=defaults)
 
 sim = LDCSim(LBMGeoLDC)
