@@ -43,7 +43,7 @@ class CUDABackend(object):
                 help='additional parameters to pass to the CUDA compiler', action='store', type='string', default='')
         group.add_option('--cuda-keep-temp', dest='cuda_keep_temp',
                 help='keep intermediate CUDA files', action='store_true', default=False)
-        return 0
+        return 1
 
     def __init__(self, options):
         self.buffers = {}
