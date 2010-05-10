@@ -42,13 +42,15 @@ class LBMGeoLDC(geo.LBMGeo3D):
 
 class LDCSim(lbm.FluidLBMSim):
 
-    filename = 'ldc'
+    filename = 'ldc_3d'
 
-    def __init__(self, geo_class):
+    def __init__(self, geo_class, defaults={}):
         opts = []
-        defaults={'lat_nz': 64, 'lat_ny': 64, 'lat_nx': 64,
+        settings={'lat_nz': 64, 'lat_ny': 64, 'lat_nx': 64,
                 'grid': 'D3Q19', 'bc_velocity': 'equilibrium', 'verbose': True}
-        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, defaults=defaults)
-
-sim = LDCSim(LBMGeoLDC)
-sim.run()
+        settings.update(defaults)
+        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, defaults=settings)
+        
+if __name__ == '__main__':
+    sim = LDCSim(LBMGeoLDC)
+    sim.run()
