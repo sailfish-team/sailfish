@@ -141,7 +141,8 @@ class Fluid2DVis(vis.FluidVis):
         self._reset()
 
         pygame.key.set_repeat(100,50)
-        pygame.display.set_caption('Sailfish v0.1-alpha1')
+        from sailfish import lbm
+        pygame.display.set_caption('Sailfish v%s' % lbm.__version__)
 
     def set_mode(self, width, height):
         if self.depth != 0:

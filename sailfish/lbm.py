@@ -16,7 +16,7 @@ from sailfish import sym
 
 SUPPORTED_BACKENDS = {'cuda': 'backend_cuda', 'opencl': 'backend_opencl'}
 
-__version__ = '0.1-alpha1'
+__version__ = '0.2-alpha1'
 
 for backend in SUPPORTED_BACKENDS.values():
     try:
