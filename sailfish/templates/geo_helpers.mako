@@ -52,6 +52,25 @@ ${device_func} inline bool isPressureNode(int type) {
 	return (type >= ${geo_bcp});
 }
 
+// Wet nodes are nodes that undergo a standard collision procedure.
+${device_func} inline bool isWetNode(int type) {
+	return (
+		%if bc_wall_.wet_nodes:
+			isFluidOrWallNode(type)
+		%else:
+			isFluidNode(type)
+		%endif
+
+		%if bc_velocity_.wet_nodes:
+			|| isVelocityNode(type)
+		%endif
+
+		%if bc_pressure_.wet_nodes:
+			|| isPressureNode(type)
+		%endif
+	);
+}
+
 ${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *type) {
 	*orientation = nodetype & ${geo_orientation_mask};
 	*type = nodetype >> ${geo_orientation_shift};

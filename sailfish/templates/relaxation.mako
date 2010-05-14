@@ -104,12 +104,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 		${bgk} = ${val};
 	%endfor
 
-	%if not bc_wall_.wet_nodes:
-		if (!isWallNode(node_type))
-	%endif
-	{
-		${fluid_velocity(0, save=True)}
-	}
+	${fluid_velocity(0, save=True)}
 }
 % endif	## model == mrt
 
@@ -189,25 +184,15 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 	%for i in range(0, len(grids)):
 		## Is there a force acting on the current grid?
 		%if sym.needs_accel(i, forces, force_couplings):
-			%if not bc_wall_.wet_nodes:
-				if (!isWallNode(node_type))
-			%endif
-			{
-				${fluid_velocity(i)};
+			${fluid_velocity(i)};
 
-				%for val, idx in sym.free_energy_external_force(sim, grid_num=i):
-					d${i}->${idx} += ${cex(val, vectors=True)};
-				%endfor
-			}
+			%for val, idx in sym.free_energy_external_force(sim, grid_num=i):
+				d${i}->${idx} += ${cex(val, vectors=True)};
+			%endfor
 		%endif
 	%endfor
 
-	%if not bc_wall_.wet_nodes:
-		if (!isWallNode(node_type))
-	%endif
-	{
-		${fluid_velocity(0, save=True)}
-	}
+	${fluid_velocity(0, save=True)}
 }
 %endif  ## model == femrt
 
@@ -231,37 +216,31 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 
 		## Is there a force acting on the current grid?
 		%if sym.needs_accel(i, forces, force_couplings):
-			%if not bc_wall_.wet_nodes:
-				if (!isWallNode(node_type))
-			%endif
-			{
-				${fluid_velocity(i)};
+			${fluid_velocity(i)};
 
-				%if simtype == 'shan-chen':
-					float pref = ${sym.bgk_external_force_pref(grid_num=i)};
-					%for val, idx in sym.bgk_external_force(grid, grid_num=i):
-						d${i}->${idx} += ${cex(val, vectors=True)};
-					%endfor
-				%elif simtype == 'free-energy':
-					%for val, idx in sym.free_energy_external_force(sim, grid_num=i):
-						d${i}->${idx} += ${cex(val, vectors=True)};
-					%endfor
-				%else:
-					float pref = ${sym.bgk_external_force_pref(grid_num=i)};
-					%for val, idx in sym.bgk_external_force(grid, grid_num=i):
-						d${i}->${idx} += ${cex(val, vectors=True)};
-					%endfor
-				%endif
+			%if simtype == 'shan-chen':
+			{
+				float pref = ${sym.bgk_external_force_pref(grid_num=i)};
+				%for val, idx in sym.bgk_external_force(grid, grid_num=i):
+					d${i}->${idx} += ${cex(val, vectors=True)};
+				%endfor
 			}
+			%elif simtype == 'free-energy':
+				%for val, idx in sym.free_energy_external_force(sim, grid_num=i):
+					d${i}->${idx} += ${cex(val, vectors=True)};
+				%endfor
+			%else:
+			{
+				float pref = ${sym.bgk_external_force_pref(grid_num=i)};
+				%for val, idx in sym.bgk_external_force(grid, grid_num=i):
+					d${i}->${idx} += ${cex(val, vectors=True)};
+				%endfor
+			}
+			%endif
 		%endif
 	%endfor
 
-	%if not bc_wall_.wet_nodes:
-		if (!isWallNode(node_type))
-	%endif
-	{
-		${fluid_velocity(0, save=True)}
-	}
+	${fluid_velocity(0, save=True)}
 }
 %endif
 
@@ -285,22 +264,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 
 ## TODO: This could be optimized.
 <%def name="relaxate(bgk_args)">
-	if (isFluidNode(type)) {
+	if (isWetNode(type)) {
 		${_relaxate(bgk_args)}
 	}
-	%if bc_wall_.wet_nodes:
-		else if (isWallNode(type)) {
-			${_relaxate(bgk_args)}
-		}
-	%endif
-	%if bc_velocity_.wet_nodes:
-		else if (isVelocityNode(type)) {
-			${_relaxate(bgk_args)}
-		}
-	%endif
-	%if bc_pressure_.wet_nodes:
-		else if (isPressureNode(type)) {
-			${_relaxate(bgk_args)}
-		}
-	%endif
 </%def>
