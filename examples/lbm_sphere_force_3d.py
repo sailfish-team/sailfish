@@ -35,13 +35,7 @@ def cd_theoretical(diam_ratio, re):
 
 def sphere_diam(width, bc):
     """The actual sphere diameter in lattice units."""
-    w = width-1
-    if bc.midgrid:
-        w -= 1
-
-#   w -= (w%4)
-
-    return w/2.0
+    return (width - 1 - 2 * bc.location) / 2.0
 
 class LBMGeoSphere(geo.LBMGeo3D):
     """3D pipe with a spherical obstacle in the middle.  Flow in the X direction."""
@@ -56,10 +50,9 @@ class LBMGeoSphere(geo.LBMGeo3D):
         h = 0.0
 
         bc = geo.get_bc(self.options.bc_velocity)
-        if bc.midgrid:
-            h = -0.5
-            z0 -= 0.5
-            y0 -= 0.5
+        h = -bc.location
+        z0 -= bc.location
+        y0 -= bc.location
 
         for z in range(0, self.lat_nz):
             for y in range(0, self.lat_ny):
@@ -98,11 +91,8 @@ class LBMGeoSphere(geo.LBMGeo3D):
                     if self._get_map((x, y, z)) == self.NODE_WALL:
                         maxy = max(maxy, y)
 
-        self.sphere_diam = float(maxy - miny)
-
         bc = geo.get_bc(self.options.bc_wall)
-        if bc.midgrid:
-            self.sphere_diam += 1
+        self.sphere_diam = float(maxy - miny) + 2.0 * bc.location
 
         diam = int(diam)
         self.add_force_object('sphere', (ix0-diam/2-3, iy0-diam/2-3, iz0-diam/2-3),
@@ -126,15 +116,8 @@ class LBMGeoSphere(geo.LBMGeo3D):
     @property
     def chan_diam(self):
         """The actual channel diameter in lattice units."""
-        w = self.width-1
         bc = geo.get_bc(self.options.bc_velocity)
-
-        if bc.midgrid:
-             w -= 1
-
-#       w -= (w%4)
-
-        return w
+        return self.width - 1 - 2.0 * bc.location
 
 class LSphereSim(lbm.FluidLBMSim):
     filename = 'sphere3d'

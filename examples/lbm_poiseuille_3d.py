@@ -115,8 +115,9 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
     # wwww  5.0  2.5  5     |-
 
     def get_velocity_profile(self, fluid_only=False):
+        bc = geo.get_bc(self.options.bc_wall)
         x = self.lat_nx/2
-        if fluid_only:
+        if fluid_only and not bc.wet_nodes:
             zvals = range(1, self.lat_nz-1)
         else:
             zvals = range(0, self.lat_nz)
@@ -134,12 +135,8 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
         return self.maxv/(width/2.0)**2 * ((width/2.0)**2 - r**2)
 
     def get_chan_width(self):
-        width = self.get_width() - 1
         bc = geo.get_bc(self.options.bc_wall)
-        if bc.midgrid:
-            return width - 1
-        else:
-            return width
+        return self.get_width() - 1 - 2 * bc.location
 
     def get_width(self):
         if self.options.along_z:

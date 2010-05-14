@@ -101,6 +101,13 @@ ${kernel} void PrepareMacroFields(
 	if (isUnusedNode(type))
 		return;
 
+	// Do not update the macroscopic fields for wall nodes which do not
+	// represent any fluid.
+	%if simtype == 'shan-chen' and not bc_wall_.wet_nodes:
+		if (isWallNode(type))
+			return;
+	%endif
+
 	int igi = gi;
 
 	%if simtype == 'free-energy':
@@ -189,8 +196,8 @@ ${kernel} void CollideAndPropagate(
 		${sc_macro_fields()}
 	%endif
 
-	boundaryConditions(&d0, type, orientation, &g0m0, v);
-	boundaryConditions(&d1, type, orientation, &g1m0, v);
+	precollisionBoundaryConditions(&d0, type, orientation, &g0m0, v);
+	precollisionBoundaryConditions(&d1, type, orientation, &g1m0, v);
 
 	%if simtype == 'shan-chen':
 		${relaxate(bgk_args_sc)}
@@ -200,11 +207,16 @@ ${kernel} void CollideAndPropagate(
 
 	// only save the macroscopic quantities if requested to do so
 	if (save_macro == 1) {
-		ovx[gi] = v[0];
-		ovy[gi] = v[1];
-		%if dim == 3:
-			ovz[gi] = v[2];
+		%if simtype == 'shan-chen' and not bc_wall_.wet_nodes:
+			if (!isWallNode(type))
 		%endif
+		{
+			ovx[gi] = v[0];
+			ovy[gi] = v[1];
+			%if dim == 3:
+				ovz[gi] = v[2];
+			%endif
+		}
 	}
 
 	${propagate('dist1_out', 'd0')}

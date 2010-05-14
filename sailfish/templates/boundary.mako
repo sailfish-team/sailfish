@@ -3,7 +3,7 @@
 %>
 
 <%namespace file="code_common.mako" import="*"/>
-<%namespace file="propagation.mako" import="rel_offset"/>
+<%namespace file="propagation.mako" import="rel_offset,get_odist"/>
 <%namespace file="utils.mako" import="get_field_off,nonlocal_fld,fld_args"/>
 
 <%def name="noneq_bb(orientation)">
@@ -61,7 +61,7 @@
 		%for i in range(1, grid.dim*2+1):
 			case ${i}: {
 				%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
-					${lvalue} = ${rvalue};
+					${lvalue.var} = ${rvalue};
 				%endfor
 				break;
 			}
@@ -386,11 +386,14 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 	if (isFluidOrWallNode(node_type) || orientation == ${geo_dir_other}) {
 		compute_macro_quant(fi, rho, v0);
 		if (isWallNode(node_type)) {
-			v0[0] = 0.0f;
-			v0[1] = 0.0f;
-			%if dim == 3:
-				v0[2] = 0.0f;
+			%if bc_wall_.location == 0.0 and bc_wall_.wet_nodes:
+				v0[0] = 0.0f;
+				v0[1] = 0.0f;
+				%if dim == 3:
+					v0[2] = 0.0f;
+				%endif
 			%endif
+
 			%if bc_wall == 'zouhe':
 				zouhe_bb(fi, orientation, rho, v0);
 			%endif
@@ -447,7 +450,25 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 	}
 }
 
-${device_func} inline void boundaryConditions(Dist *fi, int node_type, int orientation, float *rho, float *v0)
+${device_func} inline void postcollisionBoundaryConditions(Dist *fi, int node_type, int orientation, float *rho, float *v0, int gi, ${global_ptr} float *dist_out)
+{
+	%if bc_wall == 'halfbb':
+		if (isWallNode(node_type)) {
+			switch (orientation) {
+			%for i in range(1, grid.dim*2+1):
+				case ${i}: {
+					%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
+						${get_odist('dist_out', lvalue.idx)} = ${rvalue};
+					%endfor
+					break;
+				}
+			%endfor
+			}
+		}
+	%endif
+}
+
+${device_func} inline void precollisionBoundaryConditions(Dist *fi, int node_type, int orientation, float *rho, float *v0)
 {
 	%if bc_wall == 'fullbb':
 		if (isWallNode(node_type)) {

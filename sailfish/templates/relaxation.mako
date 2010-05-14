@@ -104,7 +104,10 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 		${bgk} = ${val};
 	%endfor
 
-	if (!isWallNode(node_type)) {
+	%if not bc_wall_.wet_nodes:
+		if (!isWallNode(node_type))
+	%endif
+	{
 		${fluid_velocity(0, save=True)}
 	}
 }
@@ -186,7 +189,10 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 	%for i in range(0, len(grids)):
 		## Is there a force acting on the current grid?
 		%if sym.needs_accel(i, forces, force_couplings):
-			if (!isWallNode(node_type)) {
+			%if not bc_wall_.wet_nodes:
+				if (!isWallNode(node_type))
+			%endif
+			{
 				${fluid_velocity(i)};
 
 				%for val, idx in sym.free_energy_external_force(sim, grid_num=i):
@@ -196,7 +202,10 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 		%endif
 	%endfor
 
-	if (!isWallNode(node_type)) {
+	%if not bc_wall_.wet_nodes:
+		if (!isWallNode(node_type))
+	%endif
+	{
 		${fluid_velocity(0, save=True)}
 	}
 }
@@ -222,7 +231,10 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 
 		## Is there a force acting on the current grid?
 		%if sym.needs_accel(i, forces, force_couplings):
-			if (!isWallNode(node_type)) {
+			%if not bc_wall_.wet_nodes:
+				if (!isWallNode(node_type))
+			%endif
+			{
 				${fluid_velocity(i)};
 
 				%if simtype == 'shan-chen':
@@ -244,7 +256,10 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 		%endif
 	%endfor
 
-	if (!isWallNode(node_type)) {
+	%if not bc_wall_.wet_nodes:
+		if (!isWallNode(node_type))
+	%endif
+	{
 		${fluid_velocity(0, save=True)}
 	}
 }

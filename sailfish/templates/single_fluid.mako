@@ -131,9 +131,9 @@ ${kernel} void CollideAndPropagate(
 		getMacro(&d0, type, orientation, &g0m0, v);
 	%endif
 
-	boundaryConditions(&d0, type, orientation, &g0m0, v);
-
+	precollisionBoundaryConditions(&d0, type, orientation, &g0m0, v);
 	${relaxate(bgk_args)}
+	postcollisionBoundaryConditions(&d0, type, orientation, &g0m0, v, gi, dist_out);
 
 	// only save the macroscopic quantities if requested to do so
 	if (save_macro == 1) {

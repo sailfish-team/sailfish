@@ -1,3 +1,4 @@
+from collections import namedtuple
 import operator
 from operator import itemgetter
 import math
@@ -8,6 +9,8 @@ from sympy.core import basic
 from sympy.printing.ccode import CCodePrinter
 from sympy.printing.precedence import precedence, PRECEDENCE
 import re
+
+TargetDist = namedtuple('TargetDist', 'var idx')
 
 #
 # Classes for different grid types.
@@ -627,7 +630,7 @@ def fill_missing_dists(grid, distp, missing_dir):
         sp = grid.basis[i].dot(grid.dir_to_vec(missing_dir))
 
         if sp < 0:
-            ret.append((syms[grid.idx_opposite[i]], sym))
+            ret.append((TargetDist(syms[grid.idx_opposite[i]], grid.idx_opposite[i]), sym))
 
     return ret
 

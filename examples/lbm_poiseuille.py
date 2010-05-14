@@ -74,16 +74,13 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
             self.fill_dist((0, 0), dist)
 
     def get_velocity_profile(self, fluid_only=False):
-        width = self.get_chan_width()
-        lat_nxidth = self.get_width()
-        ret = []
-        h = 0
-
         bc = geo.get_bc(self.options.bc_wall)
-        if bc.midgrid:
-            h = -0.5
+        width = self.get_chan_width()
+        lat_width = self.get_width()
+        ret = []
+        h = -bc.location
 
-        for x in range(0, lat_nxidth):
+        for x in range(0, lat_width):
             tx = x+h
             ret.append(4.0*self.maxv/width**2 * tx * (width-tx))
 
@@ -94,12 +91,8 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
         return ret
 
     def get_chan_width(self):
-        width = self.get_width() - 1
         bc = geo.get_bc(self.options.bc_wall)
-        if bc.midgrid:
-            return width - 1
-        else:
-            return width
+        return self.get_width() - 1 - 2 * bc.location
 
     def get_width(self):
         if self.options.horizontal:
