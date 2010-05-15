@@ -127,6 +127,12 @@ class LPoiSim(lbm.FluidLBMSim):
                     'lat_ny': 64, 'verbose': True}
 
         lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
+        self.add_iter_hook(100, self.status, every=True)
+
+    def status(self):
+        self.res_maxv = numpy.max(self.geo.mask_array_by_fluid(self.vy))
+        self.th_maxv = max(self.geo.get_velocity_profile())
+        print self.res_maxv, self.th_maxv
 
     def _init_post_geo(self):
         if self.options.drive == 'force':
