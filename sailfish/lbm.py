@@ -114,17 +114,32 @@ class VTKOutput(object):
     def save(self, i):
         from enthought.tvtk.api import tvtk
         id = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
-        id.point_data.scalars = self.sim.rho.flatten()
-        id.point_data.scalars.name = 'density'
+
+        # FIXME: Gracefully handle the case when there are no scalar fields.
+        fields = self.sim.output_fields.keys()
+        ffld = fields[0]
+        fields = fields[1:]
+
+        id.point_data.scalars = self.sim.output_fields[ffld].flatten()
+        id.point_data.scalars.name = ffld
+
+        for fld in fields:
+            tmp = id.point_data.add_array(self.sim.output_fields[fld].flatten())
+            id.point_data.get_array(tmp).name = fld
+
+        id.update()
+
+        for k, v in self.sim.output_vectors.iteritems():
+            if self.sim.grid.dim == 3:
+                tmp = id.point_data.add_array(numpy.c_[v[0].flatten(), v[1].flatten(), v[2].flatten()])
+            else:
+                tmp = id.point_data.add_array(numpy.c_[v[0].flatten(), v[1].flatten(), numpy.zeros_like(v[0].flatten())])
+            id.point_data.get_array(tmp).name = k
+
         if self.sim.grid.dim == 3:
-            id.point_data.vectors = numpy.c_[self.sim.vx.flatten(), self.sim.vy.flatten(), self.sim.vz.flatten()]
+            id.dimensions = list(reversed(self.sim.output_fields[ffld].shape))
         else:
-            id.point_data.vectors = numpy.c_[self.sim.vx.flatten(), self.sim.vy.flatten(), numpy.zeros_like(self.sim.vx).flatten()]
-        id.point_data.vectors.name = 'velocity'
-        if self.sim.grid.dim == 3:
-            id.dimensions = list(reversed(self.sim.rho.shape))
-        else:
-            id.dimensions = list(reversed(self.sim.rho.shape)) + [1]
+            id.dimensions = list(reversed(self.sim.output_fields[ffld].shape)) + [1]
         w = tvtk.XMLPImageDataWriter(input=id, file_name=('%s%0' + self.digits + 'd.xml') % (self.fname, i))
         w.write()
 
