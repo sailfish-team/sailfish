@@ -132,6 +132,7 @@ class Fluid2DVis(vis.FluidVis):
         self.lat_ny = lat_ny
 
         self._show_info = True
+        self._show_walls = True
         self._tracers = False
         self._velocity = False
         self._drawing = False
@@ -272,9 +273,10 @@ class Fluid2DVis(vis.FluidVis):
         wall_map = numpy.rot90(wall_map, 3)
         unused_map = numpy.rot90(unused_map, 3)
 
-        # Draw the walls.
-        a[wall_map] = self._color_wall
-        a[unused_map] = self._color_unused
+        if self._show_walls:
+            # Draw the walls.
+            a[wall_map] = self._color_wall
+            a[unused_map] = self._color_unused
 
         n = len(fields)
         fluid_map = numpy.logical_not(numpy.logical_or(wall_map, unused_map))
