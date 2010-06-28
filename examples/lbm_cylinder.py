@@ -1,6 +1,7 @@
 #!/usr/bin/python -u
 
 import sys
+import numpy as np
 
 from sailfish import geo
 from lbm_poiseuille import LBMGeoPoiseuille, LPoiSim
@@ -22,10 +23,9 @@ class LBMGeoCylinder(LBMGeoPoiseuille):
             x0 = self.lat_nx / 2
             y0 = self.lat_ny - 2*diam
 
-        for x in range(-diam/2, diam/2+1):
-            for y in range(-diam/2, diam/2+1):
-                if x**2 + y**2 <= (diam**2)/4:
-                    self.set_geo((x + x0, y + y0), self.NODE_WALL)
+        hy, hx = np.mgrid[0:self.lat_ny, 0:self.lat_nx]
+        node_map = (hx - x0)**2 + (hy - y0)**2 < (diam/2.0)**2
+        self.set_geo(node_map, self.NODE_WALL)
 
 class LCylinderSim(LPoiSim):
     filename = 'cylinder'
