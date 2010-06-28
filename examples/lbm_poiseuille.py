@@ -16,14 +16,14 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
     maxv = 0.02
 
     def define_nodes(self):
+        hy, hx = numpy.mgrid[0:self.lat_ny, 0:self.lat_nx]
+
         if self.options.horizontal:
-            for i in range(0, self.lat_nx):
-                self.set_geo((i, 0), self.NODE_WALL)
-                self.set_geo((i, self.lat_ny-1), self.NODE_WALL)
+            self.set_geo(hy == 0, self.NODE_WALL)
+            self.set_geo(hy == self.lat_ny-1, self.NODE_WALL)
         else:
-            for i in range(0, self.lat_ny):
-                self.set_geo((0, i), self.NODE_WALL)
-                self.set_geo((self.lat_nx-1, i), self.NODE_WALL)
+            self.set_geo(hx == 0, self.NODE_WALL)
+            self.set_geo(hx == self.lat_nx-1, self.NODE_WALL)
 
         # If the flow is driven by a pressure difference, add pressure boundary conditions
         # at the ends of the pipe.
