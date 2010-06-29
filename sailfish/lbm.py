@@ -190,6 +190,8 @@ class LBMSim(object):
     format_cmd = (r"sed -i -e '{{:s;N;\#//#{{p ;d}}; \!#!{{p;d}} ; s/\n//g;t s}}' {file} ; "
                   r"sed -i -e 's/}}/}}\n\n/g' {file} ; indent -linux -sob -l120 {file} ; "
                   r"sed -i -e '/^$/{{N; s/\n\([\t ]*}}\)$/\1/}}' -e '/{{$/{{N; s/{{\n$/{{/}}' {file}")
+    # The first sed call removes all newline characters except for those terminating lines
+    # that are preprocessor directives (starting with #) or single line comments (//).
 
     #: File name of the mako template containing the kernel code.
     kernel_file = 'single_fluid.mako'
