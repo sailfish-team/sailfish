@@ -57,7 +57,22 @@ colormaps = {
 
 class FluidSurfaceVis(vis.FluidVis):
 
-    def __init__(self, sim, width, height, depth, lat_nx, lat_ny):
+    name = 'surface'
+    dims = [2]
+
+    def __init__(self, sim):
+        width = sim.options.scr_w
+        height = sim.options.scr_h
+        depth = sim.options.scr_depth
+        lat_nx = sim.options.lat_nx
+        lat_ny = sim.options.lat_ny
+
+        if width == 0:
+            width = 640
+
+        if height == 0:
+            height = 480
+
         super(FluidSurfaceVis, self).__init__()
         self.depth = depth
         self.set_mode(width, height)

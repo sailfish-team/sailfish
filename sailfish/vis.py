@@ -13,6 +13,14 @@ class Field(object):
             raise ValueError('A range has to be specified for every component of the field.')
 
 class FluidVis(object):
+
+    name = 'replace_this_in_derivative_classes'
+    dim = []
+
+    @classmethod
+    def add_options(cls, group):
+        pass
+
     def __init__(self, *args, **kwargs):
         self.display_infos = []
         self.vis_fields = []

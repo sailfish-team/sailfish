@@ -12,6 +12,9 @@ from sailfish import vis
 
 from scipy import signal
 
+import optparse
+from optparse import OptionGroup, OptionParser, OptionValueError
+
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
 
@@ -109,8 +112,26 @@ class Fluid2DVis(vis.FluidVis):
     VIS_FLUCTUATION = 1
     VIS_TYPES = [VIS_LINEAR, VIS_FLUCTUATION]
 
-    def __init__(self, sim, width, height, depth, lat_nx, lat_ny, scale):
+    name = 'pygame'
+    dims = [2]
+
+    @classmethod
+    def add_options(cls, group):
+        group.add_option('--scr_w', dest='scr_w', help='screen width', type='int', action='store', default=0)
+        group.add_option('--scr_h', dest='scr_h', help='screen height', type='int', action='store', default=0)
+        group.add_option('--scr_scale', dest='scr_scale', help='screen scale', type='float', action='store', default=3.0)
+        group.add_option('--scr_depth', dest='scr_depth', help='screen color depth', type='int', action='store', default=0)
+        return True
+
+    def __init__(self, sim):
         super(Fluid2DVis, self).__init__()
+
+        width = sim.options.scr_w
+        height = sim.options.scr_h
+        scale = sim.options.scr_scale
+        depth = sim.options.scr_depth
+        lat_nx = sim.options.lat_nx
+        lat_ny = sim.options.lat_ny
 
         # If the size of the window has not been explicitly defined, automatically adjust it
         # based on the size of the grid,
@@ -178,7 +199,7 @@ class Fluid2DVis(vis.FluidVis):
             v.append(f())
         return v
 
-    def _visualize(self, tx, ty):
+    def _visualize(self):
         height, width = self.lat_ny, self.lat_nx
         srf = pygame.Surface((width, height))
         ret = []
@@ -255,8 +276,10 @@ class Fluid2DVis(vis.FluidVis):
                                       oy - self.vy[height*j/vfsp][width*i/vfsp] * scale))
 
         try:
+            tx = self.sim.tracer_x
+            ty = self.sim.tracer_y
             self._draw_tracers(tx, ty, sw, sh, width, height)
-        except ValueError:
+        except (ValueError, AttributeError):
             pass
 
         return ret
@@ -383,7 +406,7 @@ class Fluid2DVis(vis.FluidVis):
             self._process_misc_event(event)
 
     def _update_display(self, i, avg_mlups, mlups):
-        ret = self._visualize(self.sim.tracer_x, self.sim.tracer_y)
+        ret = self._visualize()
 
         if self._show_info:
             self._screen.blit(self._font.render('itr: %dk' % (i / 1000), True, (0, 255, 0)), (12, 12))
@@ -430,11 +453,17 @@ class Fluid2DVis(vis.FluidVis):
 
 class Fluid3DVisCutplane(Fluid2DVis):
 
-    def __init__(self, sim, shape, depth, scr_scale):
-        Fluid2DVis.__init__(self, sim, int(shape[0] * scr_scale), int(shape[1] *
-            scr_scale), depth, shape[0], shape[1], scr_scale)
-        self.shape = shape
-        self._scr_scale = scr_scale
+    name = 'cutplane'
+    dims = [3]
+
+    @classmethod
+    def add_options(cls, group):
+        return False
+
+    def __init__(self, sim):
+        Fluid2DVis.__init__(self, sim)
+        self.shape =  tuple(reversed(sim.shape))
+        self._scr_scale = sim.options.scr_scale
         self._cut_dim = 2
         self._cut_pos = [self.shape[0] / 2, self.shape[1] / 2, self.shape[2] / 2]
         self._reset_display()
@@ -517,8 +546,8 @@ class Fluid3DVisCutplane(Fluid2DVis):
                 if self._cut_pos[self._cut_dim] > 0:
                     self._cut_pos[self._cut_dim] -= 1
 
-    def _visualize(self, tx, ty):
-        ret = Fluid2DVis._visualize(self, tx, ty)
+    def _visualize(self):
+        ret = Fluid2DVis._visualize(self)
         dim_names = ('X', 'Y', 'Z')
         ret.append('cut {0} @ {1}'.format(dim_names[self._cut_dim], self._cut_pos[self._cut_dim]))
         return ret

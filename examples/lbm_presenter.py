@@ -34,7 +34,7 @@ class Fluid2DVisPresentation(vis2d.Fluid2DVis):
     """Fluid2DVis with presentation tricks."""
 
     def __init__(self, *args):
-        vis2d.Fluid2DVis.__init__(self, *args)
+        vis2d.Fluid2DVis.__init__(self, args[0])
         self.im_number = 0
         self.im = load_image('slides/sailfish-0.png')
         self.im_maxnumber = len(glob.glob('slides/sailfish-*.png'))
@@ -111,7 +111,7 @@ class LPresSim(lbm.FluidLBMSim):
 
         lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
-    def _init_vis_2d(self):
+    def _init_vis(self):
         self.vis = Fluid2DVisPresentation(self, self.options.scr_w, self.options.scr_h,
                                           self.options.scr_depth, self.options.lat_nx, self.options.lat_ny,
                                           self.options.scr_scale)
