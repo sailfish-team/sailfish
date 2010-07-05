@@ -397,15 +397,19 @@ class LBMSim(object):
                 self.lbm_model = x
                 break
 
+    def curr_dists(self):
+        if self.iter_ & 1:
+            return [self.gpu_dist1b]
+        else:
+            return [self.gpu_dist1a]
+
     def hostsync_dist(self):
         """Copy the current distributions from the compute unit to the host.
 
         The distributions are then available in :attr:`dist`.
         """
-        if self.iter_ & 1:
-            self.backend.from_buf(self.gpu_dist1b)
-        else:
-            self.backend.from_buf(self.gpu_dist1a)
+        for dist in self.curr_dists():
+            self.backend.from_buf(dist)
         self.backend.sync()
 
     def hostsync_velocity(self):
@@ -715,6 +719,7 @@ class LBMSim(object):
 
         # Density.
         self.gpu_rho = self.backend.alloc_buf(like=self.rho)
+        self.gpu_mom0 = [self.gpu_rho]
 
         # Tracer particles.
         if self.num_tracers:
@@ -1097,6 +1102,12 @@ class BinaryFluidBase(FluidLBMSim):
         self.add_nonlocal_field(0)
         self.add_nonlocal_field(1)
 
+    def curr_dists(self):
+        if self.iter_ & 1:
+            return [self.gpu_dist1b, self.gpu_dist2b]
+        else:
+            return [self.gpu_dist1a, self.gpu_dist2a]
+
     def _prepare_symbols(self):
         from sympy import Symbol, Matrix, Rational
         self.S.alias('phi', self.S.g1m0)
@@ -1109,6 +1120,7 @@ class BinaryFluidBase(FluidLBMSim):
     def _init_compute_fields(self):
         super(BinaryFluidBase, self)._init_compute_fields()
         self.gpu_phi = self.backend.alloc_buf(like=self.phi)
+        self.gpu_mom0.append(self.gpu_phi)
         self.gpu_dist2a = self.backend.alloc_buf(like=self.dist2)
         self.gpu_dist2b = self.backend.alloc_buf(like=self.dist2)
         self.img_rho = self.bind_nonlocal_field(self.gpu_rho, 0)

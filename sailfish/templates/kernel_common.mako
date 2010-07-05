@@ -51,6 +51,42 @@
 	}
 </%def>
 
+## FIXME: This should work in 3D.  Right now, there is no use case for that
+## so we leave it 2D only.
+<%def name="wrap_coords()">
+	if (gx < 0) {
+		%if periodic_x:
+			gx += ${lat_nx};
+		%else:
+			return;
+		%endif
+	}
+
+	if (gx > ${lat_nx-1}) {
+		%if periodic_x:
+			gx -= ${lat_nx};
+		%else:
+			return;
+		%endif
+	}
+
+	if (gy < 0) {
+		%if periodic_y:
+			gy += ${lat_ny};
+		%else:
+			return;
+		%endif
+	}
+
+	if (gy > ${lat_ny-1}) {
+		%if periodic_y:
+			gy -= ${lat_ny};
+		%else:
+			return;
+		%endif
+	}
+</%def>
+
 #define BLOCK_SIZE ${block_size}
 #define DIST_SIZE ${dist_size}
 #define GEO_FLUID ${geo_fluid}

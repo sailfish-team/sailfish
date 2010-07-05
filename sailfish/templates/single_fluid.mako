@@ -35,6 +35,40 @@ ${kernel_common.body(bgk_args_decl)}
 
 <%include file="tracers.mako"/>
 
+<%def name="init_dist_with_eq()">
+	%for local_var in bgk_equilibrium_vars:
+		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
+	%endfor
+
+	%for i, (feq, idx) in enumerate(bgk_equilibrium[0]):
+		${get_odist('dist1_in', i)} = ${cex(feq, vectors=True)};
+	%endfor
+</%def>
+
+${kernel} void SetLocalVelocity(
+	${global_ptr} float *dist1_in,
+	${global_ptr} float *irho,
+	${kernel_args_1st_moment('ov')}
+	int x, int y, float vx, float vy)
+{
+	int gx = x + get_global_id(0) - get_local_size(1) / 2;
+	int gy = y + get_global_id(1) - get_local_size(1) / 2;
+
+	${wrap_coords()}
+
+	int gi = gx + ${arr_nx}*gy;
+	float rho = irho[gi];
+	float v0[${dim}];
+
+	v0[0] = vx;
+	v0[1] = vy;
+
+	${init_dist_with_eq()}
+
+	ovx[gi] = vx;
+	ovy[gi] = vy;
+}
+
 // A kernel to set the node distributions using the equilibrium distributions
 // and the macroscopic fields.
 ${kernel} void SetInitialConditions(
@@ -54,13 +88,7 @@ ${kernel} void SetInitialConditions(
 		v0[2] = ivz[gi];
 	%endif
 
-	%for local_var in bgk_equilibrium_vars:
-		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
-	%endfor
-
-	%for i, (feq, idx) in enumerate(bgk_equilibrium[0]):
-		${get_odist('dist1_in', i)} = ${cex(feq, vectors=True)};
-	%endfor
+	${init_dist_with_eq()}
 }
 
 ${kernel} void PrepareMacroFields(

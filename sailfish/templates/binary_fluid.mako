@@ -41,17 +41,7 @@ ${kernel_common.nonlocal_fields_decl()}
 
 <%include file="finite_difference_optimized.mako"/>
 
-// A kernel to set the node distributions using the equilibrium distributions
-// and the macroscopic fields.
-${kernel} void SetInitialConditions(
-	${global_ptr} float *dist1_in,
-	${global_ptr} float *dist2_in,
-	${kernel_args_1st_moment('iv')}
-	${global_ptr} float *irho,
-	${global_ptr} float *iphi)
-{
-	${local_indices()}
-
+<%def name="init_dist_with_eq()">
 	%if simtype == 'free-energy':
 		float lap1, grad1[${dim}];
 		%if dim == 2:
@@ -59,17 +49,6 @@ ${kernel} void SetInitialConditions(
 		%else:
 			laplacian_and_grad(iphi, -1, gi, &lap1, grad1, gx, gy, gz);
 		%endif
-	%endif
-
-	// Cache macroscopic fields in local variables.
-	float rho = irho[gi];
-	float phi = iphi[gi];
-	float v0[${dim}];
-
-	v0[0] = ivx[gi];
-	v0[1] = ivy[gi];
-	%if dim == 3:
-		v0[2] = ivz[gi];
 	%endif
 
 	%for local_var in bgk_equilibrium_vars:
@@ -83,6 +62,58 @@ ${kernel} void SetInitialConditions(
 	%for i, (feq, idx) in enumerate(bgk_equilibrium[1]):
 		${get_odist('dist2_in', i)} = ${cex(feq, vectors=True)};
 	%endfor
+</%def>
+
+${kernel} void SetLocalVelocity(
+	${global_ptr} float *dist1_in,
+	${global_ptr} float *dist2_in,
+	${global_ptr} float *irho,
+	${global_ptr} float *iphi,
+	${kernel_args_1st_moment('ov')}
+	int x, int y, float vx, float vy)
+{
+	int gx = x + get_global_id(0) - get_local_size(1) / 2;
+	int gy = y + get_global_id(1) - get_local_size(1) / 2;
+
+	${wrap_coords()}
+
+	int gi = gx + ${arr_nx}*gy;
+	float rho = irho[gi];
+	float phi = iphi[gi];
+	float v0[${dim}];
+
+	v0[0] = vx;
+	v0[1] = vy;
+
+	${init_dist_with_eq()}
+
+	ovx[gi] = vx;
+	ovy[gi] = vy;
+}
+
+// A kernel to set the node distributions using the equilibrium distributions
+// and the macroscopic fields.
+${kernel} void SetInitialConditions(
+	${global_ptr} float *dist1_in,
+	${global_ptr} float *dist2_in,
+	${kernel_args_1st_moment('iv')}
+	${global_ptr} float *irho,
+	${global_ptr} float *iphi)
+{
+	${local_indices()}
+
+	// Cache macroscopic fields in local variables.
+	float rho = irho[gi];
+	float phi = iphi[gi];
+	float v0[${dim}];
+
+	v0[0] = ivx[gi];
+	v0[1] = ivy[gi];
+	%if dim == 3:
+		v0[2] = ivz[gi];
+	%endif
+
+	${init_dist_with_eq()}
 }
 
 ${kernel} void PrepareMacroFields(

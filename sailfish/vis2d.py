@@ -121,6 +121,12 @@ class Fluid2DVis(vis.FluidVis):
         group.add_option('--scr_h', dest='scr_h', help='screen height', type='int', action='store', default=0)
         group.add_option('--scr_scale', dest='scr_scale', help='screen scale', type='float', action='store', default=3.0)
         group.add_option('--scr_depth', dest='scr_depth', help='screen color depth', type='int', action='store', default=0)
+        group.add_option('--imparted_velocity', dest='impart_vel',
+            help='modulus of the velocity to be imparted on the fluid via Ctrl + mouse',
+            type='float', action='store', default=0.1)
+        group.add_option('--imparted_diameter', dest='impart_diam',
+            help='diameter of the area where the velocity is imparted on the fluid',
+            type='int', action='store', default=10)
         return True
 
     def __init__(self, sim):
@@ -148,9 +154,12 @@ class Fluid2DVis(vis.FluidVis):
         self._cmap_scale_lock = False
         self._convolve = False
         self._font = pygame.font.SysFont(font_name(), 14)
+        self._impart_velocity = False
         self.set_mode(width, height)
         self.lat_nx = lat_nx
         self.lat_ny = lat_ny
+        self._mouse_pos = 0,0
+        self._mouse_vel = 0,0
 
         self._show_info = True
         self._show_walls = True
@@ -346,6 +355,9 @@ class Fluid2DVis(vis.FluidVis):
                 self._draw_wall(event)
                 self._drawing = True
             elif event.type == pygame.MOUSEMOTION:
+                self._mouse_pos = self._get_loc(event)
+                self._mouse_vel = event.rel
+
                 if self._drawing:
                     self._draw_wall(event)
             elif event.type == pygame.KEYDOWN:
@@ -402,6 +414,11 @@ class Fluid2DVis(vis.FluidVis):
                     self._cmap_scale[self._visfield] = self._cmap_scale[self._visfield] / 1.1
                 elif event.key == pygame.K_PERIOD:
                     self._cmap_scale[self._visfield] = self._cmap_scale[self._visfield] * 1.1
+                elif event.key == pygame.K_LCTRL:
+                    self._impart_velocity = True
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_LCTRL:
+                    self._impart_velocity = False
 
             self._process_misc_event(event)
 
@@ -426,6 +443,28 @@ class Fluid2DVis(vis.FluidVis):
 
         pygame.display.flip()
 
+    def _run_impart_velocity(self, loc, dir):
+        """Impart velocity on the fluid.
+
+        :param loc: location (2-tuple)
+        :param dir: direction (2-tuple)
+        """
+        vlen = math.sqrt(dir[0]**2 + dir[1]**2)
+        fact = self.sim.options.impart_vel / vlen
+
+        args_part1 = self.sim.curr_dists() + self.sim.gpu_mom0 + self.sim.gpu_velocity
+
+        args = args_part1 + [numpy.int32(loc[0]), numpy.int32(loc[1]),
+                self.sim.float(dir[0] * fact), self.sim.float(-dir[1] * fact)]
+
+        kern = self.sim.backend.get_kernel(self.sim.mod, 'SetLocalVelocity',
+                    args=args,
+                    args_format='P' * len(args_part1) + 'iiff',
+                    block=(self.sim.options.impart_diam,
+                        self.sim.options.impart_diam))
+
+        self.sim.backend.run_kernel(kern, (1,1))
+
     def main(self):
         self._reset()
         t_prev = time.time()
@@ -440,6 +479,9 @@ class Fluid2DVis(vis.FluidVis):
                 self._update_display(i, avg_mlups, mlups)
                 pygame.time.wait(50)
                 continue
+
+            if self._impart_velocity:
+                self._run_impart_velocity(self._mouse_pos, self._mouse_vel)
 
             self.sim.sim_step(self._tracers)
 
