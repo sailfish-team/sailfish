@@ -20,11 +20,17 @@ VIS_MODULES = ['vis2d', 'vis3d', 'vis_surf']
 
 __version__ = '0.2-alpha1'
 
-try:
-    __import__('sailfish', fromlist=SUPPORTED_BACKENDS.values())
-    __import__('sailfish', fromlist=VIS_MODULES)
-except ImportError:
-    pass
+for backend in SUPPORTED_BACKENDS.values():
+    try:
+        __import__('sailfish', fromlist=[backend])
+    except ImportError:
+        pass
+
+for visbackend in VIS_MODULES:
+    try:
+        __import__('sailfish', fromlist=[visbackend])
+    except ImportError:
+        pass
 
 def get_backends():
     """Get a list of available backends."""
