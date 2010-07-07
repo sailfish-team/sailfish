@@ -64,6 +64,7 @@ ${kernel_common.nonlocal_fields_decl()}
 	%endfor
 </%def>
 
+%if dim == 2:
 ${kernel} void SetLocalVelocity(
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *dist2_in,
@@ -90,6 +91,7 @@ ${kernel} void SetLocalVelocity(
 	ovx[gi] = vx;
 	ovy[gi] = vy;
 }
+%endif
 
 // A kernel to set the node distributions using the equilibrium distributions
 // and the macroscopic fields.

@@ -45,6 +45,7 @@ ${kernel_common.body(bgk_args_decl)}
 	%endfor
 </%def>
 
+%if dim == 2:
 ${kernel} void SetLocalVelocity(
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *irho,
@@ -68,6 +69,7 @@ ${kernel} void SetLocalVelocity(
 	ovx[gi] = vx;
 	ovy[gi] = vy;
 }
+%endif
 
 // A kernel to set the node distributions using the equilibrium distributions
 // and the macroscopic fields.
