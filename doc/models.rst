@@ -62,12 +62,40 @@ Sailfish supports a number of local boundary conditions (non-local boundary cond
 currently not supported).  Each of the implemented boundary condition types can be available
 for a specific kind(s) of boundary conditions (no-slip (wall), velocity, pressure) and dimensions.
 
-Bounce-back
------------
-This is the simplest kind of boundary condition, available for no-slip and velocity nodes in
-all dimensions.  The bounce-back algorithm works by reflecting all distributions across the
-node center, and optionally adjusting some of the distributions to impose a velocity boundary
-condition.
+Full-way bounce-back
+--------------------
+This is the simplest type of boundary condition, available for no-slip and velocity nodes in
+all dimensions.  The boundary condition imposed by the full-way bounce-back algorithm takes
+effect in the middle between the boundary node (which is a dry node, i.e. it does not
+represent any fluid volume and does not undergo collisions) and the neighboring fluid node.
+The algorithm does not require any knowledge about the normal vector of the
+wall, so it can work in arbitrarily complex geometries.
+
+Full-way bounce-back works as follows:
+
+* at time :math:`t` distributions are propagated from the fluid to the bounce-back node
+* at time :math:`t+1` the distributions at the bounce-back node are reflected across the
+  node center, and then streamed in the standard way
+
+This can be summarized as :math:`f_{i}^{pre}(x, t+2) = f_{opp(i)}^{post}(x, t)` since it
+takes two time steps for the reflected distributions to reach back the fluid nodes.
+
+Half-way bounce-back
+--------------------
+The half-way bounce-back boundary rule is based on a similar idea as the full-way bounce-back
+Here however, the reflection takes only one time step and takes place exactly in
+the middle between the fluid node and what would be the first node outside of the simulation domain:
+:math:`f_{i}^{pre}(x, t+1) = f_{opp(i)}^{post}(x, t)`.  The half-way bounce-back nodes are
+wet (i.e. true fluid nodes undergoing a standard collision process).
+
+For non-stationary flows the half-way bounce-back rule is more accurate than the full-way
+bounce-back.  For stationary flows there is no difference between them as the one step time
+lag in the full-way bounce-back rule does not impact the amount of momentum and mass
+transferred between the fluid and the boundary.
+
+The wall normal vector is necessary for the half-way bounce-back rule to work as only the
+unknown distributions (those for which there is no data streaming from other nodes)
+at the boundary nodes are replaced.
 
 Equilibrium
 -----------

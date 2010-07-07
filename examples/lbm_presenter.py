@@ -34,12 +34,14 @@ class Fluid2DVisPresentation(vis2d.Fluid2DVis):
     """Fluid2DVis with presentation tricks."""
 
     def __init__(self, *args):
-        vis2d.Fluid2DVis.__init__(self, *args)
+        vis2d.Fluid2DVis.__init__(self, args[0])
         self.im_number = 0
         self.im = load_image('slides/sailfish-0.png')
         self.im_maxnumber = len(glob.glob('slides/sailfish-*.png'))
         self._show_info = False
-        pygame.display.set_caption('Sailfish v0.1-alpha1 (presentation mode)')
+        self._show_walls = False
+        pygame.display.set_caption('Sailfish v%s (presentation mode)' % lbm.__version__)
+
 
     def _draw_field(self, fields, srf, wall_map, unused_map, width, height):
         srf = super(Fluid2DVisPresentation, self)._draw_field(
@@ -52,6 +54,9 @@ class Fluid2DVisPresentation(vis2d.Fluid2DVis):
         im2.set_colorkey(0)
         srf2.blit(im2, (0,0))
         return srf2
+
+    def _draw_wall(self, event):
+        pass
 
     def _process_misc_event(self,event):
         if event.type == pygame.KEYDOWN:
@@ -71,7 +76,9 @@ class Fluid2DVisPresentation(vis2d.Fluid2DVis):
                     self.im_number = 0
 
                 self.im = load_image('slides/sailfish-%d.png' % self.im_number)
+                scale = self._cmap_scale
                 self._reset()
+                self._cmap_scale = scale
                 self.sim.geo.reset()
                 self._set_wall_from_image()
 
@@ -104,7 +111,7 @@ class LPresSim(lbm.FluidLBMSim):
 
         lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
-    def _init_vis_2d(self):
+    def _init_vis(self):
         self.vis = Fluid2DVisPresentation(self, self.options.scr_w, self.options.scr_h,
                                           self.options.scr_depth, self.options.lat_nx, self.options.lat_ny,
                                           self.options.scr_scale)

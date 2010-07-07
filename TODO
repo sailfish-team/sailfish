@@ -1,15 +1,13 @@
 * TASKS
 
+- Support postcollision boundary conditions in multifluid simulations.
+
 - Regularized boundary conditions for 2D and 3D.
 
 - Automated LDC regtest.
   Add a new regtest to automatically run the Lid-Driven Cavity example,
   and generate plots comparing the results to data from the literature
   (see also regtest/ldc_golden).
-
-- BC node direction detection in 3D.
-  Add node direction detection for 3D geometries, thus fixing the
-  BC and equilibrium boundary conditions in 3D.
 
 - Add unit tests for 2D geometry.
   The unit tests currently only cover the 3D geometry.  Add similar

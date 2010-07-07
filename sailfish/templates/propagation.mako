@@ -152,6 +152,8 @@
 	// Propagation in directions orthogonal to the X axis (global memory)
 	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
 
+	${barrier()}
+
 	// W propagation in shared memory
 	if (lx > 0) {
 		%for i in sym.get_prop_dists(grid, -1):

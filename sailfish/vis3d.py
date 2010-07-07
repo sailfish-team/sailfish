@@ -13,6 +13,9 @@ from enthought.mayavi import mlab
 
 class Fluid3DVis(vis.FluidVis):
 
+    name = 'mayavi'
+    dims = [3]
+
     def __init__(self, sim):
         super(Fluid3DVis, self).__init__()
         self._tracers = True

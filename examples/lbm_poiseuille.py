@@ -16,14 +16,14 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
     maxv = 0.02
 
     def define_nodes(self):
+        hy, hx = numpy.mgrid[0:self.lat_ny, 0:self.lat_nx]
+
         if self.options.horizontal:
-            for i in range(0, self.lat_nx):
-                self.set_geo((i, 0), self.NODE_WALL)
-                self.set_geo((i, self.lat_ny-1), self.NODE_WALL)
+            self.set_geo(hy == 0, self.NODE_WALL)
+            self.set_geo(hy == self.lat_ny-1, self.NODE_WALL)
         else:
-            for i in range(0, self.lat_ny):
-                self.set_geo((0, i), self.NODE_WALL)
-                self.set_geo((self.lat_nx-1, i), self.NODE_WALL)
+            self.set_geo(hx == 0, self.NODE_WALL)
+            self.set_geo(hx == self.lat_nx-1, self.NODE_WALL)
 
         # If the flow is driven by a pressure difference, add pressure boundary conditions
         # at the ends of the pipe.
@@ -74,16 +74,13 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
             self.fill_dist((0, 0), dist)
 
     def get_velocity_profile(self, fluid_only=False):
-        width = self.get_chan_width()
-        lat_nxidth = self.get_width()
-        ret = []
-        h = 0
-
         bc = geo.get_bc(self.options.bc_wall)
-        if bc.midgrid:
-            h = -0.5
+        width = self.get_chan_width()
+        lat_width = self.get_width()
+        ret = []
+        h = -bc.location
 
-        for x in range(0, lat_nxidth):
+        for x in range(0, lat_width):
             tx = x+h
             ret.append(4.0*self.maxv/width**2 * tx * (width-tx))
 
@@ -94,12 +91,8 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
         return ret
 
     def get_chan_width(self):
-        width = self.get_width() - 1
         bc = geo.get_bc(self.options.bc_wall)
-        if bc.midgrid:
-            return width - 1
-        else:
-            return width
+        return self.get_width() - 1 - 2 * bc.location
 
     def get_width(self):
         if self.options.horizontal:

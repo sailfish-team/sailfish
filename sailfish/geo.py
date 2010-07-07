@@ -577,9 +577,7 @@ class LBMGeo3D(LBMGeo):
     def _postprocess_nodes(self, nodes=None):
         lat_nx, lat_ny, lat_nz = self.shape
 
-        # FIXME: Eventually, we will need to postprocess nodes in 3D grids as well.
         if nodes is None:
-
             # Detect unused nodes.
             cnt = numpy.zeros_like(self.map).astype(numpy.int32)
             orientation = numpy.empty(shape=self.map.shape, dtype=numpy.int32)
@@ -618,16 +616,17 @@ class LBMGeo3D(LBMGeo):
 #
 class LBMBC(object):
     """Generic boundary condition class."""
-    def __init__(self, name, supported_types=set(LBMGeo.NODE_TYPES), dims=set([2,3]), midgrid=False, wet_nodes=False):
+    def __init__(self, name, supported_types=set(LBMGeo.NODE_TYPES), dims=set([2,3]), location=0.0, wet_nodes=False):
         """
         :param name: a string representing the boundary condition
-        :param midgrid: if ``True``, the location of the boundary condition in the real
-            domain between the grid nodes
+        :param location: location of the boundary; if 0.0, the boundary is exactly at the node; otherwise,
+            the boundary is located at 'location' * normal vector (pointing into the fluid domain)
+            away from the node
         :param wet_nodes: if ``True``, the boundary condition nodes represent fluid particles
             and undergo standard collisions
         """
         self.name = name
-        self.midgrid = midgrid
+        self.location = location
         self.wet_nodes = wet_nodes
         self.supported_types = supported_types
         self.supported_dims = dims
@@ -638,9 +637,11 @@ class LBMBC(object):
 def get_bc(type_):
     return BCS_MAP[type_]
 
-SUPPORTED_BCS = [LBMBC('fullbb', midgrid=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY])),
-                 LBMBC('equilibrium', midgrid=False, supported_types=set([LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE])),
-                 LBMBC('zouhe', midgrid=False, wet_nodes=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE]), dims=set([2]))
+SUPPORTED_BCS = [LBMBC('fullbb', location=0.5, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY])),
+                 LBMBC('halfbb', location=-0.5, wet_nodes=True, supported_types=set([LBMGeo.NODE_WALL])),
+                 LBMBC('equilibrium', supported_types=set([LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE])),
+                 LBMBC('zouhe', wet_nodes=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY,
+                     LBMGeo.NODE_PRESSURE]))
                  ]
 
 BCS_MAP = dict((x.name, x) for x in SUPPORTED_BCS)

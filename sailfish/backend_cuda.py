@@ -71,7 +71,7 @@ class CUDABackend(object):
     def nonlocal_field(self, prog, cl_buf, num, shape, strides):
         if len(shape) == 3:
             dsc = cuda.ArrayDescriptor()
-            dsc.width = strides[-2] / strides[-1]
+            dsc.width = strides[0] / strides[2]
             dsc.height = shape[-3]
             _set_txt_format(dsc, strides)
 

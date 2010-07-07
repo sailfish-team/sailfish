@@ -1,3 +1,4 @@
+import inspect
 import math
 import numpy
 import os
@@ -15,12 +16,19 @@ from mako.lookup import TemplateLookup
 from sailfish import sym
 
 SUPPORTED_BACKENDS = {'cuda': 'backend_cuda', 'opencl': 'backend_opencl'}
+VIS_MODULES = ['vis2d', 'vis3d', 'vis_surf']
 
-__version__ = '0.1-alpha1'
+__version__ = '0.2-alpha1'
 
 for backend in SUPPORTED_BACKENDS.values():
     try:
         __import__('sailfish', fromlist=[backend])
+    except ImportError:
+        pass
+
+for visbackend in VIS_MODULES:
+    try:
+        __import__('sailfish', fromlist=[visbackend])
     except ImportError:
         pass
 
@@ -31,6 +39,25 @@ def get_backends():
 
 def get_backend_module(backend):
     return sys.modules['sailfish.%s' % SUPPORTED_BACKENDS[backend]]
+
+def get_vis_engines():
+    """Get a list of available visaulization engines."""
+
+    ret = {}
+
+    for v in VIS_MODULES:
+        module = 'sailfish.%s' % v
+        if module not in sys.modules:
+            continue
+
+        for class_name, obj in inspect.getmembers(sys.modules[module]):
+            try:
+                if vis.FluidVis in inspect.getmro(obj):
+                    ret[obj.name] = obj
+            except AttributeError:
+                pass
+
+    return ret
 
 class Values(optparse.Values):
     def __init__(self, *args):
@@ -114,17 +141,32 @@ class VTKOutput(object):
     def save(self, i):
         from enthought.tvtk.api import tvtk
         id = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
-        id.point_data.scalars = self.sim.rho.flatten()
-        id.point_data.scalars.name = 'density'
+
+        # FIXME: Gracefully handle the case when there are no scalar fields.
+        fields = self.sim.output_fields.keys()
+        ffld = fields[0]
+        fields = fields[1:]
+
+        id.point_data.scalars = self.sim.output_fields[ffld].flatten()
+        id.point_data.scalars.name = ffld
+
+        for fld in fields:
+            tmp = id.point_data.add_array(self.sim.output_fields[fld].flatten())
+            id.point_data.get_array(tmp).name = fld
+
+        id.update()
+
+        for k, v in self.sim.output_vectors.iteritems():
+            if self.sim.grid.dim == 3:
+                tmp = id.point_data.add_array(numpy.c_[v[0].flatten(), v[1].flatten(), v[2].flatten()])
+            else:
+                tmp = id.point_data.add_array(numpy.c_[v[0].flatten(), v[1].flatten(), numpy.zeros_like(v[0].flatten())])
+            id.point_data.get_array(tmp).name = k
+
         if self.sim.grid.dim == 3:
-            id.point_data.vectors = numpy.c_[self.sim.vx.flatten(), self.sim.vy.flatten(), self.sim.vz.flatten()]
+            id.dimensions = list(reversed(self.sim.output_fields[ffld].shape))
         else:
-            id.point_data.vectors = numpy.c_[self.sim.vx.flatten(), self.sim.vy.flatten(), numpy.zeros_like(self.sim.vx).flatten()]
-        id.point_data.vectors.name = 'velocity'
-        if self.sim.grid.dim == 3:
-            id.dimensions = list(reversed(self.sim.rho.shape))
-        else:
-            id.dimensions = list(reversed(self.sim.rho.shape)) + [1]
+            id.dimensions = list(reversed(self.sim.output_fields[ffld].shape)) + [1]
         w = tvtk.XMLPImageDataWriter(input=id, file_name=('%s%0' + self.digits + 'd.xml') % (self.fname, i))
         w.write()
 
@@ -175,6 +217,8 @@ class LBMSim(object):
     format_cmd = (r"sed -i -e '{{:s;N;\#//#{{p ;d}}; \!#!{{p;d}} ; s/\n//g;t s}}' {file} ; "
                   r"sed -i -e 's/}}/}}\n\n/g' {file} ; indent -linux -sob -l120 {file} ; "
                   r"sed -i -e '/^$/{{N; s/\n\([\t ]*}}\)$/\1/}}' -e '/{{$/{{N; s/{{\n$/{{/}}' {file}")
+    # The first sed call removes all newline characters except for those terminating lines
+    # that are preprocessor directives (starting with #) or single line comments (//).
 
     #: File name of the mako template containing the kernel code.
     kernel_file = 'single_fluid.mako'
@@ -233,6 +277,7 @@ class LBMSim(object):
             args = sys.argv[1:]
 
         supported_backends = get_backends()
+        supported_vis = get_vis_engines()
 
         if not supported_backends:
             raise ValueError('There are no supported compute backends on your system. Make sure pycuda or pyopencl are correctly installed.')
@@ -252,6 +297,7 @@ class LBMSim(object):
         group.add_option('--periodic_x', dest='periodic_x', help='lattice periodic in the X direction', action='store_true', default=False)
         group.add_option('--periodic_y', dest='periodic_y', help='lattice periodic in the Y direction', action='store_true', default=False)
         group.add_option('--periodic_z', dest='periodic_z', help='lattice periodic in the Z direction', action='store_true', default=False)
+        group.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
         group.add_option('--visc', dest='visc', help='viscosity', type='float', action='store', default=0.01)
         group.add_option('--every', dest='every',
             help='update the data on the host every N steps', metavar='N',
@@ -265,12 +311,20 @@ class LBMSim(object):
             if opts:
                 parser.add_option_group(group)
 
+        for name, cls in supported_vis.iteritems():
+            group = OptionGroup(parser, '"%s" visualizaton engine settings' % (name))
+            opts = cls.add_options(group)
+            if opts:
+                parser.add_option_group(group)
+
         group = OptionGroup(parser, 'Run mode settings')
         group.add_option('--backend', dest='backend', help='backend', type='choice', choices=supported_backends, default=supported_backends[0])
         group.add_option('--benchmark', dest='benchmark', help='benchmark mode, implies no visualization', action='store_true', default=False)
         group.add_option('--max_iters', dest='max_iters', help='number of iterations to run in benchmark/batch mode', action='store', type='int', default=0)
         group.add_option('--batch', dest='batch', help='run in batch mode, with no visualization', action='store_true', default=False)
         group.add_option('--nobatch', dest='batch', help='run in interactive mode', action='store_false')
+        group.add_option('--vis', dest='vis', help='visualization module to use', type='choice',
+                choices=supported_vis.keys(), default='pygame')
         group.add_option('--save_src', dest='save_src', help='file to save the CUDA/OpenCL source code to', action='store', type='string', default='')
         group.add_option('--use_src', dest='use_src', help='CUDA/OpenCL source to use instead of the automatically generated one', action='store', type='string', default='')
         group.add_option('--noformat_src', dest='format_src', help='do not format the generated source code', action='store_false', default=True)
@@ -295,6 +349,11 @@ class LBMSim(object):
 
         self.options = Values(parser.defaults)
         parser.parse_args(args, self.options)
+
+        if not supported_vis:
+            if not self.options.batch:
+                print 'Warning: no visualization modules are available, switching to batch mode.'
+            self.options.batch = True
 
         # Set default command line values for unspecified options.  This is different
         # than the default values provided above, as these cannot be changed by
@@ -344,15 +403,19 @@ class LBMSim(object):
                 self.lbm_model = x
                 break
 
+    def curr_dists(self):
+        if self.iter_ & 1:
+            return [self.gpu_dist1b]
+        else:
+            return [self.gpu_dist1a]
+
     def hostsync_dist(self):
         """Copy the current distributions from the compute unit to the host.
 
         The distributions are then available in :attr:`dist`.
         """
-        if self.iter_ & 1:
-            self.backend.from_buf(self.gpu_dist1b)
-        else:
-            self.backend.from_buf(self.gpu_dist1a)
+        for dist in self.curr_dists():
+            self.backend.from_buf(dist)
         self.backend.sync()
 
     def hostsync_velocity(self):
@@ -400,10 +463,22 @@ class LBMSim(object):
         self._timed_print('Initializing visualization engine.')
 
         if not self.options.benchmark and not self.options.batch:
-            if self.grid.dim == 2:
-                self._init_vis_2d()
-            elif self.grid.dim == 3:
-                self._init_vis_3d()
+
+            engines = get_vis_engines()
+
+            if self.grid.dim in engines[self.options.vis].dims:
+                self.vis = (engines[self.options.vis])(self)
+            else:
+                self._timed_print('Warning: Selected visualization engine "%s" does not support %dD data visualization.' %
+                        (self.options.vis, self.grid.dim))
+                for name, cls in engines.iteritems():
+                    if self.grid.dim in cls.dims:
+                        self._timed_print('Warning: Falling back to the "%s" visualization engine.' % name)
+                        self.vis = cls(self)
+                        break
+                else:
+                    self._timed_print('Warning: Falling back to batch mode.')
+                    self.options.batch = True
 
     def add_iter_hook(self, i, func, every=False):
         """Add a hook that will be executed during the simulation.
@@ -650,6 +725,7 @@ class LBMSim(object):
 
         # Density.
         self.gpu_rho = self.backend.alloc_buf(like=self.rho)
+        self.gpu_mom0 = [self.gpu_rho]
 
         # Tracer particles.
         if self.num_tracers:
@@ -1020,31 +1096,8 @@ class FluidLBMSim(LBMSim):
                     geo.LBMGeo.NODE_PRESSURE in x.supported_types and
                     x.supports_dim(self.geo_class.dim)], default='equilibrium')
 
-        group = OptionGroup(parser, 'Visualization options')
-        group.add_option('--scr_w', dest='scr_w', help='screen width', type='int', action='store', default=0)
-        group.add_option('--scr_h', dest='scr_h', help='screen height', type='int', action='store', default=0)
-        group.add_option('--scr_scale', dest='scr_scale', help='screen scale', type='float', action='store', default=3.0)
-        group.add_option('--scr_depth', dest='scr_depth', help='screen color depth', type='int', action='store',
-                         default=0)
-        group.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
-        group.add_option('--vis3d', dest='vis3d', help='3D visualization engine', type='choice', choices=['mayavi', 'cutplane'], action='store', default='cutplane')
+        return []
 
-        return [group]
-
-    def _init_vis_2d(self):
-        from sailfish import vis2d
-        self.vis = vis2d.Fluid2DVis(self, self.options.scr_w, self.options.scr_h, self.options.scr_depth,
-                                    self.options.lat_nx, self.options.lat_ny,
-                                    self.options.scr_scale)
-
-    def _init_vis_3d(self):
-        if self.options.vis3d == 'mayavi':
-            from sailfish import vis3d
-            self.vis = vis3d.Fluid3DVis(self)
-        else:
-            from sailfish import vis2d
-            self.vis = vis2d.Fluid3DVisCutplane(self, tuple(reversed(self.shape)),
-                                                self.options.scr_depth, self.options.scr_scale)
 
 class BinaryFluidBase(FluidLBMSim):
     kernel_file = 'binary_fluid.mako'
@@ -1054,6 +1107,12 @@ class BinaryFluidBase(FluidLBMSim):
         self._prepare_symbols()
         self.add_nonlocal_field(0)
         self.add_nonlocal_field(1)
+
+    def curr_dists(self):
+        if self.iter_ & 1:
+            return [self.gpu_dist1b, self.gpu_dist2b]
+        else:
+            return [self.gpu_dist1a, self.gpu_dist2a]
 
     def _prepare_symbols(self):
         from sympy import Symbol, Matrix, Rational
@@ -1067,6 +1126,7 @@ class BinaryFluidBase(FluidLBMSim):
     def _init_compute_fields(self):
         super(BinaryFluidBase, self)._init_compute_fields()
         self.gpu_phi = self.backend.alloc_buf(like=self.phi)
+        self.gpu_mom0.append(self.gpu_phi)
         self.gpu_dist2a = self.backend.alloc_buf(like=self.dist2)
         self.gpu_dist2b = self.backend.alloc_buf(like=self.dist2)
         self.img_rho = self.bind_nonlocal_field(self.gpu_rho, 0)
@@ -1452,16 +1512,7 @@ class FreeSurfaceLBMSim(LBMSim):
         lb_group.add_option('--gravity', dest='gravity',
             help='gravitational acceleration', action='store', type='float',
             default=0.001)
-
-        group = OptionGroup(parser, 'Visualization options')
-        group.add_option('--scr_w', dest='scr_w', help='screen width',
-                type='int', action='store', default=640)
-        group.add_option('--scr_h', dest='scr_h', help='screen height',
-                type='int', action='store', default=480)
-        group.add_option('--scr_depth', dest='scr_depth', help='screen color depth', type='int', action='store',
-                         default=0)
-
-        return [group]
+        return []
 
     def _update_ctx(self, ctx):
         ctx['gravity'] = self.gravity
@@ -1471,10 +1522,4 @@ class FreeSurfaceLBMSim(LBMSim):
         ctx['bc_wall_'] = geo.get_bc('fullbb')
         ctx['bc_velocity_'] = geo.get_bc('fullbb')
         ctx['bc_pressure_'] = geo.get_bc('fullbb')
-
-    def _init_vis_2d(self):
-        from sailfish import vis_surf
-        self.vis = vis_surf.FluidSurfaceVis(self, self.options.scr_w,
-                self.options.scr_h, self.options.scr_depth,
-                self.options.lat_nx, self.options.lat_ny)
 
