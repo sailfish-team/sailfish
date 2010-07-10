@@ -100,12 +100,14 @@ ${kernel} void PrepareMacroFields(
 {
 	${local_indices()}
 
-	int type, orientation;
-	decodeNodeType(map[gi], &orientation, &type);
+	int ncode = map[gi];
+	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
 	if (isUnusedNode(type))
 		return;
+
+	int orientation = decodeNodeOrientation(ncode);
 
 	Dist fi;
 	float out;
@@ -129,7 +131,7 @@ ${kernel} void CollideAndPropagate(
 {
 	${local_indices()}
 
-	// shared variables for in-block propagation
+	// Shared variables for in-block propagation
 	%for i in sym.get_prop_dists(grid, 1):
 		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
 	%endfor
@@ -137,14 +139,16 @@ ${kernel} void CollideAndPropagate(
 		#define prop_${grid.idx_name[grid.idx_opposite[i]]} prop_${grid.idx_name[i]}
 	%endfor
 
-	int type, orientation;
-	decodeNodeType(map[gi], &orientation, &type);
+	int ncode = map[gi];
+	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
 	if (isUnusedNode(type))
 		return;
 
-	// cache the distributions in local variables
+	int orientation = decodeNodeOrientation(ncode);
+
+	// Cache the distributions in local variables
 	Dist d0;
 	getDist(&d0, dist_in, gi);
 
@@ -152,18 +156,18 @@ ${kernel} void CollideAndPropagate(
 		${sc_calculate_accel()}
 	%endif
 
-	// macroscopic quantities for the current cell
+	// Macroscopic quantities for the current cell
 	float g0m0, v[${dim}];
 
 	%if simtype == 'shan-chen':
 		${sc_macro_fields()}
 	%else:
-		getMacro(&d0, type, orientation, &g0m0, v);
+		getMacro(&d0, ncode, type, orientation, &g0m0, v);
 	%endif
 
-	precollisionBoundaryConditions(&d0, type, orientation, &g0m0, v);
+	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
 	${relaxate(bgk_args)}
-	postcollisionBoundaryConditions(&d0, type, orientation, &g0m0, v, gi, dist_out);
+	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out);
 
 	// only save the macroscopic quantities if requested to do so
 	if (save_macro == 1) {

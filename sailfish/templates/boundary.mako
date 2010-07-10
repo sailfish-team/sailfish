@@ -22,38 +22,24 @@
 		break;
 </%def>
 
-<%def name="get_boundary_velocity(node_type, mx, my, mz, rho=0, moments=False)">
-	int idx = (${node_type} - GEO_BCV) * ${dim};
+<%def name="get_boundary_velocity(node_param, mx, my, mz, rho=0, moments=False)">
 	%if moments:
-		${mx} = geo_params[idx] * ${rho};
-		${my} = geo_params[idx+1] * ${rho};
+		${mx} = geo_params[${node_param} * ${dim}] * ${rho};
+		${my} = geo_params[${node_param} * ${dim} + 1] * ${rho};
 		%if dim == 3:
-			${mz} = geo_params[idx+2] * ${rho};
+			${mz} = geo_params[${node_param} * ${dim} + 2] * ${rho};
 		%endif
 	%else:
-		${mx} = geo_params[idx];
-		${my} = geo_params[idx+1];
+		${mx} = geo_params[${node_param} * ${dim}];
+		${my} = geo_params[${node_param} * ${dim} + 1];
 		%if dim == 3:
-			${mz} = geo_params[idx+2];
+			${mz} = geo_params[${node_param} * ${dim} + 2];
 		%endif
 	%endif
 </%def>
 
-<%def name="get_boundary_pressure(node_type, rho)">
-	int idx = (GEO_BCP-GEO_BCV) * ${dim} + (${node_type} - GEO_BCP);
-	${rho} = geo_params[idx] * 3.0f;
-</%def>
-
-<%def name="get_boundary_params(node_type, mx, my, mz, rho, moments=False)">
-	if (${node_type} >= GEO_BCV) {
-		// Velocity boundary condition.
-		if (${node_type} < GEO_BCP) {
-			${get_boundary_velocity(node_type, mx, my, mz, rho, moments)}
-		// Pressure boundary condition.
-		} else {
-			${get_boundary_pressure(node_type, rho)}
-		}
-	}
+<%def name="get_boundary_pressure(node_param, rho)">
+	${rho} = geo_params[${geo_num_velocities * dim} + ${node_param}] * 3.0f;
 </%def>
 
 <%def name="fill_missing_distributions()">
@@ -381,7 +367,7 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
 //
-${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, float *rho, float *v0)
+${device_func} inline void getMacro(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
 {
 	if (isFluidOrWallNode(node_type) || orientation == ${geo_dir_other}) {
 		compute_macro_quant(fi, rho, v0);
@@ -400,16 +386,18 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 		}
 	} else if (isVelocityNode(node_type)) {
 		%if bc_velocity == 'zouhe':
+			int node_param = decodeNodeParam(ncode);
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			${get_boundary_velocity('node_type', 'v0[0]', 'v0[1]', 'v0[2]')}
+			${get_boundary_velocity('node_param', 'v0[0]', 'v0[1]', 'v0[2]')}
 			zouhe_bb(fi, orientation, rho, v0);
 		// We're dealing with a boundary node, for which some of the distributions
 		// might be meaningless.  Fill them with the values of the opposite
 		// distributions.
 		%elif bc_velocity == 'equilibrium':
+			int node_param = decodeNodeParam(ncode);
 			${fill_missing_distributions()}
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			${get_boundary_velocity('node_type', 'v0[0]', 'v0[1]', 'v0[2]')}
+			${get_boundary_velocity('node_param', 'v0[0]', 'v0[1]', 'v0[2]')}
 
 			switch (orientation) {
 				%for i in range(1, grid.dim*2+1):
@@ -423,10 +411,11 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 		%endif
 	} else if (isPressureNode(node_type)) {
 		%if bc_pressure == 'zouhe' or bc_pressure == 'equilibrium':
+			int node_param = decodeNodeParam(ncode);
 			${fill_missing_distributions()}
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
 			float par_rho;
-			${get_boundary_pressure('node_type', 'par_rho')}
+			${get_boundary_pressure('node_param', 'par_rho')}
 
 			switch (orientation) {
 				%for i in range(1, grid.dim*2+1):
@@ -450,7 +439,9 @@ ${device_func} inline void getMacro(Dist *fi, int node_type, int orientation, fl
 	}
 }
 
-${device_func} inline void postcollisionBoundaryConditions(Dist *fi, int node_type, int orientation, float *rho, float *v0, int gi, ${global_ptr} float *dist_out)
+// TODO: Check whether it is more efficient to actually recompute
+// node_type and orientation instead of paasing them as variables.
+${device_func} inline void postcollisionBoundaryConditions(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0, int gi, ${global_ptr} float *dist_out)
 {
 	%if bc_wall == 'halfbb':
 		if (isWallNode(node_type)) {
@@ -468,7 +459,7 @@ ${device_func} inline void postcollisionBoundaryConditions(Dist *fi, int node_ty
 	%endif
 }
 
-${device_func} inline void precollisionBoundaryConditions(Dist *fi, int node_type, int orientation, float *rho, float *v0)
+${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
 {
 	%if bc_wall == 'fullbb':
 		if (isWallNode(node_type)) {
@@ -479,7 +470,8 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int node_typ
 	%if bc_velocity == 'fullbb':
 		if (isVelocityNode(node_type)) {
 			bounce_back(fi);
-			${get_boundary_velocity('node_type', 'v0[0]', 'v0[1]', 'v0[2]')}
+			int node_param = decodeNodeParam(ncode);
+			${get_boundary_velocity('node_param', 'v0[0]', 'v0[1]', 'v0[2]')}
 			%for i, ve in enumerate(grid.basis):
 				fi->${grid.idx_name[i]} += ${cex(
 					sim.S.rho0 * 2 * grid.weights[i] * grid.v.dot(ve) / grid.cssq, pointers=True)};

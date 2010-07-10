@@ -10,6 +10,13 @@ def abstract():
     caller = inspect.getouterframes(inspect.currentframe())[1][3]
     raise NotImplementedError('%s must be implemented in subclass' % caller)
 
+def bitLen(int_type):
+    length = 0
+    while int_type:
+        int_type >>= 1
+        length += 1
+    return length
+
 class LBMGeo(object):
     """Abstract class for the LBM geometry."""
 
@@ -26,16 +33,19 @@ class LBMGeo(object):
     NODE_VELOCITY = 3
     #: Pressure boundary condition node.
     NODE_PRESSURE = 4
+    #: Boundary nodes of FSI objects.
+    NODE_BOUNDARY = 5
 
-    NODE_TYPES = [NODE_FLUID, NODE_WALL, NODE_UNUSED, NODE_VELOCITY, NODE_PRESSURE]
+    NODE_TYPES = [NODE_FLUID, NODE_WALL, NODE_UNUSED, NODE_VELOCITY,
+            NODE_PRESSURE, NODE_BOUNDARY]
 
     NODE_TYPE_MASK = 0xffffffff
-    NODE_ORIENTATION_SHIFT = 0
-    NODE_ORIENTATION_MASK = 0
+    NODE_MISC_SHIFT = 0
+    NODE_MISC_MASK = 0
     NODE_DIR_OTHER = 0
 
     @classmethod
-    def _encode_node(cls, orientation, type):
+    def _encode_node(cls, misc, type):
         """Encode a node entry for the map of nodes.
 
         :param orientation: node orientation
@@ -43,15 +53,22 @@ class LBMGeo(object):
 
         :rtype: node code
         """
-        return orientation | (type << cls.NODE_ORIENTATION_SHIFT)
+        return type | (misc << cls.NODE_MISC_SHIFT)
 
     @classmethod
     def _decode_node_type(cls, code):
-        return (code & cls.NODE_TYPE_MASK) >> cls.NODE_ORIENTATION_SHIFT
+        return (code & cls.NODE_TYPE_MASK)
 
     @classmethod
-    def _decode_node_orientation(cls, code):
-        return (code & cls.NODE_ORIENTATION_MASK)
+    def _decode_node_misc(cls, code):
+        return ((code & cls.NODE_MISC_MASK) >> cls.NODE_MISC_SHIFT)
+
+    def _encode_orientation_and_param(self, orientation, param):
+        return ((orientation << self._param_shift) | param)
+
+    def _decode_orientation_and_param(self, code):
+        return (code >> self._param_shift,
+                code & ((1 << (self._param_shift+1)) - 1))
 
     @classmethod
     def _decode_node(cls, code):
@@ -59,9 +76,9 @@ class LBMGeo(object):
 
         :param code: node code from the map
 
-        :rtype: tuple of orientation, type
+        :rtype: tuple of misc. data, type
         """
-        return cls._decode_node_orientation(code), cls._decode_node_type(code)
+        return cls._decode_node_misc(code), cls._decode_node_type(code)
 
     def __init__(self, shape, options, float, backend, sim):
         self.sim = sim
@@ -88,6 +105,10 @@ class LBMGeo(object):
     @property
     def has_velocity_nodes(self):
         return self._num_velocities > 0
+
+    @property
+    def fsi_objects(self):
+        return self._fsi_objs
 
     def count_active_nodes(self):
         """Get the number of active nodes in the simulation domain."""
@@ -127,15 +148,31 @@ class LBMGeo(object):
         self._pressure_map = numpy.ma.array(numpy.zeros(shape=self.map.shape, dtype=self.float), mask=True)
         self._num_velocities = 0
         self._num_pressures = 0
+        self._fsi_objs = []
 
     def reset(self):
         """Perform a full reset of the geometry."""
-
         self._clear_state()
         self.define_nodes()
-        a = self.params
+        self._prep_params()
         self._postprocess_nodes()
         self._update_map()
+
+    def get_defines(self):
+        return {'geo_fluid': self.NODE_FLUID,
+                'geo_wall': self.NODE_WALL,
+                'geo_unused': self.NODE_UNUSED,
+                'geo_velocity': self.NODE_VELOCITY,
+                'geo_pressure': self.NODE_PRESSURE,
+                'geo_boundary': self.NODE_BOUNDARY,
+                'geo_misc_mask': self.NODE_MISC_MASK,
+                'geo_misc_shift': self.NODE_MISC_SHIFT,
+                'geo_type_mask': self.NODE_TYPE_MASK,
+                'geo_param_shift': self._param_shift,
+                'geo_obj_shift': bitLen(len(self.fsi_objects)),
+                'geo_dir_other': self.NODE_DIR_OTHER,
+                'geo_num_velocities': self._num_velocities,
+                }
 
     def _get_map(self, location):
         """Get a node map entry.
@@ -329,11 +366,12 @@ class LBMGeo(object):
 
     @property
     def params(self):
-        if self._params is not None:
-            return self._params
+        return self._params
+
+    def _prep_params(self):
+        self._param_map = numpy.zeros(self.map.shape, dtype=numpy.uint32)
 
         ret = []
-        i = 0
 
         if self.dim == 3:
             v1, i1 = numpy.unique1d(self._velocity_map[0,:,:,:], return_inverse=True)
@@ -354,6 +392,7 @@ class LBMGeo(object):
 
         vfin, ifin = numpy.unique1d(idx, return_inverse=True)
         ifin = ifin.reshape(self._velocity_map.shape[1:])
+        i = 0
 
         for j, v in enumerate(vfin):
             at = v / i1m
@@ -371,14 +410,14 @@ class LBMGeo(object):
             if self.dim == 3:
                 ret.append(v3[a3])
 
-            self.map[midx] = self.map[midx] + i
+            self._param_map[midx] = i
             i += 1
 
         self._num_velocities = i
-        i -= 1
 
         pressure, ifin = numpy.unique1d(self._pressure_map, return_inverse=True)
         ifin = ifin.reshape(self._pressure_map.shape)
+        i = 0
 
         for j, v in enumerate(pressure):
             if v is numpy.ma.masked:
@@ -386,12 +425,12 @@ class LBMGeo(object):
 
             midx = (ifin == j)
             ret.append(v)
-            self.map[midx] = self.map[midx] + i
+            self._param_map[midx] = i
             i += 1
 
-        self._num_pressures = i + 1 - self._num_velocities
+        self._num_pressures = i
+        self._param_shift = bitLen(max(self._num_velocities, self._num_pressures))
         self._params = ret
-        return ret
 
     # FIXME: This method implicitly assumes that the object can be enclosed in a box
     # which does not intersect any other objects or boundaries.
@@ -468,14 +507,18 @@ class LBMGeo(object):
                     numpy.sum(dist[self.sim.grid.idx_opposite[dir]][fluid_map]))
         return force
 
+    def add_fsi_object(self, obj):
+        self._fsi_objs.append(obj)
+
+
 class LBMGeo2D(LBMGeo):
     """Base class for 2D geometries."""
 
     dim = 2
 
-    NODE_TYPE_MASK = 0xfffffff8
-    NODE_ORIENTATION_SHIFT = 3
-    NODE_ORIENTATION_MASK = 0x7
+    NODE_TYPE_MASK = 0x07
+    NODE_MISC_SHIFT = 3
+    NODE_MISC_MASK = 0xfffffff8
 
     def __init__(self, shape, *args, **kwargs):
         self.lat_nx, self.lat_ny = shape
@@ -487,17 +530,9 @@ class LBMGeo2D(LBMGeo):
     def _set_map(self, location, value):
         self.map[location[1], location[0]] = value
 
-    def get_defines(self):
-        return {'geo_fluid': self.NODE_FLUID,
-                'geo_wall': self.NODE_WALL,
-                'geo_unused': self.NODE_UNUSED,
-                'geo_bcv': self.NODE_VELOCITY,
-                'geo_bcp': self.NODE_PRESSURE + self._num_velocities - 1,
-                'geo_orientation_mask': self.NODE_ORIENTATION_MASK,
-                'geo_orientation_shift': self.NODE_ORIENTATION_SHIFT,
-                'geo_dir_other': self.NODE_DIR_OTHER,
-                }
-
+    # FIXME: Optimize this function like the 3D version.
+    # TODO: Possibly remove the option of postprocessing specific nodes, which
+    # might be broken anyway (?)
     def _postprocess_nodes(self, nodes=None):
         lat_nx, lat_ny = self.shape
 
@@ -526,32 +561,41 @@ class LBMGeo2D(LBMGeo):
             if self.map[y][x] != self.NODE_FLUID:
                 # If the bool corresponding to a specific direction is True, the
                 # distributions in this direction are undefined.
-                north = y < lat_ny-1 and self.map[y+1][x] == self.NODE_FLUID
-                south = y > 0 and self.map[y-1][x] == self.NODE_FLUID
-                west  = x > 0 and self.map[y][x-1] == self.NODE_FLUID
-                east  = x < lat_nx-1 and self.map[y][x+1] == self.NODE_FLUID
+                north = y < lat_ny-1 and self.map[y+1,x] == self.NODE_FLUID
+                south = y > 0 and self.map[y-1,x] == self.NODE_FLUID
+                west  = x > 0 and self.map[y,x-1] == self.NODE_FLUID
+                east  = x < lat_nx-1 and self.map[y,x+1] == self.NODE_FLUID
 
                 # Walls aligned with the grid.
                 if north and not west and not east:
-                    self.map[y][x] = self._encode_node(dir_n, self.map[y][x])
+                    self.map[y,x] = self._encode_node(
+                        self._encode_orientation_and_param(dir_n, self._param_map[y,x]),
+                        self.map[y,x])
                 elif south and not west and not east:
-                    self.map[y][x] = self._encode_node(dir_s, self.map[y][x])
+                    self.map[y,x] = self._encode_node(
+                        self._encode_orientation_and_param(dir_s, self._param_map[y,x]),
+                        self.map[y,x])
                 elif west and not south and not north:
-                    self.map[y][x] = self._encode_node(dir_w, self.map[y][x])
+                    self.map[y,x] = self._encode_node(
+                        self._encode_orientation_and_param(dir_w, self._param_map[y,x]),
+                        self.map[y,x])
                 elif east and not south and not north:
-                    self.map[y][x] = self._encode_node(dir_e, self.map[y][x])
+                    self.map[y,x] = self._encode_node(
+                        self._encode_orientation_and_param(dir_e, self._param_map[y,x]),
+                         self.map[y,x])
                 else:
-                    self.map[y][x] = self._encode_node(self.NODE_DIR_OTHER,
-                            self.map[y][x])
+                    self.map[y,x] = self._encode_node(
+                        self._encode_orientation_and_param(self.NODE_DIR_OTHER, self._param_map[y,x]),
+                            self.map[y,x])
 
 class LBMGeo3D(LBMGeo):
     """Base class for 3D geometries."""
 
     dim = 3
 
-    NODE_TYPE_MASK = 0xfffffff8
-    NODE_ORIENTATION_SHIFT = 3
-    NODE_ORIENTATION_MASK = 0x7
+    NODE_TYPE_MASK = 0x07
+    NODE_MISC_SHIFT = 3
+    NODE_MISC_MASK = 0xfffffff8
 
     def __init__(self, shape, *args, **kwargs):
         self.lat_nx, self.lat_ny, self.lat_nz = shape
@@ -562,17 +606,6 @@ class LBMGeo3D(LBMGeo):
 
     def _set_map(self, location, value):
         self.map[location[2], location[1], location[0]] = value
-
-    def get_defines(self):
-        return {'geo_fluid': self.NODE_FLUID,
-                'geo_wall': self.NODE_WALL,
-                'geo_unused': self.NODE_UNUSED,
-                'geo_bcv': self.NODE_VELOCITY,
-                'geo_bcp': self.NODE_PRESSURE + self._num_velocities - 1,
-                'geo_orientation_mask': self.NODE_ORIENTATION_MASK,
-                'geo_orientation_shift': self.NODE_ORIENTATION_SHIFT,
-                'geo_dir_other': self.NODE_DIR_OTHER,
-                }
 
     def _postprocess_nodes(self, nodes=None):
         lat_nx, lat_ny, lat_nz = self.shape
@@ -601,7 +634,9 @@ class LBMGeo3D(LBMGeo):
             self.map[(cnt == self.sim.grid.Q)] = self.NODE_UNUSED
 
             # Postprocess the whole domain here.
-            self.map[:] = self._encode_node(orientation, self.map)
+            self.map[:] = self._encode_node(
+                    self._encode_orientation_and_param(orientation, self._param_map),
+                    self.map)
         else:
             nodes_ = nodes
 
@@ -609,7 +644,10 @@ class LBMGeo3D(LBMGeo):
                 cnode_type = self._get_map(loc)
 
                 if cnode_type != self.NODE_FLUID:
-                    self._set_map(loc, self._encode_node(self.NODE_DIR_OTHER, cnode_type))
+                    self._set_map(loc, self._encode_node(
+                            self._encode_orientation_and_param(self.NODE_DIR_OTHER,
+                                    self._param_map[typle(reversed(loc))]),
+                        cnode_type))
 
 #
 # Boundary conditions

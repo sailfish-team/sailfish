@@ -39,6 +39,9 @@ perf_plots:
 	python perftest/make_plots.py perftest/2d_binary.pdf perftest/results/GeForce_GTX_285 2d_bin
 	python perftest/make_plots.py perftest/3d.pdf perftest/results/GeForce_GTX_285 3d_
 
+test:
+	python tests/geometry.py
+
 clean:
 	rm -f sailfish/*.pyc
 	rm -f perftest/*.pdf

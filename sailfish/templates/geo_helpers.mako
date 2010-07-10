@@ -41,15 +41,15 @@ ${device_func} inline bool isFluidOrWallNode(int type) {
 
 // This assumes we're dealing with a wall node.
 ${device_func} inline bool isVelocityNode(int type) {
-	return (type >= ${geo_bcv}) && (type < GEO_BCP);
-}
-
-${device_func} inline bool isVelocityOrPressureNode(int type) {
-	return (type >= ${geo_bcv});
+	return type == ${geo_velocity};
 }
 
 ${device_func} inline bool isPressureNode(int type) {
-	return (type >= ${geo_bcp});
+	return (type >= ${geo_pressure});
+}
+
+${device_func} inline bool isVelocityOrPressureNode(int type) {
+	return isVelocityNode(type) || isPressureNode(type);
 }
 
 // Wet nodes are nodes that undergo a standard collision procedure.
@@ -71,11 +71,18 @@ ${device_func} inline bool isWetNode(int type) {
 	);
 }
 
-${device_func} inline void decodeNodeType(int nodetype, int *orientation, int *type) {
-	*orientation = nodetype & ${geo_orientation_mask};
-	*type = nodetype >> ${geo_orientation_shift};
+${device_func} inline int decodeNodeType(int nodetype) {
+	return nodetype & ${geo_type_mask};
 }
 
-${device_func} inline int encodeNodeType(int orientation, int type) {
-	return orientation | (type << ${geo_orientation_shift});
+${device_func} inline int decodeNodeOrientation(int nodetype) {
+	return nodetype >> ${geo_misc_shift + geo_param_shift};
+}
+
+${device_func} inline int decodeNodeParam(int nodetype) {
+	return (nodetype >> ${geo_misc_shift}) & ${(1 << (geo_param_shift+1))-1};
+}
+
+${device_func} inline int encodeBoundaryNode(int dir_mask, int obj_id) {
+	return ${geo_boundary} | (obj_id << ${geo_misc_shift}) | (dir_mask << ${geo_misc_shift + geo_obj_shift});
 }

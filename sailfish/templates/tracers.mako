@@ -49,8 +49,9 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 		int idx = ix + ${lat_nx}*iy + ${lat_nx*lat_ny}*iz;
 	%endif
 
-	int type, orientation;
-	decodeNodeType(map[idx], &orientation, &type);
+	int ncode = map[idx];
+	int type = decodeNodeType(ncode);
+	int orientation = decodeNodeOrientation(ncode);
 
 	// Unused nodes do not participate in the simulation.
 	if (isUnusedNode(type)) {
@@ -69,7 +70,8 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 		fc.${dname} = dist[idx + DIST_SIZE*${i}];
 	%endfor
 
-	getMacro(&fc, type, orientation, &rho, v);
+	## FIXME: We just need the velocity here.
+	getMacro(&fc, ncode, type, orientation, &rho, v);
 
 	cx = cx + v[0] * DT;
 	cy = cy + v[1] * DT;

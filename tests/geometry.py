@@ -152,40 +152,50 @@ class Test3DNodeProcessing(unittest.TestCase):
     def testPostprocess(self):
         self.geo._clear_state()
         self.geo.define_nodes()
+        self.geo._prep_params()
         self.geo._postprocess_nodes()
 
         # Primary direction detection on a small box.
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((6, 6, 5))),
-                (self.sim.grid.vec_to_dir((0,0,-1)), self.geo.NODE_WALL))
+                (self.geo._encode_orientation_and_param(
+                    self.sim.grid.vec_to_dir((0,0,-1)), 0), self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((6, 6, 7))),
-                (self.sim.grid.vec_to_dir((0,0,1)), self.geo.NODE_WALL))
+                (self.geo._encode_orientation_and_param(
+                    self.sim.grid.vec_to_dir((0,0,1)), 0), self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((5, 6, 6))),
-                (self.sim.grid.vec_to_dir((-1,0,0)), self.geo.NODE_WALL))
+                (self.geo._encode_orientation_and_param(
+                    self.sim.grid.vec_to_dir((-1,0,0)), 0), self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((7, 6, 6))),
-                (self.sim.grid.vec_to_dir((1,0,0)), self.geo.NODE_WALL))
+                (self.geo._encode_orientation_and_param(
+                    self.sim.grid.vec_to_dir((1,0,0)), 0), self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((6, 5, 6))),
-                (self.sim.grid.vec_to_dir((0,-1,0)), self.geo.NODE_WALL))
+                (self.geo._encode_orientation_and_param(
+                    self.sim.grid.vec_to_dir((0,-1,0)), 0), self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((6, 7, 6))),
-                (self.sim.grid.vec_to_dir((0,1,0)), self.geo.NODE_WALL))
+                (self.geo._encode_orientation_and_param(
+                    self.sim.grid.vec_to_dir((0,1,0)), 0), self.geo.NODE_WALL))
 
         # Orientation detection at domain boundaries.
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((11, 11, 0))),
-                (self.sim.grid.vec_to_dir((0,0,1)), self.geo.NODE_WALL))
+                (self.geo._encode_orientation_and_param(
+                    self.sim.grid.vec_to_dir((0,0,1)), 0), self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((11, 11, 63))),
-                (self.sim.grid.vec_to_dir((0,0,-1)), self.geo.NODE_WALL))
+                (self.geo._encode_orientation_and_param(
+                    self.sim.grid.vec_to_dir((0,0,-1)), 0), self.geo.NODE_WALL))
 
 
     def testVelocityNodes(self):
         self.geo._clear_state()
         self.geo.define_nodes()
+        self.geo._prep_params()
 
         self.assertAlmostEqual(self.geo.params[0], 0.1)
         self.assertAlmostEqual(self.geo.params[1], 0.2)
@@ -196,16 +206,18 @@ class Test3DNodeProcessing(unittest.TestCase):
         self.assertAlmostEqual(self.geo.params[3], 0.1)
         self.assertAlmostEqual(self.geo.params[4], 0.2)
         self.assertAlmostEqual(self.geo.params[5], 0.3)
-        self.assertEqual(self.geo._get_map((22, 15, 16)), self.geo.NODE_VELOCITY+1)
-        self.assertEqual(self.geo._get_map((22, 22, 23)), self.geo.NODE_VELOCITY+1)
+        self.assertEqual(self.geo._get_map((22, 15, 16)), self.geo.NODE_VELOCITY)
+        self.assertEqual(self.geo._get_map((22, 22, 23)), self.geo.NODE_VELOCITY)
+
 
     def testPressureNodes(self):
         self.geo._clear_state()
         self.geo.define_nodes()
+        self.geo._prep_params()
 
         self.assertAlmostEqual(self.geo.params[6], 3.0)
-        self.assertEqual(self.geo._get_map((24, 15, 16)), self.geo.NODE_PRESSURE+1)
-        self.assertEqual(self.geo._get_map((24, 22, 16)), self.geo.NODE_PRESSURE+1)
+        self.assertEqual(self.geo._get_map((24, 15, 16)), self.geo.NODE_PRESSURE)
+        self.assertEqual(self.geo._get_map((24, 22, 16)), self.geo.NODE_PRESSURE)
 
 if __name__ == '__main__':
     unittest.main()

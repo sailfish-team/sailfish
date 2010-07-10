@@ -127,12 +127,14 @@ ${kernel} void PrepareMacroFields(
 {
 	${local_indices()}
 
-	int type, orientation;
-	decodeNodeType(map[gi], &orientation, &type);
+	int ncode = map[gi];
+	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
 	if (isUnusedNode(type))
 		return;
+
+	int orientation = decodeNodeOrientation(ncode);
 
 	// Do not update the macroscopic fields for wall nodes which do not
 	// represent any fluid.
@@ -193,12 +195,14 @@ ${kernel} void CollideAndPropagate(
 		#define prop_${grid.idx_name[grid.idx_opposite[i]]} prop_${grid.idx_name[i]}
 	%endfor
 
-	int type, orientation;
-	decodeNodeType(map[gi], &orientation, &type);
+	int ncode = map[gi];
+	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
 	if (isUnusedNode(type))
 		return;
+
+	int orientation = decodeNodeOrientation(ncode);
 
 	%if simtype == 'free-energy':
 		float lap1, grad1[${dim}];
@@ -223,14 +227,14 @@ ${kernel} void CollideAndPropagate(
 	float g0m0, v[${dim}], g1m0;
 
 	%if simtype == 'free-energy':
-		getMacro(&d0, type, orientation, &g0m0, v);
+		getMacro(&d0, ncode, type, orientation, &g0m0, v);
 		get0thMoment(&d1, type, orientation, &g1m0);
 	%elif simtype == 'shan-chen':
 		${sc_macro_fields()}
 	%endif
 
-	precollisionBoundaryConditions(&d0, type, orientation, &g0m0, v);
-	precollisionBoundaryConditions(&d1, type, orientation, &g1m0, v);
+	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
+	precollisionBoundaryConditions(&d1, ncode, type, orientation, &g1m0, v);
 
 	%if simtype == 'shan-chen':
 		${relaxate(bgk_args_sc)}

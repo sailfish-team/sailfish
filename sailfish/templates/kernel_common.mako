@@ -90,8 +90,6 @@
 #define BLOCK_SIZE ${block_size}
 #define DIST_SIZE ${dist_size}
 #define GEO_FLUID ${geo_fluid}
-#define GEO_BCV ${geo_bcv}
-#define GEO_BCP ${geo_bcp}
 
 #define DT 1.0f
 
