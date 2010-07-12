@@ -188,11 +188,11 @@ class Fluid2DVis(vis.FluidVis):
 
     @property
     def vx(self):
-        return self.sim.vx
+        return self.sim.geo.mask_array_by_fluid(self.sim.vx)
 
     @property
     def vy(self):
-        return self.sim.vy
+        return self.sim.geo.mask_array_by_fluid(self.sim.vy)
 
     @property
     def field(self):
