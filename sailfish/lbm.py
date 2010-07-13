@@ -96,10 +96,10 @@ class HDF5FlatOutput(object):
         self.h5file.createArray(h5t, 'rho', self.sim.rho, 'density')
 
 class HDF5NestedOutput(HDF5FlatOutput):
-    format_name='h5nexted'
+    format_name='h5nested'
 
     def __init__(self, fname, sim):
-        super(HDF5OutputNested, self).__init__(fname, sim)
+        super(HDF5NestedOutput, self).__init__(fname, sim)
         import tables
         desc = {
             'iter': tables.Float32Col(pos=0),
