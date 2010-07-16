@@ -92,6 +92,32 @@ def gauss_kernel(size, sizey=None):
     g = numpy.exp(-(x**2/float(size) + y**2/float(sizey)))
     return g / g.sum()
 
+def emboss_field(fv, a):
+    # Based on the code posted on
+    # http://stackoverflow.com/questions/2034037/image-embossing-in-python-with-pil-adding-depth-azimuth-etc
+    azi = numpy.pi/8.
+    ele = numpy.pi/16.
+    dep = 0.81
+    a1 = 255*fv
+    grad_x, grad_y = numpy.gradient(a1 * dep)
+
+    gd = numpy.cos(ele) # length of projection of ray on ground plane
+    dx = gd * numpy.cos(azi)
+    dy = gd * numpy.sin(azi)
+    dz = numpy.sin(ele)
+    # finding the unit normal vectors for the image
+    len_ = numpy.sqrt(numpy.square(grad_x) + numpy.square(grad_y) + 1.)
+    uni_x = grad_x/len_
+    uni_y = grad_y/len_
+    uni_z = 1./len_
+    a2 = 255*(dx*uni_x + dy*uni_y + dz*uni_z)
+    a2 = a2.clip(0,255).astype('int')
+    w = 0.5
+
+    a[:,:,0] = (w*a[:,:,0] + (1-w)*a2)
+    a[:,:,1] = (w*a[:,:,1] + (1-w)*a2)
+    a[:,:,2] = (w*a[:,:,2] + (1-w)*a2)
+
 cmaps = {
     1: {
         'std': _cmap_std,
@@ -153,6 +179,7 @@ class Fluid2DVis(vis.FluidVis):
         self._cmap = [None, 'std', 'rb']
         self._cmap_scale_lock = False
         self._convolve = False
+        self._emboss = False
         self._font = pygame.font.SysFont(font_name(), 14)
         self._impart_velocity = False
         self.set_mode(width, height)
@@ -262,6 +289,7 @@ class Fluid2DVis(vis.FluidVis):
             g = gauss_kernel(2, sizey=2)
             fs = map(lambda x: signal.convolve(x, g, mode='same'), fs)
 
+
         srf2 = self._draw_field(fs, srf, wall_map, unused_map, width, height)
         pygame.transform.scale(srf2, self._screen.get_size(), self._screen)
         sw, sh = self._screen.get_size()
@@ -314,6 +342,9 @@ class Fluid2DVis(vis.FluidVis):
         fluid_map = numpy.logical_not(numpy.logical_or(wall_map, unused_map))
         field = cmaps[n][self._cmap[n]](*fv)
         a[fluid_map] = field[fluid_map]
+
+        if self._emboss:
+            emboss_field(fv[0], a)
 
         # Unlock the surface and put the picture on screen.
         del a
@@ -385,6 +416,8 @@ class Fluid2DVis(vis.FluidVis):
                     self._tracers = not self._tracers
                 elif event.key == pygame.K_c:
                     self._convolve = not self._convolve
+                elif event.key == pygame.K_e:
+                    self._emboss = not self._emboss
                 elif event.key == pygame.K_p:
                     self._paused = not self._paused
                     if self._paused:
