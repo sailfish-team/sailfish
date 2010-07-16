@@ -98,8 +98,7 @@ def emboss_field(fv, a):
     azi = numpy.pi/8.
     ele = numpy.pi/16.
     dep = 0.81
-    a1 = 255*fv
-    grad_x, grad_y = numpy.gradient(a1 * dep)
+    grad_x, grad_y = numpy.gradient(255 * fv * dep)
 
     gd = numpy.cos(ele) # length of projection of ray on ground plane
     dx = gd * numpy.cos(azi)
@@ -107,10 +106,7 @@ def emboss_field(fv, a):
     dz = numpy.sin(ele)
     # finding the unit normal vectors for the image
     len_ = numpy.sqrt(numpy.square(grad_x) + numpy.square(grad_y) + 1.)
-    uni_x = grad_x/len_
-    uni_y = grad_y/len_
-    uni_z = 1./len_
-    a2 = 255*(dx*uni_x + dy*uni_y + dz*uni_z)
+    a2 = 255 * (dx*grad_x + dy*grad_y + dz) / len_
     a2 = a2.clip(0,255).astype('int')
     w = 0.5
 
