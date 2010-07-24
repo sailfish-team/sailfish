@@ -748,6 +748,8 @@ class LBMSim(object):
             # set and copied to the GPU in _init_compute_fields.
             return
 
+        self._timed_print('Initializing distributions on compute unit.')
+
         args1 = [self.gpu_dist1a] + self.gpu_velocity + [self.gpu_rho]
         args2 = [self.gpu_dist1b] + self.gpu_velocity + [self.gpu_rho]
 
@@ -757,7 +759,7 @@ class LBMSim(object):
                     block=self._kernel_block_size())
 
         kern2 = self.backend.get_kernel(self.mod, 'SetInitialConditions',
-                    args=args1,
+                    args=args2,
                     args_format='P'*len(args2),
                     block=self._kernel_block_size())
 
