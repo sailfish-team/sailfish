@@ -133,6 +133,7 @@ class LSphereSim(lbm.FluidLBMSim):
             'every': 100,
             'incompressible': True,
             'grid': 'D3Q13',
+            'bc_velocity': 'fullbb',
             'verbose': True}
         defaults_.update(defaults)
 

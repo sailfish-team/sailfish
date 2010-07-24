@@ -1092,7 +1092,7 @@ class FluidLBMSim(LBMSim):
         lb_group.add_option('--bc_velocity', dest='bc_velocity', help='boundary condition implementation to use for velocity nodes', type='choice',
                 choices=[x.name for x in geo.SUPPORTED_BCS if
                     geo.LBMGeo.NODE_VELOCITY in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='fullbb')
+                    x.supports_dim(self.geo_class.dim)], default='equilibrium')
         lb_group.add_option('--bc_pressure', dest='bc_pressure', help='boundary condition implementation to use for pressure nodes', type='choice',
                 choices=[x.name for x in geo.SUPPORTED_BCS if
                     geo.LBMGeo.NODE_PRESSURE in x.supported_types and
