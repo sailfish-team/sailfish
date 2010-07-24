@@ -13,38 +13,37 @@ Sailfish Reference Manual
 .. module:: sailfish
 
 Sailfish is a free computational fluid dynamics solver employing the Lattice Boltzmann
-method and optimized for modern commodity high-performance computational systems,
-especially Graphics Processing Units.
+method and optimized for modern multi-core systems, especially GPUs (Graphics Processing Units).
 
 To illustrate how easy it is to create simulations using the Sailfish package,
 here is a simple example code to simulate fluid flow in a lid-driven cavity::
 
-    from sailfish import lbm
-    from sailfish import geo
+    import numpy as np
+    from sailfish import geo, lbm
 
     class LBMGeoLDC(geo.LBMGeo2D):
         max_v = 0.1
 
         def define_nodes(self):
-            for i in range(0, self.lat_nx):
-                self.set_geo((i, 0), self.NODE_WALL)
-                self.set_geo((i, self.lat_ny-1), self.NODE_VELOCITY, (self.max_v, 0.0))
-            for i in range(0, self.lat_ny):
-                self.set_geo((0, i), self.NODE_WALL)
-                self.set_geo((self.lat_nx-1, i), self.NODE_WALL)
+            hy, hx = np.mgrid[0:self.lat_ny, 0:self.lat_nx]
+            wall_map = np.logical_or(
+                    np.logical_or(hx == self.lat_nx-1, hx == 0), hy == 0)
+
+            self.set_geo(hy == self.lat_ny-1, self.NODE_VELOCITY, (self.max_v, 0.0))
+            self.set_geo(wall_map, self.NODE_WALL)
 
         def init_dist(self, dist):
-            self.velocity_to_dist((0,0), (0.0, 0.0), dist)
-            self.fill_dist((0,0), dist)
+            hy, hx = np.mgrid[0:self.lat_ny, 0:self.lat_nx]
 
-            for i in range(0, self.lat_nx):
-                self.velocity_to_dist((i, self.lat_ny-1), (self.max_v, 0.0), dist)
+            self.sim.ic_fields = True
+            self.sim.rho[:] = 1.0
+            self.sim.vx[hy == self.lat_ny-1] = self.max_v
 
     class LDCSim(lbm.FluidLBMSim):
         pass
 
-    sim = LDCSim(LBMGeoLDC)
-    sim.run()
+    if __name__ == '__main__':
+        LDCSim(LBMGeoLDC).run()
 
 Want to see Sailfish in action?  Check out our `videos on YouTube <http://www.youtube.com/watch?v=kx4-VjaJ2eI&feature=PlayList&p=96C9241314F1A898&index=0&playnext=1>`_,
 or better yet, `get the code <http://gitorious.org/sailfish>`_ and see for yourself by running the provided examples.
