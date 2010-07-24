@@ -3,7 +3,7 @@ Installation
 
 Sailfish requires no installation and all sample simulations provided in the executable
 .py files can simply be started from a shell, provided the required packages are
-installed on the host system.  These are as follows:
+installed on the host system.  These are as follows (minimal required versions are shown):
 
 General requirements:
 
@@ -15,12 +15,12 @@ General requirements:
   * pycuda-0.92 (with the NVIDIA drivers and NVIDIA CUDA Toolkit)
   * pypencl (with any OpenCL implementation)
 
-Visualization:
+Visualization (optional):
 
-* pygame (for 2D)
+* pygame (for 2D/3D)
 * mayavi (for 3D)
 
-Data output:
+Data output (optional):
 
 * pytables-2.1.1 (HDF5 output)
 * tvtk (VTK output)
@@ -33,7 +33,7 @@ Downloading Sailfish
 --------------------
 
 We currently do not provide snapshot tarballs of the code, so you will need to get Sailfish
-directly from its git repositorye::
+directly from its git repository::
 
   git clone git://gitorious.org/sailfish/sailfish.git
 
@@ -74,11 +74,11 @@ To install the required packages on an Ubuntu system::
   python setup.py build
   python setup.py install
 
-There are currently no (recent enough) packages for sympy and pycuda/pyopencl available for
+There are currently no (recent enough) packages for SymPy and PyCUDA/PyOpenCL available for
 Ubuntu, so these have to be installed manually from a checked-out upstream code repository of
 these projects or a snapshot tarball.
 
-Please also note that the numpy version provided in Ubuntu releases older than Karmic is not
+Please also note that the NumPy version provided in Ubuntu releases older than Karmic is not
 recent enough for Sailfish.
 
 The example listed above assumes that you want to use the CUDA backend.  Before installing pycuda,
