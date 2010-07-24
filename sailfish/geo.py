@@ -205,18 +205,18 @@ class LBMGeo(object):
 
         if type(location) is tuple or type(location) is list:
             self._set_map(location, numpy.int32(type_))
-
             rloc = tuple(reversed(location))
-            rloc2 = tuple([slice(None)] + list(rloc))
         else:
             self.map[location] = numpy.int32(type_)
             rloc = location
-            rloc2 = numpy.resize(location, [self.dim] + list(location.shape))
 
         if val is not None:
             if type_ == self.NODE_VELOCITY:
                 if len(val) == self.dim:
-                    self._velocity_map[rloc2] = val
+                    if type(rloc) is tuple:
+                        self._velocity_map[[slice(None)] + list(rloc)] = val
+                    else:
+                        self._velocity_map[:,rloc] = self.sim.float(val).reshape([self.dim, 1])
                 else:
                     raise ValueError('Invalid velocity specified.')
             elif type_ == self.NODE_PRESSURE:
