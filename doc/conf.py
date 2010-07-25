@@ -26,7 +26,11 @@ sys.path.append(os.path.abspath('../sailfish'))
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.pngmath', 'youtube',
-		'matplotlib.sphinxext.only_directives', 'matplotlib.sphinxext.plot_directive']
+		'matplotlib.sphinxext.only_directives',
+        'matplotlib.sphinxext.plot_directive',
+        'sphinx.ext.intersphinx']
+
+intersphinx_mapping = {'python': ('http://docs.python.org/', None)}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

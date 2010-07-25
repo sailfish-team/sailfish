@@ -12,7 +12,7 @@ Sailfish Reference Manual
 
 .. module:: sailfish
 
-Sailfish is a free computational fluid dynamics solver employing the Lattice Boltzmann
+Sailfish is a free computational fluid dynamics solver based on the Lattice Boltzmann
 method and optimized for modern multi-core systems, especially GPUs (Graphics Processing Units).
 
 To illustrate how easy it is to create simulations using the Sailfish package,
