@@ -3,9 +3,8 @@
 import sys
 
 import math
-import numpy
-from sailfish import lbm
-from sailfish import geo
+import numpy as np
+from sailfish import geo, lbm
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
@@ -18,61 +17,36 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
     def define_nodes(self):
         radiussq = (self.get_chan_width() / 2.0)**2
 
-        if self.options.along_z:
-            for x in range(0, self.lat_nx):
-                for y in range(0, self.lat_ny):
-                    if (x-(self.lat_nx/2-0.5))**2 + (y-(self.lat_ny/2-0.5))**2 >= radiussq:
-                            self.set_geo((x,y,0), self.NODE_WALL)
-            self.fill_geo((slice(None), slice(None), 0))
+        hz, hy, hx = np.mgrid[0:self.lat_nz, 0:self.lat_ny, 0:self.lat_nx]
 
+        if self.options.along_z:
+            wall_map = (hx-(self.lat_nx/2-0.5))**2 + (hy-(self.lat_ny/2-0.5))**2 >= radiussq
         elif self.options.along_y:
-            for z in range(0, self.lat_nz):
-                for x in range(0, self.lat_nx):
-                    if (x-(self.lat_nx/2-0.5))**2 + (z-(self.lat_nz/2-0.5))**2 >= radiussq:
-                        self.set_geo((x,0,z), self.NODE_WALL)
-            self.fill_geo((slice(None), 0, slice(None)))
+            wall_map = (hx-(self.lat_nx/2-0.5))**2 + (hz-(self.lat_nz/2-0.5))**2 >= radiussq
         else:
-            for z in range(0, self.lat_nz):
-                for y in range(0, self.lat_ny):
-                    if (y-(self.lat_ny/2-0.5))**2 + (z-(self.lat_nz/2-0.5))**2 >= radiussq:
-                        self.set_geo((0,y,z), self.NODE_WALL)
-            self.fill_geo((0, slice(None), slice(None)))
+            wall_map = (hy-(self.lat_ny/2-0.5))**2 + (hz-(self.lat_nz/2-0.5))**2 >= radiussq
+
+        self.set_geo(wall_map, self.NODE_WALL)
 
     def init_dist(self, dist):
+        self.sim.ic_fields = True
+        self.sim.rho[:] = 1.0
+
+        hz, hy, hx = np.mgrid[0:self.lat_nz, 0:self.lat_ny, 0:self.lat_nx]
+
         if self.options.stationary:
             h = -0.5
             radius = self.get_chan_width() / 2.0
 
             if self.options.along_z:
-                for x in range(0, self.lat_nx):
-                    for y in range(0, self.lat_ny):
-                        rc = math.sqrt((x-self.lat_nx/2.0-h)**2 + (y-self.lat_ny/2.0-h)**2)
-                        if rc > radius:
-                            self.velocity_to_dist((x, y, 0), (0.0, 0.0, 0.0), dist)
-                        else:
-                            self.velocity_to_dist((x, y, 0), (0.0, 0.0, self.get_velocity(rc)), dist)
-                self.fill_dist((slice(None), slice(None), 0), dist)
+                rc = np.sqrt((hx-self.lat_nx/2.0-h)**2 + (hy-self.lat_ny/2.0-h)**2)
+                self.sim.vz[rc <= radius] = self.get_velocity(rc[rc <= radius])
             elif self.options.along_y:
-                for x in range(0, self.lat_nx):
-                    for z in range(0, self.lat_nz):
-                        rc = math.sqrt((x-self.lat_nx/2.0-h)**2 + (z-self.lat_nz/2.0-h)**2)
-                        if rc > radius:
-                            self.velocity_to_dist((x, 0, z), (0.0, 0.0, 0.0), dist)
-                        else:
-                            self.velocity_to_dist((x, 0, z), (0.0, self.get_velocity(rc), 0.0), dist)
-                self.fill_dist((slice(None), 0, slice(None)), dist)
+                rc = np.sqrt((hx-self.lat_nx/2.0-h)**2 + (hz-self.lat_nz/2.0-h)**2)
+                self.sim.vy[rc <= radius] = self.get_velocity(rc[rc <= radius])
             else:
-                for z in range(0, self.lat_nz):
-                    for y in range(0, self.lat_ny):
-                        rc = math.sqrt((z-self.lat_nz/2.0-h)**2 + (y-self.lat_ny/2.0-h)**2)
-                        if rc > radius:
-                            self.velocity_to_dist((0, y, z), (0.0, 0.0, 0.0), dist)
-                        else:
-                            self.velocity_to_dist((0, y, z), (self.get_velocity(rc), 0.0, 0.0), dist)
-                self.fill_dist((0, slice(None), slice(None)), dist)
-        else:
-            self.velocity_to_dist((0, 0, 0), (0.0, 0.0, 0.0), dist)
-            self.fill_dist((0, 0, 0), dist)
+                rc = np.sqrt((hz-self.lat_nz/2.0-h)**2 + (hy-self.lat_ny/2.0-h)**2)
+                self.sim.vx[rc <= radius] = self.get_velocity(rc[rc <= radius])
 
     # Schematic drawing of the simulated system with both on-grid and mid-grid
     # bondary conditions.

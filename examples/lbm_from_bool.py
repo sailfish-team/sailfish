@@ -18,8 +18,8 @@ class LBMGeo(geo.LBMGeo3D):
         self.set_geo_from_bool_array(self.sim.geometry)
 
     def init_dist(self, dist):
-        self.velocity_to_dist((0, 0, 0), (0.0, 0.0, 0.0), dist)
-        self.fill_dist((0, 0, 0), dist)
+        self.sim.ic_fields = True
+        self.sim.rho[:] = 1.0
 
 class LSim(lbm.FluidLBMSim):
     filename = 'bool'
