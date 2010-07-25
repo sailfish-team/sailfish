@@ -2,10 +2,9 @@
 
 import sys
 import math
-import numpy
+import numpy as np
 
-from sailfish import geo
-from sailfish import lbm
+from sailfish import geo, lbm
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
@@ -54,16 +53,14 @@ class LBMGeoSphere(geo.LBMGeo3D):
         z0 -= bc.location
         y0 -= bc.location
 
-        for z in range(0, self.lat_nz):
-            for y in range(0, self.lat_ny):
-                if (y0 - (y + h))**2 + (z0 - (z + h))**2 >= radiussq:
-#                   self.set_geo((0,y,z), self.NODE_WALL)
-                    self.set_geo((0,y,z), self.NODE_VELOCITY, (self.maxv, 0.0, 0.0))
-        self.fill_geo((0, slice(None), slice(None)))
+        hz, hy, hx = np.mgrid[0:self.lat_nz, 0:self.lat_ny, 0:self.lat_nx]
 
-        # Velocity BC at the inlet.
-        self.set_geo((0,0,0), self.NODE_VELOCITY, (self.maxv, 0.0, 0.0))
-        self.fill_geo((0,0,0), (0, slice(None), slice(None)))
+        # Channel walls.
+        node_map = (y0 - (hy + h))**2 + (z0 - (hz + h))**2 >= radiussq
+        self.set_geo(node_map, self.NODE_VELOCITY, (self.maxv, 0.0, 0.0))
+
+        # Inlet.
+        self.set_geo(hx == 0, self.NODE_VELOCITY, (self.maxv, 0.0, 0.0))
 
         ix0 = int(x0)
         iy0 = int(y0)
@@ -76,20 +73,10 @@ class LBMGeoSphere(geo.LBMGeo3D):
 
         radius = int(diam / 2)
 
-        for x in range(ix0-radius-2, ix0+radius+3):
-            for y in range(iy0-radius-2, iy0+radius+3):
-                for z in range(iz0-radius-2, iz0+radius+3):
-                    if (x0 - (x+h))**2 + (y0 - (y+h))**2 + (z0 - (z+h))**2 <= rsq:
-                        self.set_geo((x, y, z), self.NODE_WALL)
-
-        for x in range(ix0-2, ix0+3):
-            for z in range(iz0-2, iz0+3):
-                for y in range(iy0-radius-2, iy0-radius+3):
-                    if self._get_map((x, y, z)) == self.NODE_WALL:
-                        miny = min(miny, y)
-                for y in range(iy0+radius, iy0+radius+3):
-                    if self._get_map((x, y, z)) == self.NODE_WALL:
-                        maxy = max(maxy, y)
+        wall_map = (x0 - (hx+h))**2 + (y0 - (hy+h))**2 + (z0 - (hz+h))**2 <= rsq
+        self.set_geo(wall_map, self.NODE_WALL)
+        maxy = np.max(hy[wall_map])
+        miny = np.min(hy[wall_map])
 
         bc = geo.get_bc(self.options.bc_wall)
         self.sphere_diam = float(maxy - miny) + 2.0 * bc.location
@@ -99,8 +86,9 @@ class LBMGeoSphere(geo.LBMGeo3D):
                         (diam+6, diam+6, diam+6))
 
     def init_dist(self, dist):
-        self.velocity_to_dist((0, 0, 0), (self.maxv, 0.0, 0.0), dist)
-        self.fill_dist((0, 0, 0), dist)
+        self.sim.ic_fields = True
+        self.sim.rho[:] = 1.0
+        self.sim.vx[:] = self.maxv
 
     def get_reynolds(self, visc):
         re = round(self.sphere_diam * self.maxv/visc)

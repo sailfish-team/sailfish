@@ -1,6 +1,7 @@
 #!/usr/bin/python -u
 
 import sys
+import numpy as np
 from sailfish import geo
 from lbm_poiseuille_3d import LBMGeoPoiseuille, LPoiSim
 
@@ -28,11 +29,9 @@ class LBMGeoSphere(LBMGeoPoiseuille):
             y0 = self.lat_ny / 2
             z0 = self.lat_nz / 2
 
-        for z in range(-diam/2, diam/2+1):
-            for x in range(-diam/2, diam/2+1):
-                for y in range(-diam/2, diam/2+1):
-                    if z**2 + x**2 + y**2 <= (diam**2)/4:
-                        self.set_geo((x + x0, y + y0, z + z0), self.NODE_WALL)
+        hz, hy, hx = np.mgrid[0:self.lat_nz, 0:self.lat_ny, 0:self.lat_nx]
+        node_map = (hx - x0)**2 + (hy - y0)**2 + (hz - z0)**2 < (diam/2.0)**2
+        self.set_geo(node_map, self.NODE_WALL)
 
     def get_reynolds(self, visc):
         return int((self.get_width() / 3) * self.maxv/visc)
