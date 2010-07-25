@@ -82,7 +82,7 @@ takes two time steps for the reflected distributions to reach back the fluid nod
 
 Half-way bounce-back
 --------------------
-The half-way bounce-back boundary rule is based on a similar idea as the full-way bounce-back
+The half-way bounce-back boundary rule is based on a similar idea as the full-way bounce-back.
 Here however, the reflection takes only one time step and takes place exactly in
 the middle between the fluid node and what would be the first node outside of the simulation domain:
 :math:`f_{i}^{pre}(x, t+1) = f_{opp(i)}^{post}(x, t)`.  The half-way bounce-back nodes are

@@ -4,7 +4,7 @@ Setting up simulations
 Mapping physical quantities to simulation parameters
 ----------------------------------------------------
 
-Having a good grasp of how choosing LBM parameters such as grid size, numerical
+Having a good grasp of how choosing lattice-Boltzmann parameters such as grid size, numerical
 viscosity and maximum velocity affects the results is essential for running simulations
 efficiently and for interpreting their results.  The mapping between physical quantities
 describing a system and their corresponding counterparts in the simulation is often
