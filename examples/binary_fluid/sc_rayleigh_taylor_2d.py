@@ -1,9 +1,8 @@
 #!/usr/bin/python
 
 import random
-import numpy
-from sailfish import lbm
-from sailfish import geo
+import numpy as np
+from sailfish import geo, lbm
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
@@ -11,15 +10,14 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 class GeoSC(geo.LBMGeo2D):
 
     def define_nodes(self):
-        self.set_geo((0,0), self.NODE_WALL)
-        self.fill_geo((0,0), (slice(None), 0))
-        self.fill_geo((0,0), (slice(None), self.lat_ny-1))
+        hy, hx = np.mgrid[0:self.lat_ny, 0:self.lat_nx]
+        self.set_geo(np.logical_or(hy == 0, hy == self.lat_ny-1), self.NODE_WALL)
 
     def init_dist(self, dist):
-        hy, hx = numpy.mgrid[0:self.lat_ny, 0:self.lat_nx]
+        hy, hx = np.mgrid[0:self.lat_ny, 0:self.lat_nx]
 
-        self.sim.rho[:] = numpy.random.rand(*self.sim.rho.shape) / 100.0
-        self.sim.phi[:] = numpy.random.rand(*self.sim.phi.shape) / 100.0
+        self.sim.rho[:] = np.random.rand(*self.sim.rho.shape) / 100.0
+        self.sim.phi[:] = np.random.rand(*self.sim.phi.shape) / 100.0
 
         self.sim.rho[(hy <= self.lat_ny/2)] += 1.0
         self.sim.phi[(hy <= self.lat_ny/2)] = 1e-4

@@ -1,8 +1,7 @@
 #!/usr/bin/python
 
-import numpy
-from sailfish import lbm
-from sailfish import geo
+import numpy as np
+from sailfish import geo, lbm
 
 import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
@@ -10,20 +9,18 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 class GeoFEFinger(geo.LBMGeo3D):
 
     def define_nodes(self):
-        self.set_geo((0,0,0), self.NODE_WALL)
-        self.fill_geo((0,0,0), (slice(None), slice(None), 0))
-        self.fill_geo((0,0,0), (slice(None), slice(None), self.lat_nz-1))
+        hz, hy, hx = np.mgrid[0:self.lat_nz, 0:self.lat_ny, 0:self.lat_nx]
+        self.set_geo(np.logical_or(hz == 0, hz == self.lat_nz-1), self.NODE_WALL)
 
     def init_dist(self, dist):
+        hz, hy, hx = np.mgrid[0:self.lat_nz, 0:self.lat_ny, 0:self.lat_nx]
 
-        hz, hy, hx = numpy.mgrid[0:self.lat_nz, 0:self.lat_ny, 0:self.lat_nx]
-
-        a = 100.0 - 8.0 * numpy.cos(2.0 * numpy.pi * hy / self.lat_ny)
-        b = 200.0 - 8.0 * numpy.cos(2.0 * numpy.pi * hy / self.lat_ny)
+        a = 100.0 - 8.0 * np.cos(2.0 * np.pi * hy / self.lat_ny)
+        b = 200.0 - 8.0 * np.cos(2.0 * np.pi * hy / self.lat_ny)
 
         self.sim.rho[:] = 1.0
         self.sim.phi[:] = 1.0
-        self.sim.phi[numpy.logical_or(hx <= a, hx >= b)] = -1.0
+        self.sim.phi[np.logical_or(hx <= a, hx >= b)] = -1.0
 
         self.sim.ic_fields = True
 

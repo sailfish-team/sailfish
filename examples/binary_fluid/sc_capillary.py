@@ -22,7 +22,7 @@ class GeoSC(geo.LBMGeo2D):
 
         hy, hx = numpy.mgrid[0:self.lat_ny, 0:self.lat_nx]
 
-        geometry = numpy.zeros(list(reversed(self.shape)), dtype=numpy.bool) 
+        geometry = numpy.zeros(list(reversed(self.shape)), dtype=numpy.bool)
         rem_y = (self.lat_ny - chan_diam) / 2
 
         geometry[0,:] = True
@@ -37,9 +37,9 @@ class GeoSC(geo.LBMGeo2D):
                     (self.lat_ny - hy) < rem_y,
                     (self.lat_ny - hy) < rem_y - (numpy.abs((hx - self.lat_nx/2)) - chan_len/2)
                 )] = True
- 
+
         self.set_geo_from_bool_array(geometry)
-    
+
     def init_dist(self, dist):
 
         drop_diam = 30 * self.lat_ny / 200.0
