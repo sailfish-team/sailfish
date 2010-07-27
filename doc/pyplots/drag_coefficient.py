@@ -15,7 +15,7 @@ def make_subplot(file, title_):
     pl_sim = ax.loglog(data['re'], data['sim'], 'bo-')
     pl_th = ax.loglog(data['re'], data['th'], 'ro-')
     ax.legend((pl_sim, pl_th), ('simulation results', 'theoretical approximation'), 'best')
-    ax.grid('.')
+    ax.grid('on')
     ax.grid(which='minor')
     ax.set_xlim(data[0][0], data[-1][0])
     ax.set_ylabel('drag coefficient')
