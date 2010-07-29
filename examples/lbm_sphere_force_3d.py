@@ -39,6 +39,7 @@ def sphere_diam(width, bc):
 class LBMGeoSphere(geo.LBMGeo3D):
     """3D pipe with a spherical obstacle in the middle.  Flow in the X direction."""
     maxv = 0.01
+    ic_fields = False
 
     def define_nodes(self):
         radiussq = ((self.chan_diam)/2)**2
@@ -85,8 +86,9 @@ class LBMGeoSphere(geo.LBMGeo3D):
         self.add_force_object('sphere', (ix0-diam/2-3, iy0-diam/2-3, iz0-diam/2-3),
                         (diam+6, diam+6, diam+6))
 
+    # FIXME: Just a hack we use before we have the ability to calculate forces
+    # on the GPU.
     def init_dist(self, dist):
-        self.sim.ic_fields = True
         self.sim.rho[:] = 1.0
         self.sim.vx[:] = self.maxv
 
@@ -163,6 +165,11 @@ class LSphereSim(lbm.FluidLBMSim):
             self.add_iter_hook(5, self.print_theoretical_drag)
 
         self.coeffs = []
+
+    # FIXME: Hack, remove this when we can calculate forces on the GPU.
+    def _init_compute_fields(self):
+        super(LSphereSim, self)._init_compute_fields()
+        self._ic_fields = True
 
     def drag_coeff(self, force):
         return math.sqrt(force[0]*force[0]) * 8.0 / (math.pi *

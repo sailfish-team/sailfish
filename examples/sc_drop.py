@@ -9,11 +9,7 @@ import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
 
 class GeoSC(geo.LBMGeo2D):
-
-    def define_nodes(self):
-        pass
-
-    def init_dist(self, dist):
+    def init_fields(self):
         hy, hx = numpy.mgrid[0:self.lat_ny, 0:self.lat_nx]
 
         self.sim.rho[:] = 0.2
@@ -22,7 +18,6 @@ class GeoSC(geo.LBMGeo2D):
 #        self.sim.rho[:] = numpy.random.rand(*self.sim.rho.shape) / 100
 #        self.sim.rho[:] += 0.693
 
-        self.sim.ic_fields = True
 
 class SCSim(lbm.ShanChenSingle):
     filename = 'sc_phase_2d'

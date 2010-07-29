@@ -5,6 +5,8 @@ from sailfish import lbm
 from sailfish import geo
 
 class LBMGeoFS(geo.LBMGeo2D):
+    ic_fields = False
+
     def init_dist(self, dist):
         sigma = min(self.lat_ny, self.lat_nx) / 12.0
         amp = 0.4

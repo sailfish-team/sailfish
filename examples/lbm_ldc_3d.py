@@ -23,10 +23,9 @@ class LBMGeoLDC(geo.LBMGeo3D):
         self.set_geo(hz == self.lat_nz-1, self.NODE_VELOCITY, (self.max_v, 0.0, 0.0))
         self.set_geo(wall_map, self.NODE_WALL)
 
-    def init_dist(self, dist):
+    def init_fields(self):
         hz, hy, hx = np.mgrid[0:self.lat_nz, 0:self.lat_ny, 0:self.lat_nx]
 
-        self.sim.ic_fields = True
         self.sim.rho[:] = 1.0
         self.sim.vx[hz == self.lat_nz-1] = self.max_v
 

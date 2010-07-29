@@ -20,7 +20,7 @@ def bitLen(int_type):
 class LBMGeo(object):
     """Abstract class for the LBM geometry."""
 
-    #: Dimensionality, needs to be overridden in child classes.
+    #: Dimensionality, needs to be overridden in subclasses.
     dim = 0
 
     #: Fluid node.
@@ -43,6 +43,9 @@ class LBMGeo(object):
     NODE_MISC_SHIFT = 0
     NODE_MISC_MASK = 0
     NODE_DIR_OTHER = 0
+
+    #: Use :meth:`init_fields` for initial conditions if True, and :meth:`init_dist` otherwise.
+    ic_fields = True
 
     @classmethod
     def _encode_node(cls, misc, type):
@@ -123,15 +126,25 @@ class LBMGeo(object):
         Use :meth:`set_geo` and :meth:`fill_geo` to set the type of nodes.  By default,
         all nodes are set as fluid nodes.
         """
-        abstract
+        pass
 
     def init_dist(self, dist):
         """Initialize the particle distributions in the whole simulation domain.
 
-        Subclasses need to override this method to provide initial conditions for
-        the simulation.
+        Subclasses can override this method to provide initial conditions for
+        the simulation at the particle distribution level.
         """
-        abstract
+        raise NotImplementedError("'init_dist' has not been defined in the geometry class")
+
+    def init_fields(self):
+        """Initialize the macroscopic fields in the whole simulation domain.
+
+        Subclasses can override this method to provide initial conditions for
+        the simulation at the macroscopic fields level.  The field values will
+        later be used to initialize the distributions to their equilibrium
+        values.
+        """
+        pass
 
     def get_reynolds(self, viscosity):
         """Get the Reynolds number for this geometry."""
@@ -251,10 +264,13 @@ class LBMGeo(object):
         :param array: a numpy array of the same dimensionality as the simulation domain.
           This will usually be an array containing the macroscopic variables (velocity, density).
         """
-        if get_bc(self.options.bc_wall).wet_nodes:
+        try:
+            if get_bc(self.options.bc_wall).wet_nodes:
+                return array
+            mask = (self._decode_node_type(self.map) == self.NODE_WALL)
+            return numpy.ma.array(array, mask=mask)
+        except AttributeError:
             return array
-        mask = (self._decode_node_type(self.map) == self.NODE_WALL)
-        return numpy.ma.array(array, mask=mask)
 
     def _prep_array_fill(self, out, location, target, shift=0):
         loc = list(reversed(location))

@@ -28,8 +28,7 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
 
         self.set_geo(wall_map, self.NODE_WALL)
 
-    def init_dist(self, dist):
-        self.sim.ic_fields = True
+    def init_fields(self):
         self.sim.rho[:] = 1.0
 
         hz, hy, hx = np.mgrid[0:self.lat_nz, 0:self.lat_ny, 0:self.lat_nx]

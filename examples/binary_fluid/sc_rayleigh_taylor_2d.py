@@ -13,7 +13,7 @@ class GeoSC(geo.LBMGeo2D):
         hy, hx = np.mgrid[0:self.lat_ny, 0:self.lat_nx]
         self.set_geo(np.logical_or(hy == 0, hy == self.lat_ny-1), self.NODE_WALL)
 
-    def init_dist(self, dist):
+    def init_fields(self):
         hy, hx = np.mgrid[0:self.lat_ny, 0:self.lat_nx]
 
         self.sim.rho[:] = np.random.rand(*self.sim.rho.shape) / 100.0
@@ -24,8 +24,6 @@ class GeoSC(geo.LBMGeo2D):
 
         self.sim.rho[(hy > self.lat_ny/2)] = 1e-4
         self.sim.phi[(hy > self.lat_ny/2)] += 1.0
-
-        self.sim.ic_fields = True
 
 class SCSim(lbm.ShanChenBinary):
     filename = 'sc_instability_2d'

@@ -364,7 +364,7 @@ class LBMSim(object):
                     setattr(self.options, k, v)
 
         # Whether to use the macroscopic fields to set the initial distributions.
-        self.ic_fields = False
+        self._ic_fields = False
         self.num_tracers = 0
         self.iter_ = 0
         self._mlups_calls = 0
@@ -520,12 +520,18 @@ class LBMSim(object):
 
     def _init_geo(self):
         self._timed_print('Initializing geometry.')
-        self._init_fields()
 
         # Simulation geometry.
         self.geo = self.geo_class(list(reversed(self.shape)), self.options,
                 self.float, self.backend, self)
-        self.geo.init_dist(self.dist1)
+
+        self._init_fields(not self.geo.ic_fields)
+
+        if self.geo.ic_fields:
+            self.geo.init_fields()
+            self._ic_fields = True
+        else:
+            self.geo.init_dist(self.dist1)
         self.geo_params = self.float(self.geo.params)
 
     def _init_post_geo(self):
@@ -668,17 +674,24 @@ class LBMSim(object):
         return numpy.ndarray(shape, buffer=numpy.zeros(size, dtype=self.float),
                              dtype=self.float, strides=strides)
 
-    def _init_fields(self):
+    def get_dist_bytes(self, grid):
+        strides, size = self._get_strides(self.float)
+        size *= grid.Q * strides[-1]
+        return size
+
+    def _init_fields(self, need_dist):
         """Initialize the data fields used in the simulation.
 
         All the data field arrays are first allocated on the host, and filled with
         default values.  These can then be overridden when the distributions for the
         simulation are initialized.  Afterwards, the fields are copied to the compute
         unit in :meth:`_init_compute`.
+
+        :param need_dist: if True, allocate the particle distributions on the host.
+            Otherwise they are stored on the compute unit only.
         """
         self._timed_print('Preparing the data fields.')
 
-        self.dist1 = self.make_dist(self.grid)
         self.velocity = self.make_vector_field('v', True)
 
         if self.grid.dim == 2:
@@ -712,6 +725,9 @@ class LBMSim(object):
         else:
             self.tracer_loc = []
 
+        if need_dist:
+            self.dist1 = self.make_dist(self.grid)
+
     def _init_compute_fields(self):
         self._timed_print('Preparing the compute unit data fields.')
         # Velocity.
@@ -739,11 +755,15 @@ class LBMSim(object):
             self.gpu_tracer_loc = []
 
         # Particle distributions in device memory, A-B access pattern.
-        self.gpu_dist1a = self.backend.alloc_buf(like=self.dist1)
-        self.gpu_dist1b = self.backend.alloc_buf(like=self.dist1)
+        if not self._ic_fields:
+            self.gpu_dist1a = self.backend.alloc_buf(like=self.dist1)
+            self.gpu_dist1b = self.backend.alloc_buf(like=self.dist1)
+        else:
+            self.gpu_dist1a = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid))
+            self.gpu_dist1b = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid))
 
     def _init_compute_ic(self):
-        if not self.ic_fields:
+        if not self._ic_fields:
             # Nothing to do, the initial distributions have already been
             # set and copied to the GPU in _init_compute_fields.
             return
@@ -1055,8 +1075,8 @@ class FluidLBMSim(LBMSim):
         self.incompressible = self.options.incompressible
         self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
 
-    def _init_fields(self):
-        super(FluidLBMSim, self)._init_fields()
+    def _init_fields(self, need_dist):
+        super(FluidLBMSim, self)._init_fields(need_dist)
         self.vis.add_field(self.rho, 'density', True)
 
     def _update_ctx(self, ctx):
@@ -1120,17 +1140,25 @@ class BinaryFluidBase(FluidLBMSim):
         from sympy import Symbol, Matrix, Rational
         self.S.alias('phi', self.S.g1m0)
 
-    def _init_fields(self):
-        LBMSim._init_fields(self)
+    def _init_fields(self, need_dist):
+        LBMSim._init_fields(self, need_dist)
         self.phi = self.make_field('phi', True)
-        self.dist2 = self.make_dist(self.grid)
+
+        if need_dist:
+            self.dist2 = self.make_dist(self.grid)
 
     def _init_compute_fields(self):
         super(BinaryFluidBase, self)._init_compute_fields()
         self.gpu_phi = self.backend.alloc_buf(like=self.phi)
         self.gpu_mom0.append(self.gpu_phi)
-        self.gpu_dist2a = self.backend.alloc_buf(like=self.dist2)
-        self.gpu_dist2b = self.backend.alloc_buf(like=self.dist2)
+
+        if not self._ic_fields:
+            self.gpu_dist2a = self.backend.alloc_buf(like=self.dist2)
+            self.gpu_dist2b = self.backend.alloc_buf(like=self.dist2)
+        else:
+            self.gpu_dist2a = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid))
+            self.gpu_dist2b = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid))
+
         self.img_rho = self.bind_nonlocal_field(self.gpu_rho, 0)
         self.img_phi = self.bind_nonlocal_field(self.gpu_phi, 1)
 
@@ -1183,7 +1211,7 @@ class BinaryFluidBase(FluidLBMSim):
             self.kern_grid_size = (self.arr_nx/self.options.block_size * self.arr_ny, self.arr_nz)
 
     def _init_compute_ic(self):
-        if not self.ic_fields:
+        if not self._ic_fields:
             # Nothing to do, the initial distributions have already been
             # set and copied to the GPU in _init_compute_fields.
             return
@@ -1343,8 +1371,8 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
                     self.S.wyy.append(-Rational(1,24))
 
 
-    def _init_fields(self):
-        super(BinaryFluidFreeEnergy, self)._init_fields()
+    def _init_fields(self, need_dist):
+        super(BinaryFluidFreeEnergy, self)._init_fields(need_dist)
         self.vis.add_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
 
 
@@ -1475,8 +1503,8 @@ class ShanChenBinary(BinaryFluidBase):
         self.equilibrium.append(eq2[0])
         self.add_force_coupling(0, 1, 'SCG')
 
-    def _init_fields(self):
-        super(ShanChenBinary, self)._init_fields()
+    def _init_fields(self, need_dist):
+        super(ShanChenBinary, self)._init_fields(need_dist)
         self.vis.add_field((lambda: self.rho, lambda: self.phi), 'density')
 
     def _add_options(self, parser, lb_group):

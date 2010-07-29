@@ -26,10 +26,8 @@ class LBMGeoLDC(geo.LBMGeo2D):
         # walls
         self.set_geo(wall_map, self.NODE_WALL)
 
-    def init_dist(self, dist):
+    def init_fields(self):
         hy, hx = np.mgrid[0:self.lat_ny, 0:self.lat_nx]
-
-        self.sim.ic_fields = True
         self.sim.rho[:] = 1.0
         self.sim.vx[hy == self.lat_ny-1] = self.max_v
 

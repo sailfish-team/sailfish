@@ -40,7 +40,7 @@ class GeoSC(geo.LBMGeo2D):
 
         self.set_geo_from_bool_array(geometry)
 
-    def init_dist(self, dist):
+    def init_fields(self):
 
         drop_diam = 30 * self.lat_ny / 200.0
 
@@ -50,8 +50,6 @@ class GeoSC(geo.LBMGeo2D):
         self.sim.phi[:] = 0.124
         self.sim.rho[(hx - drop_diam * 2) ** 2 + (hy - self.lat_ny / 2.0)**2 < drop_diam**2] = 0.124
         self.sim.phi[(hx - drop_diam * 2) ** 2 + (hy - self.lat_ny / 2.0)**2 < drop_diam**2] = 1.0
-
-        self.sim.ic_fields = True
 
     def get_reynolds(self, viscosity):
         return int(self.lat_ny * self.maxv/viscosity)

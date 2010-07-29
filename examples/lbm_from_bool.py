@@ -17,8 +17,7 @@ class LBMGeo(geo.LBMGeo3D):
     def define_nodes(self):
         self.set_geo_from_bool_array(self.sim.geometry)
 
-    def init_dist(self, dist):
-        self.sim.ic_fields = True
+    def init_fields(self):
         self.sim.rho[:] = 1.0
 
 class LSim(lbm.FluidLBMSim):

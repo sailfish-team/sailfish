@@ -10,16 +10,11 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 
 class GeoFE(geo.LBMGeo2D):
 
-    def define_nodes(self):
-        pass
-
-    def init_dist(self, dist):
-
+    def init_fields(self):
         hy, hx = numpy.mgrid[0:self.lat_ny, 0:self.lat_nx]
 
         self.sim.rho[:] = 1.0
         self.sim.phi[:] = numpy.random.rand(*self.sim.phi.shape) / 100.0
-        self.sim.ic_fields = True
 
 class FESim(lbm.BinaryFluidFreeEnergy):
     filename = 'fe_seperation_2d'
