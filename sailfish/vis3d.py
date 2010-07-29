@@ -9,8 +9,6 @@ from sailfish import geo
 from sailfish import sym
 from sailfish import vis
 
-from enthought.mayavi import mlab
-
 class Fluid3DVis(vis.FluidVis):
 
     name = 'mayavi'
@@ -24,6 +22,8 @@ class Fluid3DVis(vis.FluidVis):
     def visualize(self):
         self.sim.sim_step(self._iter, self._tracers)
 
+        from enthought.mayavi import mlab
+
         if self._iter % self.sim.options.every == 0:
             self.density.mlab_source.set(scalars=self.sim.rho.transpose())
             self.vx.mlab_source.set(scalars=(self.sim.vy**2 + self.sim.vx**2 + self.sim.vz**2).transpose())
@@ -33,6 +33,8 @@ class Fluid3DVis(vis.FluidVis):
         self._iter += 1
 
     def main(self):
+        from enthought.mayavi import mlab
+
         self._iter = 1
         self.density = mlab.pipeline.scalar_field(self.sim.rho.transpose())
         self.vx = mlab.pipeline.scalar_field((self.sim.vx**2 + self.sim.vy**2 + self.sim.vz**2).transpose())
