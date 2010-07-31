@@ -1,23 +1,8 @@
 #!/usr/bin/python -u
 
-import os
+# Usage: perftest/run_tests.py <testsuite_name>
+
 import sys
-import numpy
-import math
-import matplotlib
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
-import time
-
-import git
-import pycuda
-import pycuda.autoinit
-
-matplotlib.use('cairo')
-import matplotlib.pyplot as plt
-
-from sailfish import geo
-from sailfish import sym
 
 from examples import lbm_ldc
 from examples import lbm_poiseuille
@@ -27,17 +12,50 @@ from examples.binary_fluid import sc_separation_2d
 from examples.binary_fluid import fe_separation_2d
 from examples.binary_fluid import fe_viscous_fingering
 
-# Default settings.
-defaults = {
-    'benchmark': True,
-    'quiet': True,
-    'verbose': False,
-    'max_iters': 10000,
-    'every': 1000
+from models import single_fluid
+
+from tests import run_suite
+
+model_tests = {
+    'd2q9_bgk': {
+        'options': {'lat_nx': 512, 'lat_ny': 512, 'model': 'bgk', 'grid': 'D2Q9'},
+        'run': lambda settings: single_fluid.TestSim(single_fluid.TestGeo2D, settings),
+    },
+
+    'd2q9_mrt': {
+        'options': {'lat_nx': 512, 'lat_ny': 512, 'model': 'mrt', 'grid': 'D2Q9'},
+        'run': lambda settings: single_fluid.TestSim(single_fluid.TestGeo2D, settings),
+    },
+
+    'd3q13_mrt': {
+        'options': {'lat_nx': 128, 'lat_ny': 64, 'lat_nz': 64, 'model': 'mrt', 'grid': 'D3Q13'},
+        'run': lambda settings: single_fluid.TestSim(single_fluid.TestGeo3D, settings),
+    },
+
+    'd3q15_bgk': {
+        'options': {'lat_nx': 128, 'lat_ny': 64, 'lat_nz': 64, 'model': 'bgk', 'grid': 'D3Q15'},
+        'run': lambda settings: single_fluid.TestSim(single_fluid.TestGeo3D, settings),
+    },
+
+    'd3q15_mrt': {
+        'options': {'lat_nx': 128, 'lat_ny': 64, 'lat_nz': 64, 'model': 'mrt', 'grid': 'D3Q15'},
+        'run': lambda settings: single_fluid.TestSim(single_fluid.TestGeo3D, settings),
+    },
+
+    'd3q19_bgk': {
+        'options': {'lat_nx': 128, 'lat_ny': 64, 'lat_nz': 64, 'model': 'bgk', 'grid': 'D3Q19'},
+        'run': lambda settings: single_fluid.TestSim(single_fluid.TestGeo3D, settings),
+    },
+
+    'd3q19_mrt': {
+        'options': {'lat_nx': 128, 'lat_ny': 64, 'lat_nz': 64, 'model': 'mrt', 'grid': 'D3Q19'},
+        'run': lambda settings: single_fluid.TestSim(single_fluid.TestGeo3D, settings),
+    },
+
 }
 
 # Tests to run.
-tests = {
+example_tests = {
     '2d_ldc_small': {
         'options': {'lat_nx': 128, 'lat_ny': 128},
         'run': lambda settings: lbm_ldc.LDCSim(lbm_ldc.LBMGeoLDC, settings),
@@ -50,12 +68,12 @@ tests = {
 
     '2d_poiseuille_small': {
         'options': {'lat_nx': 128, 'lat_ny': 128},
-        'run': lambda settings: lbm_poiseuille.LPoiSim(lbm_poiseuille.LBMGeoPoiseuille, defaults=settings),  
+        'run': lambda settings: lbm_poiseuille.LPoiSim(lbm_poiseuille.LBMGeoPoiseuille, defaults=settings),
     },
 
     '2d_poiseuille_large': {
         'options': {'lat_nx': 1024, 'lat_ny': 1024},
-        'run': lambda settings: lbm_poiseuille.LPoiSim(lbm_poiseuille.LBMGeoPoiseuille, defaults=settings),  
+        'run': lambda settings: lbm_poiseuille.LPoiSim(lbm_poiseuille.LBMGeoPoiseuille, defaults=settings),
     },
 
     '3d_poiseuille_d3q13': {
@@ -109,44 +127,6 @@ tests = {
     },
 }
 
-repo = git.Repo('.')
-head = repo.commits()[0]
-
-def run_test(name):
-    global tests, defaults, head
-
-    print '* %s' % name
-
-    if name not in tests:
-        raise ValueError('Test %s not found' % name)
-
-    settings = {}
-    settings.update(defaults)
-    settings.update(tests[name]['options'])
-    sim = tests[name]['run'](settings)
-    sim.run()
-
-    basepath = os.path.join('perftest', 'results', pycuda.autoinit.device.name().replace(' ','_'))
-    path = os.path.join(basepath, name)
-    if not os.path.exists(basepath):
-        os.makedirs(basepath)
-
-    f = open(path, 'a')
-    print >>f, head.id, time.time(), sim._bench_avg
-    f.close()
-
-if len(sys.argv) > 1:
-    done = set()
-
-    for name in sys.argv[1:]:
-        if name in tests:
-            run_test(name)
-        else:
-            # Treat test name as a prefix if an exact match has not been found.
-            for x in tests:
-                if len(name) < len(x) and name == x[0:len(name)] and x not in done:
-                    run_test(x)
-                    done.add(x)
-else:
-    for name in tests.iterkeys():
-        run_test(name)
+args = sys.argv[1:]
+suite = globals()[args[0]]
+run_suite(suite, args[1:])
