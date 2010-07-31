@@ -2,6 +2,9 @@ import git
 import os
 import time
 
+import pycuda
+import pycuda.autoinit
+
 repo = git.Repo('.')
 head = repo.commits()[0]
 
