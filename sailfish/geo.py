@@ -377,6 +377,8 @@ class LBMGeo(object):
         """Detect types of wall nodes and mark them appropriately.
 
         :param nodes: optional iterable of locations to postprocess
+            If this parameter is used, no orientation detection will be
+            performed for the new nodes.
         """
         abstract
 
@@ -546,17 +548,14 @@ class LBMGeo2D(LBMGeo):
     def _set_map(self, location, value):
         self.map[location[1], location[0]] = value
 
-    # FIXME: Optimize this function like the 3D version.
-    # TODO: Possibly remove the option of postprocessing specific nodes, which
-    # might be broken anyway (?)
     def _postprocess_nodes(self, nodes=None):
         lat_nx, lat_ny = self.shape
 
         if nodes is None:
-            nodes_ = ((x, y) for x in xrange(0, lat_nx) for y in xrange(0, lat_ny))
-
             # Detect unused nodes.
             cnt = numpy.zeros_like(self.map).astype(numpy.int32)
+            orientation = numpy.empty(shape=self.map.shape, dtype=numpy.int32)
+            orientation[:] = self.NODE_DIR_OTHER
 
             for i, vec in enumerate(self.sim.grid.basis):
                 a = numpy.roll(self.map, int(-vec[0]), axis=1)
@@ -564,45 +563,31 @@ class LBMGeo2D(LBMGeo):
 
                 cnt[(a == self.NODE_WALL)] += 1
 
+                # This will not work correctly on domain boundaries, if they are not
+                # periodic.
+                if vec.dot(vec) == 1:
+                    orientation[
+                            numpy.logical_and(self.map == self.NODE_WALL,
+                                a == self.NODE_FLUID)] = self.sim.grid.vec_to_dir(list(vec))
+
             self.map[(cnt == self.sim.grid.Q)] = self.NODE_UNUSED
+
+            # Postprocess the whole domain here.
+            self.map[:] = self._encode_node(
+                    self._encode_orientation_and_param(orientation, self._param_map),
+                    self.map)
+
         else:
             nodes_ = nodes
 
-        dir_e = self.sim.grid.vec_to_dir((1,0))
-        dir_w = self.sim.grid.vec_to_dir((-1,0))
-        dir_n = self.sim.grid.vec_to_dir((0,1))
-        dir_s = self.sim.grid.vec_to_dir((0,-1))
+            for loc in nodes_:
+                cnode_type = self._get_map(loc)
 
-        for x, y in nodes_:
-            if self.map[y][x] != self.NODE_FLUID:
-                # If the bool corresponding to a specific direction is True, the
-                # distributions in this direction are undefined.
-                north = y < lat_ny-1 and self.map[y+1,x] == self.NODE_FLUID
-                south = y > 0 and self.map[y-1,x] == self.NODE_FLUID
-                west  = x > 0 and self.map[y,x-1] == self.NODE_FLUID
-                east  = x < lat_nx-1 and self.map[y,x+1] == self.NODE_FLUID
-
-                # Walls aligned with the grid.
-                if north and not west and not east:
-                    self.map[y,x] = self._encode_node(
-                        self._encode_orientation_and_param(dir_n, self._param_map[y,x]),
-                        self.map[y,x])
-                elif south and not west and not east:
-                    self.map[y,x] = self._encode_node(
-                        self._encode_orientation_and_param(dir_s, self._param_map[y,x]),
-                        self.map[y,x])
-                elif west and not south and not north:
-                    self.map[y,x] = self._encode_node(
-                        self._encode_orientation_and_param(dir_w, self._param_map[y,x]),
-                        self.map[y,x])
-                elif east and not south and not north:
-                    self.map[y,x] = self._encode_node(
-                        self._encode_orientation_and_param(dir_e, self._param_map[y,x]),
-                         self.map[y,x])
-                else:
-                    self.map[y,x] = self._encode_node(
-                        self._encode_orientation_and_param(self.NODE_DIR_OTHER, self._param_map[y,x]),
-                            self.map[y,x])
+                if cnode_type != self.NODE_FLUID:
+                    self._set_map(loc, self._encode_node(
+                            self._encode_orientation_and_param(self.NODE_DIR_OTHER,
+                                    self._param_map[typle(reversed(loc))]),
+                        cnode_type))
 
 class LBMGeo3D(LBMGeo):
     """Base class for 3D geometries."""
@@ -641,7 +626,7 @@ class LBMGeo3D(LBMGeo):
 
                 # FIXME: Only process the primary 6 directions for now.
                 # This will not work correctly on domain boundaries, if they are not
-                # symmetric.
+                # periodic.
                 if vec.dot(vec) == 1:
                     orientation[
                             numpy.logical_and(self.map == self.NODE_WALL,
