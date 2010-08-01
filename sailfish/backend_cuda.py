@@ -43,6 +43,10 @@ class CUDABackend(object):
                 help='additional parameters to pass to the CUDA compiler', action='store', type='string', default='')
         group.add_option('--cuda-keep-temp', dest='cuda_keep_temp',
                 help='keep intermediate CUDA files', action='store_true', default=False)
+        group.add_option('--cuda-fermi-highprec', dest='cuda_fermi_highprec',
+                help='use high precision division on Compute Capability 2.0+ devices', action='store_true',
+                default=False)
+
         return 1
 
     def __init__(self, options):
@@ -140,6 +144,10 @@ class CUDABackend(object):
             options = shlex.split(self.options.cuda_nvcc_opts)
         else:
             options = []
+
+        if not self.options.cuda_fermi_highprec and pycuda.autoinit.device.compute_capability()[0] >= 2:
+            options.append('--prec-div=false')
+            options.append('--prec-sqrt=false')
 
         return pycuda.compiler.SourceModule(source, options=options, keep=self.options.cuda_keep_temp) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
 
