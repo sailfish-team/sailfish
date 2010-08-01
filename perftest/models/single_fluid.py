@@ -17,3 +17,5 @@ class TestSim(lbm.FluidLBMSim):
         settings.update(defaults)
         super(TestSim, self).__init__(geo_class, defaults=settings)
 
+if __name__ == '__main__':
+    TestSim(TestGeo2D).run()
