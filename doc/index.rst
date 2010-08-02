@@ -60,6 +60,7 @@ Contents
    installation
    tutorial
    models
+   performance
    testcases
    regtest
    api

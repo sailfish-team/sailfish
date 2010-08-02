@@ -160,7 +160,7 @@ CUDA C.  To avoid this complexity, you might want to save the generated compute 
 and inspect it in a text editor.  The generated code will be automatically formatted to be
 readable unless the ``--noformat_src`` option is specified.  The command used to format the
 code can be redefined by overriding the :attr:`lbm.LBMSim.format_cmd` value.  The default one
-requires the ``indent`` utility and is set so that the generated code roughly follows the 
+requires the ``indent`` utility and is set so that the generated code roughly follows the
 formatting style of the Linux kernel (with longer lines, which can be useful for complex expressions).
 
 Troubleshooting
