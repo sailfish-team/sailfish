@@ -56,14 +56,14 @@ Multiple relaxation times (MRT)
 TODO: Add info about the MRT model.
 
 Boundary conditions
-===================
+-------------------
 
 Sailfish supports a number of local boundary conditions (non-local boundary conditions are
 currently not supported).  Each of the implemented boundary condition types can be available
 for a specific kind(s) of boundary conditions (no-slip (wall), velocity, pressure) and dimensions.
 
 Full-way bounce-back
---------------------
+^^^^^^^^^^^^^^^^^^^^
 This is the simplest type of boundary condition, available for no-slip and velocity nodes in
 all dimensions.  The boundary condition imposed by the full-way bounce-back algorithm takes
 effect in the middle between the boundary node (which is a dry node, i.e. it does not
@@ -81,7 +81,7 @@ This can be summarized as :math:`f_{i}^{pre}(x, t+2) = f_{opp(i)}^{post}(x, t)` 
 takes two time steps for the reflected distributions to reach back the fluid nodes.
 
 Half-way bounce-back
---------------------
+^^^^^^^^^^^^^^^^^^^^
 The half-way bounce-back boundary rule is based on a similar idea as the full-way bounce-back.
 Here however, the reflection takes only one time step and takes place exactly in
 the middle between the fluid node and what would be the first node outside of the simulation domain:
@@ -98,12 +98,12 @@ unknown distributions (those for which there is no data streaming from other nod
 at the boundary nodes are replaced.
 
 Equilibrium
------------
+^^^^^^^^^^^
 This boundary condition algorithm works by imposing the BGK equilibrium distributions for
 a node.  It currently works for all types of boundary conditions in two dimensions only.
 
 Zou-He
-------
+^^^^^^
 This algorithm is based upon the idea of the reflection of the off-equilibrium distributions.
 It currently works for all types of boundary conditions in two dimensions only.
 
