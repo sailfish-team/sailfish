@@ -98,7 +98,7 @@ ${device_func} inline void bounce_back(Dist *fi)
 						${coupling_const}, sca${dists[0]}, sca${dists[1]}, gx, gy);
 				%else:
 					shan_chen_accel(gi, gg${dists[0]}m0, gg${dists[1]}m0, ${dists[0]}, ${dists[1]},
-						${coupling_const}, sca${dists[0]}, sca${dists[i]}, gx, gy, gz);
+						${coupling_const}, sca${dists[0]}, sca${dists[1]}, gx, gy, gz);
 				%endif
 			// Self-interaction of a singel component.
 			%else:
