@@ -9,10 +9,7 @@ import optparse
 from optparse import OptionGroup, OptionParser, OptionValueError
 
 class GeoSC(geo.LBMGeo2D):
-
     def init_fields(self):
-        hy, hx = numpy.mgrid[0:self.lat_ny, 0:self.lat_nx]
-
         self.sim.rho[:] = numpy.random.rand(*self.sim.rho.shape) / 1000
         self.sim.phi[:] = numpy.random.rand(*self.sim.phi.shape) / 1000
         self.sim.rho[:] += 1.0
