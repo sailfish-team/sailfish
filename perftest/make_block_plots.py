@@ -10,15 +10,10 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
 
-from matplotlib.font_manager import fontManager, FontProperties 
+from matplotlib.font_manager import fontManager, FontProperties
 font = FontProperties(size='xx-small')
 
-output = sys.argv[1]
-path = sys.argv[2]
-
-for file in glob.glob(os.path.join(path, '*')):
-    print file
-
+def make_plot(file):
     fname = os.path.basename(file)
     dat = np.loadtxt(file)
 
@@ -27,7 +22,7 @@ for file in glob.glob(os.path.join(path, '*')):
     ax2 = ax1.twinx()
 
     ax1.grid('on')
-    
+
     ax1.bar(dat[:,0]-5, dat[:,1], 10)
     ax1.set_xlabel('block size')
     ax1.set_ylabel('MLUPS')
@@ -37,7 +32,17 @@ for file in glob.glob(os.path.join(path, '*')):
     ax2.xaxis.set_ticks(dat[:,0])
 
 
-    plt.savefig(os.path.join(output, fname) + '.pdf')
-    plt.clf()
-    plt.cla()
+if __name__ == '__main__':
+    output = sys.argv[1]
+    path = sys.argv[2]
+
+    for file in glob.glob(os.path.join(path, '*')):
+        print file
+
+        make_plot(file)
+
+        fname = os.path.basename(file)
+        plt.savefig(os.path.join(output, fname) + '.pdf')
+        plt.clf()
+        plt.cla()
 
