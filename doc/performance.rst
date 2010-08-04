@@ -81,6 +81,14 @@ To fully take advantage of the available computational power, a larger block siz
 be necessary (typically twice as large as for devices of the previous generation, but make sure
 to check occupancy and register usage as well).
 
+Performance comparison for different devices
+--------------------------------------------
+
+.. plot::
+
+    from pyplots import make_comparison
+    make_comparison.comparison_plot('../perftest/results')
+
 Performance impact of the block size
 ------------------------------------
 
