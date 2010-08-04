@@ -39,6 +39,9 @@ perf_plots:
 	python perftest/make_plots.py perftest/2d_binary.pdf perftest/results/GeForce_GTX_285 2d_bin
 	python perftest/make_plots.py perftest/3d.pdf perftest/results/GeForce_GTX_285 3d_
 
+perf_block_plots:
+	python perftest/make_block_plots.py perftest perftest/results/GeForce_GTX_285/blocksize
+
 test:
 	python tests/geometry.py
 

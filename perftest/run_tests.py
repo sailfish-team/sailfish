@@ -17,6 +17,9 @@ from models import binary_fluid
 
 from tests import run_suite
 
+import optparse
+from optparse import OptionGroup, OptionParser, OptionValueError
+
 model_tests = {
     'd2q9_bgk': {
         'options': {'lat_nx': 512, 'lat_ny': 512, 'model': 'bgk', 'grid': 'D2Q9'},
@@ -162,6 +165,15 @@ example_tests = {
     },
 }
 
-args = sys.argv[1:]
-suite = globals()[args[0]]
-run_suite(suite, args[1:])
+
+if __name__ == '__main__':
+    parser = OptionParser()
+    parser.add_option('-b', '--block_scan', dest='block_scan', help='perform a scan over block sizes', action='store_true', default=False)
+    (options, args) = parser.parse_args()
+
+    suite = globals()[args[0]]
+
+    if options.block_scan:
+        run_suite(suite, args[1:], block_sizes=[32 * x for x in  range(1,9)])
+    else:
+        run_suite(suite, args[1:])

@@ -841,6 +841,9 @@ class LBMSim(object):
                     args_format='P'*len(args_tracer2),
                     block=(1,))
 
+        # For occupancy analysis in performance tests.
+        self._lb_kernel = kern_cnp1
+
         # Map: iteration parity -> kernel arguments to use.
         self.kern_map = {
             0: (kern_cnp1, kern_cnp1s, kern_trac1),
@@ -1198,6 +1201,9 @@ class BinaryFluidBase(FluidLBMSim):
         kern_mac2 = self.backend.get_kernel(self.mod, macro_name,
                          args=macro_args2, args_format='P'*len(macro_args2),
                          block=k_block_size)
+
+        # For occupancy analysis in performance tests.
+        self._lb_kernel = kern_cnp1n
 
         # Map: iteration parity -> kernel arguments to use.
         self.kern_map = {
