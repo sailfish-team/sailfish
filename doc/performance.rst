@@ -81,3 +81,28 @@ To fully take advantage of the available computational power, a larger block siz
 be necessary (typically twice as large as for devices of the previous generation, but make sure
 to check occupancy and register usage as well).
 
+Performance impact of the block size
+------------------------------------
+
+GeForce GTX 285
+^^^^^^^^^^^^^^^
+.. plot::
+
+    from pyplots import make_block_plots
+    make_block_plots.make_summary('../perftest/results/GeForce_GTX_285/blocksize')
+
+Tesla C1060
+^^^^^^^^^^^
+.. plot::
+
+    from pyplots import make_block_plots
+    make_block_plots.make_summary('../perftest/results/Tesla_C1060/blocksize')
+
+
+Tesla C2050
+^^^^^^^^^^^
+.. plot::
+
+    from pyplots import make_block_plots
+    make_block_plots.make_summary('../perftest/results/Tesla_C2050/blocksize')
+
