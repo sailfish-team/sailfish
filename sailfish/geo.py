@@ -586,7 +586,7 @@ class LBMGeo2D(LBMGeo):
                 if cnode_type != self.NODE_FLUID:
                     self._set_map(loc, self._encode_node(
                             self._encode_orientation_and_param(self.NODE_DIR_OTHER,
-                                    self._param_map[typle(reversed(loc))]),
+                                    self._param_map[tuple(reversed(loc))]),
                         cnode_type))
 
 class LBMGeo3D(LBMGeo):
@@ -647,7 +647,7 @@ class LBMGeo3D(LBMGeo):
                 if cnode_type != self.NODE_FLUID:
                     self._set_map(loc, self._encode_node(
                             self._encode_orientation_and_param(self.NODE_DIR_OTHER,
-                                    self._param_map[typle(reversed(loc))]),
+                                    self._param_map[tuple(reversed(loc))]),
                         cnode_type))
 
 #
