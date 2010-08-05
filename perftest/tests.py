@@ -10,7 +10,7 @@ import pycuda.driver
 repo = git.Repo('.')
 head = repo.commits()[0]
 
-def run_test(name, test_suite, block_sizes):
+def run_test(name, test_suite, block_sizes, double=False):
     global head
 
     # Default settings.
@@ -24,11 +24,16 @@ def run_test(name, test_suite, block_sizes):
 
     print '* %s' % name
 
+    if double:
+        defaults['precision'] = 'double'
+    else:
+        defaults['precision'] = 'single'
+
     if name not in test_suite:
         raise ValueError('Test %s not found' % name)
 
     if block_sizes is not None:
-        basepath = os.path.join('perftest', 'results',
+        basepath = os.path.join('perftest', 'results', defaults['precision'],
                 pycuda.autoinit.device.name().replace(' ', '_'),
                 'blocksize')
         path = os.path.join(basepath, name)
@@ -63,7 +68,7 @@ def run_test(name, test_suite, block_sizes):
         sim = test_suite[name]['run'](settings)
         sim.run()
 
-        basepath = os.path.join('perftest', 'results', pycuda.autoinit.device.name().replace(' ','_'))
+        basepath = os.path.join('perftest', 'results', defaults['precision'], pycuda.autoinit.device.name().replace(' ','_'))
         path = os.path.join(basepath, name)
         if not os.path.exists(basepath):
             os.makedirs(basepath)
@@ -72,7 +77,7 @@ def run_test(name, test_suite, block_sizes):
         print >>f, head.id, time.time(), sim._bench_avg
         f.close()
 
-def run_suite(suite, args, block_sizes=None):
+def run_suite(suite, args, block_sizes=None, double=False):
     sys.argv = sys.argv[0:1]
 
     if args:
@@ -80,14 +85,14 @@ def run_suite(suite, args, block_sizes=None):
 
         for name in args:
             if name in suite:
-                run_test(name, suite, block_sizes)
+                run_test(name, suite, block_sizes, double=double)
             else:
                 # Treat test name as a prefix if an exact match has not been found.
                 for x in suite:
                     if len(name) < len(x) and name == x[0:len(name)] and x not in done:
-                        run_test(x, suite, block_sizes)
+                        run_test(x, suite, block_sizes, double=double)
                         done.add(x)
     else:
         for name in suite.iterkeys():
-            run_test(name, suite, block_sizes)
+            run_test(name, suite, block_sizes, double=double)
 

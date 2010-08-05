@@ -169,11 +169,12 @@ example_tests = {
 if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option('-b', '--block_scan', dest='block_scan', help='perform a scan over block sizes', action='store_true', default=False)
-    (options, args) = parser.parse_args()
+    parser.add_option('-d', '--double', dest='double', help='run tests in double precision', action='store_true', default=False)
+    options, args = parser.parse_args()
 
     suite = globals()[args[0]]
 
     if options.block_scan:
-        run_suite(suite, args[1:], block_sizes=[32 * x for x in  range(1,9)])
+        run_suite(suite, args[1:], block_sizes=[32 * x for x in  range(1,9)], double=options.double)
     else:
-        run_suite(suite, args[1:])
+        run_suite(suite, args[1:], double=options.double)
