@@ -2,8 +2,6 @@
 
 # Usage: perftest/run_tests.py <testsuite_name>
 
-import sys
-
 from examples import lbm_ldc
 from examples import lbm_poiseuille
 from examples import lbm_poiseuille_3d
@@ -17,8 +15,7 @@ from models import binary_fluid
 
 from tests import run_suite
 
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
+from optparse import OptionParser
 
 model_tests = {
     'd2q9_bgk': {

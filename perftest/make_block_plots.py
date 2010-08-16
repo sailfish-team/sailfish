@@ -1,17 +1,14 @@
 #!/usr/bin/python
 import os
-import sys
 import numpy as np
 import matplotlib
-import optparse
 import glob
-from collections import namedtuple, deque
-from optparse import OptionGroup, OptionParser, OptionValueError
+from optparse import OptionParser
 
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
 
-from matplotlib.font_manager import fontManager, FontProperties
+from matplotlib.font_manager import FontProperties
 font = FontProperties(size='xx-small')
 
 def make_plot(file):
@@ -62,8 +59,8 @@ if __name__ == '__main__':
     path = args[1]
 
     if options.summary:
-        plt = make_summary(path)
-        plt.savefig(os.path.join(output, 'block_summary.pdf'))#,
+        plot = make_summary(path)
+        plot.savefig(os.path.join(output, 'block_summary.pdf'))#,
 #                bbox_inches='tight')
     else:
         for file in glob.glob(os.path.join(path, '*')):

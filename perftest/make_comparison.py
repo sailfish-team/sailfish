@@ -4,15 +4,12 @@ import os
 import sys
 import numpy as np
 import matplotlib
-import optparse
 import glob
-from collections import namedtuple, deque
-from optparse import OptionGroup, OptionParser, OptionValueError
 
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
 
-from matplotlib.font_manager import fontManager, FontProperties
+from matplotlib.font_manager import FontProperties
 font = FontProperties(size='xx-small')
 
 def subplot(fig, devices, model, val, num=111):

@@ -35,12 +35,12 @@ regtest3d_drag:
 	python -u regtest/drag_coefficient.py --grid=D3Q19 --model=mrt
 
 perf_plots:
-	python perftest/make_plots.py perftest/2d_single.pdf perftest/results/GeForce_GTX_285 2d_sc 2d_ldc 2d_poiseuille
-	python perftest/make_plots.py perftest/2d_binary.pdf perftest/results/GeForce_GTX_285 2d_bin
-	python perftest/make_plots.py perftest/3d.pdf perftest/results/GeForce_GTX_285 3d_
+	python perftest/make_plots.py perftest/2d_single.pdf perftest/results/single/GeForce_GTX_285 2d_sc 2d_ldc 2d_poiseuille
+	python perftest/make_plots.py perftest/2d_binary.pdf perftest/results/single/GeForce_GTX_285 2d_bin
+	python perftest/make_plots.py perftest/3d.pdf perftest/results/single/GeForce_GTX_285 3d_
 
 perf_block_plots:
-	python perftest/make_block_plots.py perftest perftest/results/GeForce_GTX_285/blocksize
+	python perftest/make_block_plots.py perftest perftest/results/single/GeForce_GTX_285/blocksize
 
 test:
 	python tests/geometry.py

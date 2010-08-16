@@ -84,27 +84,37 @@ to check occupancy and register usage as well).
 Performance comparison for different devices
 --------------------------------------------
 
+Single precision
+^^^^^^^^^^^^^^^^
 .. plot::
 
     from pyplots import make_comparison
-    make_comparison.comparison_plot('../perftest/results')
+    make_comparison.comparison_plot('../perftest/results/single')
 
-Performance impact of the block size
-------------------------------------
+Double precision
+^^^^^^^^^^^^^^^^
+.. plot::
+
+    from pyplots import make_comparison
+    make_comparison.comparison_plot('../perftest/results/double')
+
+
+Performance impact of the block size (single precision)
+-------------------------------------------------------
 
 GeForce GTX 285
 ^^^^^^^^^^^^^^^
 .. plot::
 
     from pyplots import make_block_plots
-    make_block_plots.make_summary('../perftest/results/GeForce_GTX_285/blocksize')
+    make_block_plots.make_summary('../perftest/results/single/GeForce_GTX_285/blocksize')
 
 Tesla C1060
 ^^^^^^^^^^^
 .. plot::
 
     from pyplots import make_block_plots
-    make_block_plots.make_summary('../perftest/results/Tesla_C1060/blocksize')
+    make_block_plots.make_summary('../perftest/results/single/Tesla_C1060/blocksize')
 
 
 Tesla C2050
@@ -112,5 +122,30 @@ Tesla C2050
 .. plot::
 
     from pyplots import make_block_plots
-    make_block_plots.make_summary('../perftest/results/Tesla_C2050/blocksize')
+    make_block_plots.make_summary('../perftest/results/single/Tesla_C2050/blocksize')
+
+Performance impact of the block size (double precision)
+-------------------------------------------------------
+
+GeForce GTX 285
+^^^^^^^^^^^^^^^
+.. plot::
+
+    from pyplots import make_block_plots
+    make_block_plots.make_summary('../perftest/results/double/GeForce_GTX_285/blocksize')
+
+Tesla C1060
+^^^^^^^^^^^
+.. plot::
+
+    from pyplots import make_block_plots
+    make_block_plots.make_summary('../perftest/results/double/Tesla_C1060/blocksize')
+
+
+Tesla C2050
+^^^^^^^^^^^
+.. plot::
+
+    from pyplots import make_block_plots
+    make_block_plots.make_summary('../perftest/results/double/Tesla_C2050/blocksize')
 

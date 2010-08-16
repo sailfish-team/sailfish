@@ -2,19 +2,14 @@
 
 import os
 import sys
-import numpy
-import math
 import matplotlib
-import optparse
 import glob
-import operator
 from collections import namedtuple, deque
-from optparse import OptionGroup, OptionParser, OptionValueError
 
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
 
-from matplotlib.font_manager import fontManager, FontProperties 
+from matplotlib.font_manager import FontProperties
 font = FontProperties(size='xx-small')
 
 output = sys.argv[1]
@@ -49,7 +44,7 @@ for file in files:
                 data[fname][id] = TestRes(testtime, 0.5 * (mlups + data[fname][id].mlups))
             else:
                 data[fname][id] = TestRes(testtime, mlups)
-            
+
 for k, v in data.items():
     data[k] = deque(sorted(v.items(), key=lambda x: x[1].time))
     data2[k] = list(data[k])
