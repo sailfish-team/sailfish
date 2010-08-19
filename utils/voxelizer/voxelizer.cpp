@@ -10,7 +10,7 @@ using namespace std;
 
 int main(int argc, char **argv)
 {
-	Matrix<int, 3u> voxels;
+	Matrix<char, 3u> voxels;
 	Geometry<float> geometry;
 
 	double resolution = 0.0003;
@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 	voxelize(geometry, voxels, resolution);
 	std::cout << voxels.size() << std::endl;
 
-	const long unsigned int *ext = voxels.extents();
+	const std::size_t *ext = voxels.extents();
 	std::cout << ext[0] << " " << ext[1] << " " << ext[2] << std::endl;
 
 	std::ofstream out("output.npy");
@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 
 	out.write(buf, 1);
 
-	snprintf(buf, 128, "{'descr': 'bool', 'fortran_order': False, 'shape': (%d, %d, %d)}",
+	snprintf(buf, 128, "{'descr': 'bool', 'fortran_order': False, 'shape': (%lu, %lu, %lu)}",
 			ext[0], ext[1], ext[2]);
 
 	int i, len = strlen(buf);
@@ -56,11 +56,7 @@ int main(int argc, char **argv)
 	out.write((char*)&dlen, 2);
 	out << buf;
 
-	for (Matrix<int, 3u>::iterator it = voxels.begin(); it != voxels.end(); it++) {
-		char c = *it;
-		out.write(&c, 1);
-	}
-
+	out.write(&(voxels.begin()[0]), voxels.size());
 	out.close();
 
 	return 0;
