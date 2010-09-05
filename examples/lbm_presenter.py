@@ -105,7 +105,7 @@ class LPresSim(lbm.FluidLBMSim):
         if defaults is not None:
             defaults_ = defaults
         else:
-            defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_nx': 320,
+            defaults_ = {'max_iters': 500000, 'lat_nx': 320,
                     'lat_ny': 240, 'verbose': True, 'vismode': '2col',
                     'every': 400, 'model': 'mrt','visc':0.001,'scr_scale':1.0}
 
