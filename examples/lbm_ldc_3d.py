@@ -10,7 +10,7 @@ from optparse import OptionGroup, OptionParser, OptionValueError
 class LBMGeoLDC(geo.LBMGeo3D):
     """Lid-driven cavity geometry."""
 
-    max_v = 0.1
+    max_v = 0.05
 
     def define_nodes(self):
         """Initialize the simulation for the lid-driven cavity geometry."""
@@ -20,8 +20,8 @@ class LBMGeoLDC(geo.LBMGeo3D):
                 np.logical_or(hx == self.lat_nx-1, hx == 0),
                 np.logical_or(hy == self.lat_ny-1, hy == 0)))
 
-        self.set_geo(hz == self.lat_nz-1, self.NODE_VELOCITY, (self.max_v, 0.0, 0.0))
         self.set_geo(wall_map, self.NODE_WALL)
+        self.set_geo(hz == self.lat_nz-1, self.NODE_VELOCITY, (self.max_v, 0.0, 0.0))
 
     def init_fields(self):
         hz, hy, hx = np.mgrid[0:self.lat_nz, 0:self.lat_ny, 0:self.lat_nx]
@@ -31,7 +31,7 @@ class LBMGeoLDC(geo.LBMGeo3D):
 
     # FIXME
     def get_reynolds(self, viscosity):
-        return int((self.lat_nx-1) * self.max_v/viscosity)
+        return int((self.lat_nx-2) * self.max_v/viscosity)
 
 class LDCSim(lbm.FluidLBMSim):
 
@@ -39,8 +39,8 @@ class LDCSim(lbm.FluidLBMSim):
 
     def __init__(self, geo_class, defaults={}):
         opts = []
-        settings={'lat_nz': 64, 'lat_ny': 64, 'lat_nx': 64,
-                'grid': 'D3Q19', 'bc_velocity': 'equilibrium', 'verbose': True}
+        settings={'lat_nz': 128, 'lat_ny': 128, 'lat_nx': 128,
+                'grid': 'D3Q19', 'bc_velocity': 'equilibrium', 'verbose': True, 'visc': 0.01575}
         settings.update(defaults)
         lbm.FluidLBMSim.__init__(self, geo_class, options=opts, defaults=settings)
 
