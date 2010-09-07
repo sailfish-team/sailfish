@@ -34,6 +34,9 @@ regtest3d_drag:
 	python -u regtest/drag_coefficient.py --grid=D3Q19 --model=bgk
 	python -u regtest/drag_coefficient.py --grid=D3Q19 --model=mrt
 
+regtest_ldc:
+	python -u regtest/ldc_3d.py
+
 perf_plots:
 	python perftest/make_plots.py perftest/2d_single.pdf perftest/results/single/GeForce_GTX_285 2d_sc 2d_ldc 2d_poiseuille
 	python perftest/make_plots.py perftest/2d_binary.pdf perftest/results/single/GeForce_GTX_285 2d_bin
