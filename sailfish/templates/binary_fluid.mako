@@ -146,7 +146,12 @@ ${kernel} void PrepareMacroFields(
 	int igi = gi;
 
 	%if simtype == 'free-energy':
-		// Assume neutral wetting for all walls.
+		// Assume neutral wetting for all walls by setting the density and phase at the
+		// wall node to mirror that of the neighboring fluid, so that when the density
+		// gradient is later calculated, it comes out as 0.
+		//
+		// This wetting boundary condition implementation is as in option 2 in
+		// Halim Kusumaatmaja's PhD thesis, p.18.
 		if (isWallNode(type)) {
 			if (0) { ; }
 			%for dir in grid.dir2vecidx.keys():
@@ -154,6 +159,7 @@ ${kernel} void PrepareMacroFields(
 					%if dim == 3:
 						igi += ${rel_offset(*(2*grid.dir_to_vec(dir)))};
 					%else:
+						## rel_offset() needs a 3-vector, so make the z-coordinate 0
 						igi += ${rel_offset(*(list(2*grid.dir_to_vec(dir)) + [0]))};
 					%endif
 				}
