@@ -127,6 +127,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 	%endif
 </%def>
 
+
 <%def name="bgk_relaxation_preamble()">
 	%for i in range(0, len(grids)):
 		Dist feq${i};
@@ -155,6 +156,41 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 			feq${i}.${idx} = ${cex(feq, vectors=True)};
 		%endfor
 	%endfor
+
+	%if subgrid == 'les-smagorinsky':
+		// Compute relaxation time using the standard viscosity-relaxation time relation.
+		%for i in range(0, len(grids)):
+			float tau${i} = 0.5f + 3.0f * visc;
+		%endfor
+
+		## FIXME: This will not work properly for multifluid models.
+		// Modify the relaxation time proportionally to the modulus of the local strain rate tensor.
+		// The 2nd order tensor formed from the equilibrium distributions is rho / 3 * \delta_{ab} + rho u_a u_b
+		{
+			float tmp, strain;
+
+			%for i in range(0, len(grids)):
+				strain = 0.0f;
+
+				// Off-diagonal components, count twice for symmetry reasons.
+				%for a in range(0, dim):
+					%for b in range(a+1, dim):
+						 tmp = ${cex(sym.ex_flux(grid, 'd%d' % i, a, b), pointers=True)} - ${cex(sym.S.rho * grid.v[a] * grid.v[b], vectors=True)};
+						 strain += 2.0f * tmp * tmp;
+					%endfor
+				%endfor
+
+				// Diagonal components.
+				%for a in range(0, dim):
+					tmp = ${cex(sym.ex_flux(grid, 'd%d' % i, a, a), pointers=True)} - ${cex(sym.S.rho * (grid.v[a] * grid.v[b] + grid.cssq), vectors=True)};
+					strain += tmp * tmp;
+				%endfor
+
+				// Form of the relaxation time correction as in comp-gas/9401004v1.
+				tau${i} += (sqrtf(visc*visc + 18.0f * ${cex(smagorinsky_const**2)} * sqrtf(strain)) - visc) / 2.0f;
+			%endfor
+		}
+	%endif
 </%def>
 
 %if model == 'femrt' and simtype == 'free-energy':

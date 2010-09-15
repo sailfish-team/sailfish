@@ -1100,6 +1100,8 @@ class FluidLBMSim(LBMSim):
         ctx['bc_velocity_'] = geo.get_bc(self.options.bc_velocity)
         ctx['bc_pressure_'] = geo.get_bc(self.options.bc_pressure)
         ctx['simtype'] = 'fluid'
+        ctx['subgrid'] = self.options.subgrid
+        ctx['smagorinsky_const'] = self.options.smagorinsky_const
 
     def _add_options(self, parser, lb_group):
         grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == self.geo_class.dim]
@@ -1120,6 +1122,9 @@ class FluidLBMSim(LBMSim):
                 choices=[x.name for x in geo.SUPPORTED_BCS if
                     geo.LBMGeo.NODE_PRESSURE in x.supported_types and
                     x.supports_dim(self.geo_class.dim)], default='equilibrium')
+        lb_group.add_option('--subgrid', dest='subgrid', help='subgrid model to use', type='choice',
+                choices=['none', 'les-smagorinsky'], default='none')
+        lb_group.add_option('--smagorinsky_const', dest='smagorinsky_const', help='Smagorinsky constant', type='float', action='store', default=0.03)
 
         return []
 

@@ -20,7 +20,9 @@
 	%endif
 </%def>
 
-${const_var} float tau0 = ${tau}f;		// relaxation time
+%if subgrid != 'les-smagorinsky':
+	${const_var} float tau0 = ${tau}f;		// relaxation time
+%endif
 ${const_var} float visc = ${visc}f;		// viscosity
 
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
