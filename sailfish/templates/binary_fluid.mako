@@ -213,7 +213,7 @@ ${kernel} void CollideAndPropagate(
 	%if simtype == 'free-energy':
 		float lap1, grad1[${dim}];
 
-		if (!isWallNode(type)) {
+		if (isWetNode(type)) {
 			%if dim == 2:
 				laplacian_and_grad(gg1m0, 1, gi, &lap1, grad1, gx, gy);
 			%else:
