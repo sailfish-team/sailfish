@@ -248,6 +248,11 @@ ${kernel} void CollideAndPropagate(
 		${relaxate(bgk_args_fe)}
 	%endif
 
+	// FIXME: In order for the half-way bounce back boundary condition to work, a layer of unused
+	// nodes currently has to be placed behind the wall layer.
+	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist1_out);
+	postcollisionBoundaryConditions(&d1, ncode, type, orientation, &g1m0, v, gi, dist2_out);
+
 	// only save the macroscopic quantities if requested to do so
 	if (save_macro == 1) {
 		%if simtype == 'shan-chen' and not bc_wall_.wet_nodes:
