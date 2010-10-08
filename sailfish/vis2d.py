@@ -509,7 +509,7 @@ class Fluid2DVis(vis.FluidVis):
                 pygame.time.wait(50)
                 continue
 
-            if self._impart_velocity:
+            if self.sim.grid.dim == 2 and self._impart_velocity:
                 self._run_impart_velocity(self._mouse_pos, self._mouse_vel)
 
             self.sim.sim_step(self._tracers)
