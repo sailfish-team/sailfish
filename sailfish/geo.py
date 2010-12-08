@@ -73,6 +73,7 @@ class LBMGeo(object):
         return (code >> self._param_shift,
                 code & ((1 << (self._param_shift+1)) - 1))
 
+    # TODO(mjanusz): This should return a named tuple.
     @classmethod
     def _decode_node(cls, code):
         """Decode an entry from the map of nodes.
@@ -567,7 +568,7 @@ class LBMGeo2D(LBMGeo):
                 # periodic.
                 if vec.dot(vec) == 1:
                     orientation[
-                            numpy.logical_and(self.map == self.NODE_WALL,
+                            numpy.logical_and(self.map != self.NODE_FLUID,
                                 a == self.NODE_FLUID)] = self.sim.grid.vec_to_dir(list(vec))
 
             self.map[(cnt == self.sim.grid.Q)] = self.NODE_UNUSED
@@ -629,7 +630,7 @@ class LBMGeo3D(LBMGeo):
                 # periodic.
                 if vec.dot(vec) == 1:
                     orientation[
-                            numpy.logical_and(self.map == self.NODE_WALL,
+                            numpy.logical_and(self.map != self.NODE_FLUID,
                                 a == self.NODE_FLUID)] = self.sim.grid.vec_to_dir(list(vec))
 
             self.map[(cnt == self.sim.grid.Q)] = self.NODE_UNUSED
