@@ -605,6 +605,10 @@ class LBMSim(object):
         ctx['image_fields'] = self.image_fields
         ctx['precision'] = self.options.precision
 
+        # TODO: Find a more general way of specifying whether sentinels are
+        # necessary.
+        ctx['propagation_sentinels'] = (self.options.bc_wall == 'halfbb')
+
         self._update_ctx(ctx)
         ctx.update(self.geo.get_defines())
         ctx.update(self.backend.get_defines())

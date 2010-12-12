@@ -89,11 +89,13 @@
 	%endif
 </%def>
 
+// Propagate distributions using global memory only.
+// TODO: This function is DEPRECATED and should be removed.
 <%def name="propagate2(dist_out, dist_in='fi')">
 	// update the 0-th direction distribution
 	${dist_out}[gi] = ${dist_in}.fC;
 
-	// E propagation in shared memory
+	// E propagation in global memory
 	if (gx < ${lat_nx-1}) {
 		${prop_block_bnd(dist_out, dist_in, 1, 'prop_global')}
 	}
@@ -107,7 +109,7 @@
 	// Propagation in directions orthogonal to the X axis (global memory)
 	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
 
-	// W propagation in shared memory
+	// W propagation in global memory
 	if (gx > 0) {
 		${prop_block_bnd(dist_out, dist_in, -1, 'prop_global')}
 	}
@@ -119,9 +121,21 @@
 	%endif
 </%def>
 
+// Propagate distributions using a 1D shared memory array to make the propagation
+// in the X direction more efficient.
 <%def name="propagate(dist_out, dist_in='fi')">
-	// update the 0-th direction distribution
+	<%
+		first_prop_dist = grid.idx_name[sym.get_prop_dists(grid, 1)[0]]
+	%>
+
+	// Update the 0-th direction distribution
 	${dist_out}[gi] = ${dist_in}.fC;
+
+	%if propagation_sentinels:
+		// Initialize the shared array with invalid sentinel values.  If the sentinel
+		// value is not subsequently overridden, it will not be propagated.
+		prop_${first_prop_dist}[lx] = -1.0f;
+	%endif
 
 	// E propagation in shared memory
 	if (gx < ${lat_nx-1}) {
@@ -145,7 +159,11 @@
 
 	// Save locally propagated distributions into global memory.
 	// The leftmost thread is not updated in this block.
-	if (lx > 0 && gx < ${lat_nx}) {
+	if (lx > 0 && gx < ${lat_nx})
+	%if propagation_sentinels:
+		if (prop_${first_prop_dist}[lx] != -1.0f)
+	%endif
+	{
 		${prop_block_bnd(dist_out, dist_in, 1, 'prop_local')}
 	}
 
@@ -153,6 +171,11 @@
 	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
 
 	${barrier()}
+
+	%if propagation_sentinels:
+		// Refill the propagation buffer with sentinel values.
+		prop_${first_prop_dist}[lx] = -1.0f;
+	%endif
 
 	// W propagation in shared memory
 	if (lx > 0) {
@@ -173,7 +196,11 @@
 	${barrier()}
 
 	// The rightmost thread is not updated in this block.
-	if (lx < ${block_size-1} && gx < ${lat_nx-1}) {
+	if (lx < ${block_size-1} && gx < ${lat_nx-1})
+	%if propagation_sentinels:
+		if (prop_${first_prop_dist}[lx] != -1.0f)
+	%endif
+	{
 		${prop_block_bnd(dist_out, dist_in, -1, 'prop_local')}
 	}
 </%def>
