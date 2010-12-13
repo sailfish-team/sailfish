@@ -440,7 +440,7 @@ ${device_func} inline void getMacro(Dist *fi, int ncode, int node_type, int orie
 }
 
 // TODO: Check whether it is more efficient to actually recompute
-// node_type and orientation instead of paasing them as variables.
+// node_type and orientation instead of passing them as variables.
 ${device_func} inline void postcollisionBoundaryConditions(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0, int gi, ${global_ptr} float *dist_out)
 {
 	%if bc_wall == 'halfbb':

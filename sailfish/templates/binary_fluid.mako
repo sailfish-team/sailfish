@@ -143,41 +143,76 @@ ${kernel} void PrepareMacroFields(
 			return;
 	%endif
 
-	int igi = gi;
+	Dist fi;
+	float out;
+	getDist(&fi, dist1_in, gi);
+	get0thMoment(&fi, type, orientation, &out);
+	orho[gi] = out;
+
+	int helper_idx = gi;
 
 	%if simtype == 'free-energy':
-		// Assume neutral wetting for all walls by setting the density and phase at the
-		// wall node to mirror that of the neighboring fluid, so that when the density
-		// gradient is later calculated, it comes out as 0.
+		// Assume neutral wetting for all walls by setting adjusting the phase gradient
+		// near the wall.
 		//
 		// This wetting boundary condition implementation is as in option 2 in
 		// Halim Kusumaatmaja's PhD thesis, p.18.
 		if (isWallNode(type)) {
-			if (0) { ; }
-			%for dir in grid.dir2vecidx.keys():
-				else if (orientation == ${dir}) {
-					%if dim == 3:
-						igi += ${rel_offset(*(2*grid.dir_to_vec(dir)))};
-					%else:
-						## rel_offset() needs a 3-vector, so make the z-coordinate 0
-						igi += ${rel_offset(*(list(2*grid.dir_to_vec(dir)) + [0]))};
-					%endif
-				}
-			%endfor
+			switch (orientation) {
+				%for dir in grid.dir2vecidx.keys():
+					## Symbols used on the schematics below:
+					##
+					## W: wall node (current node, pointed to by 'gi')
+					## F: fluid node
+					## |: actual location of the wall
+					## .: space between fluid nodes
+					## x: node from which data is read
+					## y: node to which data is being written
+					##
+					## The schematics assume a bc_wall_grad_order of 2.
+					case ${dir}: {
+						## Full BB: F . F | W
+						##          x ----> y
+						%if bc_wall == 'fullbb':
+							%if dim == 3:
+								helper_idx += ${rel_offset(*(bc_wall_grad_order*grid.dir_to_vec(dir)))};
+							%else:
+								## rel_offset() needs a 3-vector, so make the z-coordinate 0
+								helper_idx += ${rel_offset(*(list(bc_wall_grad_order*grid.dir_to_vec(dir)) + [0]))};
+							%endif
+						## Full BB: F . W | U
+						##          x ----> y
+						%elif bc_wall == 'halfbb' and bc_wall_grad_order == 1:
+							%if dim == 3:
+								helper_idx -= ${rel_offset(*(grid.dir_to_vec(dir)))};
+							%else:
+								helper_idx -= ${rel_offset(*(list(*grid.dir_to_vec(dir)) + [0]))};
+							%endif
+						%else:
+							WETTING_BOUNDARY_CONDITIONS_UNSUPPORTED_FOR_${bc_wall}_AND_GRAD_ORDER_${bc_wall_grad_order}
+						%endif
+					}
+				%endfor
+			}
 		}
 	%endif
 
-	// cache the distributions in local variables
-	Dist fi;
-	float out;
-
-	getDist(&fi, dist1_in, igi);
-	get0thMoment(&fi, type, orientation, &out);
-	orho[gi] = out;
-
-	getDist(&fi, dist2_in, igi);
-	get0thMoment(&fi, type, orientation, &out);
-	ophi[gi] = out;
+	%if bc_wall == 'fullbb':
+		getDist(&fi, dist2_in, helper_idx);
+		get0thMoment(&fi, type, orientation, &out);
+		if (helper_idx != gi) {
+			ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+		} else {
+			ophi[gi] = out;
+		}
+	%elif bc_wall == 'halfbb':
+		getDist(&fi, dist2_in, gi);
+		get0thMoment(&fi, type, orientation, &out);
+		ophi[gi] = out;
+		if (helper_idx != gi) {
+			ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+		}
+	%endif
 }
 
 ${kernel} void CollideAndPropagate(

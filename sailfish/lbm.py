@@ -1277,6 +1277,12 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
     def _add_options(self, parser, lb_group):
         super(BinaryFluidFreeEnergy, self)._add_options(parser, lb_group)
 
+        lb_group.add_option('--bc_wall_grad_phase', dest='bc_wall_grad_phase',
+            type='float', default=0.0, help='gradient of the phase field at '
+            'the wall; this determines the wetting properties')
+        lb_group.add_option('--bc_wall_grad_order', dest='bc_wall_grad_order', type='int',
+            default=2, help='order of the gradient stencil used for the '
+            'wetting boundary condition at the walls; valid values are 1 and 2')
         lb_group.add_option('--Gamma', dest='Gamma',
             help='Gamma parameter', action='store', type='float',
             default=0.5)
@@ -1299,6 +1305,8 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
         ctx['grids'] = [self.grid, self.grid]
         ctx['tau_phi'] = self.options.tau_phi
         ctx['simtype'] = 'free-energy'
+        ctx['bc_wall_grad_phase'] = self.options.bc_wall_grad_phase
+        ctx['bc_wall_grad_order'] = self.options.bc_wall_grad_order
 
     def _prepare_symbols(self):
         """Additional symbols and coefficients for the free-energy binary liquid model."""
