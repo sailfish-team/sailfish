@@ -80,7 +80,7 @@ ${device_func} inline int decodeNodeOrientation(int nodetype) {
 }
 
 ${device_func} inline int decodeNodeParam(int nodetype) {
-	return (nodetype >> ${geo_misc_shift}) & ${(1 << (geo_param_shift+1))-1};
+	return (nodetype >> ${geo_misc_shift}) & ${(1 << geo_param_shift)-1};
 }
 
 ${device_func} inline int encodeBoundaryNode(int dir_mask, int obj_id) {

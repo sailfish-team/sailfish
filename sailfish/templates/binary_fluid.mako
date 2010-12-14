@@ -136,10 +136,17 @@ ${kernel} void PrepareMacroFields(
 
 	int orientation = decodeNodeOrientation(ncode);
 
-	// Do not update the macroscopic fields for wall nodes which do not
-	// represent any fluid.
 	%if simtype == 'shan-chen' and not bc_wall_.wet_nodes:
+		// Do not update the macroscopic fields for wall nodes which do not
+		// represent any fluid.
 		if (isWallNode(type))
+			return;
+	%endif
+
+	%if bc_pressure == 'guo':
+		// Do not not update the fields for pressure nodes, where by definition
+		// they are constant.
+		if (isPressureNode(type))
 			return;
 	%endif
 
@@ -186,11 +193,12 @@ ${kernel} void PrepareMacroFields(
 							%if dim == 3:
 								helper_idx -= ${rel_offset(*(grid.dir_to_vec(dir)))};
 							%else:
-								helper_idx -= ${rel_offset(*(list(*grid.dir_to_vec(dir)) + [0]))};
+								helper_idx -= ${rel_offset(*(list(grid.dir_to_vec(dir)) + [0]))};
 							%endif
 						%else:
 							WETTING_BOUNDARY_CONDITIONS_UNSUPPORTED_FOR_${bc_wall}_AND_GRAD_ORDER_${bc_wall_grad_order}
 						%endif
+						break;
 					}
 				%endfor
 			}
@@ -210,7 +218,7 @@ ${kernel} void PrepareMacroFields(
 		get0thMoment(&fi, type, orientation, &out);
 		ophi[gi] = out;
 		if (helper_idx != gi) {
-			ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+			ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
 		}
 	%endif
 }
@@ -245,6 +253,30 @@ ${kernel} void CollideAndPropagate(
 
 	int orientation = decodeNodeOrientation(ncode);
 
+	%if bc_pressure == 'guo':
+		int orig_gi = gi;
+		if (isPressureNode(type)) {
+			switch (orientation) {
+				%for dir_ in grid.dir2vecidx.keys():
+					case (${dir_}): {
+						## TODO: add a function to calculate the local indices from gi
+						%if dim == 2:
+							gi += ${rel_offset(*(list(grid.dir_to_vec(dir_)) + [0]))};
+							gx += ${grid.dir_to_vec(dir_)[0]};
+							gy += ${grid.dir_to_vec(dir_)[1]};
+						%else:
+							gi += ${rel_offset(*(grid.dir_to_vec(dir_)))};
+							gx += ${grid.dir_to_vec(dir_)[0]};
+							gy += ${grid.dir_to_vec(dir_)[1]};
+							gz += ${grid.dir_to_vec(dir_)[2]};
+						%endif
+						break;
+					}
+				%endfor
+			}
+		}
+	%endif
+
 	%if simtype == 'free-energy':
 		float lap1, grad1[${dim}];
 
@@ -263,6 +295,12 @@ ${kernel} void CollideAndPropagate(
 	Dist d0, d1;
 	getDist(&d0, dist1_in, gi);
 	getDist(&d1, dist2_in, gi);
+
+	%if bc_pressure == 'guo':
+		if (isPressureNode(type)) {
+			gi = orig_gi;
+		}
+	%endif
 
 	// macroscopic quantities for the current cell
 	float g0m0, v[${dim}], g1m0;
@@ -287,6 +325,24 @@ ${kernel} void CollideAndPropagate(
 	// nodes currently has to be placed behind the wall layer.
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist1_out);
 	postcollisionBoundaryConditions(&d1, ncode, type, orientation, &g1m0, v, gi, dist2_out);
+
+	%if bc_pressure == 'guo':
+		if (isPressureNode(type)) {
+			switch (orientation) {
+				%for dir_ in grid.dir2vecidx.keys():
+					case (${dir_}): {
+						## TODO: add a function to calculate the local indices from gi
+						gx -= ${grid.dir_to_vec(dir_)[0]};
+						gy -= ${grid.dir_to_vec(dir_)[1]};
+						%if dim == 3:
+							gz -= ${grid.dir_to_vec(dir_)[2]};
+						%endif
+						break;
+					}
+				%endfor
+			}
+		}
+	%endif
 
 	// only save the macroscopic quantities if requested to do so
 	if (save_macro == 1) {

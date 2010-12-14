@@ -58,6 +58,12 @@ class LBMGeo(object):
         """
         return type | (misc << cls.NODE_MISC_SHIFT)
 
+    # A nodecode contains several pieces of information about a node.  It
+    # consists of 3 bit fields:
+    #   orientation | param_index | type
+    #
+    # The size of 'type' is determined by the NODE_MISC_SHIFT class constant.
+    # The size of 'param_index' is determined by the _param_shift variable.
     @classmethod
     def _decode_node_type(cls, code):
         return (code & cls.NODE_TYPE_MASK)
@@ -71,7 +77,7 @@ class LBMGeo(object):
 
     def _decode_orientation_and_param(self, code):
         return (code >> self._param_shift,
-                code & ((1 << (self._param_shift+1)) - 1))
+                code & ((1 << self._param_shift) - 1))
 
     # TODO(mjanusz): This should return a named tuple.
     @classmethod
@@ -448,7 +454,8 @@ class LBMGeo(object):
             i += 1
 
         self._num_pressures = i
-        self._param_shift = bitLen(max(self._num_velocities, self._num_pressures))
+        self._param_shift = bitLen(
+                max(self._num_velocities, self._num_pressures))
         self._params = ret
 
     # FIXME: This method implicitly assumes that the object can be enclosed in a box
@@ -681,7 +688,8 @@ SUPPORTED_BCS = [LBMBC('fullbb', location=0.5, supported_types=set([LBMGeo.NODE_
                  LBMBC('halfbb', location=-0.5, wet_nodes=True, supported_types=set([LBMGeo.NODE_WALL])),
                  LBMBC('equilibrium', supported_types=set([LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE])),
                  LBMBC('zouhe', wet_nodes=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY,
-                     LBMGeo.NODE_PRESSURE]))
+                     LBMGeo.NODE_PRESSURE])),
+                 LBMBC('guo', wet_nodes=True, supported_types=set([LBMGeo.NODE_PRESSURE]))
                  ]
 
 BCS_MAP = dict((x.name, x) for x in SUPPORTED_BCS)

@@ -941,7 +941,8 @@ class KernelCodePrinter(CCodePrinter):
         else:
             return super(KernelCodePrinter, self)._print_Function(expr)
 
-def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False):
+def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False,
+          phi=None):
     """Convert a SymPy expression into a string containing valid C code.
 
     :param sim: the main simulation class (descendant of :class:`LBMSim`)
@@ -967,6 +968,10 @@ def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False):
         t = t.subs(S.rho, rho)
     if rho is None:
         rho = S.rho
+
+    if type(phi) is str:
+        phi = Symbol(phi)
+        t = t.subs(S.phi, phi)
 
     if incompressible:
         t = t.subs(S.rho0, 1)

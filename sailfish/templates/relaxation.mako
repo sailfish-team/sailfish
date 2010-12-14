@@ -4,6 +4,7 @@
 
 <%page args="bgk_args_decl"/>
 <%namespace file="code_common.mako" import="*"/>
+<%namespace file="boundary.mako" import="get_boundary_pressure"/>
 
 <%def name="fluid_momentum(igrid)">
 	%if igrid in force_for_eq and equilibrium:
@@ -241,7 +242,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 %for i in range(0, len(grids)):
 	Dist *d${i},
 %endfor
-	int node_type)
+	int node_type, int ncode)
 {
 	${bgk_relaxation_preamble()}
 
@@ -249,6 +250,25 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 		%for idx in grid.idx_name:
 			d${i}->${idx} += (feq${i}.${idx} - d${i}->${idx}) / tau${i};
 		%endfor
+
+		%if bc_pressure == 'guo':
+			// The total form of the postcollision boundary node distribution value
+			// with the Guo boundary conditions is as follows:
+			//
+			// f_post(O) = f_eq(O) + f(B) - f_eq(B) + omega * (f_eq(B) - f(B))
+			//
+			// where O is the boundary node and B is the fluid node pointed to by the
+			// boundary node normal vector.  The Guo boudary condtiions are implemented
+			// so that all the standard processing proceeds for node B first, and the
+			// correction for node O is added as a postcollision boundary condition.
+			//
+			// The code below takes care of the -f_eq(B) of the formula.
+			if (isPressureNode(node_type)) {
+				%for idx in grid.idx_name:
+					d${i}->${idx} -= feq${i}.${idx};
+				%endfor
+			}
+		%endif
 
 		## Is there a force acting on the current grid?
 		%if sym.needs_accel(i, forces, force_couplings):
@@ -276,6 +296,28 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 		%endif
 	%endfor
 
+	// FIXME: This should be moved to postcollision boundary conditions.
+	%if bc_pressure == 'guo':
+		if (isPressureNode(node_type)) {
+			int node_param = decodeNodeParam(ncode);
+			float par_rho;
+			${get_boundary_pressure('node_param', 'par_rho')}
+			float par_phi = 1.0f;
+
+			%for local_var in bgk_equilibrium_vars:
+				float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True, rho='par_rho', phi='par_phi')};
+			%endfor
+
+			tau0 = tau_a;
+
+			%for i, eq in enumerate(bgk_equilibrium):
+				%for feq, idx in eq:
+					d${i}->${idx} += ${cex(feq, vectors=True, rho='par_rho', phi='par_phi')};
+				%endfor
+			%endfor
+		}
+	%endif
+
 	${fluid_velocity(0, save=True)}
 }
 %endif
@@ -286,7 +328,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 %for i in range(0, len(grids)):
 	&d${i},
 %endfor
-	type);
+	type, ncode);
 	%elif model == 'femrt':
 		FE_MRT_relaxate(${bgk_args()},
 %for i in range(0, len(grids)):

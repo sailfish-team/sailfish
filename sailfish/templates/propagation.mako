@@ -135,6 +135,7 @@
 		// Initialize the shared array with invalid sentinel values.  If the sentinel
 		// value is not subsequently overridden, it will not be propagated.
 		prop_${first_prop_dist}[lx] = -1.0f;
+		${barrier()}
 	%endif
 
 	// E propagation in shared memory
@@ -170,12 +171,13 @@
 	// Propagation in directions orthogonal to the X axis (global memory)
 	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
 
-	${barrier()}
-
 	%if propagation_sentinels:
+		${barrier()}
 		// Refill the propagation buffer with sentinel values.
 		prop_${first_prop_dist}[lx] = -1.0f;
 	%endif
+
+	${barrier()}
 
 	// W propagation in shared memory
 	if (lx > 0) {
