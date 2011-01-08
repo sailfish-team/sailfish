@@ -70,16 +70,16 @@ class Values(optparse.Values):
 
 def _convert_to_double(src):
     import re
-    tmp = re.sub('([0-9]+\.[0-9]*(e-?[0-9]*)?)f([^a-zA-Z0-9\.])', '\\1\\3',
-                 src.replace('float', 'double'))
-    tmp = tmp.replace('logf(', 'log(')
-    tmp = tmp.replace('expf(', 'exp(')
-    tmp = tmp.replace('powf(', 'pow(')
-    return tmp
+    t = re.sub('([0-9]+\.[0-9]*(e-?[0-9]*)?)f([^a-zA-Z0-9\.])', '\\1\\3',
+               src.replace('float', 'double'))
+    t = t.replace('logf(', 'log(')
+    t = t.replace('expf(', 'exp(')
+    t = t.replace('powf(', 'pow(')
+    return t
 
 # TODO: Correctly process vector and scalar fields in these clases.
 class HDF5FlatOutput(object):
-    format_name='h5flat'
+    format_name = 'h5flat'
 
     def __init__(self, fname, sim):
         self.sim = sim
@@ -96,7 +96,7 @@ class HDF5FlatOutput(object):
         self.h5file.createArray(h5t, 'rho', self.sim.rho, 'density')
 
 class HDF5NestedOutput(HDF5FlatOutput):
-    format_name='h5nested'
+    format_name = 'h5nested'
 
     def __init__(self, fname, sim):
         super(HDF5NestedOutput, self).__init__(fname, sim)
@@ -131,7 +131,7 @@ def get_fname_digits(max_iters=0):
         return str(7)
 
 class VTKOutput(object):
-    format_name='vtk'
+    format_name = 'vtk'
 
     def __init__(self, fname, sim):
         self.fname = fname
@@ -140,38 +140,38 @@ class VTKOutput(object):
 
     def save(self, i):
         from enthought.tvtk.api import tvtk
-        id = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
+        idata = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
 
         # FIXME: Gracefully handle the case when there are no scalar fields.
         fields = self.sim.output_fields.keys()
         ffld = fields[0]
         fields = fields[1:]
 
-        id.point_data.scalars = self.sim.output_fields[ffld].flatten()
-        id.point_data.scalars.name = ffld
+        idata.point_data.scalars = self.sim.output_fields[ffld].flatten()
+        idata.point_data.scalars.name = ffld
 
         for fld in fields:
-            tmp = id.point_data.add_array(self.sim.output_fields[fld].flatten())
-            id.point_data.get_array(tmp).name = fld
+            tmp = idata.point_data.add_array(self.sim.output_fields[fld].flatten())
+            idata.point_data.get_array(tmp).name = fld
 
-        id.update()
+        idata.update()
 
         for k, v in self.sim.output_vectors.iteritems():
-            if self.sim.grid.dim == 3:
-                tmp = id.point_data.add_array(numpy.c_[v[0].flatten(), v[1].flatten(), v[2].flatten()])
+            if self.sim.gridata.dim == 3:
+                tmp = idata.point_data.add_array(numpy.c_[v[0].flatten(), v[1].flatten(), v[2].flatten()])
             else:
-                tmp = id.point_data.add_array(numpy.c_[v[0].flatten(), v[1].flatten(), numpy.zeros_like(v[0].flatten())])
-            id.point_data.get_array(tmp).name = k
+                tmp = idata.point_data.add_array(numpy.c_[v[0].flatten(), v[1].flatten(), numpy.zeros_like(v[0].flatten())])
+            idata.point_data.get_array(tmp).name = k
 
-        if self.sim.grid.dim == 3:
-            id.dimensions = list(reversed(self.sim.output_fields[ffld].shape))
+        if self.sim.gridata.dim == 3:
+            idata.dimensions = list(reversed(self.sim.output_fields[ffld].shape))
         else:
-            id.dimensions = list(reversed(self.sim.output_fields[ffld].shape)) + [1]
-        w = tvtk.XMLPImageDataWriter(input=id, file_name=('%s%0' + self.digits + 'd.xml') % (self.fname, i))
+            idata.dimensions = list(reversed(self.sim.output_fields[ffld].shape)) + [1]
+        w = tvtk.XMLPImageDataWriter(input=idata, file_name=('%s%0' + self.digits + 'd.xml') % (self.fname, i))
         w.write()
 
 class NPYOutput(object):
-    format_name='npy'
+    format_name = 'npy'
 
     def __init__(self, fname, sim):
         self.fname = fname
@@ -186,7 +186,7 @@ class NPYOutput(object):
         numpy.savez(fname, **data)
 
 class MatlabOutput(object):
-    format_name='mat'
+    format_name = 'mat'
 
     def __init__(self, fname, sim):
         self.fname = fname
@@ -488,14 +488,14 @@ class LBMSim(object):
         :param every: if ``True``, the hook will be executed every *i* steps
         """
         if every:
-            self.iter__hooks_every.setdefault(i, []).append(func)
+            self.iter_hooks_every.setdefault(i, []).append(func)
         else:
-            self.iter__hooks.setdefault(i, []).append(func)
+            self.iter_hooks.setdefault(i, []).append(func)
 
     def clear_hooks(self):
         """Remove all hooks."""
-        self.iter__hooks = {}
-        self.iter__hooks_every = {}
+        self.iter_hooks = {}
+        self.iter_hooks_every = {}
 
     def get_tau(self):
         return self.float((6.0 * self.options.visc + 1.0)/2.0)
@@ -964,11 +964,11 @@ class LBMSim(object):
         for i in range(0, self.options.max_iters):
             need_data = False
 
-            if self.iter_ in self.iter__hooks:
+            if self.iter_ in self.iter_hooks:
                 need_data = True
 
             if not need_data:
-                for k in self.iter__hooks_every:
+                for k in self.iter_hooks_every:
                     if self.iter_ % k == 0:
                         need_data = True
                         break
@@ -976,9 +976,9 @@ class LBMSim(object):
             self.sim_step(tracers=False, get_data=need_data)
 
             if need_data:
-                for hook in self.iter__hooks.get(self.iter_-1, []):
+                for hook in self.iter_hooks.get(self.iter_-1, []):
                     hook()
-                for k, v in self.iter__hooks_every.iteritems():
+                for k, v in self.iter_hooks_every.iteritems():
                     if (self.iter_-1) % k == 0:
                         for hook in v:
                             hook()
@@ -1040,7 +1040,7 @@ class LBMSim(object):
         self._force_term_for_eq[grid] = force
 
     def add_force_coupling(self, i, j, g):
-        self._force_couplings[(i,j)] = g
+        self._force_couplings[(i, j)] = g
 
     def add_nonlocal_field(self, num):
         if self.options.backend == 'cuda':
@@ -1328,9 +1328,9 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
         self.S.make_vector('grad1', self.grid.dim, self.S.g1d1m0x, self.S.g1d1m0y, self.S.g1d1m0z)
 
         if self.grid.dim == 3:
-            self.S.wxy = [x[0]*x[1]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
-            self.S.wyz = [x[1]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
-            self.S.wxz = [x[0]*x[2]*Rational(1,4) for x in sym.D3Q19.basis[1:]]
+            self.S.wxy = [x[0]*x[1]*Rational(1, 4) for x in sym.D3Q19.basis[1:]]
+            self.S.wyz = [x[1]*x[2]*Rational(1, 4) for x in sym.D3Q19.basis[1:]]
+            self.S.wxz = [x[0]*x[2]*Rational(1, 4) for x in sym.D3Q19.basis[1:]]
             self.S.wi = []
             self.S.wxx = []
             self.S.wyy = []
@@ -1338,42 +1338,42 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
 
             for x in sym.D3Q19.basis[1:]:
                 if x.dot(x) == 1:
-                    self.S.wi.append(Rational(1,6))
+                    self.S.wi.append(Rational(1, 6))
 
                     if abs(x[0]) == 1:
-                        self.S.wxx.append(Rational(5,12))
+                        self.S.wxx.append(Rational(5, 12))
                     else:
-                        self.S.wxx.append(-Rational(1,3))
+                        self.S.wxx.append(-Rational(1, 3))
 
                     if abs(x[1]) == 1:
-                        self.S.wyy.append(Rational(5,12))
+                        self.S.wyy.append(Rational(5, 12))
                     else:
-                        self.S.wyy.append(-Rational(1,3))
+                        self.S.wyy.append(-Rational(1, 3))
 
                     if abs(x[2]) == 1:
-                        self.S.wzz.append(Rational(5,12))
+                        self.S.wzz.append(Rational(5, 12))
                     else:
-                        self.S.wzz.append(-Rational(1,3))
+                        self.S.wzz.append(-Rational(1, 3))
 
                 elif x.dot(x) == 2:
-                    self.S.wi.append(Rational(1,12))
+                    self.S.wi.append(Rational(1, 12))
 
                     if abs(x[0]) == 1:
-                        self.S.wxx.append(-Rational(1,24))
+                        self.S.wxx.append(-Rational(1, 24))
                     else:
-                        self.S.wxx.append(Rational(1,12))
+                        self.S.wxx.append(Rational(1, 12))
 
                     if abs(x[1]) == 1:
-                        self.S.wyy.append(-Rational(1,24))
+                        self.S.wyy.append(-Rational(1, 24))
                     else:
-                        self.S.wyy.append(Rational(1,12))
+                        self.S.wyy.append(Rational(1, 12))
 
                     if abs(x[2]) == 1:
-                        self.S.wzz.append(-Rational(1,24))
+                        self.S.wzz.append(-Rational(1, 24))
                     else:
-                        self.S.wzz.append(Rational(1,12))
+                        self.S.wzz.append(Rational(1, 12))
         else:
-            self.S.wxy = [x[0]*x[1]*Rational(1,4) for x in sym.D2Q9.basis[1:]]
+            self.S.wxy = [x[0]*x[1]*Rational(1, 4) for x in sym.D2Q9.basis[1:]]
             self.S.wyz = [0] * 9
             self.S.wxz = [0] * 9
             self.S.wzz = [0] * 9
@@ -1383,21 +1383,21 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
 
             for x in sym.D2Q9.basis[1:]:
                 if x.dot(x) == 1:
-                    self.S.wi.append(Rational(1,3))
+                    self.S.wi.append(Rational(1, 3))
 
                     if abs(x[0]) == 1:
-                        self.S.wxx.append(Rational(1,3))
+                        self.S.wxx.append(Rational(1, 3))
                     else:
-                        self.S.wxx.append(-Rational(1,6))
+                        self.S.wxx.append(-Rational(1, 6))
 
                     if abs(x[1]) == 1:
-                        self.S.wyy.append(Rational(1,3))
+                        self.S.wyy.append(Rational(1, 3))
                     else:
-                        self.S.wyy.append(-Rational(1,6))
+                        self.S.wyy.append(-Rational(1, 6))
                 else:
-                    self.S.wi.append(Rational(1,12))
-                    self.S.wxx.append(-Rational(1,24))
-                    self.S.wyy.append(-Rational(1,24))
+                    self.S.wi.append(Rational(1, 12))
+                    self.S.wxx.append(-Rational(1, 24))
+                    self.S.wyy.append(-Rational(1, 24))
 
 
     def _init_fields(self, need_dist):
