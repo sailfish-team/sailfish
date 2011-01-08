@@ -35,9 +35,11 @@ class LBMGeo(object):
     NODE_PRESSURE = 4
     #: Boundary nodes of FSI objects.
     NODE_BOUNDARY = 5
+    #: Slip node.
+    NODE_SLIP = 6
 
     NODE_TYPES = [NODE_FLUID, NODE_WALL, NODE_UNUSED, NODE_VELOCITY,
-            NODE_PRESSURE, NODE_BOUNDARY]
+            NODE_PRESSURE, NODE_BOUNDARY, NODE_SLIP]
 
     NODE_TYPE_MASK = 0xffffffff
     NODE_MISC_SHIFT = 0
@@ -181,6 +183,7 @@ class LBMGeo(object):
     def get_defines(self):
         return {'geo_fluid': self.NODE_FLUID,
                 'geo_wall': self.NODE_WALL,
+                'geo_slip': self.NODE_SLIP,
                 'geo_unused': self.NODE_UNUSED,
                 'geo_velocity': self.NODE_VELOCITY,
                 'geo_pressure': self.NODE_PRESSURE,
@@ -685,6 +688,7 @@ def get_bc(type_):
     return BCS_MAP[type_]
 
 SUPPORTED_BCS = [LBMBC('fullbb', location=0.5, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY])),
+                 LBMBC('slipbb', location=0.5, supported_types=set([LBMGeo.NODE_SLIP])),
                  LBMBC('halfbb', location=-0.5, wet_nodes=True, supported_types=set([LBMGeo.NODE_WALL])),
                  LBMBC('equilibrium', supported_types=set([LBMGeo.NODE_VELOCITY, LBMGeo.NODE_PRESSURE])),
                  LBMBC('zouhe', wet_nodes=True, supported_types=set([LBMGeo.NODE_WALL, LBMGeo.NODE_VELOCITY,

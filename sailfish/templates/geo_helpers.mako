@@ -31,6 +31,10 @@ ${device_func} inline bool isFluidNode(int type) {
 	return type == ${geo_fluid};
 }
 
+${device_func} inline bool isSlipNode(int type) {
+	return type == ${geo_slip};
+}
+
 ${device_func} inline bool isWallNode(int type) {
 	return type == ${geo_wall};
 }

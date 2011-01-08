@@ -1,3 +1,4 @@
+import copy
 from collections import namedtuple
 import operator
 from operator import itemgetter
@@ -620,6 +621,24 @@ def bb_swap_pairs(grid):
 
         ret.add(min(i,j))
 
+    return ret
+
+def slip_bb_swap_pairs(grid, normal_dir):
+    ret = set()
+    normal_vec = grid.dir_to_vec(normal_dir)
+
+    for i, ei in enumerate(grid.basis):
+        sp = ei.dot(normal_vec)
+        if sp > 0:
+            expected = copy.deepcopy(ei)
+            for j, val in enumerate(normal_vec):
+                if val != 0:
+                    expected[j] *= -1
+
+            for j, ej in enumerate(grid.basis):
+                if ej == expected:
+                    ret.add((i, j))
+                    break
     return ret
 
 def fill_missing_dists(grid, distp, missing_dir):

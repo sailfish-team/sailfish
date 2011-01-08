@@ -1059,6 +1059,7 @@ class FluidLBMSim(LBMSim):
         ret['incompressible'] = self.incompressible
         ret['model'] = self.lbm_model
         ret['bc_wall'] = self.options.bc_wall
+        ret['bc_slip'] = self.options.bc_slip
         ret['bc_velocity'] = self.options.bc_velocity
         ret['bc_pressure'] = self.options.bc_pressure
 
@@ -1089,6 +1090,7 @@ class FluidLBMSim(LBMSim):
     def _update_ctx(self, ctx):
         ctx['incompressible'] = self.incompressible
         ctx['bc_wall'] = self.options.bc_wall
+        ctx['bc_slip'] = self.options.bc_slip
 
         if self.geo.has_velocity_nodes:
             ctx['bc_velocity'] = self.options.bc_velocity
@@ -1101,6 +1103,7 @@ class FluidLBMSim(LBMSim):
             ctx['bc_pressure'] = None
 
         ctx['bc_wall_'] = geo.get_bc(self.options.bc_wall)
+        ctx['bc_slip_'] = geo.get_bc(self.options.bc_slip)
         ctx['bc_velocity_'] = geo.get_bc(self.options.bc_velocity)
         ctx['bc_pressure_'] = geo.get_bc(self.options.bc_pressure)
         ctx['simtype'] = 'fluid'
@@ -1118,6 +1121,10 @@ class FluidLBMSim(LBMSim):
                 choices=[x.name for x in geo.SUPPORTED_BCS if
                     geo.LBMGeo.NODE_WALL in x.supported_types and
                     x.supports_dim(self.geo_class.dim)], default='fullbb')
+        lb_group.add_option('--bc_slip', dest='bc_slip', help='boundary condition implementation to use for slip nodes', type='choice',
+                choices=[x.name for x in geo.SUPPORTED_BCS if
+                    geo.LBMGeo.NODE_SLIP in x.supported_types and
+                    x.supports_dim(self.geo_class.dim)], default='slipbb')
         lb_group.add_option('--bc_velocity', dest='bc_velocity', help='boundary condition implementation to use for velocity nodes', type='choice',
                 choices=[x.name for x in geo.SUPPORTED_BCS if
                     geo.LBMGeo.NODE_VELOCITY in x.supported_types and

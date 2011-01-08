@@ -369,7 +369,7 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 //
 ${device_func} inline void getMacro(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
 {
-	if (isFluidOrWallNode(node_type) || orientation == ${geo_dir_other}) {
+	if (isFluidOrWallNode(node_type) || isSlipNode(node_type) || orientation == ${geo_dir_other}) {
 		compute_macro_quant(fi, rho, v0);
 		if (isWallNode(node_type)) {
 			%if bc_wall_.location == 0.0 and bc_wall_.wet_nodes:
@@ -503,6 +503,24 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, i
 					fi->${idx} = ${cex(feq, pointers=True)};
 				%endfor
 			%endfor
+		}
+	%endif
+
+	%if bc_slip == 'slipbb':
+		if (isSlipNode(node_type)) {
+			float t;
+			switch (orientation) {
+			%for i in range(1, grid.dim*2+1):
+				case ${i}: {
+					%for j, k in sym.slip_bb_swap_pairs(grid, i):
+						t = fi->${grid.idx_name[j]};
+						fi->${grid.idx_name[j]} = fi->${grid.idx_name[k]};
+						fi->${grid.idx_name[k]} = t;
+					%endfor
+					break;
+				}
+			%endfor
+			}
 		}
 	%endif
 }
