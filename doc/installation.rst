@@ -84,3 +84,19 @@ recent enough for Sailfish.
 The example listed above assumes that you want to use the CUDA backend.  Before installing pycuda,
 please make sure the NVIDIA CUDA Toolkit is installed in ``/usr/local/cuda``.  You can get the
 necessary files at http://nvidia.com/cuda.
+
+Mac OS X installation instructions (Mac Ports)
+----------------------------------------------
+
+The easiest way to install all the Sailfish prerequisites on Mac OS X is to use the Mac Ports
+project and the PyOpenCL backend in Sailfish.  Follow the instructions at http://www.macports.org/,
+and then run::
+
+  port install py26-sympy py26-pyopencl py26-game py26-mako py26-scipy
+
+To run the Sailfish examples, remember to use the correct Python interpreter (i.e. the one
+installed via Mac Ports).  For instance:
+
+  python2.6 ./lbm_ldc.py --scr_depth=24
+
+Note that for the pygame visualization, you may need to specify the --scr_depth option.
