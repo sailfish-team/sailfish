@@ -8,9 +8,8 @@ from sailfish import geo
 from sailfish import vis
 
 import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
+from optparse import OptionGroup, OptionParser
 
-from mako.template import Template
 from mako.lookup import TemplateLookup
 
 from sailfish import sym
@@ -71,11 +70,12 @@ class Values(optparse.Values):
 
 def _convert_to_double(src):
     import re
-    t = re.sub('([0-9]+\.[0-9]*(e-?[0-9]*)?)f([^a-zA-Z0-9\.])', '\\1\\3', src.replace('float', 'double'))
-    t = t.replace('logf(', 'log(')
-    t = t.replace('expf(', 'exp(')
-    t = t.replace('powf(', 'pow(')
-    return t
+    tmp = re.sub('([0-9]+\.[0-9]*(e-?[0-9]*)?)f([^a-zA-Z0-9\.])', '\\1\\3',
+                 src.replace('float', 'double'))
+    tmp = tmp.replace('logf(', 'log(')
+    tmp = tmp.replace('expf(', 'exp(')
+    tmp = tmp.replace('powf(', 'pow(')
+    return tmp
 
 # TODO: Correctly process vector and scalar fields in these clases.
 class HDF5FlatOutput(object):
@@ -1156,7 +1156,6 @@ class BinaryFluidBase(FluidLBMSim):
             return [self.gpu_dist1a, self.gpu_dist2a]
 
     def _prepare_symbols(self):
-        from sympy import Symbol, Matrix, Rational
         self.S.alias('phi', self.S.g1m0)
 
     def _init_fields(self, need_dist):
@@ -1318,7 +1317,7 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
     def _prepare_symbols(self):
         """Additional symbols and coefficients for the free-energy binary liquid model."""
         super(BinaryFluidFreeEnergy, self)._prepare_symbols()
-        from sympy import Symbol, Matrix, Rational
+        from sympy import Symbol, Rational
 
         self.S.Gamma = Symbol('Gamma')
         self.S.kappa = Symbol('kappa')
