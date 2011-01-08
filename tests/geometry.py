@@ -158,39 +158,46 @@ class Test3DNodeProcessing(unittest.TestCase):
         # Primary direction detection on a small box.
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((6, 6, 5))),
-                (self.geo._encode_orientation_and_param(
-                    self.sim.grid.vec_to_dir((0,0,-1)), 0), self.geo.NODE_WALL))
+                geo.NodeInfo(misc=self.geo._encode_orientation_and_param(
+                        self.sim.grid.vec_to_dir((0,0,-1)), 0),
+                    type=self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((6, 6, 7))),
-                (self.geo._encode_orientation_and_param(
-                    self.sim.grid.vec_to_dir((0,0,1)), 0), self.geo.NODE_WALL))
+                geo.NodeInfo(misc=self.geo._encode_orientation_and_param(
+                        self.sim.grid.vec_to_dir((0,0,1)), 0),
+                    type=self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((5, 6, 6))),
-                (self.geo._encode_orientation_and_param(
-                    self.sim.grid.vec_to_dir((-1,0,0)), 0), self.geo.NODE_WALL))
+                geo.NodeInfo(misc=self.geo._encode_orientation_and_param(
+                        self.sim.grid.vec_to_dir((-1,0,0)), 0),
+                    type=self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((7, 6, 6))),
-                (self.geo._encode_orientation_and_param(
-                    self.sim.grid.vec_to_dir((1,0,0)), 0), self.geo.NODE_WALL))
+                geo.NodeInfo(misc=self.geo._encode_orientation_and_param(
+                        self.sim.grid.vec_to_dir((1,0,0)), 0),
+                    type=self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((6, 5, 6))),
-                (self.geo._encode_orientation_and_param(
-                    self.sim.grid.vec_to_dir((0,-1,0)), 0), self.geo.NODE_WALL))
+                geo.NodeInfo(misc=self.geo._encode_orientation_and_param(
+                        self.sim.grid.vec_to_dir((0,-1,0)), 0),
+                    type=self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((6, 7, 6))),
-                (self.geo._encode_orientation_and_param(
-                    self.sim.grid.vec_to_dir((0,1,0)), 0), self.geo.NODE_WALL))
+                geo.NodeInfo(misc=self.geo._encode_orientation_and_param(
+                        self.sim.grid.vec_to_dir((0,1,0)), 0),
+                    type=self.geo.NODE_WALL))
 
         # Orientation detection at domain boundaries.
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((11, 11, 0))),
-                (self.geo._encode_orientation_and_param(
-                    self.sim.grid.vec_to_dir((0,0,1)), 0), self.geo.NODE_WALL))
+                geo.NodeInfo(misc=self.geo._encode_orientation_and_param(
+                        self.sim.grid.vec_to_dir((0,0,1)), 0),
+                    type=self.geo.NODE_WALL))
         self.assertEqual(
                 self.geo._decode_node(self.geo._get_map((11, 11, 63))),
-                (self.geo._encode_orientation_and_param(
-                    self.sim.grid.vec_to_dir((0,0,-1)), 0), self.geo.NODE_WALL))
-
+                geo.NodeInfo(misc=self.geo._encode_orientation_and_param(
+                        self.sim.grid.vec_to_dir((0,0,-1)), 0),
+                    type=self.geo.NODE_WALL))
 
     def testVelocityNodes(self):
         self.geo._clear_state()

@@ -1,8 +1,12 @@
+from collections import namedtuple
+
 import os
 import sys
 import numpy
 
 from sailfish import sym
+
+NodeInfo = namedtuple('NodeInfo', 'misc type')
 
 # Abstract class implementation, from Peter's Norvig site.
 def abstract():
@@ -81,16 +85,16 @@ class LBMGeo(object):
         return (code >> self._param_shift,
                 code & ((1 << self._param_shift) - 1))
 
-    # TODO(mjanusz): This should return a named tuple.
     @classmethod
     def _decode_node(cls, code):
         """Decode an entry from the map of nodes.
 
         :param code: node code from the map
 
-        :rtype: tuple of misc. data, type
+        :rtype: NodeInfo: tuple of misc. data, type
         """
-        return cls._decode_node_misc(code), cls._decode_node_type(code)
+        return NodeInfo(misc=cls._decode_node_misc(code),
+                        type=cls._decode_node_type(code))
 
     def __init__(self, shape, options, float, backend, sim):
         self.sim = sim
