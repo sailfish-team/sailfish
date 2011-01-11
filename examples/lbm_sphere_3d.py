@@ -2,7 +2,6 @@
 
 import sys
 import numpy as np
-from sailfish import geo
 from lbm_poiseuille_3d import LBMGeoPoiseuille, LPoiSim
 
 class LBMGeoSphere(LBMGeoPoiseuille):

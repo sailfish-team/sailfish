@@ -1,12 +1,7 @@
 #!/usr/bin/python
 
-import random
 import numpy
-from sailfish import lbm
-from sailfish import geo
-
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
+from sailfish import geo, lb_single
 
 class GeoSC(geo.LBMGeo2D):
     def init_fields(self):
@@ -19,12 +14,12 @@ class GeoSC(geo.LBMGeo2D):
 #        self.sim.rho[:] += 0.693
 
 
-class SCSim(lbm.ShanChenSingle):
+class SCSim(lb_single.ShanChenSingle):
     filename = 'sc_phase_2d'
 
     def __init__(self, geo_class):
-        lbm.ShanChenSingle.__init__(self, geo_class, options=[],
-                              defaults={'bc_velocity': 'equilibrium', 'verbose': True, 'lat_nx': 256,
+        lb_single.ShanChenSingle.__init__(self, geo_class, options=[],
+                                defaults={'bc_velocity': 'equilibrium', 'verbose': True, 'lat_nx': 256,
                                 'lat_ny': 256, 'grid': 'D2Q9', 'G': 5.0,
                                 'visc': 0.166666666666, 'periodic_x': True, 'periodic_y': True, 'every': 20,
                                 'scr_scale': 1})

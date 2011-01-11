@@ -6,12 +6,9 @@
 import sys
 import numpy
 
-from sailfish import lbm
-from sailfish import geo
+from sailfish import geo, lb_single
 
 import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
-
 
 class LBMGeo(geo.LBMGeo3D):
     def define_nodes(self):
@@ -20,7 +17,7 @@ class LBMGeo(geo.LBMGeo3D):
     def init_fields(self):
         self.sim.rho[:] = 1.0
 
-class LSim(lbm.FluidLBMSim):
+class LSim(lb_single.FluidLBMSim):
     filename = 'bool'
 
     def __init__(self, geo_class, args=sys.argv[1:], defaults=None):
@@ -28,7 +25,7 @@ class LSim(lbm.FluidLBMSim):
         opts.append(optparse.make_option('--geo', dest='geo', type='string', help='file defining the geometry',
                                          default=None))
 
-        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults)
+        lb_single.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults)
 
         if self.options.geo is not None:
             geo = numpy.logical_not(numpy.load(self.options.geo))

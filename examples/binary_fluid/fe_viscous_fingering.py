@@ -1,10 +1,7 @@
 #!/usr/bin/python
 
 import numpy as np
-from sailfish import geo, lbm
-
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
+from sailfish import geo, lb_binary
 
 class GeoFEFinger(geo.LBMGeo3D):
 
@@ -22,7 +19,7 @@ class GeoFEFinger(geo.LBMGeo3D):
         self.sim.phi[:] = 1.0
         self.sim.phi[np.logical_or(hx <= a, hx >= b)] = -1.0
 
-class FEFingerSim(lbm.BinaryFluidFreeEnergy):
+class FEFingerSim(lb_binary.BinaryFluidFreeEnergy):
 
     filename = 'fe_fingering'
 
@@ -36,7 +33,7 @@ class FEFingerSim(lbm.BinaryFluidFreeEnergy):
                     'periodic_z': True}
         settings.update(defaults)
 
-        lbm.BinaryFluidFreeEnergy.__init__(self, geo_class, options=[], defaults=settings)
+        lb_binary.BinaryFluidFreeEnergy.__init__(self, geo_class, options=[], defaults=settings)
 
         self.add_body_force((3.0e-5, 0.0, 0.0), grid=0, accel=False)
 

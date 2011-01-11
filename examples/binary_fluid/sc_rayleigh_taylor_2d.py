@@ -1,11 +1,7 @@
 #!/usr/bin/python
 
-import random
 import numpy as np
-from sailfish import geo, lbm
-
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
+from sailfish import geo, lb_binary
 
 class GeoSC(geo.LBMGeo2D):
 
@@ -25,12 +21,12 @@ class GeoSC(geo.LBMGeo2D):
         self.sim.rho[(hy > self.lat_ny/2)] = 1e-4
         self.sim.phi[(hy > self.lat_ny/2)] += 1.0
 
-class SCSim(lbm.ShanChenBinary):
+class SCSim(lb_binary.ShanChenBinary):
     filename = 'sc_instability_2d'
 
     def __init__(self, geo_class):
-        lbm.ShanChenBinary.__init__(self, geo_class, options=[],
-                              defaults={'bc_velocity': 'equilibrium', 'verbose': True, 'lat_nx': 640, #1280,
+        lb_binary.ShanChenBinary.__init__(self, geo_class, options=[],
+                                defaults={'bc_velocity': 'equilibrium', 'verbose': True, 'lat_nx': 640, #1280,
                                 'lat_ny': 400, 'grid': 'D2Q9', 'G': -1.2,
                                 'visc': 0.166666666666, 'periodic_x': True, 'scr_scale': 1})
         self.options.tau_phi = self.get_tau()

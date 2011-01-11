@@ -1,12 +1,8 @@
 #!/usr/bin/python
 
-import random
 import numpy
-from sailfish import lbm
-from sailfish import geo
+from sailfish import geo, lb_binary
 
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
 
 class GeoSC(geo.LBMGeo2D):
     def init_fields(self):
@@ -15,7 +11,7 @@ class GeoSC(geo.LBMGeo2D):
         self.sim.rho[:] += 1.0
         self.sim.phi[:] += 1.0
 
-class SCSim(lbm.ShanChenBinary):
+class SCSim(lb_binary.ShanChenBinary):
     filename = 'sc_separation_2d'
 
     def __init__(self, geo_class, defaults={}):
@@ -24,7 +20,7 @@ class SCSim(lbm.ShanChenBinary):
                     'visc': 0.166666666666, 'periodic_x': True, 'periodic_y': True, 'every': 5,
                     'scr_scale': 1}
         settings.update(defaults)
-        lbm.ShanChenBinary.__init__(self, geo_class, options=[], defaults=settings)
+        lb_binary.ShanChenBinary.__init__(self, geo_class, options=[], defaults=settings)
         self.options.tau_phi = self.get_tau()
 
 if __name__ == '__main__':

@@ -1,8 +1,7 @@
 #!/usr/bin/python
 
 import numpy
-from sailfish import lbm
-from sailfish import geo
+from sailfish import geo, lbm
 
 class LBMGeoFS(geo.LBMGeo2D):
     ic_fields = False

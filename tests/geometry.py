@@ -7,7 +7,7 @@ import numpy
 sys.path.append('.')
 sys.path.append('..')
 
-from sailfish import lbm, geo, backend_dummy
+from sailfish import lb_single, geo, backend_dummy
 
 class DummyOptions(object):
     boundary = 'fullbb'
@@ -64,7 +64,7 @@ class Test3DForce(unittest.TestCase):
         backend = backend_dummy.DummyBackend()
         options = DummyOptions()
         options.force = True
-        self.sim = lbm.FluidLBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True,
+        self.sim = lb_single.FluidLBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True,
             'lat_nx': self.shape[0], 'lat_ny': self.shape[1], 'lat_nz': self.shape[2]})
         self.sim._init_shape()
         update_options(self.sim.options, options)
@@ -141,7 +141,7 @@ class Test3DNodeProcessing(unittest.TestCase):
 
     def setUp(self):
         backend = backend_dummy.DummyBackend()
-        self.sim = lbm.FluidLBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True,
+        self.sim = lb_single.FluidLBMSim(TestGeo3D, defaults={'grid': 'D3Q19', 'quiet': True,
             'lat_nx': self.shape[0], 'lat_ny': self.shape[1], 'lat_nz': self.shape[2], 'periodic_z': True})
         self.sim._init_shape()
         update_options(self.sim.options, DummyOptions())

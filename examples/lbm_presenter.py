@@ -1,18 +1,14 @@
 #!/usr/bin/python -u
 
-import sys
-import os
-import numpy
 import glob
+import os
+import sys
+import optparse
+
+import numpy
 import pygame
 
-from sailfish import lbm
-from sailfish import vis2d
-from sailfish import geo
-from scipy import signal
-
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
+from sailfish import lbm, lb_single, vis2d
 
 from lbm_poiseuille import LBMGeoPoiseuille
 
@@ -93,7 +89,7 @@ class Fluid2DVisPresentation(vis2d.Fluid2DVis):
         self._set_wall_from_image()
         super(Fluid2DVisPresentation, self).main()
 
-class LPresSim(lbm.FluidLBMSim):
+class LPresSim(lb_single.FluidLBMSim):
     filename = 'Sailfish_Presentation'
 
     def __init__(self, geo_class, args=sys.argv[1:], defaults=None):
@@ -109,7 +105,7 @@ class LPresSim(lbm.FluidLBMSim):
                     'lat_ny': 240, 'verbose': True, 'vismode': '2col',
                     'every': 400, 'model': 'mrt','visc':0.001,'scr_scale':1.0}
 
-        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
+        lb_single.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
     def _init_vis(self):
         self.vis = Fluid2DVisPresentation(self, self.options.scr_w, self.options.scr_h,

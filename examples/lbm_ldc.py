@@ -1,12 +1,9 @@
 #!/usr/bin/python
 
 import numpy as np
-from sailfish import lbm
-from sailfish import geo
+from sailfish import lb_single, geo
 
 import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
-
 
 class LBMGeoLDC(geo.LBMGeo2D):
     """Lid-driven cavity geometry."""
@@ -34,7 +31,7 @@ class LBMGeoLDC(geo.LBMGeo2D):
     def get_reynolds(self, viscosity):
         return int((self.lat_nx-1) * self.max_v/viscosity)
 
-class LDCSim(lbm.FluidLBMSim):
+class LDCSim(lb_single.FluidLBMSim):
 
     filename = 'ldc'
 
@@ -46,7 +43,7 @@ class LDCSim(lbm.FluidLBMSim):
         settings = {'bc_velocity': 'equilibrium', 'verbose': True}
         settings.update(defaults)
 
-        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, defaults=settings)
+        lb_single.FluidLBMSim.__init__(self, geo_class, options=opts, defaults=settings)
 
         if self.options.test_re100:
             self.options.batch = True

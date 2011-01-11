@@ -1,19 +1,10 @@
 #!/usr/bin/python
+"""A low Reynolds number flow of a drop through a capillary channel."""
 
-#
-# A low Reynolds number flow of a drop through a capillary channel.
-#
-
-import random
 import numpy
-from sailfish import lbm
-from sailfish import geo
-
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
+from sailfish import geo, lb_binary
 
 class GeoSC(geo.LBMGeo2D):
-
     maxv = 0.005
 
     def define_nodes(self):
@@ -55,11 +46,11 @@ class GeoSC(geo.LBMGeo2D):
         return int(self.lat_ny * self.maxv/viscosity)
 
 
-class SCSim(lbm.ShanChenBinary):
+class SCSim(lb_binary.ShanChenBinary):
     filename = 'sc_instability_2d'
 
     def __init__(self, geo_class):
-        lbm.ShanChenBinary.__init__(self, geo_class, options=[],
+        lb_binary.ShanChenBinary.__init__(self, geo_class, options=[],
                               defaults={'bc_velocity': 'equilibrium', 'verbose': True, 'lat_nx': 640,
                                 'lat_ny': 200, 'grid': 'D2Q9', 'G': -1.2,
                                 'visc': 0.166666666666, 'periodic_x': True, 'periodic_y': True, 'scr_scale': 1})
@@ -74,7 +65,7 @@ class SCSim(lbm.ShanChenBinary):
         self.add_iter_hook(100, self.average_dens, every=True)
 
     def average_dens(self):
-        print self.iter_, numpy.average(self.rho), numpy.average(self.phi) 
+        print self.iter_, numpy.average(self.rho), numpy.average(self.phi)
 
 sim = SCSim(GeoSC)
 sim.run()

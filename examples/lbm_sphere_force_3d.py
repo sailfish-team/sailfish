@@ -4,10 +4,9 @@ import sys
 import math
 import numpy as np
 
-from sailfish import geo, lbm
+from sailfish import geo, lb_single
 
 import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
 
 def cd_theoretical(diam_ratio, re):
     """Return the theoretical value of drag coefficient.
@@ -109,7 +108,7 @@ class LBMGeoSphere(geo.LBMGeo3D):
         bc = geo.get_bc(self.options.bc_velocity)
         return self.width - 1 - 2.0 * bc.location
 
-class LSphereSim(lbm.FluidLBMSim):
+class LSphereSim(lb_single.FluidLBMSim):
     filename = 'sphere3d'
 
     def __init__(self, geo_class, defaults={}, args=sys.argv[1:]):
@@ -127,7 +126,7 @@ class LSphereSim(lbm.FluidLBMSim):
             'verbose': True}
         defaults_.update(defaults)
 
-        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
+        lb_single.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
         if self.options.batch and not ('every' in self.options.specified):
             self.options.every = 1000

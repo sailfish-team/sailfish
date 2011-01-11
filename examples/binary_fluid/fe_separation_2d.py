@@ -1,12 +1,8 @@
 #!/usr/bin/python
 
-import random
 import numpy
-from sailfish import lbm
-from sailfish import geo
+from sailfish import geo, lb_binary
 
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
 
 class GeoFE(geo.LBMGeo2D):
 
@@ -16,7 +12,7 @@ class GeoFE(geo.LBMGeo2D):
         self.sim.rho[:] = 1.0
         self.sim.phi[:] = numpy.random.rand(*self.sim.phi.shape) / 100.0
 
-class FESim(lbm.BinaryFluidFreeEnergy):
+class FESim(lb_binary.BinaryFluidFreeEnergy):
     filename = 'fe_seperation_2d'
 
     def __init__(self, geo_class, defaults={}):
@@ -28,7 +24,7 @@ class FESim(lbm.BinaryFluidFreeEnergy):
                     'periodic_x': True, 'periodic_y': True}
         settings.update(defaults)
 
-        lbm.BinaryFluidFreeEnergy.__init__(self, geo_class, options=[], defaults=settings)
+        lb_binary.BinaryFluidFreeEnergy.__init__(self, geo_class, options=[], defaults=settings)
 
 if __name__ == '__main__':
     sim = FESim(GeoFE)

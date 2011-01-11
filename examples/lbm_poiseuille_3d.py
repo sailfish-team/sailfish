@@ -4,10 +4,9 @@ import sys
 
 import math
 import numpy as np
-from sailfish import geo, lbm
+from sailfish import geo, lb_single
 
 import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
 
 class LBMGeoPoiseuille(geo.LBMGeo3D):
     """3D Poiseuille geometry."""
@@ -122,7 +121,7 @@ class LBMGeoPoiseuille(geo.LBMGeo3D):
     def get_reynolds(self, viscosity):
         return int(self.get_width() * self.maxv/viscosity)
 
-class LPoiSim(lbm.FluidLBMSim):
+class LPoiSim(lb_single.FluidLBMSim):
 
     filename = 'poiseuille3d'
 
@@ -138,7 +137,7 @@ class LPoiSim(lbm.FluidLBMSim):
         if defaults is not None:
             defaults_.update(defaults)
 
-        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
+        lb_single.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
 
     def _init_post_geo(self):
         if self.options.drive == 'force':

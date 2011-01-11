@@ -3,11 +3,9 @@
 import sys
 import numpy as np
 
-from sailfish import lbm
-from sailfish import geo
+from sailfish import geo, lb_single
 
 import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
 
 
 class LBMGeoPoiseuille(geo.LBMGeo2D):
@@ -100,7 +98,7 @@ class LBMGeoPoiseuille(geo.LBMGeo2D):
     def get_reynolds(self, viscosity):
         return int(self.get_width() * self.maxv/viscosity)
 
-class LPoiSim(lbm.FluidLBMSim):
+class LPoiSim(lb_single.FluidLBMSim):
 
     filename = 'poiseuille'
 
@@ -116,7 +114,7 @@ class LPoiSim(lbm.FluidLBMSim):
             defaults_ = {'max_iters': 500000, 'visc': 0.1, 'lat_nx': 64,
                     'lat_ny': 64, 'verbose': True}
 
-        lbm.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
+        lb_single.FluidLBMSim.__init__(self, geo_class, options=opts, args=args, defaults=defaults_)
         self.add_iter_hook(100, self.status, every=True)
 
     def status(self):

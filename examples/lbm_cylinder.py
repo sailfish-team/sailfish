@@ -3,7 +3,6 @@
 import sys
 import numpy as np
 
-from sailfish import geo
 from lbm_poiseuille import LBMGeoPoiseuille, LPoiSim
 
 class LBMGeoCylinder(LBMGeoPoiseuille):
