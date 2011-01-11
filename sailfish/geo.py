@@ -1,7 +1,10 @@
-from collections import namedtuple
+"""Classes used to specify LB simulation geometry."""
 
-import os
-import sys
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'GPL3'
+
+from collections import namedtuple
 import numpy
 
 from sailfish import sym

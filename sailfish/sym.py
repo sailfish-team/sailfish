@@ -1,3 +1,9 @@
+"""Helper code for symbolic processing and RTCG."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'GPL3'
+
 import copy
 from collections import namedtuple
 import operator
@@ -8,7 +14,7 @@ import sympy
 from sympy import Matrix, Rational, Symbol, Poly, Eq
 from sympy.core import basic
 from sympy.printing.ccode import CCodePrinter
-from sympy.printing.precedence import precedence, PRECEDENCE
+from sympy.printing.precedence import precedence
 import re
 
 TargetDist = namedtuple('TargetDist', 'var idx')

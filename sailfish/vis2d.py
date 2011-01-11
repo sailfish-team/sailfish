@@ -1,31 +1,31 @@
-import math
-import numpy
-import pygame
+"""pygame visualization backend."""
 
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'GPL3'
+
+import math
 import os
 import sys
 import time
 
-from sailfish import geo
-from sailfish import sym
-from sailfish import vis
-
+import numpy
+import pygame
 from scipy import signal
 
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
+from sailfish import geo, vis
 
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
 
-def font_name():
+def _font_name():
     import platform
     if platform.system() == 'Windows':
         return 'Courier New'
     else:
         return 'Liberation Mono'
 
-def hsv_to_rgb(a):
+def _hsv_to_rgb(a):
     t = a[:,:,0]*6.0
     i = t.astype(numpy.uint8)
     f = t - numpy.floor(t)
@@ -54,7 +54,7 @@ def _cmap_hsv(drw):
     drw = drw.reshape((drw.shape[0], drw.shape[1], 1)) * numpy.float32([1.0, 1.0, 1.0])
     drw[:,:,2] = 1.0
     drw[:,:,1] = 1.0
-    drw = hsv_to_rgb(drw) * 255.0
+    drw = _hsv_to_rgb(drw) * 255.0
     return drw.astype(numpy.uint8)
 
 def _cmap_std(drw):
@@ -81,7 +81,7 @@ def _cmap_bin_red_blue(a, b):
     g[:] = 0.0
     return (numpy.dstack([a,g,b]) * 255.0).astype(numpy.uint8)
 
-def gauss_kernel(size, sizey=None):
+def _gauss_kernel(size, sizey=None):
     """Return a normalized 2D gauss kernel array for convolutions"""
     size = int(size)
     if not sizey:
@@ -92,7 +92,7 @@ def gauss_kernel(size, sizey=None):
     g = numpy.exp(-(x**2/float(size) + y**2/float(sizey)))
     return g / g.sum()
 
-def emboss_field(fv, a):
+def _emboss_field(fv, a):
     # Based on the code posted on
     # http://stackoverflow.com/questions/2034037/image-embossing-in-python-with-pil-adding-depth-azimuth-etc
     azi = numpy.pi/8.
@@ -176,7 +176,7 @@ class Fluid2DVis(vis.FluidVis):
         self._cmap_scale_lock = False
         self._convolve = False
         self._emboss = False
-        self._font = pygame.font.SysFont(font_name(), 14)
+        self._font = pygame.font.SysFont(_font_name(), 14)
         self._impart_velocity = False
         self.set_mode(width, height)
         self.lat_nx = lat_nx
@@ -282,7 +282,7 @@ class Fluid2DVis(vis.FluidVis):
                 fs.append((fv - avg_) / (max_ - min_))
 
         if self._convolve:
-            g = gauss_kernel(2, sizey=2)
+            g = _gauss_kernel(2, sizey=2)
             fs = map(lambda x: signal.convolve(x, g, mode='same'), fs)
 
 
@@ -340,7 +340,7 @@ class Fluid2DVis(vis.FluidVis):
         a[fluid_map] = field[fluid_map]
 
         if self._emboss:
-            emboss_field(fv[0], a)
+            _emboss_field(fv[0], a)
 
         # Unlock the surface and put the picture on screen.
         del a

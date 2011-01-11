@@ -1,3 +1,9 @@
+"""Sailfish OpenCL backend."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'GPL3'
+
 import os
 import pyopencl as cl
 

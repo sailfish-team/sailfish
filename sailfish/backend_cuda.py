@@ -1,11 +1,17 @@
+"""Sailfish CUDA backend."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'GPL3'
+
 import operator
+from struct import calcsize, pack
 
 import pycuda.autoinit
 import pycuda.compiler
 import pycuda.tools
 import pycuda.driver as cuda
 
-from struct import calcsize, pack
 
 def _expand_block(block):
     if block is int:

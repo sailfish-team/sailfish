@@ -1,19 +1,22 @@
+"""Core Lattice Boltzmann simulation classes for Sailfish."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'GPL3'
+
 import inspect
 import math
 import numpy
 import os
 import sys
 import time
-from sailfish import geo
-from sailfish import vis
-from sailfish import io
 
 import optparse
 from optparse import OptionGroup, OptionParser
 
 from mako.lookup import TemplateLookup
 
-from sailfish import sym
+from sailfish import geo, io, sym, vis
 
 SUPPORTED_BACKENDS = {'cuda': 'backend_cuda', 'opencl': 'backend_opencl'}
 VIS_MODULES = ['vis2d', 'vis3d', 'vis_surf']

@@ -1,3 +1,9 @@
+"""Base Sailfish visualization classes."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'GPL3'
+
 class Field(object):
     def __init__(self, name, values, negative=False, ranges=None):
         self.name = name
@@ -13,7 +19,6 @@ class Field(object):
             raise ValueError('A range has to be specified for every component of the field.')
 
 class FluidVis(object):
-
     name = 'replace_this_in_derivative_classes'
     dim = []
 
@@ -40,5 +45,3 @@ class FluidVis(object):
     @property
     def num_fields(self):
         return len(self.vis_fields)
-
-

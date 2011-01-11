@@ -1,12 +1,9 @@
-import math
-import numpy
-import pygame
-import os
-import sys
-import time
+"""3D MayaVi visualization class."""
 
-from sailfish import geo
-from sailfish import sym
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'GPL3'
+
 from sailfish import vis
 
 class Fluid3DVis(vis.FluidVis):

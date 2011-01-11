@@ -1,8 +1,8 @@
-import pycuda.autoinit
-import pycuda.compiler
-import pycuda.driver as cuda
+"""A dummy Sailfish backend.  Used for testing."""
 
-from struct import calcsize, pack
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'GPL3'
 
 class DummyBackend(object):
 

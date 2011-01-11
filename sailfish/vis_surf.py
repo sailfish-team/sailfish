@@ -1,3 +1,9 @@
+"""OpenGL visualization backend."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'GPL3'
+
 import math
 import os
 import sys
@@ -16,8 +22,6 @@ try:
 except ImportError:
     has_ropengl = False
 
-from sailfish import geo
-from sailfish import sym
 from sailfish import vis
 
 pygame.init()
@@ -50,13 +54,12 @@ def _vis_scl(v):
     col[1,:] = v
     return col
 
-colormaps = {
+_colormaps = {
     'rgb': _vis_rgb,
     'scl': _vis_scl,
     }
 
 class FluidSurfaceVis(vis.FluidVis):
-
     name = 'surface'
     dims = [2]
 
@@ -106,7 +109,7 @@ class FluidSurfaceVis(vis.FluidVis):
         self._paused = False
         self._reset()
 
-        self._colormap = colormaps.keys()[0]
+        self._colormap = _colormaps.keys()[0]
         self._minh = -0.1
         self._maxh = 0.1
 
@@ -175,7 +178,7 @@ class FluidSurfaceVis(vis.FluidVis):
         self._minh = min(self._minh, numpy.min(mesh_z))
         self._maxh = max(self._maxh, numpy.max(mesh_z))
 
-        col = colormaps[self._colormap]((vtx[2::3]-self._minh)/(self._maxh-self._minh))
+        col = _colormaps[self._colormap]((vtx[2::3]-self._minh)/(self._maxh-self._minh))
         col = numpy.ravel(numpy.transpose(col))
 
         vtx.shape = (self.mesh_n, 3)
@@ -281,9 +284,9 @@ class FluidSurfaceVis(vis.FluidVis):
                     else:
                         self._angle_z += 1.0
                 elif event.key == pygame.K_c:
-                    idx = colormaps.keys().index(self._colormap) + 1
-                    idx %= len(colormaps.keys())
-                    self._colormap = colormaps.keys()[idx]
+                    idx = _colormaps.keys().index(self._colormap) + 1
+                    idx %= len(_colormaps.keys())
+                    self._colormap = _colormaps.keys()[idx]
 
     def main(self):
         t_prev = time.time()
