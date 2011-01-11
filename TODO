@@ -1,7 +1,5 @@
 * TASKS
 
-- Support postcollision boundary conditions in multifluid simulations.
-
 - Regularized boundary conditions for 2D and 3D.
 
 - Automated LDC regtest.
