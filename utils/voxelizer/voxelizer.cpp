@@ -8,6 +8,15 @@
 using namespace cvmlcpp;
 using namespace std;
 
+// TODO: use the 'pad' option in voxelize to generate an additional layer of
+// nodes outside of the object being voxelizer
+//
+// TODO: tranform this program into a Python module so that STL geometry can
+// be used to directly initialize a simulation
+//
+// TODO: consider using the distances() function to provide an orientation
+// for the walls
+
 int main(int argc, char **argv)
 {
 	Matrix<char, 3u> voxels;
