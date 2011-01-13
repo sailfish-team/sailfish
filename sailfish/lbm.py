@@ -828,29 +828,6 @@ class LBMSim(object):
         self._mlups_calls += 1
         return (self._mlups, mlups)
 
-    # TODO: Move this to a separate class.
-    def output_ascii(self, file):
-        if self.grid.dim == 3:
-            rho = self.geo.mask_array_by_fluid(self.rho)
-            vx = self.geo.mask_array_by_fluid(self.vx)
-            vy = self.geo.mask_array_by_fluid(self.vy)
-            vz = self.geo.mask_array_by_fluid(self.vz)
-
-            for z in range(0, vx.shape[0]):
-                for y in range(0, vx.shape[1]):
-                    for x in range(0, vx.shape[2]):
-                        print >>file, rho[z,y,x], vx[z,y,x], vy[z,y,x], vz[z,y,x]
-                    print >>file, ''
-        else:
-            rho = self.geo.mask_array_by_fluid(self.rho)
-            vx = self.geo.mask_array_by_fluid(self.vx)
-            vy = self.geo.mask_array_by_fluid(self.vy)
-
-            for y in range(0, vx.shape[0]):
-                for x in range(0, vx.shape[1]):
-                    print >>file, rho[y,x], vx[y,x], vy[y,x]
-                print >>file, ''
-
     def _run_benchmark(self):
         cycles = self.options.every
 
