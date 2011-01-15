@@ -588,6 +588,8 @@ def free_energy_mrt_matrix(grid):
 def bgk_external_force(grid, grid_num=0):
     """Get expressions for the external body force correction in the BGK model.
 
+    This implements the external force as in Eq. 20 from PhysRevE 65, 046308.
+
     :param grid: the grid class to be used
 
     :rtype: list of sympy expressions (in the same order as the current grid's basis)
@@ -604,9 +606,9 @@ def bgk_external_force(grid, grid_num=0):
     return ret
 
 def bgk_external_force_pref(grid_num=0):
-    # This includes a factor of c_s^2.
+    # FIXME: This includes a factor of c_s^2.
 
-    # FIXMe
+    # FIXME
     rho = getattr(S, 'g%sm0' % grid_num)
 
     if grid_num == 0:

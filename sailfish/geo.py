@@ -166,9 +166,6 @@ class LBMGeo(object):
         """Get the Reynolds number for this geometry."""
         abstract
 
-    def get_defines(self):
-        abstract
-
     def _clear_state(self):
         self._params = None
         self.map[:] = 0
