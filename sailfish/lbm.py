@@ -2,7 +2,7 @@
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
-__license__ = 'GPL3'
+__license__ = 'LGPL'
 __version__ = '0.2-alpha1'
 
 import inspect
@@ -13,53 +13,11 @@ import sys
 import time
 
 import optparse
-from optparse import OptionGroup, OptionParser
-
-from mako.lookup import TemplateLookup
 
 from sailfish import geo, io, sym, vis
 
-SUPPORTED_BACKENDS = {'cuda': 'backend_cuda', 'opencl': 'backend_opencl'}
-VIS_MODULES = ['vis2d', 'vis3d', 'vis_surf']
 
-for backend in SUPPORTED_BACKENDS.values():
-    try:
-        __import__('sailfish', fromlist=[backend])
-    except ImportError:
-        pass
 
-for visbackend in VIS_MODULES:
-    try:
-        __import__('sailfish', fromlist=[visbackend])
-    except ImportError:
-        pass
-
-def get_backends():
-    """Get a list of available backends."""
-    return sorted([k for k, v in SUPPORTED_BACKENDS.iteritems()
-        if ('sailfish.%s' % v) in sys.modules])
-
-def get_backend_module(backend):
-    return sys.modules['sailfish.%s' % SUPPORTED_BACKENDS[backend]]
-
-def get_vis_engines():
-    """Get a list of available visaulization engines."""
-
-    ret = {}
-
-    for v in VIS_MODULES:
-        module = 'sailfish.%s' % v
-        if module not in sys.modules:
-            continue
-
-        for class_name, obj in inspect.getmembers(sys.modules[module]):
-            try:
-                if vis.FluidVis in inspect.getmro(obj):
-                    ret[obj.name] = obj
-            except AttributeError:
-                pass
-
-    return ret
 
 class Values(optparse.Values):
     def __init__(self, *args):
@@ -71,14 +29,6 @@ class Values(optparse.Values):
         if hasattr(self, 'specified'):
             self.specified.add(name)
 
-def _convert_to_double(src):
-    import re
-    t = re.sub('([0-9]+\.[0-9]*(e-?[0-9]*)?)f([^a-zA-Z0-9\.])', '\\1\\3',
-               src.replace('float', 'double'))
-    t = t.replace('logf(', 'log(')
-    t = t.replace('expf(', 'exp(')
-    t = t.replace('powf(', 'pow(')
-    return t
 
 class Hook(object):
     """Class wrapping hook called after simulation iteration.
@@ -94,15 +44,6 @@ class Hook(object):
 class LBMSim(object):
     """Base class for LBM simulations. Descendant classes should be declared for specific simulations."""
 
-    #: The filename base for screenshots.
-    filename = 'lbm_sim'
-
-    #: The command to use to automatically format the compute unit source code.
-    format_cmd = (r"sed -i -e '{{:s;N;\#//#{{p ;d}}; \!#!{{p;d}} ; s/\n//g;t s}}' {file} ; "
-                  r"sed -i -e 's/}}/}}\n\n/g' {file} ; indent -linux -sob -l120 {file} ; "
-                  r"sed -i -e '/^$/{{N; s/\n\([\t ]*}}\)$/\1/}}' -e '/{{$/{{N; s/{{\n$/{{/}}' {file}")
-    # The first sed call removes all newline characters except for those terminating lines
-    # that are preprocessor directives (starting with #) or single line comments (//).
 
     #: File name of the mako template containing the kernel code.
     kernel_file = 'single_fluid.mako'
@@ -132,129 +73,7 @@ class LBMSim(object):
     def constants(self):
         return []
 
-    def _add_options(self, parser, lb_group):
-        """Add simulation options common to a class of simulations.
-
-        Descendant classes (e.g. free surface, single fluid, etc) should use
-        this method to provide their own generic options common to all
-        simulations.
-
-        :param parser: instance of the optparse.OptionParser class
-        :param lb_group: instance of optparser.OptionGroup class representing
-            core LB engine settings
-        :rtype: iterable of optparse.OptionGroup instances or None
-        """
-        pass
-
     def __init__(self, geo_class, options=[], args=None, defaults=None):
-        """
-        :param geo_class: geometry class to use for the simulation
-        :param options: iterable of ``optparse.Option`` instances representing additional
-          options accepted by this simulation
-        :param args: command line arguments
-        :param defaults: a dictionary specifying the default values for any simulation options.
-          These take precedence over the default values specified in ``optparse.Option`` objects.
-        """
-        self._t_start = time.time()
-
-        if args is None:
-            args = sys.argv[1:]
-
-        supported_backends = get_backends()
-        supported_vis = get_vis_engines()
-
-        if not supported_backends:
-            raise ValueError('There are no supported compute backends on your system. Make sure pycuda or pyopencl are correctly installed.')
-
-        self.geo_class = geo_class
-
-        parser = OptionParser()
-        parser.add_option('-q', '--quiet', dest='quiet', help='reduce verbosity', action='store_true', default=False)
-        parser.add_option('-v', '--verbose', dest='verbose', help='print additional info about the simulation', action='store_true', default=False)
-
-        group = OptionGroup(parser, 'LB engine settings')
-        group.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
-        group.add_option('--block_size', dest='block_size', help='size of the block of threds', type='int', action='store', default=64)
-        group.add_option('--lat_nx', dest='lat_nx', help='lattice width', type='int', action='store', default=128)
-        group.add_option('--lat_ny', dest='lat_ny', help='lattice height', type='int', action='store', default=128)
-        group.add_option('--lat_nz', dest='lat_nz', help='lattice depth', type='int', action='store', default=1)
-        group.add_option('--periodic_x', dest='periodic_x', help='lattice periodic in the X direction', action='store_true', default=False)
-        group.add_option('--periodic_y', dest='periodic_y', help='lattice periodic in the Y direction', action='store_true', default=False)
-        group.add_option('--periodic_z', dest='periodic_z', help='lattice periodic in the Z direction', action='store_true', default=False)
-        group.add_option('--tracers', dest='tracers', help='number of tracer particles', type='int', action='store', default=32)
-        group.add_option('--visc', dest='visc', help='viscosity', type='float', action='store', default=0.01)
-        group.add_option('--every', dest='every',
-            help='update the data on the host every N steps', metavar='N',
-            type='int', action='store', default=100)
-
-        group.add_option('--from', dest='from_',
-            help='update the data on the host from N steps', metavar='N',
-            type='int', action='store', default=0)
-
-
-        class_options = self._add_options(parser, group)
-        parser.add_option_group(group)
-
-        for backend in supported_backends:
-            group = OptionGroup(parser, '"%s" backend settings' % backend)
-            opts = get_backend_module(backend).backend.add_options(group)
-            if opts:
-                parser.add_option_group(group)
-
-        for name, cls in supported_vis.iteritems():
-            group = OptionGroup(parser, '"%s" visualizaton engine settings' % (name))
-            opts = cls.add_options(group)
-            if opts:
-                parser.add_option_group(group)
-
-        group = OptionGroup(parser, 'Run mode settings')
-        group.add_option('--backend', dest='backend', help='backend', type='choice', choices=supported_backends, default=supported_backends[0])
-        group.add_option('--benchmark', dest='benchmark', help='benchmark mode, implies no visualization', action='store_true', default=False)
-        group.add_option('--max_iters', dest='max_iters', help='number of iterations to run in benchmark/batch mode', action='store', type='int', default=0)
-        group.add_option('--batch', dest='batch', help='run in batch mode, with no visualization', action='store_true', default=False)
-        group.add_option('--nobatch', dest='batch', help='run in interactive mode', action='store_false')
-        group.add_option('--vis', dest='vis', help='visualization module to use', type='choice',
-                choices=supported_vis.keys(), default='pygame')
-        group.add_option('--save_src', dest='save_src', help='file to save the CUDA/OpenCL source code to', action='store', type='string', default='')
-        group.add_option('--use_src', dest='use_src', help='CUDA/OpenCL source to use instead of the automatically generated one', action='store', type='string', default='')
-        group.add_option('--noformat_src', dest='format_src', help='do not format the generated source code', action='store_false', default=True)
-        group.add_option('--output', dest='output', help='save simulation results to FILE', metavar='FILE', action='store', type='string', default='')
-        group.add_option('--output_format', dest='output_format', help='output format', type='choice',
-                choices=io.format_name_to_cls.keys(), default='npy')
-        group.add_option('--use_mako_cache', dest='mako_cache',
-                help='cache the generated Mako templates in /tmp/sailfish_modules-$USER', action='store_true',
-                default=False)
-        group.add_option('--save_checkpoint', help='base name of the checkpoint file', type='string', default='')
-        group.add_option('--restore_checkpoint', help='name of the checkpoint file from which to restore the starting state of the simulation', type='string', default='')
-        parser.add_option_group(group)
-
-        if class_options is not None:
-            for group in class_options:
-                parser.add_option_group(group)
-
-        group = OptionGroup(parser, 'Simulation-specific options')
-        for option in options:
-            group.add_option(option)
-
-        if options:
-            parser.add_option_group(group)
-
-        self.options = Values(parser.defaults)
-        parser.parse_args(args, self.options)
-
-        if not supported_vis:
-            if not self.options.batch:
-                print 'Warning: no visualization modules are available, switching to batch mode.'
-            self.options.batch = True
-
-        # Set default command line values for unspecified options.  This is different
-        # than the default values provided above, as these cannot be changed by
-        # subclasses.
-        if defaults is not None:
-            for k, v in defaults.iteritems():
-                if k not in self.options.specified:
-                    setattr(self.options, k, v)
-
         # Whether to use the macroscopic fields to set the initial distributions.
         self._ic_fields = False
         self.num_tracers = 0
@@ -460,97 +279,6 @@ class LBMSim(object):
     def _update_ctx(self, ctx):
         pass
 
-    def _init_code(self):
-        self._timed_print('Preparing compute device code.')
-
-        # Clear all locale settings, we do not want them affecting the
-        # generated code in any way.
-        import locale
-        locale.setlocale(locale.LC_ALL, 'C')
-
-        if self.options.mako_cache:
-            import pwd
-            lookup = TemplateLookup(directories=sys.path,
-                    module_directory='/tmp/sailfish_modules-%s' % (pwd.getpwuid(os.getuid())[0]))
-        else:
-            lookup = TemplateLookup(directories=sys.path)
-
-        lbm_tmpl = lookup.get_template(os.path.join('sailfish/templates', self.kernel_file))
-
-        self.tau = self.get_tau()
-        ctx = {}
-        ctx['dim'] = self.grid.dim
-        ctx['block_size'] = self.options.block_size
-
-        # Size of the lattice.
-        ctx['lat_ny'] = self.options.lat_ny
-        ctx['lat_nx'] = self.options.lat_nx
-        ctx['lat_nz'] = self.options.lat_nz
-
-        # Actual size of the array, including any padding.
-        ctx['arr_nx'] = self.arr_nx
-        ctx['arr_ny'] = self.arr_ny
-        ctx['arr_nz'] = self.arr_nz
-        ctx['periodic_x'] = int(self.options.periodic_x)
-        ctx['periodic_y'] = int(self.options.periodic_y)
-        ctx['periodic_z'] = int(self.options.periodic_z)
-        ctx['num_params'] = len(self.geo_params)
-        ctx['geo_params'] = self.geo_params
-        ctx['tau'] = self.tau
-        ctx['visc'] = self.float(self.options.visc)
-        ctx['backend'] = self.options.backend
-        ctx['dist_size'] = self.get_dist_size()
-        ctx['pbc_offsets'] = [{-1: self.options.lat_nx,
-                                1: -self.options.lat_nx},
-                              {-1: self.options.lat_ny*self.arr_nx,
-                                1: -self.options.lat_ny*self.arr_nx},
-                              {-1: self.options.lat_nz*self.arr_ny*self.arr_nx,
-                                1: -self.options.lat_nz*self.arr_ny*self.arr_nx}]
-        ctx['bnd_limits'] = [self.options.lat_nx, self.options.lat_ny, self.options.lat_nz]
-        ctx['loc_names'] = ['gx', 'gy', 'gz']
-        ctx['periodicity'] = [int(self.options.periodic_x), int(self.options.periodic_y),
-                            int(self.options.periodic_z)]
-        ctx['grid'] = self.grid
-        ctx['sim'] = self
-        ctx['model'] = self.lbm_model
-        ctx['bgk_equilibrium'] = self.equilibrium
-        ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
-        ctx['constants'] = self.constants
-        ctx['grids'] = [self.grid]
-
-        ctx['simtype'] = 'lbm'
-        ctx['forces'] = self.forces
-        ctx['force_couplings'] = self._force_couplings
-        ctx['force_for_eq'] = self._force_term_for_eq
-        ctx['image_fields'] = self.image_fields
-        ctx['precision'] = self.options.precision
-
-        # TODO: Find a more general way of specifying whether sentinels are
-        # necessary.
-        ctx['propagation_sentinels'] = (self.options.bc_wall == 'halfbb')
-
-        self._update_ctx(ctx)
-        ctx.update(self.geo.get_defines())
-        ctx.update(self.backend.get_defines())
-        src = lbm_tmpl.render(**ctx)
-
-        if self._is_double_precision():
-            src = _convert_to_double(src)
-
-        if self.options.save_src:
-            with open(self.options.save_src, 'w') as fsrc:
-                print >>fsrc, src
-
-            if self.options.format_src:
-                os.system(self.format_cmd.format(file=self.options.save_src))
-
-        # If external source code was requested, ignore the code that we have
-        # just generated above.
-        if self.options.use_src:
-            with open(self.options.use_src, 'r') as fsrc:
-                src = fsrc.read()
-
-        self.mod = self.backend.build(src)
 
     def _get_strides(self, type_):
         t = type_().nbytes

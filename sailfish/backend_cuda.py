@@ -7,7 +7,6 @@ __license__ = 'GPL3'
 import operator
 from struct import calcsize, pack
 
-import pycuda.autoinit
 import pycuda.compiler
 import pycuda.tools
 import pycuda.driver as cuda
@@ -42,27 +41,45 @@ def _set_txt_format(dsc, strides):
         dsc.num_channels = 2
 
 class CUDABackend(object):
+    name='cuda'
+
+    @classmethod
+    def devices_count(cls):
+        """Returns the number of CUDA devices on this host."""
+        return pycuda.driver.Device.count
 
     @classmethod
     def add_options(cls, group):
-        group.add_option('--cuda-kernel-stats', dest='cuda_kernel_stats',
-                help='print information about amount of memory and registers used by the kernels', action='store_true', default=False)
-        group.add_option('--cuda-nvcc-opts', dest='cuda_nvcc_opts',
-                help='additional parameters to pass to the CUDA compiler', action='store', type='string', default='')
-        group.add_option('--cuda-keep-temp', dest='cuda_keep_temp',
-                help='keep intermediate CUDA files', action='store_true', default=False)
-        group.add_option('--cuda-fermi-highprec', dest='cuda_fermi_highprec',
-                help='use high precision division on Compute Capability 2.0+ devices', action='store_true',
+        group.add_argument('--cuda-kernel-stats', dest='cuda_kernel_stats',
+                help='print information about amount of memory and registers '
+                     'used by the kernels', action='store_true',
+                     default=False)
+        group.add_argument('--cuda-nvcc-opts', dest='cuda_nvcc_opts',
+                help='additional parameters to pass to the CUDA compiler',
+                type=str, default='')
+        group.add_argument('--cuda-keep-temp', dest='cuda_keep_temp',
+                help='keep intermediate CUDA files', action='store_true',
                 default=False)
-
+        group.add_argument('--cuda-fermi-highprec', dest='cuda_fermi_highprec',
+                help='use high precision division on Compute Capability 2.0+ '
+                     ' devices', action='store_true', default=False)
+        group.add_argument('--block_size', type=int, default=64,
+                help='size of the block of threads on the compute device')
         return 1
 
-    def __init__(self, options):
+    def __init__(self, options, gpu_id):
+        """Initializes the CUDA backend.
+
+        :param gpu_id: number of the GPU to use
+        """
+        cuda.init()
         self.buffers = {}
         self.arrays = {}
         self._kern_stats = set()
         self._tex_to_memcpy = {}
         self.options = options
+        self._device = cuda.Device(gpu_id)
+        self._ctx = self._device.make_context()
 
     def alloc_buf(self, size=None, like=None, wrap_in_array=True):
         if like is not None:
@@ -81,6 +98,14 @@ class CUDABackend(object):
         else:
             buf = cuda.mem_alloc(size)
 
+        return buf
+
+    def alloc_async_buf(self, size, dtype):
+        """Allocates a buffer that can be used for asynchronous data
+        transfers."""
+        buf = cuda.pagelocked_zeros(size, dtype=dtype)
+        cl_buf = cuda.mem_alloc(buf.nbytes)
+        self.buffers[cl_buf] = buf
         return buf
 
     def nonlocal_field(self, prog, cl_buf, num, shape, strides):
@@ -147,7 +172,13 @@ class CUDABackend(object):
             if target.base is not None:
                 cuda.memcpy_dtoh(target.base, cl_buf)
             else:
-                cuda.memcpy_dtoh(target, cl_buf)
+                cuda.memcpy_dtoh(target, cl_buf),
+
+    def to_buf_async(self, cl_buf, stream=None):
+        cuda.memcpy_htod_async(cl_buf, self.buffers[cl_buf], stream)
+
+    def from_buf_async(self, cl_buf, stream=None):
+        cuda.memcpy_dtoh_async(self.buffers[cl_buf], cl_buf, stream)
 
     def build(self, source):
         if self.options.cuda_nvcc_opts:
@@ -181,7 +212,7 @@ class CUDABackend(object):
 
         return kern
 
-    def run_kernel(self, kernel, grid_size):
+    def run_kernel(self, kernel, grid_size, stream=None):
         kernel.param_setv(0, pack(kernel.args[1], *kernel.args[0]))
         for img_field in kernel.img_fields:
             # Copy device buffer to 3D CUDA array if neessary.
@@ -215,7 +246,16 @@ class CUDABackend(object):
         return lambda : kernel(*arrays).get()
 
     def sync(self):
-        cuda.Context.synchronize()
+        self._ctx.synchronize()
+
+    def make_stream(self):
+        return cuda.Stream()
+
+    def make_sync_event(self, stream):
+        event = cuda.Event(cuda.event_flags.DISABLE_TIMING)
+        event.record(stream)
+        stream.wait_for_event(event)
+        return event
 
     def get_defines(self):
         return {

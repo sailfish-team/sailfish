@@ -2,13 +2,44 @@
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
-__license__ = 'GPL3'
+__license__ = 'LGPLv3'
 
-import numpy
+import numpy as np
 
-from sailfish import lbm, geo, sym
+from sailfish.lb_base import LBSim
 
-class FluidLBMSim(lbm.LBMSim):
+class LBFluidSim(LBSim):
+    @classmethod
+    def add_options(cls, group):
+        LBSim.add_options(group)
+
+        group.add_argument('--visc', type=float, help='numerical viscosity')
+        group.add_argument('--incompressible',
+                action='store_true', default=False,
+                help='use the incompressible model of Luo and He')
+        group.add_argument('--model', help='LB model to use',
+                type=str, choices=['bgk', 'mrt'],
+                default='bgk')
+        group.add_argument('--subgrid', default='none', type=str,
+                choices=['none', 'les-smagorinsky'],
+                help='subgrid model to use')
+        group.add_argument('--smagorinsky_const',
+                help='Smagorinsky constant', type=float, default=0.03)
+
+
+#        grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == self.geo_class.dim]
+#        default_grid = grids[0]
+
+#        lb_group.add_option('--grid', dest='grid', help='grid type to use', type='choice', choices=grids, default=default_grid)
+
+
+
+
+####################################################
+# OLD STUFF BELOW THIS LINE
+
+""""
+
     @property
     def sim_info(self):
         ret = lbm.LBMSim.sim_info.fget(self)
@@ -66,53 +97,25 @@ class FluidLBMSim(lbm.LBMSim):
         ctx['subgrid'] = self.options.subgrid
         ctx['smagorinsky_const'] = self.options.smagorinsky_const
 
-    def _add_options(self, parser, lb_group):
-        grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == self.geo_class.dim]
-        default_grid = grids[0]
-
-        lb_group.add_option('--model', dest='model', help='LBE model to use', type='choice', choices=['bgk', 'mrt'], action='store', default='bgk')
-        lb_group.add_option('--incompressible', dest='incompressible', help='whether to use the incompressible model of Luo and He', action='store_true', default=False)
-        lb_group.add_option('--grid', dest='grid', help='grid type to use', type='choice', choices=grids, default=default_grid)
-        lb_group.add_option('--bc_wall', dest='bc_wall', help='boundary condition implementation to use for wall nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_WALL in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='fullbb')
-        lb_group.add_option('--bc_slip', dest='bc_slip', help='boundary condition implementation to use for slip nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_SLIP in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='slipbb')
-        lb_group.add_option('--bc_velocity', dest='bc_velocity', help='boundary condition implementation to use for velocity nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_VELOCITY in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='equilibrium')
-        lb_group.add_option('--bc_pressure', dest='bc_pressure', help='boundary condition implementation to use for pressure nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_PRESSURE in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='equilibrium')
-        lb_group.add_option('--subgrid', dest='subgrid', help='subgrid model to use', type='choice',
-                choices=['none', 'les-smagorinsky'], default='none')
-        lb_group.add_option('--smagorinsky_const', dest='smagorinsky_const', help='Smagorinsky constant', type='float', action='store', default=0.03)
-
-        return []
 
 
-class ShanChenSingle(FluidLBMSim):
+class ShanChenSingle(FluidLBSim):
+    @classmethod
+    def add_options(cls, group):
+        FluidLBSim.add_options(group)
+        group.add_argument('--G', type=float, default=1.0,
+            help='Shan-Chen interaction strength')
+
     @property
     def constants(self):
         return [('SCG', self.options.G)]
+
 
     def __init__(self, geo_class, options=[], args=None, defaults=None):
         super(ShanChenSingle, self).__init__(geo_class, options, args, defaults)
         self.add_force_coupling(0, 0, 'SCG')
         self.add_nonlocal_field(0)
 
-    def _add_options(self, parser, lb_group):
-        super(ShanChenSingle, self)._add_options(parser, lb_group)
-
-        lb_group.add_option('--G', dest='G',
-            help='Shan-Chen interaction strength', action='store', type='float',
-            default=1.0)
-        return None
 
     def _init_compute_fields(self):
         super(ShanChenSingle, self)._init_compute_fields()
@@ -123,16 +126,16 @@ class ShanChenSingle(FluidLBMSim):
         args_tracer2 = [self.gpu_dist1a, self.geo.gpu_map] + self.gpu_tracer_loc
         args_tracer1 = [self.gpu_dist1b, self.geo.gpu_map] + self.gpu_tracer_loc
         args1 = ([self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_rho] + self.gpu_velocity +
-                 [numpy.uint32(0), self.gpu_rho])
+                 [np.uint32(0), self.gpu_rho])
         args2 = ([self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_rho] + self.gpu_velocity +
-                 [numpy.uint32(0), self.gpu_rho])
+                 [np.uint32(0), self.gpu_rho])
 
         # Special argument list for the case where macroscopic quantities data is to be
         # saved in global memory, i.e. a visualization step.
         args1v = ([self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_rho] + self.gpu_velocity +
-                  [numpy.uint32(1), self.gpu_rho])
+                  [np.uint32(1), self.gpu_rho])
         args2v = ([self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_rho] + self.gpu_velocity +
-                  [numpy.uint32(1), self.gpu_rho])
+                  [np.uint32(1), self.gpu_rho])
 
         macro_args1 = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_rho]
         macro_args2 = [self.geo.gpu_map, self.gpu_dist1b, self.gpu_rho]
@@ -209,3 +212,5 @@ class ShanChenSingle(FluidLBMSim):
         super(ShanChenSingle, self)._update_ctx(ctx)
         ctx['simtype'] = 'shan-chen'
         ctx['sc_pseudopotential'] = 'sc_ppot_exp'
+
+"""
