@@ -138,8 +138,8 @@ class MatlabOutput(object):
         data.update(self.sim.output_vectors)
         scipy.io.savemat(fname, data)
 
-OUTPUTS = [NPYOutput, HDF5FlatOutput, HDF5NestedOutput, VTKOutput, MatlabOutput]
+_OUTPUTS = [NPYOutput, HDF5FlatOutput, HDF5NestedOutput, VTKOutput, MatlabOutput]
 
 format_name_to_cls = {}
-for output_class in OUTPUTS:
+for output_class in _OUTPUTS:
     format_name_to_cls[output_class.format_name] = output_class

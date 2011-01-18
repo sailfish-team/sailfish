@@ -11,11 +11,18 @@ import pyopencl.reduction as reduction
 import pyopencl.tools
 
 class OpenCLBackend(object):
+    name='opencl'
 
     @classmethod
     def add_options(cls, group):
-        group.add_option('--opencl-interactive-select', dest='opencl_interactive',
-                help='select the OpenCL device in an interactive manner', action='store_true', default=False)
+        group.add_argument('--opencl-interactive-select',
+                dest='opencl_interactive',
+                help='select the OpenCL device in an interactive manner',
+                action='store_true', default=False)
+        group.add_argument('--opencl-block-size', type=int,
+                help='size of the block of threads on the compute '
+                     'device; use 0 to set block size to an '
+                     'automatically selected value', default=0)
         return 1
 
     def __init__(self, options):
