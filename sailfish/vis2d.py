@@ -514,7 +514,7 @@ class Fluid2DVis(vis.FluidVis):
 
             self.sim.sim_step(self._tracers)
 
-            if i % self.sim.options.every == 0 and i:
+            if i % self.sim.options.every == 0 and i and i >= self.sim.options.from_:
                 avg_mlups, mlups = self.sim.get_mlups(time.time() - t_prev)
                 self._update_display(i, avg_mlups, mlups)
                 t_prev = time.time()

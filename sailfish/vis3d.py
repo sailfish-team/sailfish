@@ -21,7 +21,7 @@ class Fluid3DVis(vis.FluidVis):
 
         from enthought.mayavi import mlab
 
-        if self._iter % self.sim.options.every == 0:
+        if self._iter % self.sim.options.every == 0 and self._iter >= self.sim.options.from_:
             self.density.mlab_source.set(scalars=self.sim.rho.transpose())
             self.vx.mlab_source.set(scalars=(self.sim.vy**2 + self.sim.vx**2 + self.sim.vz**2).transpose())
             self.velocity.mlab_source.set(u=self.sim.vx.transpose(), v=self.sim.vy.transpose(), w=self.sim.vz.transpose())
