@@ -26,8 +26,8 @@ __ http://gitorious.org/sailfish/sailfish/blobs/master/TODO
 Note that you don't need to be a physicist or engineer to be able to provide useful help.
 We have a number of things that we would like to do within the project that only
 require basic programming skills but which would nevertheless be very helpful to us.
-If you want to help but are not sure how, feel free to contact us directly or via
-the *sailfish-cfd* mailing list.
+If you want to help but are not sure how, please contact us on the *sailfish-cfd*
+mailing list.
 
 License
 -------
