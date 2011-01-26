@@ -51,6 +51,11 @@ class LBMachineMaster(object):
             self._block_id_to_runner[block.id] = p
             p.start()
 
+        # XXX: communicate neighbour runners
+        # this also gives a go-ahead to start the simulation
+        # the neihbours connector should probably be a class that is going to
+        #  hide whether the connection is local or over the network; for now
+        #  maybe not necessary
         for runner in self.runners:
             runner.join()
 
@@ -59,6 +64,52 @@ class LBMachineMaster(object):
 def _start_machine_master(config, blocks, lb_class):
     master = LBMachineMaster(config, blocks, lb_class)
     master.run()
+
+class GeometryError(Exception):
+    pass
+
+class LBGeometryProcessor(object):
+    def __init__(self, blocks, dim):
+        self.blocks = blocks
+        self.dim = dim
+
+    def _annotate(self):
+        # Assign IDs to blocks.  The block ID corresponds to its position
+        # in the internal blocks list.
+        for i, block in enumerate(self.blocks):
+            block.id = i
+
+    def _init_lower_coord_map(self):
+        # List position corresponds to the principal axis (X, Y, Z).  List
+        # items are maps from lower coordinate along the specific axis to
+        # a list of block IDs.
+        self._coord_map_list = [{}, {}, {}]
+        for block in self.blocks:
+            for i, coord in enumerate(block.location):
+                self._coord_map_list[i].setdefault(coord, []).append(block.id)
+
+    def _connect_blocks(self):
+        connected = [False] * len(self.blocks)
+
+        for axis in range(self.dim):
+            for block in sorted(self.blocks, key=lambda x: x.location[axis]):
+                higher_coord = block.location[axis] + block.size[axis]
+                if higher_coord not in self._coord_map_list[axis]:
+                    continue
+                for neighbor_candidate in \
+                        self._coord_map_list[axis][higher_coord]:
+                    #XXX: make sure there is overlap in the remaining dims
+                    #XXX: actually connect the blocks here
+
+
+        # Ensure every block is connected to at least one other block.
+        if not all(connected):
+            raise GeometryError()
+
+    def tranform(self):
+        self._annotate()
+        self._init_lower_coord_map()
+        self._connect_blocks()
 
 
 class LBSimulationController(object):
@@ -72,7 +123,7 @@ class LBSimulationController(object):
         # Use a default global geometry is one has not been
         # specified explicitly.
         if lb_geo is None:
-            if lb_class.geo.dim == 2:
+            if self.dim == 2:
                 lb_geo = LBGeometry2D
             else:
                 lb_geo = LBGeometry3D
@@ -119,18 +170,20 @@ class LBSimulationController(object):
         lb_class.update_defaults(defaults)
         self.conf.set_defaults(defaults)
 
+    @property
+    def dim(self):
+        """Dimensionality of the simulation: 2 or 3."""
+        return self.lb_class.geo.dim
+
     def run(self):
         self.conf.parse()
         self.geo = self._lb_geo(self.conf)
 
         blocks = self.geo.blocks()
+        proc = LBGeometryProcessor(blocks, self.dim)
+        blocks = proc.transform()
 
-        # Assign IDs to blocks
-        for i, block in enumerate(blocks):
-            block.id = i
 
-        # TODO: connect the blocks to each other here
-        # XXX
 
         # TODO: do this over MPI
         p = Process(target=_start_machine_master,
