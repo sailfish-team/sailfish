@@ -176,6 +176,12 @@ class LBMSim(object):
         group.add_option('--every', dest='every',
             help='update the data on the host every N steps', metavar='N',
             type='int', action='store', default=100)
+
+        group.add_option('--from', dest='from_',
+            help='update the data on the host from N steps', metavar='N',
+            type='int', action='store', default=0)
+
+
         class_options = self._add_options(parser, group)
         parser.add_option_group(group)
 
@@ -759,11 +765,11 @@ class LBMSim(object):
 
         if (not self.options.benchmark and (not self.options.batch or
             (self.options.batch and self.options.output)) and
-            i % self.options.every == 0) or get_data:
+            i % self.options.every == 0 and i >= self.options.from_) or get_data:
 
             self._lbm_step(True, tracers=tracers, **kwargs)
 
-            if self.options.output and i % self.options.every == 0:
+            if self.options.output and i % self.options.every == 0 and i >= self.options.from_:
                 self.output.save(i)
         else:
             self._lbm_step(False, tracers=tracers, **kwargs)
