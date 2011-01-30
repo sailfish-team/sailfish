@@ -7,6 +7,13 @@ import numpy as np
 # TODO: envelope size should be calculated automatically
 
 class LBBlock(object):
+    _X_LOW = 0
+    _X_HIGH = 1
+    _Y_LOW = 2
+    _Y_HIGH = 3
+    _Z_LOW = 4
+    _Z_HIGH = 5
+
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
         self.location = location
         self.size = size
@@ -16,6 +23,7 @@ class LBBlock(object):
         self.actual_size = size
         self._runner = None
         self._id = None
+        self._clear_connections()
 
     @property
     def runner(self):
@@ -33,6 +41,29 @@ class LBBlock(object):
     def id(self, x):
         self._id = x
 
+    def connect(self, block):
+        """Creates a connection between this block and another block.
+
+        :param block: block object to connect to
+        :returns: True if the connection was successful
+        :rtype: bool
+        """
+        raise NotImplementedError('Method should be defined by subclass.')
+
+    def _add_connection(self, axis, span, block_id):
+        self._connections.setdefault(axis, []).append((span, block_id))
+
+    def _clear_connections(self):
+        self._connections = {}
+
+    def _get_connection_span(self, axis, block_id):
+        """Method used for testing."""
+        for span, bid in self._connections[axis]:
+            if bid == block_id:
+                return span
+        return None
+
+
 class LBBlock2D(LBBlock):
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
         self.ox, self.oy = location
@@ -43,6 +74,68 @@ class LBBlock2D(LBBlock):
     def _nonghost_slice(self):
         """Returns a 2-tuple of slice objects that selects all non-ghost nodes."""
         return slice(0, None), slice(0, None)
+
+    def connect(self, block):
+        hx = self.nx + self.ox
+        hy = self.ny + self.oy
+
+        tg_hx = block.nx + block.ox
+        tg_hy = block.ny + block.oy
+
+        if hx == block.ox:
+            if block.oy < self.oy:
+                span_min_tg = self.oy - block.oy
+                span_min = 0
+            else:
+                span_min_tg = 0
+                span_min = block.oy - self.oy
+
+            if hy > tg_hy:
+                span_max = tg_hy - self.oy
+                span_max_tg = block.ny
+            else:
+                span_max = self.ny
+                span_max_tg = hy - block.oy
+
+            if span_max < span_min or span_max_tg < span_min_tg:
+                return False
+
+            span = slice(span_min, span_max)
+            span_tg = slice(span_min_tg, span_max_tg)
+
+            self._add_connection(self._X_HIGH, (self.nx-1, span), block.id)
+            block._add_connection(self._X_LOW, (0, span_tg), self.id)
+            return True
+        elif tg_hx == self.ox:
+            return block.connect(self)
+        elif hy == block.oy:
+            if block.ox < self.ox:
+                span_min_tg = self.ox - block.ox
+                span_min = 0
+            else:
+                span_min_tg = 0
+                span_min = block.ox - self.ox
+
+            if hx > tg_hx:
+                span_max = tg_hx - self.ox
+                span_max_tg = block.nx
+            else:
+                span_max = self.nx
+                span_max_tg = hx - block.ox
+
+            if span_max < span_min or span_max_tg < span_min_tg:
+                return False
+
+            span = slice(span_min, span_max)
+            span_tg = slice(span_min_tg, span_max_tg)
+
+            self._add_connection(self._Y_HIGH, (span, self.ny-1), block.id)
+            block._add_connection(self._Y_LOW, (span_tg, 0), self.id)
+            return True
+        elif tg_hy == self.oy:
+            return block.connect(self)
+
+        return False
 
 
 class LBBlock3D(LBBlock):
