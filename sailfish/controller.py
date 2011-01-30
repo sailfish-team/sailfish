@@ -86,7 +86,7 @@ class LBGeometryProcessor(object):
         self._coord_map_list = [{}, {}, {}]
         for block in self.blocks:
             for i, coord in enumerate(block.location):
-                self._coord_map_list[i].setdefault(coord, []).append(block.id)
+                self._coord_map_list[i].setdefault(coord, []).append(block)
 
     def _connect_blocks(self):
         connected = [False] * len(self.blocks)
@@ -100,7 +100,7 @@ class LBGeometryProcessor(object):
                         self._coord_map_list[axis][higher_coord]:
                     if block.connect(neighbor_candidate):
                         connected[block.id] = True
-                        connected[neighbor_candidate] = True
+                        connected[neighbor_candidate.id] = True
 
         # Ensure every block is connected to at least one other block.
         if not all(connected):
@@ -111,6 +111,7 @@ class LBGeometryProcessor(object):
         self._init_lower_coord_map()
         self._connect_blocks()
 
+        return self.blocks
 
 class LBSimulationController(object):
     """Controls the execution of a LB simulation."""
@@ -173,7 +174,7 @@ class LBSimulationController(object):
     @property
     def dim(self):
         """Dimensionality of the simulation: 2 or 3."""
-        return self.lb_class.geo.dim
+        return self._lb_class.geo.dim
 
     def run(self):
         self.conf.parse()
@@ -182,8 +183,6 @@ class LBSimulationController(object):
         blocks = self.geo.blocks()
         proc = LBGeometryProcessor(blocks, self.dim)
         blocks = proc.transform()
-
-
 
         # TODO: do this over MPI
         p = Process(target=_start_machine_master,

@@ -44,6 +44,9 @@ class LBBlock(object):
     def connect(self, block):
         """Creates a connection between this block and another block.
 
+        A connection can only be created when the blocks are next to each
+        other.
+
         :param block: block object to connect to
         :returns: True if the connection was successful
         :rtype: bool
@@ -151,6 +154,8 @@ class LBBlock3D(LBBlock):
     def _nonghost_slice(self):
         """Returns a 3-tuple of slice objects that selects all non-ghost nodes."""
         return slice(0, None), slice(0, None), slice(0, None)
+
+    # TODO: implement the connect method
 
 
 class GeoBlock(object):
