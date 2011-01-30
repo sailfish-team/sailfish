@@ -98,15 +98,15 @@ class LBGeometryProcessor(object):
                     continue
                 for neighbor_candidate in \
                         self._coord_map_list[axis][higher_coord]:
-                    #XXX: make sure there is overlap in the remaining dims
-                    #XXX: actually connect the blocks here
-
+                    if block.connect(neighbor_candidate):
+                        connected[block.id] = True
+                        connected[neighbor_candidate] = True
 
         # Ensure every block is connected to at least one other block.
         if not all(connected):
             raise GeometryError()
 
-    def tranform(self):
+    def transform(self):
         self._annotate()
         self._init_lower_coord_map()
         self._connect_blocks()
