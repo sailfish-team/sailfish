@@ -54,7 +54,7 @@ class LBBlock(object):
         self._connections.setdefault(axis, []).append((span, block_id))
 
     def _clear_connections(self):
-        self._connections = {}
+         self._connections = {}
 
     def _get_connection_span(self, axis, block_id):
         """Method used for testing."""
@@ -82,20 +82,34 @@ class LBBlock2D(LBBlock):
         tg_hx = block.nx + block.ox
         tg_hy = block.ny + block.oy
 
-        if hx == block.ox:
-            if block.oy < self.oy:
-                span_min_tg = self.oy - block.oy
+        def get_span(tg_od, sf_od, tg_hd, sf_hd, tg_nd, sf_nd):
+            """Calculates the connection slices for both blocks.
+
+            The arguments names follow the scheme:
+            tg; target (block)
+            sf: self
+            hd: max position (hx, hy)
+            nd: min position (nx, ny)
+            """
+            if tg_od < sf_od:
+                span_min_tg = sf_od - tg_od
                 span_min = 0
             else:
                 span_min_tg = 0
-                span_min = block.oy - self.oy
+                span_min = tg_od - sf_od
 
-            if hy > tg_hy:
-                span_max = tg_hy - self.oy
-                span_max_tg = block.ny
+            if sf_hd > tg_hd:
+                span_max = tg_hd - sf_od
+                span_max_tg = tg_nd
             else:
-                span_max = self.ny
-                span_max_tg = hy - block.oy
+                span_max = sf_nd
+                span_max_tg = sf_hd - tg_od
+
+            return span_min, span_max, span_min_tg, span_max_tg
+
+        if hx == block.ox:
+            span_min, span_max, span_min_tg, span_max_tg = get_span(
+                    block.oy, self.oy, tg_hy, hy, block.ny, self.ny)
 
             if span_max < span_min or span_max_tg < span_min_tg:
                 return False
@@ -109,19 +123,8 @@ class LBBlock2D(LBBlock):
         elif tg_hx == self.ox:
             return block.connect(self)
         elif hy == block.oy:
-            if block.ox < self.ox:
-                span_min_tg = self.ox - block.ox
-                span_min = 0
-            else:
-                span_min_tg = 0
-                span_min = block.ox - self.ox
-
-            if hx > tg_hx:
-                span_max = tg_hx - self.ox
-                span_max_tg = block.nx
-            else:
-                span_max = self.nx
-                span_max_tg = hx - block.ox
+            span_min, span_max, span_min_tg, span_max_tg = get_span(
+                    block.ox, self.ox, tg_hx, hx, block.nx, self.nx)
 
             if span_max < span_min or span_max_tg < span_min_tg:
                 return False
