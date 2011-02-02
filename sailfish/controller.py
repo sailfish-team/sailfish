@@ -1,5 +1,6 @@
+import os
 import sys
-from multiprocessing import Process
+from multiprocessing import Process, Pipe, Array, Event
 
 from sailfish import codegen, config, io, block_runner
 from sailfish.geo import LBGeometry2D, LBGeometry3D
@@ -17,11 +18,28 @@ def _start_block_runner(block, config, lb_class, backend_class, gpu_id):
     # We instantiate the backend class here (instead in the machine
     # master), so that the backend object is created within the
     # context of the new process.
+
+    print 'block %d at PID %d' % (block.id, os.getpid())
+
+    # FIXME: for some reason, this fails.
     backend = backend_class(config, gpu_id)
+    #backend = None
     sim = lb_class(config)
     output = None
     runner = block_runner.BlockRunner(sim, block, output, backend)
     runner.run()
+
+class LBBlockConnector(object):
+    def __init__(self, array, send_ev, recv_ev):
+        self._array = array
+        self._send_ev = send_ev
+        self._recv_ev = recv_ev
+
+    def send(self, data):
+        self._send_ev.set()
+
+    def recv(self, data):
+        self._recv_ev.wait()
 
 class LBMachineMaster(object):
     def __init__(self, config, blocks, lb_class):
@@ -30,11 +48,12 @@ class LBMachineMaster(object):
         self.lb_class = lb_class
         self.runners = []
         self._block_id_to_runner = {}
+        self._pipes = []
 
     def _assign_blocks_to_gpus(self):
         block2gpu = {}
         # TODO: actually assign to different GPUs here
-        for block in self.blocks:
+        for gpu, block in enumerate(self.blocks):
             block2gpu[block.id] = 0
 
         return block2gpu
@@ -43,19 +62,39 @@ class LBMachineMaster(object):
         block2gpu = self._assign_blocks_to_gpus()
         backend_class = _get_backends().next()
 
+        # A set to keep track which connections are already created.
+        _block_conns = set()
+        for i, block in enumerate(self.blocks):
+            for axis, nbid in block.connecting_blocks():
+                if (block.id, nbid) in _block_conns:
+                    continue
+
+                _block_conns.add((block.id, nbid))
+                _block_conns.add((nbid, block.id))
+
+                size = block.connection_buf_size(axis, nbid)
+                # FIXME: make it work for doubles as well.
+                array = Array('f', size)
+                ev1 = Event()
+                ev2 = Event()
+
+                block.add_connector(nbid, LBBlockConnector(array, ev1, ev2))
+                self.blocks[nbid].add_connector(block.id,
+                        LBBlockConnector(array, ev2, ev1))
+
         for block in self.blocks:
+            a, conn = Pipe()
+            self._pipes.append(a)
+
             p = Process(target=_start_block_runner,
                         args=(block, self.config, self.lb_class,
                               backend_class, block2gpu[block.id]))
             self.runners.append(p)
             self._block_id_to_runner[block.id] = p
-            p.start()
 
-        # XXX: communicate neighbour runners
-        # this also gives a go-ahead to start the simulation
-        # the neihbours connector should probably be a class that is going to
-        #  hide whether the connection is local or over the network; for now
-        #  maybe not necessary
+        for runner in self.runners:
+            runner.start()
+
         for runner in self.runners:
             runner.join()
 
@@ -110,7 +149,6 @@ class LBGeometryProcessor(object):
         self._annotate()
         self._init_lower_coord_map()
         self._connect_blocks()
-
         return self.blocks
 
 class LBSimulationController(object):
