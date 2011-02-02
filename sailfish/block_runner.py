@@ -74,6 +74,15 @@ class BlockRunner(object):
     """
 
     def run(self):
+        for b_id, connector in self._block._connectors.iteritems():
+            connector.send(None)
+
+        print "block %d: send done" % self._block.id
+
+        for b_id, connector in self._block._connectors.iteritems():
+            connector.recv(None)
+
+        print "block %d: recv done" % self._block.id
 
         import time
         time.sleep(10)

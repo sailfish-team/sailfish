@@ -24,6 +24,7 @@ class LBBlock(object):
         self._runner = None
         self._id = None
         self._clear_connections()
+        self._clear_connectors()
 
     @property
     def runner(self):
@@ -57,7 +58,13 @@ class LBBlock(object):
         self._connections.setdefault(axis, []).append((span, block_id))
 
     def _clear_connections(self):
-         self._connections = {}
+        self._connections = {}
+
+    def _clear_connectors(self):
+        self._connectors = {}
+
+    def add_connector(self, block_id, connector):
+        self._connectors[block_id] = connector
 
     def _get_connection_span(self, axis, block_id):
         """Method used for testing."""
@@ -66,6 +73,18 @@ class LBBlock(object):
                 return span
         return None
 
+    def connecting_blocks(self):
+        """Returns a list of pairs: (block IDs, axis) representing connections
+        to different blocks."""
+        ids = []
+        for axis, v in self._connections.iteritems():
+            for span, bid in v:
+                ids.append((axis, bid))
+
+        return ids
+
+    def connection_buf_size(self, axis, block_id):
+        raise NotImplementedError('Method should be defined by subclass.')
 
 class LBBlock2D(LBBlock):
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
@@ -84,6 +103,8 @@ class LBBlock2D(LBBlock):
 
         tg_hx = block.nx + block.ox
         tg_hy = block.ny + block.oy
+
+        assert block.id != self.id
 
         def get_span(tg_od, sf_od, tg_hd, sf_hd, tg_nd, sf_nd):
             """Calculates the connection slices for both blocks.
@@ -142,6 +163,21 @@ class LBBlock2D(LBBlock):
             return block.connect(self)
 
         return False
+
+    def connection_buf_size(self, axis, block_id):
+        for span, b_id in self._connections[axis]:
+            if b_id != block_id:
+                continue
+
+            size = 1
+            for coord in span:
+                if type(coord) is slice:
+                    size *= max(1, coord.stop - coord.start)
+
+            # FIXME: This should include ghost nodes.
+            return size
+
+        return 0
 
 
 class LBBlock3D(LBBlock):
