@@ -87,19 +87,19 @@ class VTKOutput(object):
         idata.update()
 
         for k, v in self.sim.output_vectors.iteritems():
-            if self.sim.gridata.dim == 3:
-                tmp = idata.point_data.add_array(numpy.c_[v[0].flatten(), 
+            if self.sim.grid.dim == 3:
+                tmp = idata.point_data.add_array(numpy.c_[v[0].flatten(),
                                                  v[1].flatten(), v[2].flatten()])
             else:
                 tmp = idata.point_data.add_array(numpy.c_[v[0].flatten(),
                                                  v[1].flatten(), numpy.zeros_like(v[0].flatten())])
             idata.point_data.get_array(tmp).name = k
 
-        if self.sim.gridata.dim == 3:
+        if self.sim.grid.dim == 3:
             idata.dimensions = list(reversed(self.sim.output_fields[ffld].shape))
         else:
             idata.dimensions = list(reversed(self.sim.output_fields[ffld].shape)) + [1]
-        w = tvtk.XMLPImageDataWriter(input=idata, 
+        w = tvtk.XMLPImageDataWriter(input=idata,
                                      file_name=('%s%0' + self.digits + 'd.xml') % (self.fname, i))
         w.write()
 
