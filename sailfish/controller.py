@@ -21,17 +21,21 @@ def _start_block_runner(block, config, lb_class, backend_class, gpu_id):
 
     print 'block %d at PID %d' % (block.id, os.getpid())
 
-    # FIXME: for some reason, this fails.
     backend = backend_class(config, gpu_id)
-    #backend = None
     sim = lb_class(config)
+
+    # FIXME: instantiate a proper IO class here.
     output = None
     runner = block_runner.BlockRunner(sim, block, output, backend)
     runner.run()
 
+
 class LBBlockConnector(object):
-    def __init__(self, array, send_ev, recv_ev):
-        self._array = array
+    """Handles data exchange between two blocks."""
+
+    def __init__(self, send_array, recv_array, send_ev, recv_ev):
+        self._send_array = send_array
+        self._recv_array = recv_array
         self._send_ev = send_ev
         self._recv_ev = recv_ev
 
@@ -40,6 +44,7 @@ class LBBlockConnector(object):
 
     def recv(self, data):
         self._recv_ev.wait()
+
 
 class LBMachineMaster(object):
     def __init__(self, config, blocks, lb_class):
@@ -64,6 +69,8 @@ class LBMachineMaster(object):
 
         # A set to keep track which connections are already created.
         _block_conns = set()
+
+        # Create block connectors for all block connections.
         for i, block in enumerate(self.blocks):
             for axis, nbid in block.connecting_blocks():
                 if (block.id, nbid) in _block_conns:
@@ -74,27 +81,29 @@ class LBMachineMaster(object):
 
                 size = block.connection_buf_size(axis, nbid)
                 # FIXME: make it work for doubles as well.
-                array = Array('f', size)
+                array1 = Array('f', size)
+                array2 = Array('f', size)
                 ev1 = Event()
                 ev2 = Event()
 
-                block.add_connector(nbid, LBBlockConnector(array, ev1, ev2))
+                block.add_connector(nbid,
+                        LBBlockConnector(array1, array2, ev1, ev2))
                 self.blocks[nbid].add_connector(block.id,
-                        LBBlockConnector(array, ev2, ev1))
+                        LBBlockConnector(array2, array1, ev2, ev1))
 
+        # Create block runners for all blocks.
         for block in self.blocks:
-            a, conn = Pipe()
-            self._pipes.append(a)
-
             p = Process(target=_start_block_runner,
                         args=(block, self.config, self.lb_class,
                               backend_class, block2gpu[block.id]))
             self.runners.append(p)
             self._block_id_to_runner[block.id] = p
 
+        # Start all block runners.
         for runner in self.runners:
             runner.start()
 
+        # Wait for all block runners to finish.
         for runner in self.runners:
             runner.join()
 

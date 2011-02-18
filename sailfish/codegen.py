@@ -51,13 +51,22 @@ class BlockCodeGenerator(object):
     def __init__(self, simulation):
         self._sim = simulation
 
-    def get_code(self, kernel_file, use_mako_cache=False):
+    @property
+    def config(self):
+        return self._sim.config
+
+    def get_code(self, block_runner):
+        if self.config.use_src:
+            with open(self.config.use_src, 'r') as f:
+                src = f.read()
+            return src
+
         # Clear all locale settings, we do not want them affecting the
         # generated code in any way.
         import locale
         locale.setlocale(locale.LC_ALL, 'C')
 
-        if use_mako_cache:
+        if self.config.use_mako_cache:
             import pwd
             lookup = TemplateLookup(directories=sys.path,
                     module_directory='/tmp/sailfish_modules-%s' %
@@ -67,11 +76,15 @@ class BlockCodeGenerator(object):
 
         code_tmpl = lookup.get_template(os.path.join('sailfish/templates',
                                         self._sim.kernel_file))
-        ctx = self._build_context()
+        ctx = self._build_context(block_runner)
         src = code_tmpl.render(**ctx)
 
-        if self._is_double_precision():
+        if self.is_double_precision():
             src = _convert_to_double(src)
+
+        if self.config.save_src:
+            self.save_code(src, self.config.save_src,
+                           self.config.format_src)
 
         return src
 
@@ -82,58 +95,34 @@ class BlockCodeGenerator(object):
         if reformat:
             os.system(self._format_cmd.format(path=dest_path))
 
-    def _build_context(self):
+    def is_double_precision(self):
+        return self.config.precision == 'double'
+
+    def _build_context(self, block_runnner):
         ctx = {}
-        ctx['dim'] = self.grid.dim
-        ctx['block_size'] = self.options.block_size
+        ctx['block_size'] = self.config.block_size
 
-        # Size of the lattice.
-        ctx['lat_ny'] = self.options.lat_ny
-        ctx['lat_nx'] = self.options.lat_nx
-        ctx['lat_nz'] = self.options.lat_nz
+        self._sim.update_context(ctx)
+        block_runnner.update_context(ctx)
 
-        # Actual size of the array, including any padding.
-        ctx['arr_nx'] = self.arr_nx
-        ctx['arr_ny'] = self.arr_ny
-        ctx['arr_nz'] = self.arr_nz
-        ctx['periodic_x'] = int(self.options.periodic_x)
-        ctx['periodic_y'] = int(self.options.periodic_y)
-        ctx['periodic_z'] = int(self.options.periodic_z)
-        ctx['num_params'] = len(self.geo_params)
-        ctx['geo_params'] = self.geo_params
-        ctx['tau'] = self.tau
-        ctx['visc'] = self.float(self.options.visc)
-        ctx['backend'] = self.options.backend
-        ctx['dist_size'] = self.get_dist_size()
-        ctx['pbc_offsets'] = [{-1: self.options.lat_nx,
-                                1: -self.options.lat_nx},
-                              {-1: self.options.lat_ny*self.arr_nx,
-                                1: -self.options.lat_ny*self.arr_nx},
-                              {-1: self.options.lat_nz*self.arr_ny*self.arr_nx,
-                                1: -self.options.lat_nz*self.arr_ny*self.arr_nx}]
-        ctx['bnd_limits'] = [self.options.lat_nx, self.options.lat_ny, self.options.lat_nz]
-        ctx['loc_names'] = ['gx', 'gy', 'gz']
-        ctx['periodicity'] = [int(self.options.periodic_x), int(self.options.periodic_y),
-                            int(self.options.periodic_z)]
-        ctx['grid'] = self.grid
-        ctx['sim'] = self
-        ctx['model'] = self.lbm_model
-        ctx['bgk_equilibrium'] = self.equilibrium
-        ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
-        ctx['constants'] = self.constants
-        ctx['grids'] = [self.grid]
+        return ctx
 
-        ctx['simtype'] = 'lbm'
-        ctx['forces'] = self.forces
-        ctx['force_couplings'] = self._force_couplings
-        ctx['force_for_eq'] = self._force_term_for_eq
-        ctx['image_fields'] = self.image_fields
-        ctx['precision'] = self.options.precision
-
-        # TODO: Find a more general way of specifying whether sentinels are
-        # necessary.
-        ctx['propagation_sentinels'] = (self.options.bc_wall == 'halfbb')
-
-        self._update_ctx(ctx)
-        ctx.update(self.geo.get_defines())
-        ctx.update(self.backend.get_defines())
+#        ctx['num_params'] = len(self.geo_params)
+#        ctx['geo_params'] = self.geo_params
+#        ctx['backend'] = self.options.backend
+#        ctx['dist_size'] = self.get_dist_size()
+#        ctx['grid'] = self.grid
+#        ctx['sim'] = self
+#        ctx['bgk_equilibrium'] = self.equilibrium
+#        ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
+#        ctx['constants'] = self.constants
+#        ctx['grids'] = [self.grid]
+#
+#        ctx['forces'] = self.forces
+#        ctx['force_couplings'] = self._force_couplings
+#        ctx['force_for_eq'] = self._force_term_for_eq
+#        ctx['image_fields'] = self.image_fields
+#
+#        # TODO: Find a more general way of specifying whether sentinels are
+#        # necessary.
+#        ctx['propagation_sentinels'] = (self.options.bc_wall == 'halfbb')

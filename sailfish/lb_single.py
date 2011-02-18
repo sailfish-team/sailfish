@@ -4,16 +4,16 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPLv3'
 
-import numpy as np
-
 from sailfish.lb_base import LBSim
 
 class LBFluidSim(LBSim):
+    kernel_file = "single_fluid.mako"
+
     @classmethod
     def add_options(cls, group):
         LBSim.add_options(group)
 
-        group.add_argument('--visc', type=float, help='numerical viscosity')
+        group.add_argument('--visc', type=float, default=1.0, help='numerical viscosity')
         group.add_argument('--incompressible',
                 action='store_true', default=False,
                 help='use the incompressible model of Luo and He')
@@ -26,11 +26,18 @@ class LBFluidSim(LBSim):
         group.add_argument('--smagorinsky_const',
                 help='Smagorinsky constant', type=float, default=0.03)
 
+    def __init__(self, config):
+        LBSim.__init__(self, config)
+
+    def update_context(self, ctx):
+        ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0
+        ctx['visc'] = self.config.visc
+        ctx['model'] = self.config.model
+        ctx['loc_names'] = ['gx', 'gy', 'gz']
+        ctx['simtype'] = 'lbm'
 
 #        grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == self.geo_class.dim]
 #        default_grid = grids[0]
-
-#        lb_group.add_option('--grid', dest='grid', help='grid type to use', type='choice', choices=grids, default=default_grid)
 
 
 
