@@ -7,6 +7,8 @@ import numpy as np
 # TODO: envelope size should be calculated automatically
 
 class LBBlock(object):
+    dim = None
+
     _X_LOW = 0
     _X_HIGH = 1
     _Y_LOW = 2
@@ -19,7 +21,8 @@ class LBBlock(object):
         self.size = size
         self.envelope_size = envelope_size
         # Actual size of the simulation domain, including the envelope (ghost
-        # nodes).
+        # nodes)
+        # XXX: calculate that.
         self.actual_size = size
         self._runner = None
         self._id = None
@@ -86,7 +89,12 @@ class LBBlock(object):
     def connection_buf_size(self, axis, block_id):
         raise NotImplementedError('Method should be defined by subclass.')
 
+    def update_context(self, ctx):
+        raise NotImplementedError('Method should be defined by subclass.')
+
 class LBBlock2D(LBBlock):
+    dim = 2
+
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
         self.ox, self.oy = location
         self.nx, self.ny = size
@@ -96,6 +104,15 @@ class LBBlock2D(LBBlock):
     def _nonghost_slice(self):
         """Returns a 2-tuple of slice objects that selects all non-ghost nodes."""
         return slice(0, None), slice(0, None)
+
+    # XXX: Fix this.
+    @property
+    def periodic_x(self):
+        return False
+
+    @property
+    def periodic_y(self):
+        return False
 
     def connect(self, block):
         hx = self.nx + self.ox
@@ -165,6 +182,7 @@ class LBBlock2D(LBBlock):
         return False
 
     def connection_buf_size(self, axis, block_id):
+        # XXX: This is broken.
         for span, b_id in self._connections[axis]:
             if b_id != block_id:
                 continue
@@ -180,7 +198,13 @@ class LBBlock2D(LBBlock):
         return 0
 
 
+    def update_context(self, ctx):
+        ctx['dim'] = self.dim
+
+
 class LBBlock3D(LBBlock):
+    dim = 3
+
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
         self.ox, self.oy, self.oz = location
         self.nx, self.ny, self.nz = size
@@ -191,14 +215,16 @@ class LBBlock3D(LBBlock):
         """Returns a 3-tuple of slice objects that selects all non-ghost nodes."""
         return slice(0, None), slice(0, None), slice(0, None)
 
-    # TODO: implement the connect method
+    def update_context(self, ctx):
+        ctx['dim'] = self.dim
 
 
 class GeoBlock(object):
     """Abstract class for the geometry of a LBBlock."""
 
     NODE_GHOST = 0
-    # TODO: what happens if the ghost is actually a boundary node?
+    # TODO: Note: a ghost node should be able to carry information about
+    # the normal node type.
 
     @classmethod
     def add_options(cls, group):

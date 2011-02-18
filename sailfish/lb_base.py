@@ -1,3 +1,5 @@
+import numpy as np
+
 class LBSim(object):
     """Describes a specific type of a lattice Boltzmann simulation."""
 
@@ -18,3 +20,4 @@ class LBSim(object):
 
     def __init__(self, config):
         self.config = config
+

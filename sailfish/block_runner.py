@@ -1,8 +1,9 @@
-from sailfish import codegen, config
-
+import math
+import numpy as np
+from sailfish import codegen
 
 class BlockRunner(object):
-    """Runs the simulation for single LBBlock
+    """Runs the simulation for a single LBBlock
     """
     def __init__(self, simulation, block, output, backend):
         # Create a 2-way connection between the LBBlock and this BlockRunner
@@ -15,14 +16,90 @@ class BlockRunner(object):
         self._bcg = codegen.BlockCodeGenerator(simulation)
         self._sim = simulation
 
-    def _init_geometry(self):
-        pass
+        if self._bcg.is_double_precision():
+            self.float = np.float64
+        else:
+            self.float = np.float32
 
+    @property
+    def config(self):
+        return self._sim.config
+
+    def update_context(self, ctx):
+        self._block.update_context(ctx)
+        ctx.update(self._backend.get_defines())
+
+        # Size of the lattice.
+        ctx['lat_ny'] = self._lat_size[-2]
+        ctx['lat_nx'] = self._lat_size[-1]
+
+        # Actual size of the array, including any padding.
+        ctx['arr_nx'] = self._physical_size[-1]
+        ctx['arr_ny'] = self._physical_size[-2]
+
+        ctx['periodic_x'] = int(self._block.periodic_x)
+        ctx['periodic_y'] = int(self._block.periodic_y)
+
+        bnd_limits = list(self._block.size[:])
+
+        if self._block.dim == 3:
+            ctx['lat_nz'] = self._lat_size[-3]
+            ctx['arr_nz'] = self._physical_size[-3]
+            ctx['periodic_z'] = int(self._block.periodic_z)
+        else:
+            ctx['lat_nz'] = 1
+            ctx['arr_nz'] = 1
+            ctx['periodic_z'] = 0
+            bnd_limits.append(1)
+
+        ctx['bnd_limits'] = bnd_limits
+#        ctx['periodicity'] = [int(self.options.periodic_x),
+#                              int(self.options.periodic_y),
+#                              int(self.options.periodic_z)]
+
+#        ctx['pbc_offsets'] = [{-1: self.options.lat_nx,
+#                                1: -self.options.lat_nx},
+#                              {-1: self.options.lat_ny*self.arr_nx,
+#                                1: -self.options.lat_ny*self.arr_nx},
+#                              {-1: self.options.lat_nz*self.arr_ny*self.arr_nx,
+#                                1: -self.options.lat_nz*self.arr_ny*self.arr_nx}]
+
+
+    def _init_geometry(self):
+        self._init_shape()
+
+    def _init_shape(self):
+        # Logical size of the lattice.  X dimension is the last one on the
+        # list.
+        self._lat_size = list(reversed(self._block.actual_size))
+
+        # Physical in-memory size of the lattice, adjusted for optimal memory
+        # access from the compute unit.  Size of the X dimension is rounded up
+        # to a multiple of block_size.
+        self._physical_size = list(reversed(self._block.actual_size))
+        self._physical_size[-1] = (int(math.ceil(float(self._physical_size[-1]) /
+                                                self.config.block_size)) *
+                                       self.config.block_size)
+
+    def _get_strides_and_size(self, type_):
+        """Returns the a tuple of:
+             1) strides for the NumPy array storing the lattice
+             2) total number of nodes in this array
+        """
+        t = type_().nbytes
+
+        strides = [t]
+        nodes = self._physical_size[0]
+
+        for dim_size in self._physical_size[-1:0:-1]:
+            strides = [strides[0] * dim_size] + strides
+            nodes *= dim_size
+
+        return strides, nodes
     def _get_compute_code(self):
-        return self._bcg.get_code()
+        return self._bcg.get_code(self)
 
     def _init_compute(self):
-
         code = self._get_compute_code()
         self.module = self.backend.build(code)
 
@@ -31,6 +108,7 @@ class BlockRunner(object):
         self._bulk_stream = self.backend.make_stream()
 
         # Allocate a transfer buffer suitable for asynchronous transfers.
+
 
     def _step_bulk(self):
         """Runs one simulation step in the bulk domain.
@@ -73,22 +151,25 @@ class BlockRunner(object):
     - read data from transfer buffer to the host
     """
 
-    def run(self):
+    # XXX: Make these functions do something useful.
+    def send_data(self):
         for b_id, connector in self._block._connectors.iteritems():
             connector.send(None)
 
         print "block %d: send done" % self._block.id
 
+    def recv_data(self):
         for b_id, connector in self._block._connectors.iteritems():
             connector.recv(None)
 
         print "block %d: recv done" % self._block.id
 
-        import time
-        time.sleep(10)
-        return
-"""
+    def run(self):
         self._init_geometry()
-        self._init_code()
         self._init_compute()
-"""
+
+        return
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()

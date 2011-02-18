@@ -19,6 +19,7 @@ from sailfish import geo, io, sym, vis
 
 
 
+<<<<<<< HEAD
 class Values(optparse.Values):
     def __init__(self, *args):
         optparse.Values.__init__(self, *args)
@@ -41,6 +42,8 @@ class Hook(object):
     def __call__(self):
         self.function()
 
+=======
+>>>>>>> Add some cleanup work on shape processing.
 class LBMSim(object):
     """Base class for LBM simulations. Descendant classes should be declared for specific simulations."""
 
@@ -85,10 +88,6 @@ class LBMSim(object):
         if not self.options.quiet:
             print 'Using the "%s" backend.' % self.options.backend
 
-        if not self._is_double_precision():
-            self.float = numpy.float32
-        else:
-            self.float = numpy.float64
 
         self.S = sym.S()
         self.forces = {}
@@ -243,16 +242,6 @@ class LBMSim(object):
         if self.options.verbose:
             print '[{0:07.2f}] {1}'.format(time.time() - self._t_start, info)
 
-    def _init_shape(self):
-        self.arr_nx = int(math.ceil(float(self.options.lat_nx) / self.options.block_size)) * self.options.block_size
-        self.arr_ny = self.options.lat_ny
-        self.arr_nz = self.options.lat_nz
-
-        # Particle distributions in host memory.
-        if self.grid.dim == 2:
-            self.shape = (self.options.lat_ny, self.options.lat_nx)
-        else:
-            self.shape = (self.options.lat_nz, self.options.lat_ny, self.options.lat_nx)
 
     def _init_geo(self):
         self._timed_print('Initializing geometry.')
@@ -270,22 +259,7 @@ class LBMSim(object):
             self.geo.init_dist(self.dist1)
         self.geo_params = self.float(self.geo.params)
 
-    def _init_post_geo(self):
-        pass
 
-    def _update_ctx(self, ctx):
-        pass
-
-
-    def _get_strides(self, type_):
-        t = type_().nbytes
-        if self.grid.dim == 3:
-            strides = (self.arr_ny * self.arr_nx * t, self.arr_nx * t, t)
-            size = self.arr_nx * self.arr_ny * self.arr_nz
-        else:
-            strides = (self.arr_nx * t, t)
-            size = self.arr_nx * self.arr_ny
-        return (strides, size)
 
     def make_field(self, name=None, output=False):
         """Create a new numpy array representing a scalar field used in the simulation.
