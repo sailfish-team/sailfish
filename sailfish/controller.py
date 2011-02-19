@@ -151,7 +151,7 @@ class LBGeometryProcessor(object):
                         connected[neighbor_candidate.id] = True
 
         # Ensure every block is connected to at least one other block.
-        if not all(connected):
+        if not all(connected) and len(connected) > 1:
             raise GeometryError()
 
     def transform(self):
@@ -166,7 +166,6 @@ class LBSimulationController(object):
     def __init__(self, lb_class, lb_geo=None):
         self.conf = config.LBConfig()
         self._lb_class = lb_class
-        self._lb_geo = lb_geo
 
         # Use a default global geometry is one has not been
         # specified explicitly.
@@ -175,6 +174,8 @@ class LBSimulationController(object):
                 lb_geo = LBGeometry2D
             else:
                 lb_geo = LBGeometry3D
+
+        self._lb_geo = lb_geo
 
         group = self.conf.add_group('Runtime mode settings')
         group.add_argument('--mode', help='runtime mode', type=str,

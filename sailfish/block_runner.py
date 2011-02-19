@@ -1,4 +1,5 @@
 import math
+import operator
 import numpy as np
 from sailfish import codegen
 
@@ -53,6 +54,7 @@ class BlockRunner(object):
             bnd_limits.append(1)
 
         ctx['bnd_limits'] = bnd_limits
+        ctx['dist_size'] = self._get_nodes()
 #        ctx['periodicity'] = [int(self.options.periodic_x),
 #                              int(self.options.periodic_y),
 #                              int(self.options.periodic_z)]
@@ -64,9 +66,25 @@ class BlockRunner(object):
 #                              {-1: self.options.lat_nz*self.arr_ny*self.arr_nx,
 #                                1: -self.options.lat_nz*self.arr_ny*self.arr_nx}]
 
+    def make_scalar_field(self, dtype, name=None):
+        size = self._get_nodes()
+        strides = self._get_strides(dtype)
+
+        field = np.ndarray(self._physical_size, buffer=np.zeros(size, dtype=dtype),
+                           dtype=dtype, strides=strides)
+
+        if name is not None:
+            self._output.register_field(field, name)
+
+        return field
 
     def _init_geometry(self):
         self._init_shape()
+        self._geo_block = self._sim.geo(self._physical_size, self._block)
+        self._geo_block.reset()
+
+        # XXX: think how to deal with node encoding
+        # XXX: later, allocate device buffers
 
     def _init_shape(self):
         # Logical size of the lattice.  X dimension is the last one on the
@@ -78,24 +96,19 @@ class BlockRunner(object):
         # to a multiple of block_size.
         self._physical_size = list(reversed(self._block.actual_size))
         self._physical_size[-1] = (int(math.ceil(float(self._physical_size[-1]) /
-                                                self.config.block_size)) *
+                                                 self.config.block_size)) *
                                        self.config.block_size)
 
-    def _get_strides_and_size(self, type_):
-        """Returns the a tuple of:
-             1) strides for the NumPy array storing the lattice
-             2) total number of nodes in this array
-        """
+    def _get_strides(self, type_):
+        """Returns a list of strides for the NumPy array storing the lattice."""
         t = type_().nbytes
+        return list(reversed(reduce(lambda x, y: x + [x[-1] * y],
+                self._physical_size[-1:0:-1], [t])))
 
-        strides = [t]
-        nodes = self._physical_size[0]
+    def _get_nodes(self):
+        """Returns the total amount of actual nodes in the lattice."""
+        return reduce(operator.mul, self._physical_size)
 
-        for dim_size in self._physical_size[-1:0:-1]:
-            strides = [strides[0] * dim_size] + strides
-            nodes *= dim_size
-
-        return strides, nodes
     def _get_compute_code(self):
         return self._bcg.get_code(self)
 
