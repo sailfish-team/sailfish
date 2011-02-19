@@ -230,13 +230,30 @@ class GeoBlock(object):
     def add_options(cls, group):
         pass
 
+        lb_group.add_option('--bc_wall', dest='bc_wall', help='boundary condition implementation to use for wall nodes', type='choice',
+                choices=[x.name for x in geo.SUPPORTED_BCS if
+                    geo.LBMGeo.NODE_WALL in x.supported_types and
+                    x.supports_dim(self.geo_class.dim)], default='fullbb')
+        lb_group.add_option('--bc_slip', dest='bc_slip', help='boundary condition implementation to use for slip nodes', type='choice',
+                choices=[x.name for x in geo.SUPPORTED_BCS if
+                    geo.LBMGeo.NODE_SLIP in x.supported_types and
+                    x.supports_dim(self.geo_class.dim)], default='slipbb')
+        lb_group.add_option('--bc_velocity', dest='bc_velocity', help='boundary condition implementation to use for velocity nodes', type='choice',
+                choices=[x.name for x in geo.SUPPORTED_BCS if
+                    geo.LBMGeo.NODE_VELOCITY in x.supported_types and
+                    x.supports_dim(self.geo_class.dim)], default='equilibrium')
+        lb_group.add_option('--bc_pressure', dest='bc_pressure', help='boundary condition implementation to use for pressure nodes', type='choice',
+                choices=[x.name for x in geo.SUPPORTED_BCS if
+                    geo.LBMGeo.NODE_PRESSURE in x.supported_types and
+                    x.supports_dim(self.geo_class.dim)], default='equilibrium')
+
     def __init__(self, grid_shape, block, *args, **kwargs):
         self.block = block
         self.grid_shape = grid_shape
         # The type map allocated by the block runner already includes
         # ghost nodes, and is formatted in a way that makes it suitable
         # for copying to the compute device.
-        self._type_map = block.runner.make_int_field()
+        self._type_map = block.runner.make_scalar_field(np.uint32)
         self._type_map_encoded = False
         self._type_map_view = self._type_map.view()[block._nonghost_slice]
 
@@ -255,28 +272,11 @@ class GeoBlock(object):
         self._define_ghosts()
 
 
-        lb_group.add_option('--bc_wall', dest='bc_wall', help='boundary condition implementation to use for wall nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_WALL in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='fullbb')
-        lb_group.add_option('--bc_slip', dest='bc_slip', help='boundary condition implementation to use for slip nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_SLIP in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='slipbb')
-        lb_group.add_option('--bc_velocity', dest='bc_velocity', help='boundary condition implementation to use for velocity nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_VELOCITY in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='equilibrium')
-        lb_group.add_option('--bc_pressure', dest='bc_pressure', help='boundary condition implementation to use for pressure nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_PRESSURE in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='equilibrium')
-
 class GeoBlock2D(GeoBlock):
     dim = 2
 
     def __init__(self, grid_shape, block, *args, **kwargs):
-        self.gx, self.gy = grid_shape
+        self.gy, self.gx = grid_shape
         GeoBlock.__init__(self, grid_shape, block, *args, **kwargs)
 
     def _get_mgrid(self):
@@ -292,7 +292,7 @@ class GeoBlock3D(GeoBlock):
     dim = 3
 
     def __init__(self, grid_shape, block, *args, **kwargs):
-        self.gx, self.gy, self.gz = grid_shape
+        self.gz, self.gy, self.gx = grid_shape
         GeoBlock.__init__(self, grid_shape, block, *args, **kwargs)
 
     def _get_mgrid(self):
