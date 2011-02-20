@@ -62,3 +62,29 @@ class LBGeometry3D(LBGeometry):
                            self.config.lat_nz))]
 
 
+# TODO: Finish this.
+#
+# Boundary conditions.
+#
+class LBBC(object):
+    parametrized = False
+
+class BCWall(LBBC):
+    pass
+
+class BCHalfBBWall(BCWall):
+    pass
+
+class BCFullBBWall(BCWall):
+    pass
+
+class BCSlip(LBBC):
+    pass
+
+class BCVelocity(LBBC):
+    parametrized = True
+
+class BCPressure(LBBC):
+    paremetrized = True
+
+

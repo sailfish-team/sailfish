@@ -4,13 +4,14 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPLv3'
 
+from sailfish import sym
 from sailfish.lb_base import LBSim
 
 class LBFluidSim(LBSim):
     kernel_file = "single_fluid.mako"
 
     @classmethod
-    def add_options(cls, group):
+    def add_options(cls, group, dim):
         LBSim.add_options(group)
 
         group.add_argument('--visc', type=float, default=1.0, help='numerical viscosity')
@@ -26,8 +27,19 @@ class LBFluidSim(LBSim):
         group.add_argument('--smagorinsky_const',
                 help='Smagorinsky constant', type=float, default=0.03)
 
+        grids = [x.__name__ for x in sym.KNOWN_GRIDS if
+                 x.dim == dim]
+        group.add_argument('--grid',
+                help='LB grid', type='choice',
+                choices=grids, default=grids[0])
+
     def __init__(self, config):
         LBSim.__init__(self, config)
+
+        for x in sym.KNOWN_GRIDS:
+            if x.__name__ == config.grid:
+                self.grid = x
+                break
 
     def update_context(self, ctx):
         ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0
@@ -35,9 +47,8 @@ class LBFluidSim(LBSim):
         ctx['model'] = self.config.model
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['simtype'] = 'lbm'
+        ctx['grid'] = self.grid
 
-#        grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == self.geo_class.dim]
-#        default_grid = grids[0]
 
 
 

@@ -29,6 +29,7 @@ class BlockRunner(object):
     def update_context(self, ctx):
         self._block.update_context(ctx)
         ctx.update(self._backend.get_defines())
+        ctx.update(self._geo_block.get_defines())
 
         # Size of the lattice.
         ctx['lat_ny'] = self._lat_size[-2]
@@ -55,6 +56,16 @@ class BlockRunner(object):
 
         ctx['bnd_limits'] = bnd_limits
         ctx['dist_size'] = self._get_nodes()
+
+        # FIXME Additional constants.
+        ctx['constants'] = []
+
+        # FIXME: Geometry parameters.
+        ctx['num_params'] = 0
+        ctx['geo_params'] = []
+
+
+
 #        ctx['periodicity'] = [int(self.options.periodic_x),
 #                              int(self.options.periodic_y),
 #                              int(self.options.periodic_z)]
