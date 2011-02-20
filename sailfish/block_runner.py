@@ -12,7 +12,7 @@ class BlockRunner(object):
         block.runner = self
 
         self._output = output
-        self._backend = backend
+        self.backend = backend
 
         self._bcg = codegen.BlockCodeGenerator(simulation)
         self._sim = simulation
@@ -28,8 +28,8 @@ class BlockRunner(object):
 
     def update_context(self, ctx):
         self._block.update_context(ctx)
-        ctx.update(self._backend.get_defines())
-        ctx.update(self._geo_block.get_defines())
+        self._geo_block.update_context(ctx)
+        ctx.update(self.backend.get_defines())
 
         # Size of the lattice.
         ctx['lat_ny'] = self._lat_size[-2]
@@ -39,23 +39,29 @@ class BlockRunner(object):
         ctx['arr_nx'] = self._physical_size[-1]
         ctx['arr_ny'] = self._physical_size[-2]
 
-        ctx['periodic_x'] = int(self._block.periodic_x)
-        ctx['periodic_y'] = int(self._block.periodic_y)
-
         bnd_limits = list(self._block.size[:])
 
         if self._block.dim == 3:
             ctx['lat_nz'] = self._lat_size[-3]
             ctx['arr_nz'] = self._physical_size[-3]
-            ctx['periodic_z'] = int(self._block.periodic_z)
+            periodic_z = int(self._block.periodic_z)
         else:
             ctx['lat_nz'] = 1
             ctx['arr_nz'] = 1
-            ctx['periodic_z'] = 0
+            periodic_z = 0
             bnd_limits.append(1)
+
+        ctx['periodic_x'] = int(self._block.periodic_x)
+        ctx['periodic_y'] = int(self._block.periodic_y)
+        ctx['periodic_z'] = periodic_z
+
+        ctx['periodicity'] = [int(self._block.periodic_x),
+                              int(self._block.periodic_y),
+                              periodic_z]
 
         ctx['bnd_limits'] = bnd_limits
         ctx['dist_size'] = self._get_nodes()
+        ctx['sim'] = self._sim
 
         # FIXME Additional constants.
         ctx['constants'] = []
@@ -64,11 +70,6 @@ class BlockRunner(object):
         ctx['num_params'] = 0
         ctx['geo_params'] = []
 
-
-
-#        ctx['periodicity'] = [int(self.options.periodic_x),
-#                              int(self.options.periodic_y),
-#                              int(self.options.periodic_z)]
 
 #        ctx['pbc_offsets'] = [{-1: self.options.lat_nx,
 #                                1: -self.options.lat_nx},
@@ -131,6 +132,7 @@ class BlockRunner(object):
                                   self.backend.make_stream())
         self._bulk_stream = self.backend.make_stream()
 
+
         # Allocate a transfer buffer suitable for asynchronous transfers.
 
 
@@ -191,6 +193,7 @@ class BlockRunner(object):
     def run(self):
         self._init_geometry()
         self._init_compute()
+        self._step_bulk()
 
         return
 

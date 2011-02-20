@@ -187,7 +187,7 @@ class CUDABackend(object):
         else:
             options = []
 
-        if not self.options.cuda_fermi_highprec and pycuda.autoinit.device.compute_capability()[0] >= 2:
+        if not self.options.cuda_fermi_highprec and self._device.compute_capability()[0] >= 2:
             options.append('--prec-div=false')
             options.append('--prec-sqrt=false')
 
@@ -259,6 +259,7 @@ class CUDABackend(object):
 
     def get_defines(self):
         return {
+            'backend': 'cuda',
             'shared_var': '__shared__',
             'kernel': '__global__',
             'global_ptr': '',
