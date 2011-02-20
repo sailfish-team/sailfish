@@ -198,7 +198,7 @@ class LBSimulationController(object):
                  'can be separated by a comma')
 
         group = self.conf.add_group('Simulation-specific settings')
-        lb_class.add_options(group)
+        lb_class.add_options(group, self.dim)
 
         group = self.conf.add_group('Geometry settings')
         lb_geo.add_options(group)

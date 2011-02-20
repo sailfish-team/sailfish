@@ -222,30 +222,27 @@ class LBBlock3D(LBBlock):
 class GeoBlock(object):
     """Abstract class for the geometry of a LBBlock."""
 
-    NODE_GHOST = 0
+    # TODO: change the way boundary conditions are specified and encoded.
+    # The condition should be specified by passing an object/class, and the
+    # encoding should be done by an encoder class.
+
+    NODE_FLUID = 0
+    NODE_WALL = 1
+    NODE_VELOCITY = 2
+    NODE_PRESSURE = 3
+    NODE_BOUNDARY = 4
+    NODE_GHOST = 5
+    NODE_UNUSED = 6
+    NODE_SLIP = 7
+    NODE_MISC_MASK = 0
+    NODE_MISC_SHIFT = 1
+    NODE_TYPE_MASK = 2
     # TODO: Note: a ghost node should be able to carry information about
     # the normal node type.
 
     @classmethod
     def add_options(cls, group):
         pass
-
-        lb_group.add_option('--bc_wall', dest='bc_wall', help='boundary condition implementation to use for wall nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_WALL in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='fullbb')
-        lb_group.add_option('--bc_slip', dest='bc_slip', help='boundary condition implementation to use for slip nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_SLIP in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='slipbb')
-        lb_group.add_option('--bc_velocity', dest='bc_velocity', help='boundary condition implementation to use for velocity nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_VELOCITY in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='equilibrium')
-        lb_group.add_option('--bc_pressure', dest='bc_pressure', help='boundary condition implementation to use for pressure nodes', type='choice',
-                choices=[x.name for x in geo.SUPPORTED_BCS if
-                    geo.LBMGeo.NODE_PRESSURE in x.supported_types and
-                    x.supports_dim(self.geo_class.dim)], default='equilibrium')
 
     def __init__(self, grid_shape, block, *args, **kwargs):
         self.block = block
@@ -270,6 +267,23 @@ class GeoBlock(object):
         mgrid = self._get_mgrid()
         self.define_nodes(*mgrid)
         self._define_ghosts()
+
+    def get_defines(self):
+        return {'geo_fluid': self.NODE_FLUID,
+                'geo_wall': self.NODE_WALL,
+                'geo_slip': self.NODE_SLIP,
+                'geo_unused': self.NODE_UNUSED,
+                'geo_velocity': self.NODE_VELOCITY,
+                'geo_pressure': self.NODE_PRESSURE,
+                'geo_boundary': self.NODE_BOUNDARY,
+                'geo_misc_mask': 0,
+                'geo_misc_shift': 0,
+                'geo_type_mask': 0xffffffff,
+                'geo_param_shift': 0,
+                'geo_obj_shift': 0,
+                'geo_dir_other': 0,
+                'geo_num_velocities': 0,
+                }
 
 
 class GeoBlock2D(GeoBlock):
