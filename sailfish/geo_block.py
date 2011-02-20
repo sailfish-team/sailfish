@@ -268,8 +268,9 @@ class GeoBlock(object):
         self.define_nodes(*mgrid)
         self._define_ghosts()
 
-    def get_defines(self):
-        return {'geo_fluid': self.NODE_FLUID,
+    def update_context(self, ctx):
+        ctx.update({
+                'geo_fluid': self.NODE_FLUID,
                 'geo_wall': self.NODE_WALL,
                 'geo_slip': self.NODE_SLIP,
                 'geo_unused': self.NODE_UNUSED,
@@ -283,7 +284,10 @@ class GeoBlock(object):
                 'geo_obj_shift': 0,
                 'geo_dir_other': 0,
                 'geo_num_velocities': 0,
-                }
+                'bc_wall_': BCWall,
+                'bc_velocity_': BCWall,
+                'bc_pressure_': BCWall,
+                })
 
 
 class GeoBlock2D(GeoBlock):
@@ -317,4 +321,34 @@ class GeoBlock3D(GeoBlock):
     def _define_ghosts(self):
         assert not self._type_map_encoded
         # TODO: actually define ghost nodes here
+
+
+# TODO: Finish this.
+#
+# Boundary conditions.
+#
+class LBBC(object):
+    parametrized = False
+    wet_nodes = False
+    location = 0.0
+
+class BCWall(LBBC):
+    pass
+
+class BCHalfBBWall(BCWall):
+    wet_nodes = True
+    pass
+
+class BCFullBBWall(BCWall):
+    pass
+
+class BCSlip(LBBC):
+    pass
+
+class BCVelocity(LBBC):
+    parametrized = True
+
+class BCPressure(LBBC):
+    paremetrized = True
+
 

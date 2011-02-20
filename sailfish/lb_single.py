@@ -7,12 +7,15 @@ __license__ = 'LGPLv3'
 from sailfish import sym
 from sailfish.lb_base import LBSim
 
+class GridError(Exception):
+    pass
+
 class LBFluidSim(LBSim):
     kernel_file = "single_fluid.mako"
 
     @classmethod
     def add_options(cls, group, dim):
-        LBSim.add_options(group)
+        LBSim.add_options(group, dim)
 
         group.add_argument('--visc', type=float, default=1.0, help='numerical viscosity')
         group.add_argument('--incompressible',
@@ -29,8 +32,7 @@ class LBFluidSim(LBSim):
 
         grids = [x.__name__ for x in sym.KNOWN_GRIDS if
                  x.dim == dim]
-        group.add_argument('--grid',
-                help='LB grid', type='choice',
+        group.add_argument('--grid', help='LB grid', type=str,
                 choices=grids, default=grids[0])
 
     def __init__(self, config):
@@ -41,6 +43,11 @@ class LBFluidSim(LBSim):
                 self.grid = x
                 break
 
+        if not hasattr(self, 'grid'):
+            raise GridError('Invalid grid selected: {}'.format(config.grid))
+
+        self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
+
     def update_context(self, ctx):
         ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0
         ctx['visc'] = self.config.visc
@@ -48,11 +55,18 @@ class LBFluidSim(LBSim):
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['simtype'] = 'lbm'
         ctx['grid'] = self.grid
+        ctx['grids'] = [self.grid]
+        ctx['bgk_equilibrium'] = self.equilibrium
+        ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
+
+        ctx['forces'] = {}
+        ctx['force_couplings'] = {}
+        ctx['force_for_eq'] = {}
+        ctx['image_fields'] = set()
 
 
 
-
-
+    self.get_kernel('SetIniitialConditions')
 ####################################################
 # OLD STUFF BELOW THIS LINE
 
