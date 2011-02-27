@@ -22,6 +22,12 @@ class BlockRunner(object):
         else:
             self.float = np.float32
 
+        self._scalar_fields = []
+        self._vector_fields = []
+        self._gpu_field_map = {}
+        self._gpu_grids_primary = []
+        self._gpu_grids_secondary = []
+
     @property
     def config(self):
         return self._sim.config
@@ -78,7 +84,10 @@ class BlockRunner(object):
 #                              {-1: self.options.lat_nz*self.arr_ny*self.arr_nx,
 #                                1: -self.options.lat_nz*self.arr_ny*self.arr_nx}]
 
-    def make_scalar_field(self, dtype, name=None):
+    def make_scalar_field(self, dtype=None, name=None):
+        if dtype is None:
+            dtype = self.float
+
         size = self._get_nodes()
         strides = self._get_strides(dtype)
 
@@ -88,7 +97,20 @@ class BlockRunner(object):
         if name is not None:
             self._output.register_field(field, name)
 
+        self._scalar_fields.append(field)
         return field
+
+    def make_vector_field(self, name=None, output=False):
+        components = []
+
+        for x in range(0, self._block.dim):
+            components.append(self.make_scalar_field(self.float))
+
+        if name is not None:
+            self._output.register_field(components, name)
+
+        self._vector_fields.append(components)
+        return components
 
     def _init_geometry(self):
         self._init_shape()
@@ -96,7 +118,6 @@ class BlockRunner(object):
         self._geo_block.reset()
 
         # XXX: think how to deal with node encoding
-        # XXX: later, allocate device buffers
 
     def _init_shape(self):
         # Logical size of the lattice.  X dimension is the last one on the
@@ -111,6 +132,13 @@ class BlockRunner(object):
                                                  self.config.block_size)) *
                                        self.config.block_size)
 
+        # CUDA block/grid size for standard kernel call.
+        self._kernel_grid_size = list(self._block.actual_size)
+        self._kernel_grid_size[0] /= self.config.block_size
+
+        self._kernel_block_size = [1] * len(self._lat_size)
+        self._kernel_block_size[0] = self.config.block_size
+
     def _get_strides(self, type_):
         """Returns a list of strides for the NumPy array storing the lattice."""
         t = type_().nbytes
@@ -120,6 +148,11 @@ class BlockRunner(object):
     def _get_nodes(self):
         """Returns the total amount of actual nodes in the lattice."""
         return reduce(operator.mul, self._physical_size)
+
+    def _get_dist_bytes(self, grid):
+        """Returns the number of bytes required to store a single set of
+           distributions for the whole simulation domain."""
+        return self._get_nodes() * grid.Q * self.float().nbytes
 
     def _get_compute_code(self):
         return self._bcg.get_code(self)
@@ -135,6 +168,45 @@ class BlockRunner(object):
 
         # Allocate a transfer buffer suitable for asynchronous transfers.
 
+    def _init_gpu_data(self):
+        for field in self._scalar_fields:
+            self._gpu_field_map[id(field)] = self.backend.alloc_buf(like=field)
+
+        for field in self._vector_fields:
+            gpu_vector = []
+            for component in field:
+                gpu_vector.append(self.backend.alloc_buf(like=component))
+            self._gpu_field_map[id(field)] = gpu_vector
+
+        for grid in self._sim.grids:
+            size = self._get_dist_bytes(grid)
+            self._gpu_grids_primary.append(self.backend.alloc_buf(size=size))
+            self._gpu_grids_secondary.append(self.backend.alloc_buf(size=size))
+
+        self._gpu_geo_map = self.backend.alloc_buf(
+                like=self._geo_block.encoded_map())
+
+    def gpu_field(self, field):
+        """Returns the GPU copy of a field."""
+        return self._gpu_field_map[id(field)]
+
+    def gpu_dist(self, num, copy):
+        """Returns a GPU dist array."""
+        if copy == 0:
+            return self._gpu_grids_primary[num]
+        else:
+            return self._gpu_grids_secondary[num]
+
+    def gpu_geo_map(self):
+        return self._gpu_geo_map
+
+    def get_kernel(self, name, args, args_format):
+        return self.backend.get_kernel(self.module, name, args=args,
+                args_format=args_format, block=self._kernel_block_size)
+
+    def exec_kernel(self, name, args, args_format):
+        kernel = self.get_kernel(name, args, args_format)
+        self.backend.run_kernel(kernel, self._kernel_grid_size)
 
     def _step_bulk(self):
         """Runs one simulation step in the bulk domain.
@@ -153,30 +225,6 @@ class BlockRunner(object):
 
         stream = self._boundary_stream[self._step]
 
-        self.backend.to_buf(buf, stream=stream)
-        self.backend.make_sync_event(stream)
-        self.backend.run_kernel(populate_data_kernel, None,
-                                stream=stream)
-        self.backend.make_sync_event(stream)
-        self.backend.run_kernel(time_step, None, stream=stream)
-        self.backend.make_sync_event(stream)
-        self.backend.run_kernel(copy_kernel, None, stream=stream)
-        self.backend.make_sync_event(stream)
-        self.backend.from_buf(buf, stream=stream)
-
-    """
-    Boundary streams: (odd and even)
-    - copy data from other blocks to transfer buffer in GPU memory
-    - sync
-    - write data to correct places in the grid
-    - sync
-    - time step for boundary blocks
-    - sync
-    - copy data to transfer buffer
-    - sync
-    - read data from transfer buffer to the host
-    """
-
     # XXX: Make these functions do something useful.
     def send_data(self):
         for b_id, connector in self._block._connectors.iteritems():
@@ -193,6 +241,13 @@ class BlockRunner(object):
     def run(self):
         self._init_geometry()
         self._init_compute()
+        self._sim.init_fields(self)
+        self._init_gpu_data()
+        self._sim.initial_conditions(self)
+
+        # XXX: Figureout whether to store them this way...
+        self._kernels_full = self._sim.get_compute_kernels(self, True)
+        self._kernels_none = self._sim.get_compute_kenrels(self, False)
         self._step_bulk()
 
         return

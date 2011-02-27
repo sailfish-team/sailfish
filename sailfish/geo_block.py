@@ -289,6 +289,14 @@ class GeoBlock(object):
                 'bc_pressure_': BCWall,
                 })
 
+    def _encode_map(self):
+        raise Exception('FIXME')
+
+    def encoded_map(self):
+        if not self._type_map_encoded:
+            self._encode_map()
+
+        return self._type_map
 
 class GeoBlock2D(GeoBlock):
     dim = 2
