@@ -114,6 +114,7 @@ class LBFluidSim(LBSim):
     def init_fields(self, runner):
         self.rho = runner.make_scalar_field(name='rho')
         self.v = runner.make_vector_field(name='v')
+        self.vx, self.vy = self.v
 
 
 ####################################################

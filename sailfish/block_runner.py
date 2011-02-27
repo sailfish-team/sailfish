@@ -118,8 +118,6 @@ class BlockRunner(object):
                                         self._sim.grid)
         self._geo_block.reset()
 
-        # XXX: think how to deal with node encoding
-
     def _init_shape(self):
         # Logical size of the lattice.  X dimension is the last one on the
         # list.
@@ -251,6 +249,7 @@ class BlockRunner(object):
         self._init_geometry()
         self._init_compute()
         self._sim.init_fields(self)
+        self._geo_block.init_fields(self._sim)
         self._init_gpu_data()
         self._sim.initial_conditions(self)
 
