@@ -1,6 +1,11 @@
-import numpy as np
-
+"""Base class for all lattice Boltzman simulations in Sailfish."""
 from sailfish import sym
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'LGPL'
+__version__ = '0.3-alpha1'
+
 
 class LBSim(object):
     """Describes a specific type of a lattice Boltzmann simulation."""
@@ -32,3 +37,10 @@ class LBSim(object):
         self.S = sym.S()
         self.iteration = 0
 
+    # TODO(michalj): Restore support for body forces.
+    # TODO(michalj): Restore support for force couplings.
+    # TODO(michalj): Restore support for fields accessed via textures.
+    # TODO(michalj): Restore support for iter hooks.
+    # TODO(michalj): Restore support for defining visualization fields.
+    # TODO(michalj): Restore support for tracer particles.
+    # TODO(michalj): Restore support for free-surface LB.
