@@ -212,7 +212,7 @@ class LBSimulationController(object):
                     "'{}' backend options".format(backend.name))
             backend.add_options(group)
 
-        # TODO: visualization engine settings
+        # TODO(michalj): Restore support for on-line data visualization.
 
         # Set default values defined by the simulation-specific class.
         defaults = {}
