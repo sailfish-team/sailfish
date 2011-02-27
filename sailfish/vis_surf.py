@@ -1,5 +1,8 @@
 """OpenGL visualization backend."""
 
+# TODO(michalj): Port this visualization backend.
+raise NotImplementedError("This visualization backend has not been ported yet.")
+
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'GPL3'
