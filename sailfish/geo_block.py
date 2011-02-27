@@ -4,6 +4,15 @@ __license__ = 'GPL3'
 
 import numpy as np
 
+def bit_len(num):
+    """Returns the minimal number of bits necesary to encode `num`."""
+    length = 0
+    while num:
+        num >>= 1
+        length += 1
+    return max(length, 1)
+
+
 # TODO: envelope size should be calculated automatically
 
 class LBBlock(object):
@@ -219,13 +228,105 @@ class LBBlock3D(LBBlock):
         ctx['dim'] = self.dim
 
 
+class GeoEncoder(object):
+    """Takes information about geometry as specified by the simulation and
+    encodes it into buffers suitable for processing on a GPU.
+
+    This is an abstract class.  Its implementations provide a specific encoding
+    scheme."""
+    def __init__(self):
+        self._type_id_map = {}
+
+    def encode(self):
+        raise NotImplementedError("encode() should be implemented in a subclass")
+
+    def update_context(self, ctx):
+        raise NotImplementedError("update_context() should be implemented in a subclass")
+
+    def _type_id(self, node_type):
+        if node_type in self._type_id_map:
+            return self._type_id_map[node_type]
+        else:
+            return 0xffffffff
+
+
+class GeoEncoderConst(GeoEncoder):
+    """Encodes information about the type, optional parameters and orientation
+    of a node into a single uint32.  Optional parameters are stored in const
+    memory."""
+
+    def __init__(self):
+        GeoEncoder.__init__(self)
+
+        self._bits_type = 0
+        self._bits_orientation = 0
+        self._bits_param = 0
+        self._type_map = None
+
+    def prepare_encode(self, type_map):
+        """
+        Args:
+          type_map: uint32 array representing node type information
+        """
+        uniq_types = np.unique(type_map)
+
+        for i, node_type in enumerate(uniq_types):
+            self._type_id_map[node_type] = i
+
+        self._bits_type = bit_len(uniq_types.size)
+        self._type_map = type_map
+
+    def encode(self):
+        assert self._type_map is not None
+
+        # TODO: process params and orientation here.
+        param = np.zeros_like(self._type_map)
+        orientation = np.zeros_like(self._type_map)
+
+        self._type_map[:] = self._encode_node(orientation, param, self._type_map)
+
+        # Drop the reference to the map array.
+        self._type_map = None
+
+    def update_context(self, ctx):
+        ctx.update({
+            'geo_fluid': self._type_id(GeoBlock.NODE_FLUID),
+            'geo_wall': self._type_id(GeoBlock.NODE_WALL),
+            'geo_slip': self._type_id(GeoBlock.NODE_SLIP),
+            'geo_unused': self._type_id(GeoBlock.NODE_UNUSED),
+            'geo_velocity': self._type_id(GeoBlock.NODE_VELOCITY),
+            'geo_pressure': self._type_id(GeoBlock.NODE_PRESSURE),
+            'geo_boundary': self._type_id(GeoBlock.NODE_BOUNDARY),
+            'geo_misc_shift': self._bits_type,
+            'geo_type_mask': (1 << self._bits_type) - 1,
+            'geo_param_shift': self._bits_param,
+            'geo_obj_shift': 0,
+            'geo_dir_other': 0,
+            'geo_num_velocities': 0,
+        })
+
+    def _encode_node(self, orientation, param, node_type):
+        """Encodes information for a single node into a uint32.
+
+        The node code consists of the following bit fields:
+          orientation | param_index | node_type
+        """
+        misc_data = (orientation << self._bits_param) | param
+        return node_type | (misc_data << self._bits_type)
+
+# TODO: Implement this class.
+class GeoEncoderBuffer(GeoEncoder):
+    pass
+
+# TODO: Implement this class.
+class GeoEncoderMap(GeoEncoder):
+    pass
+
+
 class GeoBlock(object):
     """Abstract class for the geometry of a LBBlock."""
 
-    # TODO: change the way boundary conditions are specified and encoded.
-    # The condition should be specified by passing an object/class, and the
-    # encoding should be done by an encoder class.
-
+    # TODO: Deprecate these in favor of BC classes.
     NODE_FLUID = 0
     NODE_WALL = 1
     NODE_VELOCITY = 2
@@ -244,15 +345,21 @@ class GeoBlock(object):
     def add_options(cls, group):
         pass
 
-    def __init__(self, grid_shape, block, *args, **kwargs):
+    def __init__(self, grid_shape, block, grid, *args, **kwargs):
+        """
+        Args:
+          grid: grid object specifying the connectivity of the lattice
+        """
         self.block = block
         self.grid_shape = grid_shape
+        self.grid = grid
         # The type map allocated by the block runner already includes
         # ghost nodes, and is formatted in a way that makes it suitable
         # for copying to the compute device.
         self._type_map = block.runner.make_scalar_field(np.uint32)
         self._type_map_encoded = False
         self._type_map_view = self._type_map.view()[block._nonghost_slice]
+        self._encoder = None
 
     def define_nodes(self, *args):
         raise NotImplementedError('define_nodes() not defined in a child'
@@ -260,6 +367,9 @@ class GeoBlock(object):
 
     def set_geo(self, where, type_, params=None):
         assert not self._type_map_encoded
+
+        # TODO: if type_ is a class, we should just store its ID; if it's
+        # an object, the ID should be dynamically assigned
         self._type_map_view[where] = type_
 
     def reset(self):
@@ -267,34 +377,26 @@ class GeoBlock(object):
         mgrid = self._get_mgrid()
         self.define_nodes(*mgrid)
         self._define_ghosts()
+        self._postprocess_nodes()
+
+        # TODO: At this point, we should decide which GeoEncoder class to use.
+        self._encoder = GeoEncoderConst()
+        self._encoder.prepare_encode(self._type_map)
 
     def update_context(self, ctx):
+        assert self._encoder is not None
+
+        self._encoder.update_context(ctx)
+
         ctx.update({
-                'geo_fluid': self.NODE_FLUID,
-                'geo_wall': self.NODE_WALL,
-                'geo_slip': self.NODE_SLIP,
-                'geo_unused': self.NODE_UNUSED,
-                'geo_velocity': self.NODE_VELOCITY,
-                'geo_pressure': self.NODE_PRESSURE,
-                'geo_boundary': self.NODE_BOUNDARY,
-                'geo_misc_mask': 0,
-                'geo_misc_shift': 0,
-                'geo_type_mask': 0xffffffff,
-                'geo_param_shift': 0,
-                'geo_obj_shift': 0,
-                'geo_dir_other': 0,
-                'geo_num_velocities': 0,
                 'bc_wall_': BCWall,
                 'bc_velocity_': BCWall,
                 'bc_pressure_': BCWall,
                 })
 
-    def _encode_map(self):
-        raise Exception('FIXME')
-
     def encoded_map(self):
         if not self._type_map_encoded:
-            self._encode_map()
+            self._encoder.encode()
 
         return self._type_map
 
@@ -313,6 +415,18 @@ class GeoBlock2D(GeoBlock):
         assert not self._type_map_encoded
         # TODO: actually define ghost nodes here
 
+    def _postprocess_nodes(self):
+        # Find nodes which are walls themselves and are completely surrounded by
+        # walls.  These nodes are marked as unused, as they do not contribute to
+        # the dynamics of the fluid in any way.
+        cnt = np.zeros_like(self._type_map).astype(np.uint32)
+        for i, vec in enumerate(self.grid.basis):
+            a = np.roll(self._type_map, int(-vec[0]), axis=1)
+            a = np.roll(a, int(-vec[1]), axis=0)
+            cnt[(a == self.NODE_WALL)] += 1
+
+        self._type_map[(cnt == self.grid.Q)] = self.NODE_UNUSED
+
 
 class GeoBlock3D(GeoBlock):
     dim = 3
@@ -330,6 +444,8 @@ class GeoBlock3D(GeoBlock):
         assert not self._type_map_encoded
         # TODO: actually define ghost nodes here
 
+    def _postprocess_nodes(self):
+        raise NotImplementedError("_postprocess_nodes()")
 
 # TODO: Finish this.
 #

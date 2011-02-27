@@ -114,7 +114,8 @@ class BlockRunner(object):
 
     def _init_geometry(self):
         self._init_shape()
-        self._geo_block = self._sim.geo(self._physical_size, self._block)
+        self._geo_block = self._sim.geo(self._physical_size, self._block,
+                                        self._sim.grid)
         self._geo_block.reset()
 
         # XXX: think how to deal with node encoding
@@ -208,14 +209,22 @@ class BlockRunner(object):
         kernel = self.get_kernel(name, args, args_format)
         self.backend.run_kernel(kernel, self._kernel_grid_size)
 
-    def _step_bulk(self):
+    def step(self, output_req):
+        # call _step_boundary here
+        self._step_bulk(output_req)
+        self._sim.iteration += 1
+
+    def _step_bulk(self, output_req):
         """Runs one simulation step in the bulk domain.
 
         Bulk domain is defined to be all nodes that belong to CUDA
         blocks that do not depend on input from any ghost nodes.
         """
-        kernel = None
-        self.backend.run_kernel(kernel, self._bulk_grid_size)
+        if output_req:
+            kernel = self._kernels_none[self._sim.iteration & 1]
+        else:
+            kernel = self._kernels_none[self._sim.iteration & 1]
+        self.backend.run_kernel(kernel, self._kernel_grid_size)
 
     def _step_boundary(self):
         """Runs one simulation step for the boundary blocks.
@@ -245,13 +254,24 @@ class BlockRunner(object):
         self._init_gpu_data()
         self._sim.initial_conditions(self)
 
-        # XXX: Figureout whether to store them this way...
         self._kernels_full = self._sim.get_compute_kernels(self, True)
-        self._kernels_none = self._sim.get_compute_kenrels(self, False)
-        self._step_bulk()
+        self._kernels_none = self._sim.get_compute_kernels(self, False)
 
-        return
+        if self.config.output:
+            self._output.save(self._sim.iteration)
 
-if __name__ == "__main__":
-    import doctest
-    doctest.testmod()
+        while True:
+            output_req = ((self._sim.iteration + 1) % self.config.every) == 0
+            self.step(output_req)
+
+            if output_req and self.config.output:
+                self._output.save(self._sim.iteration)
+
+            # TODO: send data to other blocks
+
+            if (self.config.max_iters > 0 and self._sim.iteration >=
+                    self.config.max_iters):
+                break
+
+            # TODO: recv data from other blocks
+

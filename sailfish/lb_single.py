@@ -50,6 +50,10 @@ class LBFluidSim(LBSim):
 
         self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grids[0])
 
+    @property
+    def grid(self):
+        return self.grids[0]
+
     def update_context(self, ctx):
         ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0
         ctx['visc'] = self.config.visc
@@ -79,6 +83,11 @@ class LBFluidSim(LBSim):
         runner.exec_kernel('SetInitialConditions', args2, 'P'*len(args2))
 
     def get_compute_kernels(self, runner, full_output):
+        """
+        Args:
+          full_output: if True, returns kernels for
+
+        """
         gpu_rho = runner.gpu_field(self.rho)
         gpu_v = runner.gpu_field(self.v)
         gpu_dist1a = runner.gpu_dist(0, 0)
@@ -97,9 +106,9 @@ class LBFluidSim(LBSim):
 
         kernels = []
         kernels.append(runner.get_kernel(
-                'collideandpropagate', args1, 'p'*(len(args1)-1)+'i'))
+                'CollideAndPropagate', args1, 'P'*(len(args1)-1)+'i'))
         kernels.append(runner.get_kernel(
-                'collideandpropagate', args2, 'p'*(len(args2)-1)+'i'))
+                'CollideAndPropagate', args2, 'P'*(len(args2)-1)+'i'))
         return kernels
 
     def init_fields(self, runner):

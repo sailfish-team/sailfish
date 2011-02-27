@@ -12,6 +12,7 @@ class LBOutput(object):
         else:
             self._scalar_fields[name] = field
 
+
 # TODO: Correctly process vector and scalar fields in these clases.
 class HDF5FlatOutput(LBOutput):
     """Saves simulation data in a HDF5 file."""
@@ -19,6 +20,10 @@ class HDF5FlatOutput(LBOutput):
 
     def __init__(self, fname, sim):
         LBOutput.__init__(self)
+
+        # FIXME: Port this class.
+        raise NotImplementedError('This class has not been ported yet.')
+
         self.sim = sim
         import tables
         self.h5file = tables.openFile(fname, mode='w')
@@ -38,6 +43,9 @@ class HDF5NestedOutput(HDF5FlatOutput):
     format_name = 'h5nested'
 
     def __init__(self, fname, sim):
+        # FIXME: Port this class.
+        raise NotImplementedError('This class has not been ported yet.')
+
         super(HDF5NestedOutput, self).__init__(fname, sim)
         import tables
         desc = {
@@ -75,18 +83,19 @@ class VTKOutput(LBOutput):
     """Saves simulation data in VTK files."""
     format_name = 'vtk'
 
-    def __init__(self, fname, sim):
+    def __init__(self, config):
         LBOutput.__init__(self)
-        self.fname = fname
-        self.sim = sim
-        self.digits = _get_fname_digits(sim.options.max_iters)
+        self.fname = config.output
+        self.digits = _get_fname_digits(config.max_iters)
 
     def save(self, i):
+        # FIXME: Port this class.
+        raise NotImplementedError('This class has not been ported yet.')
+
         from enthought.tvtk.api import tvtk
         idata = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
 
-        # FIXME: Gracefully handle the case when there are no scalar fields.
-        fields = self.sim.output_fields.keys()
+        fields = self._scalar_fields.keys() + self._vector_fields.keys()
         ffld = fields[0]
         fields = fields[1:]
 
@@ -121,17 +130,16 @@ class NPYOutput(LBOutput):
     """Saves simulation data as numpy arrays."""
     format_name = 'npy'
 
-    def __init__(self, fname, sim):
+    def __init__(self, config):
         LBOutput.__init__(self)
-        self.fname = fname
-        self.sim = sim
-        self.digits = _get_fname_digits(sim.options.max_iters)
+        self.digits = _get_fname_digits(config.max_iters)
+        self.fname = config.output
 
     def save(self, i):
         fname = ('%s%0' + self.digits + 'd') % (self.fname, i)
         data = {}
-        data.update(self.sim.output_fields)
-        data.update(self.sim.output_vectors)
+        data.update(self._scalar_fields)
+        data.update(self._vector_fields)
         numpy.savez(fname, **data)
 
 
@@ -139,18 +147,17 @@ class MatlabOutput(LBOutput):
     """Ssves simulation data as Matlab .mat files."""
     format_name = 'mat'
 
-    def __init__(self, fname, sim):
+    def __init__(self, config):
         LBOutput.__init__(self)
-        self.fname = fname
-        self.sim = sim
-        self.digits = _get_fname_digits(sim.options.max_iters)
+        self.digits = _get_fname_digits(config.max_iters)
+        self.fname = config.output
 
     def save(self, i):
         import scipy.io
         fname = ('%s%0' + self.digits + 'd.mat') % (self.fname, i)
         data = {}
-        data.update(self.sim.output_fields)
-        data.update(self.sim.output_vectors)
+        data.update(self._scalar_fields)
+        data.update(self._vector_fields)
         scipy.io.savemat(fname, data)
 
 _OUTPUTS = [NPYOutput, HDF5FlatOutput, HDF5NestedOutput, VTKOutput, MatlabOutput]

@@ -15,6 +15,13 @@ class LBSim(object):
     def update_defaults(cls, defaults):
         pass
 
+    @property
+    def grid(self):
+        """Returns a grid object representing the connectivity of the lattice
+        used in the simulation.  If the simulation uses more than 1 grid,
+        returns the grid with the highest connectivity."""
+        raise NotImplementedError("grid() should be defined in a subclass")
+
     def update_context(self, ctx):
         """Updates the context dicitionary containing variables used for
         code generation."""
@@ -23,4 +30,5 @@ class LBSim(object):
     def __init__(self, config):
         self.config = config
         self.S = sym.S()
+        self.iteration = 0
 
