@@ -24,8 +24,8 @@ def _start_block_runner(block, config, lb_class, backend_class, gpu_id):
     backend = backend_class(config, gpu_id)
     sim = lb_class(config)
 
-    # FIXME: instantiate a proper IO class here.
-    output = io.LBOutput()
+    output_cls = io.format_name_to_cls[config.output_format]
+    output = output_cls(config)
     runner = block_runner.BlockRunner(sim, block, output, backend)
     runner.run()
 
