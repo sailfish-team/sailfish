@@ -1,12 +1,24 @@
 import math
 import numpy
 
+class LBOutput(object):
+    def __init__(self, **kwargs):
+        self._scalar_fields = {}
+        self._vector_fields = {}
+
+    def register_field(self, field, name):
+        if type(field) is list:
+            self._vector_fields[name] = field
+        else:
+            self._scalar_fields[name] = field
+
 # TODO: Correctly process vector and scalar fields in these clases.
-class HDF5FlatOutput(object):
+class HDF5FlatOutput(LBOutput):
     """Saves simulation data in a HDF5 file."""
     format_name = 'h5flat'
 
     def __init__(self, fname, sim):
+        LBOutput.__init__(self)
         self.sim = sim
         import tables
         self.h5file = tables.openFile(fname, mode='w')
@@ -59,11 +71,12 @@ def _get_fname_digits(max_iters=0):
         return str(7)
 
 
-class VTKOutput(object):
+class VTKOutput(LBOutput):
     """Saves simulation data in VTK files."""
     format_name = 'vtk'
 
     def __init__(self, fname, sim):
+        LBOutput.__init__(self)
         self.fname = fname
         self.sim = sim
         self.digits = _get_fname_digits(sim.options.max_iters)
@@ -104,11 +117,12 @@ class VTKOutput(object):
         w.write()
 
 
-class NPYOutput(object):
+class NPYOutput(LBOutput):
     """Saves simulation data as numpy arrays."""
     format_name = 'npy'
 
     def __init__(self, fname, sim):
+        LBOutput.__init__(self)
         self.fname = fname
         self.sim = sim
         self.digits = _get_fname_digits(sim.options.max_iters)
@@ -121,11 +135,12 @@ class NPYOutput(object):
         numpy.savez(fname, **data)
 
 
-class MatlabOutput(object):
+class MatlabOutput(LBOutput):
     """Ssves simulation data as Matlab .mat files."""
     format_name = 'mat'
 
     def __init__(self, fname, sim):
+        LBOutput.__init__(self)
         self.fname = fname
         self.sim = sim
         self.digits = _get_fname_digits(sim.options.max_iters)
