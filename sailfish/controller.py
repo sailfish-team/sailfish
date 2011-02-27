@@ -47,6 +47,9 @@ class LBBlockConnector(object):
 
 
 class LBMachineMaster(object):
+    """Controls execution of a LB simulation on a single physical machine
+    (possibly with multiple GPUs and multiple LB blocks being simulated)."""
+
     def __init__(self, config, blocks, lb_class):
         self.blocks = blocks
         self.config = config
@@ -117,6 +120,11 @@ class GeometryError(Exception):
     pass
 
 class LBGeometryProcessor(object):
+    """Transforms a set of LBBlocks into a another set covering the same
+    physical domain, but optimized for execution of the available hardware.
+    Initializes logical connections between the blocks based on their
+    location."""
+
     def __init__(self, blocks, dim):
         self.blocks = blocks
         self.dim = dim
@@ -232,7 +240,7 @@ class LBSimulationController(object):
         proc = LBGeometryProcessor(blocks, self.dim)
         blocks = proc.transform()
 
-        # TODO: do this over MPI
+        # TODO(michalj): do this over MPI
         p = Process(target=_start_machine_master,
                     args=(self.conf, blocks, self._lb_class))
         p.start()
