@@ -9,7 +9,7 @@ import os
 import sys
 import time
 
-import numpy
+import numpy as np
 import pygame
 from scipy import signal
 
@@ -27,59 +27,59 @@ def _font_name():
 
 def _hsv_to_rgb(a):
     t = a[:,:,0]*6.0
-    i = t.astype(numpy.uint8)
-    f = t - numpy.floor(t)
+    i = t.astype(np.uint8)
+    f = t - np.floor(t)
 
     v = a[:,:,2]
 
-    o = numpy.ones_like(a[:,:,0])
+    o = np.ones_like(a[:,:,0])
     p = v * (o - a[:,:,1])
     q = v * (o - a[:,:,1]*f)
     t = v * (o - a[:,:,1]*(o - f))
 
-    i = numpy.mod(i, 6)
+    i = np.mod(i, 6)
     sh = i.shape
-    i = i.reshape(sh[0], sh[1], 1) * numpy.uint8([1,1,1])
+    i = i.reshape(sh[0], sh[1], 1) * np.uint8([1,1,1])
 
-    choices = [numpy.dstack((v, t, p)),
-               numpy.dstack((q, v, p)),
-               numpy.dstack((p, v, t)),
-               numpy.dstack((p, q, v)),
-               numpy.dstack((t, p, v)),
-               numpy.dstack((v, p, q))]
+    choices = [np.dstack((v, t, p)),
+               np.dstack((q, v, p)),
+               np.dstack((p, v, t)),
+               np.dstack((p, q, v)),
+               np.dstack((t, p, v)),
+               np.dstack((v, p, q))]
 
-    return numpy.choose(i, choices)
+    return np.choose(i, choices)
 
 def _cmap_hsv(drw):
-    drw = drw.reshape((drw.shape[0], drw.shape[1], 1)) * numpy.float32([1.0, 1.0, 1.0])
+    drw = drw.reshape((drw.shape[0], drw.shape[1], 1)) * np.float32([1.0, 1.0, 1.0])
     drw[:,:,2] = 1.0
     drw[:,:,1] = 1.0
     drw = _hsv_to_rgb(drw) * 255.0
-    return drw.astype(numpy.uint8)
+    return drw.astype(np.uint8)
 
 def _cmap_std(drw):
-    return (drw.reshape((drw.shape[0], drw.shape[1], 1)) * 255.0).astype(numpy.uint8) * numpy.uint8([1,1,0])
+    return (drw.reshape((drw.shape[0], drw.shape[1], 1)) * 255.0).astype(np.uint8) * np.uint8([1,1,0])
 
 def _cmap_2col(drw):
-    drw = ((drw*(drw>0).astype(int)).reshape((drw.shape[0], drw.shape[1], 1)) * numpy.uint8([255, 0, 0])
-        - ( drw*(drw<0).astype(int)).reshape((drw.shape[0], drw.shape[1], 1)) * numpy.uint8([0, 0, 255]))
+    drw = ((drw*(drw>0).astype(int)).reshape((drw.shape[0], drw.shape[1], 1)) * np.uint8([255, 0, 0])
+        - ( drw*(drw<0).astype(int)).reshape((drw.shape[0], drw.shape[1], 1)) * np.uint8([0, 0, 255]))
     drw[drw>255] = 255
     drw[drw<-255] = -255
-    return drw.astype(numpy.uint8)
+    return drw.astype(np.uint8)
 
 def _cmap_rgb1(drw):
     """Default color palette from gnuplot."""
-    r = numpy.sqrt(drw)
-    g = numpy.power(drw, 3)
-    b = numpy.sin(drw * math.pi)
+    r = np.sqrt(drw)
+    g = np.power(drw, 3)
+    b = np.sin(drw * math.pi)
 
-    return (numpy.dstack([r,g,b]) * 250.0).astype(numpy.uint8)
+    return (np.dstack([r,g,b]) * 250.0).astype(np.uint8)
 
 def _cmap_bin_red_blue(a, b):
     """Two fields, mapped to the red and blue components, respectively."""
     g = a.copy()
     g[:] = 0.0
-    return (numpy.dstack([a,g,b]) * 255.0).astype(numpy.uint8)
+    return (np.dstack([a,g,b]) * 255.0).astype(np.uint8)
 
 def _gauss_kernel(size, sizey=None):
     """Return a normalized 2D gauss kernel array for convolutions"""
@@ -88,24 +88,24 @@ def _gauss_kernel(size, sizey=None):
         sizey = size
     else:
         sizey = int(sizey)
-    x, y = numpy.mgrid[-size:size+1, -sizey:sizey+1]
-    g = numpy.exp(-(x**2/float(size) + y**2/float(sizey)))
+    x, y = np.mgrid[-size:size+1, -sizey:sizey+1]
+    g = np.exp(-(x**2/float(size) + y**2/float(sizey)))
     return g / g.sum()
 
 def _emboss_field(fv, a):
     # Based on the code posted on
     # http://stackoverflow.com/questions/2034037/image-embossing-in-python-with-pil-adding-depth-azimuth-etc
-    azi = numpy.pi/8.
-    ele = numpy.pi/16.
+    azi = np.pi/8.
+    ele = np.pi/16.
     dep = 0.81
-    grad_x, grad_y = numpy.gradient(255 * fv * dep)
+    grad_x, grad_y = np.gradient(255 * fv * dep)
 
-    gd = numpy.cos(ele) # length of projection of ray on ground plane
-    dx = gd * numpy.cos(azi)
-    dy = gd * numpy.sin(azi)
-    dz = numpy.sin(ele)
+    gd = np.cos(ele) # length of projection of ray on ground plane
+    dx = gd * np.cos(azi)
+    dy = gd * np.sin(azi)
+    dz = np.sin(ele)
     # finding the unit normal vectors for the image
-    len_ = numpy.sqrt(numpy.square(grad_x) + numpy.square(grad_y) + 1.)
+    len_ = np.sqrt(np.square(grad_x) + np.square(grad_y) + 1.)
     a2 = 255 * (dx*grad_x + dy*grad_y + dz) / len_
     a2 = a2.clip(0,255).astype('int')
     w = 0.5
@@ -246,7 +246,7 @@ class Fluid2DVis(vis.FluidVis):
         fs = []
 
         for i, fv in enumerate(self.get_field_vals(field)):
-            fv = numpy.ma.array(fv, mask=(numpy.logical_or(wall_map, unused_map)))
+            fv = np.ma.array(fv, mask=(np.logical_or(wall_map, unused_map)))
 
             if self._vistype == self.VIS_LINEAR:
 
@@ -261,7 +261,7 @@ class Fluid2DVis(vis.FluidVis):
                     if field.ranges is not None:
                         rng = field.ranges[i]
                     else:
-                        rng = (numpy.min(fv), numpy.max(fv))
+                        rng = (np.min(fv), np.max(fv))
 
                 # If negative values are allowed, map the field to
                 # [-1;1], otherwise map it to [0;1]
@@ -277,9 +277,9 @@ class Fluid2DVis(vis.FluidVis):
                 fs.append(fv)
 
             elif self._vistype == self.VIS_FLUCTUATION:
-                max_ = numpy.max(fv)
-                min_ = numpy.min(fv)
-                avg_ = numpy.average(fv)
+                max_ = np.max(fv)
+                min_ = np.min(fv)
+                avg_ = np.average(fv)
                 fs.append((fv - avg_) / (max_ - min_))
 
         if self._convolve:
@@ -291,7 +291,7 @@ class Fluid2DVis(vis.FluidVis):
         pygame.transform.scale(srf2, self._screen.get_size(), self._screen)
         sw, sh = self._screen.get_size()
 
-        maxv = numpy.max(numpy.sqrt(numpy.square(self.vx) + numpy.square(self.vy)))
+        maxv = np.max(np.sqrt(np.square(self.vx) + np.square(self.vy)))
         ret.append('maxv: %.3f' % maxv)
 
         # Draw the velocity field
@@ -323,12 +323,12 @@ class Fluid2DVis(vis.FluidVis):
 
         # Rotate the field to the correct position.
         for field in fields:
-            fv.append(numpy.rot90(field.astype(numpy.float32), 3))
+            fv.append(np.rot90(field.astype(np.float32), 3))
 
         a = pygame.surfarray.pixels3d(srf)
 
-        wall_map = numpy.rot90(wall_map, 3)
-        unused_map = numpy.rot90(unused_map, 3)
+        wall_map = np.rot90(wall_map, 3)
+        unused_map = np.rot90(unused_map, 3)
 
         if self._show_walls:
             # Draw the walls.
@@ -336,7 +336,7 @@ class Fluid2DVis(vis.FluidVis):
             a[unused_map] = self._color_unused
 
         n = len(fields)
-        fluid_map = numpy.logical_not(numpy.logical_or(wall_map, unused_map))
+        fluid_map = np.logical_not(np.logical_or(wall_map, unused_map))
         field = cmaps[n][self._cmap[n]](*fv)
         a[fluid_map] = field[fluid_map]
 
@@ -484,7 +484,7 @@ class Fluid2DVis(vis.FluidVis):
 
         args_part1 = self.sim.curr_dists() + self.sim.gpu_mom0 + self.sim.gpu_velocity
 
-        args = args_part1 + [numpy.int32(loc[0]), numpy.int32(loc[1]),
+        args = args_part1 + [np.int32(loc[0]), np.int32(loc[1]),
                 self.sim.float(dir[0] * fact), self.sim.float(-dir[1] * fact)]
 
         kern = self.sim.backend.get_kernel(self.sim.mod, 'SetLocalVelocity',
