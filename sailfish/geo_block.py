@@ -375,13 +375,17 @@ class GeoBlock(object):
     def reset(self):
         self._type_map_encoded = False
         mgrid = self._get_mgrid()
-        self.define_nodes(*mgrid)
+        self._define_nodes(*mgrid)
         self._define_ghosts()
         self._postprocess_nodes()
 
         # TODO: At this point, we should decide which GeoEncoder class to use.
         self._encoder = GeoEncoderConst()
         self._encoder.prepare_encode(self._type_map)
+
+    def init_fields(self, sim):
+        mgrid = self._get_mgrid()
+        self._init_fields(sim, *mgrid)
 
     def update_context(self, ctx):
         assert self._encoder is not None
