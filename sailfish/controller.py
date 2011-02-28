@@ -1,6 +1,7 @@
-import os
+import logging
+import platform
 import sys
-from multiprocessing import Process, Pipe, Array, Event
+from multiprocessing import Process, Array, Event
 
 from sailfish import codegen, config, io, block_runner
 from sailfish.geo import LBGeometry2D, LBGeometry3D
@@ -18,9 +19,6 @@ def _start_block_runner(block, config, lb_class, backend_class, gpu_id):
     # We instantiate the backend class here (instead in the machine
     # master), so that the backend object is created within the
     # context of the new process.
-
-    print 'block %d at PID %d' % (block.id, os.getpid())
-
     backend = backend_class(config, gpu_id)
     sim = lb_class(config)
 
@@ -57,6 +55,18 @@ class LBMachineMaster(object):
         self.runners = []
         self._block_id_to_runner = {}
         self._pipes = []
+        self.config.logger = logging.getLogger('saifish')
+        formatter = logging.Formatter("[%(relativeCreated)6d %(processName)s] %(message)s")
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+        self.config.logger.addHandler(handler)
+
+        if config.verbose:
+            self.config.logger.setLevel(logging.INFO)
+        elif config.quiet:
+            self.config.logger.setLevel(logging.ERROR)
+        else:
+            self.config.logger.setLevel(logging.WARNING)
 
     def _assign_blocks_to_gpus(self):
         block2gpu = {}
@@ -67,6 +77,8 @@ class LBMachineMaster(object):
         return block2gpu
 
     def run(self):
+        self.config.logger.info("Machine master starting.")
+
         block2gpu = self._assign_blocks_to_gpus()
         backend_class = _get_backends().next()
 
@@ -97,6 +109,7 @@ class LBMachineMaster(object):
         # Create block runners for all blocks.
         for block in self.blocks:
             p = Process(target=_start_block_runner,
+                        name="Block/{}".format(block.id),
                         args=(block, self.config, self.lb_class,
                               backend_class, block2gpu[block.id]))
             self.runners.append(p)
@@ -242,6 +255,7 @@ class LBSimulationController(object):
 
         # TODO(michalj): do this over MPI
         p = Process(target=_start_machine_master,
+                    name='Master/{}'.format(platform.node()),
                     args=(self.conf, blocks, self._lb_class))
         p.start()
         p.join()

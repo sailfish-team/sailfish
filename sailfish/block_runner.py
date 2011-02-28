@@ -246,6 +246,8 @@ class BlockRunner(object):
         print "block %d: recv done" % self._block.id
 
     def run(self):
+        self.config.logger.info("Initializing block.")
+
         self._init_geometry()
         self._init_compute()
         self._sim.init_fields(self)
@@ -258,6 +260,8 @@ class BlockRunner(object):
 
         if self.config.output:
             self._output.save(self._sim.iteration)
+
+        self.config.logger.info("Starting simulation.")
 
         while True:
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
@@ -273,4 +277,8 @@ class BlockRunner(object):
                 break
 
             # TODO: recv data from other blocks
+
+        self.config.logger.info(
+            "Simulation completed after {} iterations.".format(
+                self._sim.iteration))
 
