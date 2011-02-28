@@ -57,6 +57,8 @@ class BlockCodeGenerator(object):
 
     def get_code(self, block_runner):
         if self.config.use_src:
+            self.config.logger.debug(
+                    "Using code from '{}'.".format(self.config.use_src))
             with open(self.config.use_src, 'r') as f:
                 src = f.read()
             return src
