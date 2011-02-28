@@ -223,7 +223,7 @@ class BlockRunner(object):
         blocks that do not depend on input from any ghost nodes.
         """
         if output_req:
-            kernel = self._kernels_none[self._sim.iteration & 1]
+            kernel = self._kernels_full[self._sim.iteration & 1]
         else:
             kernel = self._kernels_none[self._sim.iteration & 1]
         self.backend.run_kernel(kernel, self._kernel_grid_size)
@@ -248,6 +248,15 @@ class BlockRunner(object):
             connector.recv(None)
 
         print "block %d: recv done" % self._block.id
+
+    def _fields_to_host(self):
+        """Copies data for all fields from the GPU to the host."""
+        for field in self._scalar_fields:
+            self.backend.from_buf(self._gpu_field_map[id(field)])
+
+        for field in self._vector_fields:
+            for component in self._gpu_field_map[id(field)]:
+                self.backend.from_buf(component)
 
     def run(self):
         self.config.logger.info("Initializing block.")
@@ -277,6 +286,7 @@ class BlockRunner(object):
             self.step(output_req)
 
             if output_req and self.config.output:
+                self._fields_to_host()
                 self._output.save(self._sim.iteration)
 
             # TODO: send data to other blocks

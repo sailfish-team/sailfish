@@ -37,7 +37,6 @@ class LBSim(object):
         self.S = sym.S()
         self.iteration = 0
 
-    # TODO(michalj): Restore support for body forces.
     # TODO(michalj): Restore support for force couplings.
     # TODO(michalj): Restore support for fields accessed via textures.
     # TODO(michalj): Restore support for iter hooks.

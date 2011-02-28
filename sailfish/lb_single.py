@@ -12,7 +12,44 @@ from sailfish.lb_base import LBSim
 class GridError(Exception):
     pass
 
+class LBForcedSim(LBSim):
+    """Adds support for body forces."""
+
+    def __init__(self, config):
+        super(LBForcedSim, self).__init__(config)
+        self._forces = {}
+
+    # TODO(michalj): Add support for dynamical forces via sympy expressions
+    # and for global force fields via numpy arrays.
+    def add_body_force(self, force, grid=0, accel=True):
+        """Add a constant global force field acting on the fluid.
+
+        Multiple calls to this function will add the value of `force` to any
+        previously set value.  Forces and accelerations are processed separately
+        and are never mixed in this addition process.
+
+        :param force: n-vector representing the force value
+        :param grid: grid number on which this force is acting
+        :param accel: if ``True``, the added field is an acceleration field, otherwise
+            it is an actual force field
+        """
+        dim = self.grids[0].dim
+        assert len(force) == dim
+
+        # Create an empty force vector.  Use numpy so that we can easily compute
+        # sums.
+        self._forces.setdefault(grid, {}).setdefault(accel, np.zeros(dim, np.float64))
+        a = self._forces[grid][accel] + np.float64(force)
+        self._forces[grid][accel] = a
+
+    def update_context(self, ctx):
+        super(LBForcedSim, self).update_context(ctx)
+        ctx['forces'] = self._forces
+
+
 class LBFluidSim(LBSim):
+    """Simulates a single phase fluid."""
+
     kernel_file = "single_fluid.mako"
 
     @classmethod
@@ -37,7 +74,7 @@ class LBFluidSim(LBSim):
                 choices=grids, default=grids[0])
 
     def __init__(self, config):
-        LBSim.__init__(self, config)
+        super(LBFluidSim, self).__init__(config)
 
         self.grids = []
         for x in sym.KNOWN_GRIDS:
@@ -55,6 +92,7 @@ class LBFluidSim(LBSim):
         return self.grids[0]
 
     def update_context(self, ctx):
+        super(LBFluidSim, self).update_context(ctx)
         ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0
         ctx['visc'] = self.config.visc
         ctx['model'] = self.config.model
@@ -65,7 +103,6 @@ class LBFluidSim(LBSim):
         ctx['bgk_equilibrium'] = self.equilibrium
         ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
 
-        ctx['forces'] = {}
         ctx['force_couplings'] = {}
         ctx['force_for_eq'] = {}
         ctx['image_fields'] = set()
@@ -95,7 +132,7 @@ class LBFluidSim(LBSim):
         gpu_map = runner.gpu_geo_map()
 
         args1 = [gpu_map, gpu_dist1a, gpu_dist1b, gpu_rho] + gpu_v
-        args2 = [gpu_map, gpu_dist1b, gpu_dist1b, gpu_rho] + gpu_v
+        args2 = [gpu_map, gpu_dist1b, gpu_dist1a, gpu_rho] + gpu_v
 
         if full_output:
             args1 += [np.uint32(1)]
