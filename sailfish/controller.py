@@ -56,17 +56,17 @@ class LBMachineMaster(object):
         self._block_id_to_runner = {}
         self._pipes = []
         self.config.logger = logging.getLogger('saifish')
-        formatter = logging.Formatter("[%(relativeCreated)6d %(processName)s] %(message)s")
+        formatter = logging.Formatter("[%(relativeCreated)6d %(levelname)5s %(processName)s] %(message)s")
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         self.config.logger.addHandler(handler)
 
         if config.verbose:
-            self.config.logger.setLevel(logging.INFO)
+            self.config.logger.setLevel(logging.DEBUG)
         elif config.quiet:
-            self.config.logger.setLevel(logging.ERROR)
-        else:
             self.config.logger.setLevel(logging.WARNING)
+        else:
+            self.config.logger.setLevel(logging.INFO)
 
     def _assign_blocks_to_gpus(self):
         block2gpu = {}

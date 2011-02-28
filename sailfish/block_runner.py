@@ -113,6 +113,7 @@ class BlockRunner(object):
         return components
 
     def _init_geometry(self):
+        self.config.logger.debug("Initializing geometry.")
         self._init_shape()
         self._geo_block = self._sim.geo(self._physical_size, self._block,
                                         self._sim.grid)
@@ -157,6 +158,7 @@ class BlockRunner(object):
         return self._bcg.get_code(self)
 
     def _init_compute(self):
+        self.config.logger.debug("Initializing compute unit.")
         code = self._get_compute_code()
         self.module = self.backend.build(code)
 
@@ -168,6 +170,8 @@ class BlockRunner(object):
         # Allocate a transfer buffer suitable for asynchronous transfers.
 
     def _init_gpu_data(self):
+        self.config.logger.debug("Initializing compute unit data.")
+
         for field in self._scalar_fields:
             self._gpu_field_map[id(field)] = self.backend.alloc_buf(like=field)
 
@@ -250,9 +254,11 @@ class BlockRunner(object):
 
         self._init_geometry()
         self._init_compute()
+        self.config.logger.debug("Initializing macroscopic fields.")
         self._sim.init_fields(self)
         self._geo_block.init_fields(self._sim)
         self._init_gpu_data()
+        self.config.logger.debug("Applying initial conditions.")
         self._sim.initial_conditions(self)
 
         self._kernels_full = self._sim.get_compute_kernels(self, True)
@@ -262,6 +268,9 @@ class BlockRunner(object):
             self._output.save(self._sim.iteration)
 
         self.config.logger.info("Starting simulation.")
+
+        if not self.config.max_iters:
+            self.config.logger.warning("Running infinite simulation.")
 
         while True:
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
