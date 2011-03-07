@@ -506,7 +506,8 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, i
 		}
 	%endif
 
-	%if bc_slip == 'slipbb':
+	## Slip bounce-back boundary conditions are not supported in D3Q13.
+	%if bc_slip == 'slipbb' and (grid.dim != 3 or grid.Q != 13):
 		if (isSlipNode(node_type)) {
 			float t;
 			switch (orientation) {
