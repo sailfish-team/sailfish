@@ -107,6 +107,7 @@ class LBBlock2D(LBBlock):
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
         self.ox, self.oy = location
         self.nx, self.ny = size
+        self._periodicity = [False, False]
         LBBlock.__init__(self, location, size, envelope_size, *args, **kwargs)
 
     @property
@@ -114,16 +115,28 @@ class LBBlock2D(LBBlock):
         """Returns a 2-tuple of slice objects that selects all non-ghost nodes."""
         return slice(0, None), slice(0, None)
 
-    # XXX: Fix this.
     @property
     def periodic_x(self):
-        return False
+        """X-axis periodicity within this block."""
+        return self._periodicity[0]
 
     @property
     def periodic_y(self):
-        return False
+        """Y-axis periodicity within this block."""
+        return self._periodicity[1]
 
-    def connect(self, block):
+    def enable_local_periodicity(self, axis):
+        """Makes the block locally periodic along a given axis."""
+        assert axis <= dim-1
+        self._periodicity[axis] = True
+
+    def connect(self, block, geo=None):
+        """Tries to connect the current block to another block, and returns True
+        if successful.
+
+        :param `geo`: None for a local block connection; for a global
+               connection due to lattice periodicity, a LBGeometry object
+        """
         hx = self.nx + self.ox
         hy = self.ny + self.oy
 
@@ -157,9 +170,12 @@ class LBBlock2D(LBBlock):
 
             return span_min, span_max, span_min_tg, span_max_tg
 
-        if hx == block.ox:
+        def connect_x():
+            """Connects the blocks along the X axis.  The wall at the highest X
+            coordinate of `self` is connected to the wall at the lowest X
+            coordinate of `block`."""
             span_min, span_max, span_min_tg, span_max_tg = get_span(
-                    block.oy, self.oy, tg_hy, hy, block.ny, self.ny)
+                block.oy, self.oy, tg_hy, hy, block.ny, self.ny)
 
             if span_max < span_min or span_max_tg < span_min_tg:
                 return False
@@ -170,9 +186,11 @@ class LBBlock2D(LBBlock):
             self._add_connection(self._X_HIGH, (self.nx-1, span), block.id)
             block._add_connection(self._X_LOW, (0, span_tg), self.id)
             return True
-        elif tg_hx == self.ox:
-            return block.connect(self)
-        elif hy == block.oy:
+
+        def connect_y():
+            """Connects the blocks along the Y axis.  The wall at the highest Y
+            coordinate of `self` is connected to the wall at the lowest Y
+            coordinate of `block`."""
             span_min, span_max, span_min_tg, span_max_tg = get_span(
                     block.ox, self.ox, tg_hx, hx, block.nx, self.nx)
 
@@ -185,6 +203,24 @@ class LBBlock2D(LBBlock):
             self._add_connection(self._Y_HIGH, (span, self.ny-1), block.id)
             block._add_connection(self._Y_LOW, (span_tg, 0), self.id)
             return True
+
+        # Check if a global connection across the simulation domain is
+        # requested.
+        if geo is not None:
+            if self.ox == 0 and tg_hx == geo.gx:
+                return block.connect(self, geo)
+            elif block.ox == 0 and hx == geo.gx:
+                return connect_x()
+            if self.oy == 0 and tg_hy == geo.gy:
+                return block.connect(self, geo)
+            elif block.oy == 0 and hy == geo.gy:
+                return connect_y()
+        elif hx == block.ox:
+            return connect_x()
+        elif tg_hx == self.ox:
+            return block.connect(self)
+        elif hy == block.oy:
+            return connect_y()
         elif tg_hy == self.oy:
             return block.connect(self)
 
@@ -217,6 +253,7 @@ class LBBlock3D(LBBlock):
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
         self.ox, self.oy, self.oz = location
         self.nx, self.ny, self.nz = size
+        self._periodicity = [False, False, False]
         LBBlock.__init__(self, location, size, envelope_size, *args, **kwargs)
 
     @property

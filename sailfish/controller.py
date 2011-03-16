@@ -138,9 +138,10 @@ class LBGeometryProcessor(object):
     Initializes logical connections between the blocks based on their
     location."""
 
-    def __init__(self, blocks, dim):
+    def __init__(self, blocks, dim, geo):
         self.blocks = blocks
         self.dim = dim
+        self.geo = geo
 
     def _annotate(self):
         # Assign IDs to blocks.  The block ID corresponds to its position
@@ -157,8 +158,13 @@ class LBGeometryProcessor(object):
             for i, coord in enumerate(block.location):
                 self._coord_map_list[i].setdefault(coord, []).append(block)
 
-    def _connect_blocks(self):
+    def _connect_blocks(self, config):
         connected = [False] * len(self.blocks)
+
+        def try_connect(block1, block2, geo=None):
+            if block1.connect(block2, geo):
+                connected[block1.id] = True
+                connected[block2.id] = True
 
         for axis in range(self.dim):
             for block in sorted(self.blocks, key=lambda x: x.location[axis]):
@@ -167,18 +173,59 @@ class LBGeometryProcessor(object):
                     continue
                 for neighbor_candidate in \
                         self._coord_map_list[axis][higher_coord]:
-                    if block.connect(neighbor_candidate):
-                        connected[block.id] = True
-                        connected[neighbor_candidate.id] = True
+                    try_connect(block, neighbor_candidate)
+
+        # In case the simulation domain is globally periodic, try to connect
+        # the blocks at the lower boundary of the domain along the periodic
+        # axis (i.e. coordinate = 0) with blocks which have a boundary at the
+        # highest global coordinate (gx, gy, gz).
+        if config.periodic_x:
+            for block in self._coord_map_list[0][0]:
+                # If the block spans the whole X axis of the domain, mark it
+                # as locally periodic and do not try to find any neigbor
+                # candidates.
+                if block.location[0] + block.size[0] == self.geo.gx:
+                    block.enable_local_periodicity(0)
+                    continue
+
+                for x0, candidates in self._coord_map_list[0].iteritems():
+                    for candidate in candidates:
+                       if (candidate.location[0] + candidate.size[0]
+                               == self.geo.gx):
+                            try_connect(block, candidate, self.geo)
+
+        if config.periodic_y:
+            for block in self._coord_map_list[1][0]:
+                if block.location[1] + block.size[1] == self.geo.gy:
+                    block.enable_local_periodicity(1)
+                    continue
+
+                for y0, candidates in self._coord_map_list[1].iteritems():
+                    for candidate in candidates:
+                       if (candidate.location[1] + candidate.size[1]
+                               == self.geo.gy):
+                            try_connect(block, candidate, self.geo)
+
+        if dim > 2 and config.periodic_z:
+            for block in self._coord_map_list[2][0]:
+                if block.location[2] + block.size[2] == self.geo.gz:
+                    block.enable_local_periodicity(2)
+                    continue
+
+                for z0, candidates in self._coord_map_list[2].iteritems():
+                    for candidate in candidates:
+                       if (candidate.location[2] + candidate.size[2]
+                               == self.geo.gz):
+                            try_connect(block, candidate, self.geo)
 
         # Ensure every block is connected to at least one other block.
         if not all(connected) and len(connected) > 1:
             raise GeometryError()
 
-    def transform(self):
+    def transform(self, config):
         self._annotate()
         self._init_lower_coord_map()
-        self._connect_blocks()
+        self._connect_blocks(config)
         return self.blocks
 
 class LBSimulationController(object):
@@ -250,8 +297,8 @@ class LBSimulationController(object):
         self.geo = self._lb_geo(self.conf)
 
         blocks = self.geo.blocks()
-        proc = LBGeometryProcessor(blocks, self.dim)
-        blocks = proc.transform()
+        proc = LBGeometryProcessor(blocks, self.dim, self.geo)
+        blocks = proc.transform(self.conf)
 
         # TODO(michalj): do this over MPI
         p = Process(target=_start_machine_master,
