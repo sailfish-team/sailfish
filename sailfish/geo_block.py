@@ -127,7 +127,7 @@ class LBBlock2D(LBBlock):
 
     def enable_local_periodicity(self, axis):
         """Makes the block locally periodic along a given axis."""
-        assert axis <= dim-1
+        assert axis <= self.dim-1
         self._periodicity[axis] = True
 
     def connect(self, block, geo=None):

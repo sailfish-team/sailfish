@@ -1,5 +1,6 @@
 import math
-import numpy
+import numpy as np
+import operator
 
 class LBOutput(object):
     def __init__(self, **kwargs):
@@ -12,6 +13,35 @@ class LBOutput(object):
         else:
             self._scalar_fields[name] = field
 
+
+class VisualizationWrapper(LBOutput):
+    """Passes data to a visualization engine, and handles saving it to a
+    file."""
+    format_name = 'vis'
+
+    # TODO(mjanusz): Add the option not to save data to a file.
+    def __init__(self, config, block, vis_buffer, vis_block, vis_iter, output_cls):
+        self._output = output_cls(config)
+        self._vis_buffer = vis_buffer
+        self._vis_block = vis_block
+        self._vis_iter = vis_iter
+        self.block = block
+        self.nodes = reduce(operator.mul, block.actual_size)
+
+    def register_field(self, field, name):
+        self._output.register_field(field, name)
+
+    def save(self, i):
+        self._output.save(i)
+
+        # Only update the buffer if the block to which we belong is
+        # currently being visualized.
+        if self.block.id == self._vis_block.value:
+            self._vis_iter.value = i
+            # TODO(michalj): Add the option to select a field to visualize.
+#            field = self._output._vector_fields[self._output._vector_fields.keys()[0]][0]
+            field = self._output._scalar_fields[self._output._scalar_fields.keys()[0]]
+            self._vis_buffer[0:self.nodes] = field.reshape(self.nodes)[:]
 
 # TODO: Correctly process vector and scalar fields in these clases.
 class HDF5FlatOutput(LBOutput):
@@ -34,7 +64,7 @@ class HDF5FlatOutput(LBOutput):
 
     def save(self, i):
         h5t = self.h5file.createGroup(self.h5grp, 'iter%d' % i, 'iteration %d' % i)
-        self.h5file.createArray(h5t, 'v', numpy.dstack(self.sim.velocity), 'velocity')
+        self.h5file.createArray(h5t, 'v', np.dstack(self.sim.velocity), 'velocity')
         self.h5file.createArray(h5t, 'rho', self.sim.rho, 'density')
 
 
@@ -109,12 +139,12 @@ class VTKOutput(LBOutput):
         idata.update()
 
         for k, v in self.sim.output_vectors.iteritems():
-            if self.sim.grid.dim == 3:
-                tmp = idata.point_data.add_array(numpy.c_[v[0].flatten(),
+            if self.sim.gridata.dim == 3:
+                tmp = idata.point_data.add_array(np.c_[v[0].flatten(),
                                                  v[1].flatten(), v[2].flatten()])
             else:
-                tmp = idata.point_data.add_array(numpy.c_[v[0].flatten(),
-                                                 v[1].flatten(), numpy.zeros_like(v[0].flatten())])
+                tmp = idata.point_data.add_array(np.c_[v[0].flatten(),
+                                                 v[1].flatten(), np.zeros_like(v[0].flatten())])
             idata.point_data.get_array(tmp).name = k
 
         if self.sim.grid.dim == 3:
@@ -127,7 +157,7 @@ class VTKOutput(LBOutput):
 
 
 class NPYOutput(LBOutput):
-    """Saves simulation data as numpy arrays."""
+    """Saves simulation data as np arrays."""
     format_name = 'npy'
 
     def __init__(self, config):
@@ -140,7 +170,7 @@ class NPYOutput(LBOutput):
         data = {}
         data.update(self._scalar_fields)
         data.update(self._vector_fields)
-        numpy.savez(fname, **data)
+        np.savez(fname, **data)
 
 
 class MatlabOutput(LBOutput):
