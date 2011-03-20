@@ -34,3 +34,7 @@ class LBConfig(argparse.Namespace):
 
     def parse(self):
         self._parser.parse_args(namespace=self)
+
+    @property
+    def output_required(self):
+        return self.output or self.mode == 'visualization'

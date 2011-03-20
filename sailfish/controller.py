@@ -1,7 +1,8 @@
 import logging
+import operator
 import platform
 import sys
-from multiprocessing import Process, Array, Event
+from multiprocessing import Process, Array, Event, Value
 
 from sailfish import codegen, config, io, block_runner
 from sailfish.geo import LBGeometry2D, LBGeometry3D
@@ -10,20 +11,26 @@ def _get_backends():
     for backend in ['cuda', 'opencl']:
         try:
             module = 'sailfish.backend_{}'.format(backend)
-            __import__('sailfish', fromlist=["backend_{}".format(backend)])
+            __import__('sailfish', fromlist=['backend_{}'.format(backend)])
             yield sys.modules[module].backend
         except ImportError:
             pass
 
-def _start_block_runner(block, config, lb_class, backend_class, gpu_id):
+def _get_visualization_engines():
+    for engine in ['2d']:
+        try:
+            module = 'sailfish.vis_{}'.format(engine)
+            __import__('sailfish', fromlist=['vis_{}'.format(engine)])
+            yield sys.modules[module].engine
+        except ImportError:
+            pass
+
+def _start_block_runner(block, config, lb_class, backend_class, gpu_id, output):
     # We instantiate the backend class here (instead in the machine
     # master), so that the backend object is created within the
     # context of the new process.
     backend = backend_class(config, gpu_id)
     sim = lb_class(config)
-
-    output_cls = io.format_name_to_cls[config.output_format]
-    output = output_cls(config)
     runner = block_runner.BlockRunner(sim, block, output, backend)
     runner.run()
 
@@ -106,12 +113,39 @@ class LBMachineMaster(object):
                 self.blocks[nbid].add_connector(block.id,
                         LBBlockConnector(array2, array1, ev2, ev1))
 
+        # Compute the largest buffer size necessary to transfer
+        # data to be visualized.
+        max_size = reduce(max,
+                (reduce(operator.mul, x.actual_size) for x in self.blocks), 0)
+        vis_buffer = Array('f', max_size)
+        vis_iter = Value('i', 0)
+
+        # Identifies which block to visualize.
+        vis_block = Value('i', 0)
+
+        # Start the visualizatione engine.
+        vis_class = _get_visualization_engines().next()
+
+        # Event to singal that the visualization process should be terminated.
+        quit_event = Event()
+        vis_process = Process(
+                target=lambda: vis_class(
+                    self.config, self.blocks, quit_event, vis_buffer, vis_block,
+                    vis_iter).run(),
+                name='VisEngine')
+        vis_process.start()
+
+        output_cls = io.format_name_to_cls[self.config.output_format]
+
         # Create block runners for all blocks.
         for block in self.blocks:
+            output = io.VisualizationWrapper(
+                    self.config, block, vis_buffer, vis_block, vis_iter, output_cls)
             p = Process(target=_start_block_runner,
                         name="Block/{}".format(block.id),
                         args=(block, self.config, self.lb_class,
-                              backend_class, block2gpu[block.id]))
+                              backend_class, block2gpu[block.id],
+                              output))
             self.runners.append(p)
             self._block_id_to_runner[block.id] = p
 
@@ -122,6 +156,9 @@ class LBMachineMaster(object):
         # Wait for all block runners to finish.
         for runner in self.runners:
             runner.join()
+
+        quit_event.set()
+        vis_process.join()
 
 # TODO: eventually, these arguments will be passed asynchronously
 # in a different way
@@ -206,7 +243,7 @@ class LBGeometryProcessor(object):
                                == self.geo.gy):
                             try_connect(block, candidate, self.geo)
 
-        if dim > 2 and config.periodic_z:
+        if self.dim > 2 and config.periodic_z:
             for block in self._coord_map_list[2][0]:
                 if block.location[2] + block.size[2] == self.geo.gz:
                     block.enable_local_periodicity(2)
@@ -264,6 +301,9 @@ class LBSimulationController(object):
             type=str, default='cuda,opencl',
             help='computational backends to use; multiple backends '
                  'can be separated by a comma')
+        group.add_argument('--visualize',
+            type=str, default='2d',
+            help='visualization engine to use')
 
         group = self.conf.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)
@@ -280,7 +320,10 @@ class LBSimulationController(object):
                     "'{}' backend options".format(backend.name))
             backend.add_options(group)
 
-        # TODO(michalj): Restore support for on-line data visualization.
+        for engine in _get_visualization_engines():
+            group = self.conf.add_group(
+                    "'{}' visualization engine".format(engine.name))
+            engine.add_options(group)
 
         # Set default values defined by the simulation-specific class.
         defaults = {}

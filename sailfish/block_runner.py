@@ -285,7 +285,7 @@ class BlockRunner(object):
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
             self.step(output_req)
 
-            if output_req and self.config.output:
+            if output_req and self.config.output_required:
                 self._fields_to_host()
                 self._output.save(self._sim.iteration)
 
