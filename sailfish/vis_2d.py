@@ -208,7 +208,7 @@ class Fluid2DVis(vis.FluidVis):
     def _visualize(self):
         width, height = self.size
         srf = pygame.Surface((width, height))
-        ret = []
+        ret = [self._vis_config.field_name]
 
         srf2 = self._draw_field(srf, None, None, width, height)
         pygame.transform.scale(srf2, self._screen.get_size(), self._screen)
@@ -329,7 +329,7 @@ class Fluid2DVis(vis.FluidVis):
                 self._screen.blit(self._font.render('itr: %dk' % (curr_iter /
                     1000), True, (0, 255, 0)), (12, 12))
 
-                y = 48
+                y = 36
                 for info in ret:
                     tmp = self._font.render(info, True, (0, 255, 0))
                     self._screen.blit(tmp, (12, y))
