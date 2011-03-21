@@ -6,6 +6,9 @@ __license__ = 'GPL3'
 
 import os
 import pyopencl as cl
+import pyopencl.array as clarray
+import pyopencl.reduction as reduction
+import pyopencl.tools
 
 class OpenCLBackend(object):
 
@@ -34,8 +37,9 @@ class OpenCLBackend(object):
 
         self.queue = cl.CommandQueue(self.ctx)
         self.buffers = {}
+        self.arrays = {}
 
-    def alloc_buf(self, size=None, like=None):
+    def alloc_buf(self, size=None, like=None, wrap_in_array=True):
         mf = cl.mem_flags
         if like is not None:
             if like.base is not None:
@@ -46,6 +50,8 @@ class OpenCLBackend(object):
             buf = cl.Buffer(self.ctx, mf.READ_WRITE | mf.COPY_HOST_PTR, hostbuf=hbuf)
             self.buffers[buf] = hbuf
             self.to_buf(buf)
+            if wrap_in_array:
+                self.arrays[buf] = clarray.Array(like.shape, like.dtype, data=buf)
         else:
             buf = cl.Buffer(self.ctx, mf.READ_WRITE, size)
 
@@ -92,6 +98,30 @@ class OpenCLBackend(object):
             global_size.append(dim * kernel.block[i])
 
         cl.enqueue_nd_range_kernel(self.queue, kernel, global_size, kernel.block[0:len(global_size)])
+
+    def get_reduction_kernel(self, reduce_expr, map_expr, neutral, *args):
+        """Generate and return reduction kernel; see PyOpenCL documentation
+        of pyopencl.reduction.ReductionKernel for detailed description.
+        Function expects buffers that are in device address space,
+        stored in gpu_* variables.
+
+        :param reduce_expr: expression used to reduce two values into one,
+            must use a and b as values names, e.g. 'a+b'
+        :param map_expr: expression used to map value from input array,
+            arrays are named x0, x1, etc., e.g. 'x0[i]*x1[i]
+        :param neutral: neutral value in reduce_expr, e.g. '0'
+        :param args: buffers on which to calculate reduction, e.g. backend.gpu_rho
+        """
+        arrays = []
+        arguments = []
+        for i, arg in enumerate(args):
+            array = self.arrays[arg]
+            arrays.append(array)
+            arguments.append('const {0} *x{1}'.format(pyopencl.tools.dtype_to_ctype(array.dtype), i))
+        kernel = reduction.ReductionKernel(arrays[0].dtype, neutral=neutral,
+                reduce_expr=reduce_expr, map_expr=map_expr,
+                arguments=', '.join(arguments))
+        return lambda : kernel(*arrays).get()
 
     def sync(self):
         self.queue.finish()

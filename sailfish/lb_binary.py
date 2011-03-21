@@ -42,8 +42,8 @@ class BinaryFluidBase(lb_single.FluidLBMSim):
             self.gpu_dist2a = self.backend.alloc_buf(like=self.dist2)
             self.gpu_dist2b = self.backend.alloc_buf(like=self.dist2)
         else:
-            self.gpu_dist2a = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid))
-            self.gpu_dist2b = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid))
+            self.gpu_dist2a = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid), wrap_in_array=False)
+            self.gpu_dist2b = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid), wrap_in_array=False)
 
         self.img_rho = self.bind_nonlocal_field(self.gpu_rho, 0)
         self.img_phi = self.bind_nonlocal_field(self.gpu_phi, 1)

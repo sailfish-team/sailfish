@@ -80,6 +80,16 @@ def _convert_to_double(src):
     t = t.replace('powf(', 'pow(')
     return t
 
+class Hook(object):
+    """Class wrapping hook called after simulation iteration.
+    :param function: function to execute when hook is called
+    :param need_data: whether hook needs transmitting data from device to host
+    """
+    def __init__(self, function, need_data=True):
+        self.need_data = need_data
+        self.function = function
+    def __call__(self):
+        self.function()
 
 class LBMSim(object):
     """Base class for LBM simulations. Descendant classes should be declared for specific simulations."""
@@ -360,7 +370,7 @@ class LBMSim(object):
                     self._timed_print('Warning: Falling back to batch mode.')
                     self.options.batch = True
 
-    def add_iter_hook(self, i, func, every=False):
+    def add_iter_hook(self, i, func, every=False, need_data=True):
         """Add a hook that will be executed during the simulation.
 
         :param i: number of the time step after which the hook is to be run
@@ -368,14 +378,39 @@ class LBMSim(object):
         :param every: if ``True``, the hook will be executed every *i* steps
         """
         if every:
-            self.iter_hooks_every.setdefault(i, []).append(func)
+            self.iter_hooks_every.setdefault(i, []).append(Hook(func, need_data))
         else:
-            self.iter_hooks.setdefault(i, []).append(func)
+            self.iter_hooks.setdefault(i, []).append(Hook(func, need_data))
 
     def clear_hooks(self):
         """Remove all hooks."""
         self.iter_hooks = {}
         self.iter_hooks_every = {}
+
+    def get_reduction(self, reduce_expr, map_expr, neutral, *args):
+        """Generate and return reduction kernel; see PyCUDA and PyOpenCL
+        documentation of ReductionKernel for detailed description.
+        Function expects buffers that are in the host address space,
+        e.g. sim.rho, sim.velocity, etc.
+
+        :param reduce_expr: expression used to reduce two values into one,
+            must use a and b as values names, e.g. 'a+b'
+        :param map_expr: expression used to map value from input array,
+            arrays are named x0, x1, etc., e.g. 'x0[i]*x1[i]
+        :param neutral: neutral value in reduce_expr, e.g. '0'
+        :param args: buffers on which to calculate reduction, e.g. sim.rho
+        """
+        arrays = []
+        for arg in args:
+            if arg.base is not None:
+                array = arg.base
+            else:
+                array = arg
+            for dev_buf, host_buf in self.backend.buffers.iteritems():
+                if array is host_buf:
+                    arrays.append(dev_buf)
+                    break
+        return self.backend.get_reduction_kernel(reduce_expr, map_expr, neutral, *arrays)
 
     def get_tau(self):
         return self.float((6.0 * self.options.visc + 1.0)/2.0)
@@ -643,8 +678,8 @@ class LBMSim(object):
             self.gpu_dist1a = self.backend.alloc_buf(like=self.dist1)
             self.gpu_dist1b = self.backend.alloc_buf(like=self.dist1)
         else:
-            self.gpu_dist1a = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid))
-            self.gpu_dist1b = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid))
+            self.gpu_dist1a = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid), wrap_in_array=False)
+            self.gpu_dist1b = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid), wrap_in_array=False)
 
     def _init_compute_ic(self):
         if not self._ic_fields:
@@ -845,23 +880,23 @@ class LBMSim(object):
             need_data = False
 
             if self.iter_ in self.iter_hooks:
-                need_data = True
+                for hook in self.iter_hooks.get(self.iter_, []):
+                    need_data = need_data or hook.need_data
 
             if not need_data:
-                for k in self.iter_hooks_every:
+                for k, hooks in self.iter_hooks_every.iteritems():
                     if self.iter_ % k == 0:
-                        need_data = True
-                        break
+                        for hook in hooks:
+                            need_data = need_data or hook.need_data
 
             self.sim_step(tracers=False, get_data=need_data)
 
-            if need_data:
-                for hook in self.iter_hooks.get(self.iter_-1, []):
-                    hook()
-                for k, v in self.iter_hooks_every.iteritems():
-                    if (self.iter_-1) % k == 0:
-                        for hook in v:
-                            hook()
+            for hook in self.iter_hooks.get(self.iter_-1, []):
+                hook()
+            for k, v in self.iter_hooks_every.iteritems():
+                if (self.iter_-1) % k == 0:
+                    for hook in v:
+                        hook()
 
 
     def run(self):

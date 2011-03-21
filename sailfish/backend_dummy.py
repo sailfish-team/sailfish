@@ -12,8 +12,9 @@ class DummyBackend(object):
 
     def __init__(self, options=None):
         self.buffers = {}
+        self.arrays = {}
 
-    def alloc_buf(self, size=None, like=None):
+    def alloc_buf(self, size=None, like=None, wrap_in_array=True):
         return 0
 
     def to_buf(self, cl_buf, source=None):
@@ -30,6 +31,9 @@ class DummyBackend(object):
 
     def run_kernel(self, kernel, grid_size):
         return None
+
+    def get_reduction_kernel(self, reduce_expr, map_expr, neutral, *args):
+        return lambda : None
 
     def sync(self):
         pass

@@ -11,6 +11,8 @@ import pycuda.autoinit
 import pycuda.compiler
 import pycuda.tools
 import pycuda.driver as cuda
+import pycuda.gpuarray as cudaarray
+import pycuda.reduction as reduction
 
 
 def _expand_block(block):
@@ -57,11 +59,12 @@ class CUDABackend(object):
 
     def __init__(self, options):
         self.buffers = {}
+        self.arrays = {}
         self._kern_stats = set()
         self._tex_to_memcpy = {}
         self.options = options
 
-    def alloc_buf(self, size=None, like=None):
+    def alloc_buf(self, size=None, like=None, wrap_in_array=True):
         if like is not None:
             # When calculating the total array size, take into account
             # any striding.
@@ -73,6 +76,8 @@ class CUDABackend(object):
                 self.buffers[buf] = like
 
             self.to_buf(buf)
+            if wrap_in_array:
+                self.arrays[buf] = cudaarray.GPUArray(like.shape, like.dtype, gpudata=buf)
         else:
             buf = cuda.mem_alloc(size)
 
@@ -184,6 +189,30 @@ class CUDABackend(object):
             #    self._tex_to_memcpy[img_field]()
             kernel.param_set_texref(img_field)
         kernel.launch_grid(*_expand_grid(grid_size))
+
+    def get_reduction_kernel(self, reduce_expr, map_expr, neutral, *args):
+        """Generate and return reduction kernel; see PyCUDA documentation
+        of pycuda.reduction.ReductionKernel for detailed description.
+        Function expects buffers that are in device address space,
+        stored in gpu_* variables.
+
+        :param reduce_expr: expression used to reduce two values into one,
+            must use a and b as values names, e.g. 'a+b'
+        :param map_expr: expression used to map value from input array,
+            arrays are named x0, x1, etc., e.g. 'x0[i]*x1[i]
+        :param neutral: neutral value in reduce_expr, e.g. '0'
+        :param args: buffers on which to calculate reduction, e.g. backend.gpu_rho
+        """
+        arrays = []
+        arguments = []
+        for i, arg in enumerate(args):
+            array = self.arrays[arg]
+            arrays.append(array)
+            arguments.append('const {0} *x{1}'.format(pycuda.tools.dtype_to_ctype(array.dtype), i))
+        kernel = reduction.ReductionKernel(arrays[0].dtype, neutral=neutral,
+                reduce_expr=reduce_expr, map_expr=map_expr,
+                arguments=', '.join(arguments))
+        return lambda : kernel(*arrays).get()
 
     def sync(self):
         cuda.Context.synchronize()
