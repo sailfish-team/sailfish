@@ -147,15 +147,13 @@ class Fluid2DVis(vis.FluidVis):
         group.add_argument('--scr_scale', help='screen scale', type=float, default=3.0)
         group.add_argument('--scr_depth', help='screen color depth', type=int, default=0)
 
-    def __init__(self, config, blocks, quit_event, vis_buffer, vis_block,
-            vis_iter):
+    def __init__(self, config, blocks, quit_event, vis_buffer, vis_config):
         super(Fluid2DVis, self).__init__()
         self.config = config
         self.config.logger.info("Initializating pygame 2D vis. engine.")
         self._quit_event = quit_event
         self._buffer = vis_buffer
-        self._block = vis_block
-        self._iter = vis_iter
+        self._vis_config = vis_config
         self._blocks = blocks
 
         self._font_color = (0, 255, 0)
@@ -199,7 +197,7 @@ class Fluid2DVis(vis.FluidVis):
 
     @property
     def size(self):
-        return self._blocks[self._block.value].actual_size
+        return self._blocks[self._vis_config.block].actual_size
 
     def get_field_vals(self, field):
         v = []
@@ -234,6 +232,7 @@ class Fluid2DVis(vis.FluidVis):
 
         tmp[:] = (tmp - v_min) / (v_max - v_min)
         tmp[tmp > 1.0]  = 1.0
+        tmp = np.abs(tmp)
         tmp = np.rot90(tmp, 3)
 
         # TODO(michalj): Draw the walls here.
@@ -318,7 +317,8 @@ class Fluid2DVis(vis.FluidVis):
             self._process_misc_event(event)
 
     def _update_display(self):
-        if self._iter.value < 0:
+        curr_iter = self._vis_config.iteration
+        if curr_iter < 0:
             self._screen.blit(
                     self._font.render('Waiting for simulation startup...',
                     True, self._font_color), (12, 12))
@@ -326,7 +326,8 @@ class Fluid2DVis(vis.FluidVis):
             ret = self._visualize()
 
             if self._show_info:
-                self._screen.blit(self._font.render('itr: %dk' % (self._iter.value / 1000), True, (0, 255, 0)), (12, 12))
+                self._screen.blit(self._font.render('itr: %dk' % (curr_iter /
+                    1000), True, (0, 255, 0)), (12, 12))
 
                 y = 48
                 for info in ret:
