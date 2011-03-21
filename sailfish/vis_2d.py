@@ -158,10 +158,10 @@ class Fluid2DVis(vis.FluidVis):
         self._iter = vis_iter
         self._blocks = blocks
 
+        self._font_color = (0, 255, 0)
         self._show_info = True
         self._show_walls = True
         self._velocity = False
-        self._paused = False
         self._draw_type = 1
         self._visfield = 0
         self._vistype = self.VIS_LINEAR
@@ -222,6 +222,8 @@ class Fluid2DVis(vis.FluidVis):
     def _draw_field(self, srf, wall_map, unused_map, width, height):
         a = pygame.surfarray.pixels3d(srf)
 
+        # FIXME(michalj): This is horribly inefficient.  We should only recreate
+        # the array if the data has been updated.
         tmp = np.zeros((height, width), dtype=np.float32)
         tmp.reshape(width * height)[:] = self._buffer[:]
 
@@ -285,10 +287,6 @@ class Fluid2DVis(vis.FluidVis):
                     self._convolve = not self._convolve
                 elif event.key == pygame.K_e:
                     self._emboss = not self._emboss
-                elif event.key == pygame.K_p:
-                    self._paused = not self._paused
-                    if self._paused:
-                        print 'Simulation paused @ iter = %d.' % self.sim.iter_
                 elif event.key == pygame.K_q:
                     sys.exit()
                 elif event.key == pygame.K_s:
@@ -320,21 +318,26 @@ class Fluid2DVis(vis.FluidVis):
             self._process_misc_event(event)
 
     def _update_display(self):
-        ret = self._visualize()
+        if self._iter.value < 0:
+            self._screen.blit(
+                    self._font.render('Waiting for simulation startup...',
+                    True, self._font_color), (12, 12))
+        else:
+            ret = self._visualize()
 
-        if self._show_info:
-            self._screen.blit(self._font.render('itr: %dk' % (self._iter.value / 1000), True, (0, 255, 0)), (12, 12))
+            if self._show_info:
+                self._screen.blit(self._font.render('itr: %dk' % (self._iter.value / 1000), True, (0, 255, 0)), (12, 12))
 
-            y = 48
-            for info in ret:
-                tmp = self._font.render(info, True, (0, 255, 0))
-                self._screen.blit(tmp, (12, y))
-                y += 12
+                y = 48
+                for info in ret:
+                    tmp = self._font.render(info, True, (0, 255, 0))
+                    self._screen.blit(tmp, (12, y))
+                    y += 12
 
-            for info in self.display_infos:
-                tmp = self._font.render(info(), True, (0, 255, 0))
-                self._screen.blit(tmp, (12, y))
-                y += 12
+                for info in self.display_infos:
+                    tmp = self._font.render(info(), True, (0, 255, 0))
+                    self._screen.blit(tmp, (12, y))
+                    y += 12
 
         pygame.display.flip()
 
