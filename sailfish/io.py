@@ -1,10 +1,11 @@
 import math
 import numpy as np
 import operator
-from ctypes import Structure, c_uint16, c_int32, c_uint8
+from ctypes import Structure, c_uint16, c_int32, c_uint8, c_char_p
 
 class VisConfig(Structure):
-    _fields_ = [('iteration', c_int32), ('block', c_uint16), ('field', c_uint8)]
+    _fields_ = [('iteration', c_int32), ('block', c_uint16), ('field', c_uint8),
+            ('fields', c_uint8), ('field_name', c_char_p)]
 
 class LBOutput(object):
     def __init__(self, **kwargs):
@@ -41,6 +42,11 @@ class VisualizationWrapper(LBOutput):
         # currently being visualized.
         if self.block.id == self._vis_config.block:
             self._vis_config.iteration = i
+            # TODO(michalj): Optimize this.
+            all_names = self._output._scalar_fields.keys() + self._output._vector_fields.keys()
+            self._vis_config.fields = len(all_names)
+            self._vis_config.field_name = all_names[self._vis_config.field]
+
             # TODO(michalj): Add the option to select a field to visualize.
             field = self._output._vector_fields[self._output._vector_fields.keys()[0]][0]
 #            field = self._output._scalar_fields[self._output._scalar_fields.keys()[0]]

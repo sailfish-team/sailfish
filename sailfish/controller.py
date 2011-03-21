@@ -121,6 +121,7 @@ class LBMachineMaster(object):
 
         vis_config = Value(io.VisConfig)
         vis_config.iteration = -1
+        vis_config.field_name = ''
 
         # Start the visualizatione engine.
         vis_class = _get_visualization_engines().next()
