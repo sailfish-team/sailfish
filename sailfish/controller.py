@@ -118,7 +118,7 @@ class LBMachineMaster(object):
         max_size = reduce(max,
                 (reduce(operator.mul, x.actual_size) for x in self.blocks), 0)
         vis_buffer = Array('f', max_size)
-        vis_iter = Value('i', 0)
+        vis_iter = Value('i', -1)
 
         # Identifies which block to visualize.
         vis_block = Value('i', 0)
