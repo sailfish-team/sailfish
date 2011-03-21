@@ -1,6 +1,10 @@
 import math
 import numpy as np
 import operator
+from ctypes import Structure, c_uint16, c_int32, c_uint8
+
+class VisConfig(Structure):
+    _fields_ = [('iteration', c_int32), ('block', c_uint16), ('field', c_uint8)]
 
 class LBOutput(object):
     def __init__(self, **kwargs):
@@ -20,11 +24,10 @@ class VisualizationWrapper(LBOutput):
     format_name = 'vis'
 
     # TODO(mjanusz): Add the option not to save data to a file.
-    def __init__(self, config, block, vis_buffer, vis_block, vis_iter, output_cls):
+    def __init__(self, config, block, vis_buffer, vis_config, output_cls):
         self._output = output_cls(config)
         self._vis_buffer = vis_buffer
-        self._vis_block = vis_block
-        self._vis_iter = vis_iter
+        self._vis_config = vis_config
         self.block = block
         self.nodes = reduce(operator.mul, block.actual_size)
 
@@ -36,11 +39,11 @@ class VisualizationWrapper(LBOutput):
 
         # Only update the buffer if the block to which we belong is
         # currently being visualized.
-        if self.block.id == self._vis_block.value:
-            self._vis_iter.value = i
+        if self.block.id == self._vis_config.block:
+            self._vis_config.iteration = i
             # TODO(michalj): Add the option to select a field to visualize.
-#            field = self._output._vector_fields[self._output._vector_fields.keys()[0]][0]
-            field = self._output._scalar_fields[self._output._scalar_fields.keys()[0]]
+            field = self._output._vector_fields[self._output._vector_fields.keys()[0]][0]
+#            field = self._output._scalar_fields[self._output._scalar_fields.keys()[0]]
             self._vis_buffer[0:self.nodes] = field.reshape(self.nodes)[:]
 
 # TODO: Correctly process vector and scalar fields in these clases.

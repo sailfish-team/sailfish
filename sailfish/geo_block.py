@@ -429,7 +429,9 @@ class GeoBlock(object):
 
         self._encoder.update_context(ctx)
 
+        # FIXME(michalj)
         ctx.update({
+                'bc_wall': 'fullbb',
                 'bc_wall_': BCWall,
                 'bc_velocity_': BCWall,
                 'bc_pressure_': BCWall,

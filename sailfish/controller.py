@@ -118,10 +118,9 @@ class LBMachineMaster(object):
         max_size = reduce(max,
                 (reduce(operator.mul, x.actual_size) for x in self.blocks), 0)
         vis_buffer = Array('f', max_size)
-        vis_iter = Value('i', -1)
 
-        # Identifies which block to visualize.
-        vis_block = Value('i', 0)
+        vis_config = Value(io.VisConfig)
+        vis_config.iteration = -1
 
         # Start the visualizatione engine.
         vis_class = _get_visualization_engines().next()
@@ -130,8 +129,7 @@ class LBMachineMaster(object):
         quit_event = Event()
         vis_process = Process(
                 target=lambda: vis_class(
-                    self.config, self.blocks, quit_event, vis_buffer, vis_block,
-                    vis_iter).run(),
+                    self.config, self.blocks, quit_event, vis_buffer, vis_config).run(),
                 name='VisEngine')
         vis_process.start()
 
@@ -140,7 +138,7 @@ class LBMachineMaster(object):
         # Create block runners for all blocks.
         for block in self.blocks:
             output = io.VisualizationWrapper(
-                    self.config, block, vis_buffer, vis_block, vis_iter, output_cls)
+                    self.config, block, vis_buffer, vis_config, output_cls)
             p = Process(target=_start_block_runner,
                         name="Block/{}".format(block.id),
                         args=(block, self.config, self.lb_class,
