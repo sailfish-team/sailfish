@@ -56,6 +56,10 @@ ${device_func} inline bool isVelocityOrPressureNode(int type) {
 	return isVelocityNode(type) || isPressureNode(type);
 }
 
+${device_func} inline bool isGhostNode(int type) {
+	return (type == ${geo_ghost});
+}
+
 // Wet nodes are nodes that undergo a standard collision procedure.
 ${device_func} inline bool isWetNode(int type) {
 	return (

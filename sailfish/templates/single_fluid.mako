@@ -106,7 +106,7 @@ ${kernel} void PrepareMacroFields(
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isUnusedNode(type))
+	if (isUnusedNode(type) || isGhostNode(type))
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);
@@ -145,7 +145,7 @@ ${kernel} void CollideAndPropagate(
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isUnusedNode(type))
+	if (isUnusedNode(type) || isGhostNode(type))
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);
