@@ -89,6 +89,7 @@ class LBFluidSim(LBSim):
 
     @property
     def grid(self):
+        """Grid with the highest connectivity (Q)."""
         return self.grids[0]
 
     def update_context(self, ctx):

@@ -25,12 +25,11 @@ def _get_visualization_engines():
         except ImportError:
             pass
 
-def _start_block_runner(block, config, lb_class, backend_class, gpu_id, output):
+def _start_block_runner(block, config, sim, backend_class, gpu_id, output):
     # We instantiate the backend class here (instead in the machine
     # master), so that the backend object is created within the
     # context of the new process.
     backend = backend_class(config, gpu_id)
-    sim = lb_class(config)
     runner = block_runner.BlockRunner(sim, block, output, backend)
     runner.run()
 
@@ -83,16 +82,12 @@ class LBMachineMaster(object):
 
         return block2gpu
 
-    def run(self):
-        self.config.logger.info("Machine master starting.")
 
-        block2gpu = self._assign_blocks_to_gpus()
-        backend_class = _get_backends().next()
-
+    def _init_connectors(self):
+        """Creates block connectors for all blocks connections."""
         # A set to keep track which connections are already created.
         _block_conns = set()
 
-        # Create block connectors for all block connections.
         for i, block in enumerate(self.blocks):
             for axis, nbid in block.connecting_blocks():
                 if (block.id, nbid) in _block_conns:
@@ -112,6 +107,29 @@ class LBMachineMaster(object):
                         LBBlockConnector(array1, array2, ev1, ev2))
                 self.blocks[nbid].add_connector(block.id,
                         LBBlockConnector(array2, array1, ev2, ev1))
+
+    def _init_block_envelope(self, sim):
+        """Sets the size of the ghost node envelope for all blocks."""
+        envelope_size = sim.nonlocality
+        for vec in sim.grid.basis:
+            for comp in vec:
+                envelope_size = max(sim.nonlocality, abs(comp))
+
+        # Get rid of any Sympy wrapper objects.
+        envelope_size = int(envelope_size)
+
+        for block in self.blocks:
+            block.set_actual_size(envelope_size)
+
+    def run(self):
+        self.config.logger.info('Machine master starting.')
+
+        sim = self.lb_class(self.config)
+        self._init_block_envelope(sim)
+
+        block2gpu = self._assign_blocks_to_gpus()
+
+        self._init_connectors()
 
         # Compute the largest buffer size necessary to transfer
         # data to be visualized.
@@ -135,15 +153,16 @@ class LBMachineMaster(object):
         vis_process.start()
 
         output_cls = io.format_name_to_cls[self.config.output_format]
+        backend_cls = _get_backends().next()
 
         # Create block runners for all blocks.
         for block in self.blocks:
             output = io.VisualizationWrapper(
                     self.config, block, vis_buffer, vis_config, output_cls)
             p = Process(target=_start_block_runner,
-                        name="Block/{}".format(block.id),
-                        args=(block, self.config, self.lb_class,
-                              backend_class, block2gpu[block.id],
+                        name='Block/{}'.format(block.id),
+                        args=(block, self.config, sim,
+                              backend_cls, block2gpu[block.id],
                               output))
             self.runners.append(p)
             self._block_id_to_runner[block.id] = p
@@ -170,7 +189,7 @@ class GeometryError(Exception):
 
 class LBGeometryProcessor(object):
     """Transforms a set of LBBlocks into a another set covering the same
-    physical domain, but optimized for execution of the available hardware.
+    physical domain, but optimized for execution on the available hardware.
     Initializes logical connections between the blocks based on their
     location."""
 
@@ -263,6 +282,7 @@ class LBGeometryProcessor(object):
         self._init_lower_coord_map()
         self._connect_blocks(config)
         return self.blocks
+
 
 class LBSimulationController(object):
     """Controls the execution of a LB simulation."""
