@@ -197,7 +197,7 @@ class Fluid2DVis(vis.FluidVis):
 
     @property
     def size(self):
-        return self._blocks[self._vis_config.block].actual_size
+        return self._blocks[self._vis_config.block].size
 
     def get_field_vals(self, field):
         v = []
