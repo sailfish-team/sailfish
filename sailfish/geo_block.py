@@ -343,6 +343,7 @@ class GeoEncoderConst(GeoEncoder):
             'geo_velocity': self._type_id(GeoBlock.NODE_VELOCITY),
             'geo_pressure': self._type_id(GeoBlock.NODE_PRESSURE),
             'geo_boundary': self._type_id(GeoBlock.NODE_BOUNDARY),
+            'geo_ghost': self._type_id(GeoBlock.NODE_GHOST),
             'geo_misc_shift': self._bits_type,
             'geo_type_mask': (1 << self._bits_type) - 1,
             'geo_param_shift': self._bits_param,
