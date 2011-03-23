@@ -152,7 +152,10 @@ class LBMachineMaster(object):
                 name='VisEngine')
         vis_process.start()
 
-        output_cls = io.format_name_to_cls[self.config.output_format]
+        if self.config.output:
+            output_cls = io.format_name_to_cls[self.config.output_format]
+        else:
+            output_cls = io.LBOutput
         backend_cls = _get_backends().next()
 
         # Create block runners for all blocks.

@@ -8,7 +8,7 @@ class VisConfig(Structure):
             ('fields', c_uint8), ('field_name', c_char_p)]
 
 class LBOutput(object):
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         self._scalar_fields = {}
         self._vector_fields = {}
 
@@ -17,6 +17,9 @@ class LBOutput(object):
             self._vector_fields[name] = field
         else:
             self._scalar_fields[name] = field
+
+    def save(self, i):
+        pass
 
 
 class VisualizationWrapper(LBOutput):
