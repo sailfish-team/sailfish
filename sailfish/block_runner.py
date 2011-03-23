@@ -85,15 +85,17 @@ class BlockRunner(object):
 #                                1: -self.options.lat_nz*self.arr_ny*self.arr_nx}]
 
     def make_scalar_field(self, dtype=None, name=None):
+        """Allocates a scalar NumPy array.
+
+        The array includes padding adjusted for the compute device (hidden from
+        the end user), as well as space for any ghost nodes (not hidden)."""
         if dtype is None:
             dtype = self.float
 
         size = self._get_nodes()
         strides = self._get_strides(dtype)
 
-        # XXX: this should allocate the memory including the ghost nodes, but
-        # return a view in which the ghost nodes are not accessible
-
+        # XXX: this should allocate the memory including the ghost nodes
         field = np.ndarray(self._physical_size, buffer=np.zeros(size, dtype=dtype),
                            dtype=dtype, strides=strides)
 
@@ -104,6 +106,7 @@ class BlockRunner(object):
         return field
 
     def make_vector_field(self, name=None, output=False):
+        """Allocates several scalar arrays representing a vector field."""
         components = []
 
         for x in range(0, self._block.dim):
@@ -123,20 +126,20 @@ class BlockRunner(object):
         self._geo_block.reset()
 
     def _init_shape(self):
-        # Logical size of the lattice.  X dimension is the last one on the
-        # list.
-        self._lat_size = list(reversed(self._block.size))
+        # Logical size of the lattice (including ghost nodes).
+        # X dimension is the last one on the list.
+        self._lat_size = list(reversed(self._block.actual_size))
 
         # Physical in-memory size of the lattice, adjusted for optimal memory
         # access from the compute unit.  Size of the X dimension is rounded up
         # to a multiple of block_size.
-        self._physical_size = list(reversed(self._block.size))
+        self._physical_size = list(reversed(self._block.actual_size))
         self._physical_size[-1] = (int(math.ceil(float(self._physical_size[-1]) /
                                                  self.config.block_size)) *
                                        self.config.block_size)
 
         # CUDA block/grid size for standard kernel call.
-        self._kernel_grid_size = list(self._block.size)
+        self._kernel_grid_size = list(self._block.actual_size)
         self._kernel_grid_size[0] /= self.config.block_size
 
         self._kernel_block_size = [1] * len(self._lat_size)

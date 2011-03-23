@@ -29,6 +29,7 @@ class LBBlock(object):
         # Actual size of the simulation domain, including the envelope (ghost
         # nodes).  This is set later when the envelope size is known.
         self.actual_size = None
+        self.envelope_size = 0
         self._runner = None
         self._id = None
         self._clear_connections()
@@ -116,7 +117,9 @@ class LBBlock2D(LBBlock):
     @property
     def _nonghost_slice(self):
         """Returns a 2-tuple of slice objects that selects all non-ghost nodes."""
-        return slice(0, None), slice(0, None)
+
+        es = self.envelope_size
+        return (slice(es, es + self.ny), slice(es, es + self.nx))
 
     @property
     def periodic_x(self):
@@ -132,6 +135,8 @@ class LBBlock2D(LBBlock):
         """Makes the block locally periodic along a given axis."""
         assert axis <= self.dim-1
         self._periodicity[axis] = True
+        # TODO: As an optimization, we could drop the ghost node layer in this
+        # case.
 
     def connect(self, block, geo=None):
         """Tries to connect the current block to another block, and returns True
@@ -262,6 +267,7 @@ class LBBlock3D(LBBlock):
     @property
     def _nonghost_slice(self):
         """Returns a 3-tuple of slice objects that selects all non-ghost nodes."""
+        # FIXME(michalj)
         return slice(0, None), slice(0, None), slice(0, None)
 
     def update_context(self, ctx):
@@ -401,8 +407,8 @@ class GeoBlock(object):
         self._type_map_view = self._type_map.view()[block._nonghost_slice]
         self._encoder = None
 
-    def define_nodes(self, *args):
-        raise NotImplementedError('define_nodes() not defined in a child'
+    def _define_nodes(self, *args):
+        raise NotImplementedError('_define_nodes() not defined in a child'
                 'class.')
 
     def set_geo(self, where, type_, params=None):
@@ -459,7 +465,13 @@ class GeoBlock2D(GeoBlock):
 
     def _define_ghosts(self):
         assert not self._type_map_encoded
-        # XXX: actually define ghost nodes here
+        es = self.block.envelope_size
+        if not es:
+            return
+        self._type_map[0:es, :] = self.NODE_GHOST
+        self._type_map[:, 0:es] = self.NODE_GHOST
+        self._type_map[self.block.ny:, :] = self.NODE_GHOST
+        self._type_map[:, self.block.nx:] = self.NODE_GHOST
 
     def _postprocess_nodes(self):
         # Find nodes which are walls themselves and are completely surrounded by

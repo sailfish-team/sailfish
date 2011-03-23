@@ -134,7 +134,7 @@ class LBMachineMaster(object):
         # Compute the largest buffer size necessary to transfer
         # data to be visualized.
         max_size = reduce(max,
-                (reduce(operator.mul, x.actual_size) for x in self.blocks), 0)
+                (reduce(operator.mul, x.size) for x in self.blocks), 0)
         vis_buffer = Array('f', max_size)
 
         vis_config = Value(io.VisConfig)

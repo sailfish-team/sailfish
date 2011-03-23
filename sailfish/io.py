@@ -30,7 +30,7 @@ class VisualizationWrapper(LBOutput):
         self._vis_buffer = vis_buffer
         self._vis_config = vis_config
         self.block = block
-        self.nodes = reduce(operator.mul, block.actual_size)
+        self.nodes = reduce(operator.mul, block.size)
 
     def register_field(self, field, name):
         self._output.register_field(field, name)
@@ -49,9 +49,8 @@ class VisualizationWrapper(LBOutput):
 
             # TODO(michalj): Add the option to select a field to visualize.
             field = self._output._vector_fields[self._output._vector_fields.keys()[0]][0]
-            print field.shape
 #            field = self._output._scalar_fields[self._output._scalar_fields.keys()[0]]
-            self._vis_buffer[0:self.nodes] = field.reshape(self.nodes)[:]
+            self._vis_buffer[0:self.nodes] = field[self.block._nonghost_slice].reshape(self.nodes)[:]
 
 # TODO: Correctly process vector and scalar fields in these clases.
 class HDF5FlatOutput(LBOutput):
