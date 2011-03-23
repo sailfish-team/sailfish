@@ -12,6 +12,9 @@ class LBSim(object):
 
     kernel_file = "__TEMPLATE_NOT_SET__"
 
+    #: How many layers of nearest neighbors nodes are required by the model.
+    nonlocality = 0
+
     @classmethod
     def add_options(cls, group, dim):
         pass

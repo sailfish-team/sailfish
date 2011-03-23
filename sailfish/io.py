@@ -49,6 +49,7 @@ class VisualizationWrapper(LBOutput):
 
             # TODO(michalj): Add the option to select a field to visualize.
             field = self._output._vector_fields[self._output._vector_fields.keys()[0]][0]
+            print field.shape
 #            field = self._output._scalar_fields[self._output._scalar_fields.keys()[0]]
             self._vis_buffer[0:self.nodes] = field.reshape(self.nodes)[:]
 

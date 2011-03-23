@@ -13,8 +13,6 @@ def bit_len(num):
     return max(length, 1)
 
 
-# TODO: envelope size should be calculated automatically
-
 class LBBlock(object):
     dim = None
 
@@ -25,14 +23,12 @@ class LBBlock(object):
     _Z_LOW = 4
     _Z_HIGH = 5
 
-    def __init__(self, location, size, envelope_size=None, *args, **kwargs):
+    def __init__(self, location, size, *args, **kwargs):
         self.location = location
         self.size = size
-        self.envelope_size = envelope_size
         # Actual size of the simulation domain, including the envelope (ghost
-        # nodes)
-        # XXX: calculate that.
-        self.actual_size = size
+        # nodes).  This is set later when the envelope size is known.
+        self.actual_size = None
         self._runner = None
         self._id = None
         self._clear_connections()
@@ -100,6 +96,13 @@ class LBBlock(object):
 
     def update_context(self, ctx):
         raise NotImplementedError('Method should be defined by subclass.')
+
+    def set_actual_size(self, envelope_size):
+        # TODO: It might be possible to optimize this a little by avoiding
+        # having buffers on the sides which are not connected to other blocks.
+        self.actual_size = [x + 2 * envelope_size for x in self.size]
+        self.envelope_size = envelope_size
+
 
 class LBBlock2D(LBBlock):
     dim = 2
@@ -456,7 +459,7 @@ class GeoBlock2D(GeoBlock):
 
     def _define_ghosts(self):
         assert not self._type_map_encoded
-        # TODO: actually define ghost nodes here
+        # XXX: actually define ghost nodes here
 
     def _postprocess_nodes(self):
         # Find nodes which are walls themselves and are completely surrounded by
