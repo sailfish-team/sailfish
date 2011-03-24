@@ -147,12 +147,13 @@ class Fluid2DVis(vis.FluidVis):
         group.add_argument('--scr_scale', help='screen scale', type=float, default=3.0)
         group.add_argument('--scr_depth', help='screen color depth', type=int, default=0)
 
-    def __init__(self, config, blocks, quit_event, vis_buffer, vis_config):
+    def __init__(self, config, blocks, quit_event, vis_buffer, geo_buffer, vis_config):
         super(Fluid2DVis, self).__init__()
         self.config = config
         self.config.logger.info("Initializating pygame 2D vis. engine.")
         self._quit_event = quit_event
         self._buffer = vis_buffer
+        self._geo_buffer = geo_buffer
         self._vis_config = vis_config
         self._blocks = blocks
 

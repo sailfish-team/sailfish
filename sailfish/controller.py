@@ -1,7 +1,9 @@
+import ctypes
 import logging
 import operator
 import platform
 import sys
+import multiprocessing as mp
 from multiprocessing import Process, Array, Event, Value
 
 from sailfish import codegen, config, io, block_runner
@@ -61,6 +63,8 @@ class LBMachineMaster(object):
         self.runners = []
         self._block_id_to_runner = {}
         self._pipes = []
+        self._vis_process = None
+        self._quit_event = None
         self.config.logger = logging.getLogger('saifish')
         formatter = logging.Formatter("[%(relativeCreated)6d %(levelname)5s %(processName)s] %(message)s")
         handler = logging.StreamHandler()
@@ -121,6 +125,49 @@ class LBMachineMaster(object):
         for block in self.blocks:
             block.set_actual_size(envelope_size)
 
+    def _init_visualization_and_io(self):
+        if self.config.output:
+            output_cls = io.format_name_to_cls[self.config.output_format]
+        else:
+            output_cls = io.LBOutput
+
+        if self.config.mode != 'visualization':
+            return lambda block: output_cls(self.config)
+
+        # Compute the largest buffer size necessary to transfer
+        # data to be visualized.
+        max_size = reduce(max,
+                (reduce(operator.mul, x.size) for x in self.blocks), 0)
+        vis_lock = mp.RLock()
+        vis_buffer = Array(ctypes.c_float, max_size, lock=vis_lock)
+        vis_geo_buffer = Array(ctypes.c_uint8, max_size, lock=vis_lock)
+
+        vis_config = Value(io.VisConfig, lock=vis_lock)
+        vis_config.iteration = -1
+        vis_config.field_name = ''
+
+        # Start the visualizatione engine.
+        vis_class = _get_visualization_engines().next()
+
+        # Event to singal that the visualization process should be terminated.
+        self._quit_event = Event()
+        self._vis_process = Process(
+                target=lambda: vis_class(
+                    self.config, self.blocks, self._quit_event, vis_buffer,
+                    vis_geo_buffer, vis_config).run(),
+                name='VisEngine')
+        self._vis_process.start()
+
+        return lambda block: io.VisualizationWrapper(
+                self.config, block, vis_buffer, vis_geo_buffer, vis_config, output_cls)
+
+    def _finish_visualization(self):
+        if self.config.mode != 'visualization':
+            return
+
+        self._quit_event.set()
+        self._vis_process.join()
+
     def run(self):
         self.config.logger.info('Machine master starting.')
 
@@ -130,38 +177,12 @@ class LBMachineMaster(object):
         block2gpu = self._assign_blocks_to_gpus()
 
         self._init_connectors()
-
-        # Compute the largest buffer size necessary to transfer
-        # data to be visualized.
-        max_size = reduce(max,
-                (reduce(operator.mul, x.size) for x in self.blocks), 0)
-        vis_buffer = Array('f', max_size)
-
-        vis_config = Value(io.VisConfig)
-        vis_config.iteration = -1
-        vis_config.field_name = ''
-
-        # Start the visualizatione engine.
-        vis_class = _get_visualization_engines().next()
-
-        # Event to singal that the visualization process should be terminated.
-        quit_event = Event()
-        vis_process = Process(
-                target=lambda: vis_class(
-                    self.config, self.blocks, quit_event, vis_buffer, vis_config).run(),
-                name='VisEngine')
-        vis_process.start()
-
-        if self.config.output:
-            output_cls = io.format_name_to_cls[self.config.output_format]
-        else:
-            output_cls = io.LBOutput
+        output_initializer = self._init_visualization_and_io()
         backend_cls = _get_backends().next()
 
         # Create block runners for all blocks.
         for block in self.blocks:
-            output = io.VisualizationWrapper(
-                    self.config, block, vis_buffer, vis_config, output_cls)
+            output = output_initializer(block)
             p = Process(target=_start_block_runner,
                         name='Block/{}'.format(block.id),
                         args=(block, self.config, sim,
@@ -178,8 +199,7 @@ class LBMachineMaster(object):
         for runner in self.runners:
             runner.join()
 
-        quit_event.set()
-        vis_process.join()
+        self._finish_visualization()
 
 # TODO: eventually, these arguments will be passed asynchronously
 # in a different way

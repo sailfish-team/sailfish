@@ -28,10 +28,11 @@ class VisualizationWrapper(LBOutput):
     format_name = 'vis'
 
     # TODO(mjanusz): Add the option not to save data to a file.
-    def __init__(self, config, block, vis_buffer, vis_config, output_cls):
+    def __init__(self, config, block, vis_buffer, geo_buffer, vis_config, output_cls):
         self._output = output_cls(config)
         self._vis_buffer = vis_buffer
         self._vis_config = vis_config
+        self._geo_buffer = geo_buffer
         self.block = block
         self.nodes = reduce(operator.mul, block.size)
 
