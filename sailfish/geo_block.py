@@ -29,7 +29,7 @@ class LBBlock(object):
         # Actual size of the simulation domain, including the envelope (ghost
         # nodes).  This is set later when the envelope size is known.
         self.actual_size = None
-        self.envelope_size = 0
+        self.envelope_size = None
         self._runner = None
         self._id = None
         self._clear_connections()
@@ -404,6 +404,8 @@ class GeoBlock(object):
         # ghost nodes, and is formatted in a way that makes it suitable
         # for copying to the compute device.
         self._type_map = block.runner.make_scalar_field(np.uint32)
+        self._type_vis_map = np.zeros(list(reversed(block.size)),
+                dtype=np.uint8)
         self._type_map_encoded = False
         self._type_map_view = self._type_map.view()[block._nonghost_slice]
         self._encoder = None
@@ -423,6 +425,10 @@ class GeoBlock(object):
         self._type_map_encoded = False
         mgrid = self._get_mgrid()
         self._define_nodes(*mgrid)
+
+        # Cache the unencoded type map for visualization.
+        self._type_vis_map[:] = self._type_map_view[:]
+
         self._define_ghosts()
         self._postprocess_nodes()
 
@@ -452,6 +458,9 @@ class GeoBlock(object):
             self._encoder.encode()
 
         return self._type_map
+
+    def visualization_map(self):
+        return self._type_vis_map
 
 class GeoBlock2D(GeoBlock):
     dim = 2

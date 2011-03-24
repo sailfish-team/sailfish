@@ -27,12 +27,14 @@ class BlockRunner(object):
         self._gpu_field_map = {}
         self._gpu_grids_primary = []
         self._gpu_grids_secondary = []
+        self._vis_map_cache = None
 
     @property
     def config(self):
         return self._sim.config
 
     def update_context(self, ctx):
+        """Called by the codegen module."""
         self._block.update_context(ctx)
         self._geo_block.update_context(ctx)
         ctx.update(self.backend.get_defines())
@@ -76,13 +78,18 @@ class BlockRunner(object):
         ctx['num_params'] = 0
         ctx['geo_params'] = []
 
+        arr_nx = self._physical_size[-1]
+        arr_ny = self._physical_size[-2]
 
-#        ctx['pbc_offsets'] = [{-1: self.options.lat_nx,
-#                                1: -self.options.lat_nx},
-#                              {-1: self.options.lat_ny*self.arr_nx,
-#                                1: -self.options.lat_ny*self.arr_nx},
-#                              {-1: self.options.lat_nz*self.arr_ny*self.arr_nx,
-#                                1: -self.options.lat_nz*self.arr_ny*self.arr_nx}]
+        ctx['pbc_offsets'] = [{-1:  self.config.lat_nx,
+                                1: -self.config.lat_nx},
+                              {-1:  self.config.lat_ny * arr_nx,
+                                1: -self.config.lat_ny * arr_nx}]
+
+        if self._block.dim == 3:
+            ctx['pbc_offsets'].append(
+                              {-1:  self.config.lat_nz * arr_ny * arr_nx,
+                                1: -self.config.lat_nz * arr_ny * arr_nx})
 
     def make_scalar_field(self, dtype=None, name=None):
         """Allocates a scalar NumPy array.
@@ -95,7 +102,6 @@ class BlockRunner(object):
         size = self._get_nodes()
         strides = self._get_strides(dtype)
 
-        # XXX: this should allocate the memory including the ghost nodes
         field = np.ndarray(self._physical_size, buffer=np.zeros(size, dtype=dtype),
                            dtype=dtype, strides=strides)
 
@@ -118,10 +124,15 @@ class BlockRunner(object):
         self._vector_fields.append(components)
         return components
 
+    def visualization_map(self):
+        if self._vis_map_cache is None:
+            self._vis_map_cache = self._geo_block.visualization_map()
+        return self._vis_map_cache
+
     def _init_geometry(self):
         self.config.logger.debug("Initializing geometry.")
         self._init_shape()
-        self._geo_block = self._sim.geo(self._physical_size, self._block,
+        self._geo_block = self._sim.geo(self._global_size, self._block,
                                         self._sim.grid)
         self._geo_block.reset()
 
@@ -144,6 +155,13 @@ class BlockRunner(object):
 
         self._kernel_block_size = [1] * len(self._lat_size)
         self._kernel_block_size[0] = self.config.block_size
+
+        # Global grid size.
+        if self._block.dim == 2:
+            self._global_size = (self.config.lat_ny, self.config.lat_nx)
+        else:
+            self._global_size = (self.config.lat_nz, self.config.lat_ny,
+                    self.config.lat_nx)
 
     def _get_strides(self, type_):
         """Returns a list of strides for the NumPy array storing the lattice."""
