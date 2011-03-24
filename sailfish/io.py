@@ -55,6 +55,7 @@ class VisualizationWrapper(LBOutput):
             field = self._output._vector_fields[self._output._vector_fields.keys()[0]][0]
 #            field = self._output._scalar_fields[self._output._scalar_fields.keys()[0]]
             self._vis_buffer[0:self.nodes] = field[self.block._nonghost_slice].reshape(self.nodes)[:]
+            self._geo_buffer[0:self.nodes] = self.block.runner.visualization_map().reshape(self.nodes)[:]
 
 # TODO: Correctly process vector and scalar fields in these clases.
 class HDF5FlatOutput(LBOutput):

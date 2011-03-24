@@ -13,7 +13,7 @@ import numpy as np
 import pygame
 from scipy import signal
 
-from sailfish import lb_base, vis
+from sailfish import lb_base, vis, geo_block
 
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
@@ -218,6 +218,14 @@ class Fluid2DVis(vis.FluidVis):
         # TODO(michalj): Add support for tracer particles.
         return ret
 
+    def _draw_geometry(self, tg_buffer, width, height):
+        geo_map = np.zeros((height, width), dtype=np.uint8)
+        geo_map.reshape(width * height)[:] = self._geo_buffer[:]
+
+        geo_map = np.rot90(geo_map, 3)
+
+        tg_buffer[geo_map == geo_block.GeoBlock.NODE_WALL] = self._color_wall
+
     def _draw_field(self, srf, wall_map, unused_map, width, height):
         a = pygame.surfarray.pixels3d(srf)
 
@@ -236,11 +244,11 @@ class Fluid2DVis(vis.FluidVis):
         tmp = np.abs(tmp)
         tmp = np.rot90(tmp, 3)
 
-        # TODO(michalj): Draw the walls here.
         # TODO(michalj): Add support for multi-component fields.
         vis_field = cmaps[1]['rgb1'](tmp)
         a[:] = vis_field[:]
 
+        self._draw_geometry(a, width, height)
         # TODO(michalj): Add support for embossing.
 
         # Unlock the surface and put the picture on screen.
