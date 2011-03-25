@@ -213,6 +213,8 @@ class BlockRunner(object):
         self._gpu_geo_map = self.backend.alloc_buf(
                 like=self._geo_block.encoded_map())
 
+        print self._geo_block.encoded_map()
+
     def gpu_field(self, field):
         """Returns the GPU copy of a field."""
         return self._gpu_field_map[id(field)]
