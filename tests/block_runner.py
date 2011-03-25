@@ -20,6 +20,8 @@ class TestBasicFunctionality(unittest.TestCase):
         config.parse()
         config.precision = 'single'
         config.block_size = 8
+        # Does not affect behaviour of any of the functions tested here.
+        config.lat_nz, config.lat_nx, config.lat_ny = self.size_3d
         self.sim = LBSim(config)
         self.backend = DummyBackend()
 
@@ -31,6 +33,7 @@ class TestBasicFunctionality(unittest.TestCase):
 
     def test_strides_and_size_2d(self):
         block = LBBlock2D(self.location, self.size)
+        block.set_actual_size(0)
         runner = BlockRunner(self.sim, block, output=None,
                              backend=self.backend)
         runner._init_shape()
@@ -46,6 +49,7 @@ class TestBasicFunctionality(unittest.TestCase):
 
     def test_strides_and_size_3d(self):
         block = LBBlock3D(self.location_3d, self.size_3d)
+        block.set_actual_size(0)
         runner = BlockRunner(self.sim, block, output=None,
                              backend=self.backend)
         runner._init_shape()
