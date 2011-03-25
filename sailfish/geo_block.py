@@ -329,7 +329,14 @@ class GeoEncoderConst(GeoEncoder):
         param = np.zeros_like(self._type_map)
         orientation = np.zeros_like(self._type_map)
 
-        self._type_map[:] = self._encode_node(orientation, param, self._type_map)
+        # Remap type IDs.
+        max_type_code = max(self._type_id_map.keys())
+        type_choice_map = np.zeros(max_type_code+1, dtype=np.uint32)
+        for orig_code, new_code in self._type_id_map.iteritems():
+            type_choice_map[orig_code] = new_code
+
+        self._type_map[:] = self._encode_node(orientation, param,
+                np.choose(self._type_map, type_choice_map))
 
         # Drop the reference to the map array.
         self._type_map = None
@@ -429,8 +436,8 @@ class GeoBlock(object):
         # Cache the unencoded type map for visualization.
         self._type_vis_map[:] = self._type_map_view[:]
 
+#        self._postprocess_nodes()
         self._define_ghosts()
-        self._postprocess_nodes()
 
         # TODO: At this point, we should decide which GeoEncoder class to use.
         self._encoder = GeoEncoderConst()
@@ -456,6 +463,7 @@ class GeoBlock(object):
     def encoded_map(self):
         if not self._type_map_encoded:
             self._encoder.encode()
+            self._type_map_encoded = True
 
         return self._type_map
 
@@ -480,8 +488,8 @@ class GeoBlock2D(GeoBlock):
             return
         self._type_map[0:es, :] = self.NODE_GHOST
         self._type_map[:, 0:es] = self.NODE_GHOST
-        self._type_map[self.block.ny:, :] = self.NODE_GHOST
-        self._type_map[:, self.block.nx:] = self.NODE_GHOST
+        self._type_map[es+self.block.ny:, :] = self.NODE_GHOST
+        self._type_map[:, es+self.block.nx:] = self.NODE_GHOST
 
     def _postprocess_nodes(self):
         # Find nodes which are walls themselves and are completely surrounded by

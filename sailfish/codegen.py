@@ -103,6 +103,7 @@ class BlockCodeGenerator(object):
     def _build_context(self, block_runnner):
         ctx = {}
         ctx['block_size'] = self.config.block_size
+        ctx['propagation_sentinels'] = True
 
         self._sim.update_context(ctx)
         block_runnner.update_context(ctx)
