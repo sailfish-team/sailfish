@@ -184,3 +184,62 @@ ${kernel} void CollideAndPropagate(
 	${propagate('dist_out', 'd0')}
 }
 
+<%def name="pbc_helper(axis)">
+	// TODO(michalj): Generalize this for grids with e_i > 1.
+	// From low idx to high idx.
+	%for i in sym.get_prop_dists(grid, 1, axis):
+		float f${grid.idx_name[i]} = ${get_dist('dist', i, 'gi_low')};
+	%endfor
+
+	%for i in sym.get_prop_dists(grid, 1, axis):
+		${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
+	%endfor
+
+	// From high idx to low idx.
+	%for i in sym.get_prop_dists(grid, -1, axis):
+		float f${grid.idx_name[i]} = ${get_dist('dist', i, '(gi_high+1)')};
+	%endfor
+
+	%for i in sym.get_prop_dists(grid, -1, axis):
+		${get_dist('dist', i, '(gi_low+1)')} = f${grid.idx_name[i]};
+	%endfor
+</%def>
+
+// Applies periodic boundary conditions within a single block.
+//  dist: pointer to the distributions array
+//  axis: along which axis the PBCs are to be applied (0:x, 1:y, 2:z)
+${kernel} void ApplyPeriodicBoundaryConditions(
+		${global_ptr} float *dist, int axis)
+{
+	int idx1 = get_global_id(0);
+	int gi_low, gi_high;
+
+	// For single block PBC, the envelope size (width of the ghost node
+	// layer is alawys 1.
+	%if dim == 2:
+		if (axis == 0) {
+			gi_low = getGlobalIdx(0, idx1);
+			gi_high = getGlobalIdx(${lat_nx-2}, idx1);
+			${pbc_helper(0)}
+		} else if (axis == 1) {
+			gi_low = getGlobalIdx(idx1, 0);
+			gi_high = getGlobalIdx(idx1, ${lat_ny-2});
+			${pbc_helper(1)}
+		}
+	%else:
+		int idx2 = get_global_id(1);
+		if (axis == 0) {
+			gi_low = getGlobalIdx(0, idx1, idx2);
+			gi_high = getGlobalIdx(${lat_nx-2}, idx1, idx2);
+			${pbc_helper(0)}
+		} else if (axis == 1) {
+			gi_low = getGlobalIdx(idx1, 0, idx2);
+			gi_high = getGlobalIdx(idx1, ${lat_ny-2}, idx2);
+			${pbc_helper(1)}
+		} else {
+			gi_low = getGlobalIdx(idx1, idx2, 0);
+			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});
+			${pbc_helper(2)}
+		}
+	%endif
+}

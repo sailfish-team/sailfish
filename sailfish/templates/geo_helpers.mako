@@ -1,3 +1,5 @@
+<%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
+
 typedef struct Dist {
 %for i, dname in enumerate(grid.idx_name):
 	float ${dname};
@@ -19,7 +21,7 @@ typedef struct DistM {
 ${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int idx)
 {
 	%for i, dname in enumerate(grid.idx_name):
-		dout->${dname} = din[idx + DIST_SIZE*${i}];
+		dout->${dname} = ${get_dist('din', i, 'idx')};
 	%endfor
 }
 
@@ -94,3 +96,13 @@ ${device_func} inline int decodeNodeParam(int nodetype) {
 ${device_func} inline int encodeBoundaryNode(int dir_mask, int obj_id) {
 	return ${geo_boundary} | (obj_id << ${geo_misc_shift}) | (dir_mask << ${geo_misc_shift + geo_obj_shift});
 }
+
+%if dim == 2:
+	${device_func} inline int getGlobalIdx(int gx, int gy) {
+		return gx * ${arr_nx} * gy;
+	}
+%else:
+	${device_func} inline int getGlobalIdx(int gx, int gy, int gz) {
+		return gx * ${arr_nx} * gy + ${arr_nx * arr_ny} * gz;
+	}
+%endif
