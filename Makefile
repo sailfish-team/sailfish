@@ -46,7 +46,8 @@ perf_block_plots:
 	python perftest/make_block_plots.py perftest perftest/results/single/GeForce_GTX_285/blocksize
 
 test:
-	python tests/geometry.py
+	python tests/block_runner.py
+	python tests/geo_block.py
 
 clean:
 	rm -f sailfish/*.pyc
