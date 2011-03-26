@@ -25,17 +25,19 @@ class TestBasicFunctionality(unittest.TestCase):
         self.sim = LBSim(config)
         self.backend = DummyBackend()
 
+    def get_block_runner(self, block):
+        return BlockRunner(self.sim, block, output=None,
+                backend=self.backend, quit_event=None)
+
     def test_block_connection(self):
         block = LBBlock2D(self.location, self.size)
-        runner = BlockRunner(self.sim, block, output=None,
-                             backend=self.backend)
+        runner = self.get_block_runner(block)
         self.assertEqual(block.runner, runner)
 
     def test_strides_and_size_2d(self):
         block = LBBlock2D(self.location, self.size)
         block.set_actual_size(0)
-        runner = BlockRunner(self.sim, block, output=None,
-                             backend=self.backend)
+        runner = self.get_block_runner(block)
         runner._init_shape()
 
         # Last dimension is rounded up to a multiple of block_size
@@ -50,8 +52,7 @@ class TestBasicFunctionality(unittest.TestCase):
     def test_strides_and_size_3d(self):
         block = LBBlock3D(self.location_3d, self.size_3d)
         block.set_actual_size(0)
-        runner = BlockRunner(self.sim, block, output=None,
-                             backend=self.backend)
+        runner = self.get_block_runner(block)
         runner._init_shape()
 
         # Last dimension is rounded up to a multiple of block_size
