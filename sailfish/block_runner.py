@@ -60,13 +60,12 @@ class BlockRunner(object):
             periodic_z = 0
             bnd_limits.append(1)
 
-        ctx['periodic_x'] = int(self._block.periodic_x)
-        ctx['periodic_y'] = int(self._block.periodic_y)
-        ctx['periodic_z'] = periodic_z
+        ctx['periodic_x'] = 0 #int(self._block.periodic_x)
+        ctx['periodic_y'] = 0 #int(self._block.periodic_y)
+        ctx['periodic_z'] = 0 #periodic_z
+        ctx['periodicity'] = [0, 0, 0]
 
-        ctx['periodicity'] = [int(self._block.periodic_x),
-                              int(self._block.periodic_y),
-                              periodic_z]
+#[int(self._block.periodic_x), int(self._block.periodic_y), periodic_z]
 
         ctx['bnd_limits'] = bnd_limits
         ctx['dist_size'] = self._get_nodes()
@@ -251,7 +250,56 @@ class BlockRunner(object):
             kernel = self._kernels_full[self._sim.iteration & 1]
         else:
             kernel = self._kernels_none[self._sim.iteration & 1]
+
+        # TODO(michalj): Do we need the sync here?
+        self.backend.sync()
+
         self.backend.run_kernel(kernel, self._kernel_grid_size)
+
+        if self._sim.iteration & 1:
+            base = 0
+        else:
+            base = 3
+
+        # TODO(michalj): Do we need the sync here?
+        self.backend.sync()
+
+        if self._block.periodic_x:
+            kernel = self._pbc_kernels[base]
+            if self._block.dim == 2:
+                grid_size = (
+                        int(math.ceil(self._lat_size[0] /
+                            self.config.block_size)), 1)
+            else:
+                grid_size = (
+                        int(math.ceil(self._lat_size[1] /
+                            self.config.block_size)),
+                        int(math.ceil(self._lat_size[0] /
+                            self.config.block_size)))
+
+            self.backend.run_kernel(kernel, grid_size)
+
+        if self._block.periodic_y:
+            kernel = self._pbc_kernels[base + 1]
+            if self._block.dim == 2:
+                grid_size = (
+                        int(math.ceil(self._lat_size[1] /
+                            self.config.block_size)), 1)
+            else:
+                grid_size = (
+                        int(math.ceil(self._lat_size[2] /
+                            self.config.block_size)),
+                        int(math.ceil(self._lat_size[0] /
+                            self.config.block_size)))
+            self.backend.run_kernel(kernel, grid_size)
+
+        if self._block.dim == 3 and self._block.periodic_z:
+            kernel = self._pbc_kernels[base + 2]
+            grid_size = (
+                    int(math.ceil(self._lat_size[2] / self.config.block_size)),
+                    int(math.ceil(self._lat_size[1] / self.config.block_size)))
+            self.backend.run_kernel(kernel, grid_size)
+
 
     def _step_boundary(self):
         """Runs one simulation step for the boundary blocks.
@@ -297,6 +345,7 @@ class BlockRunner(object):
 
         self._kernels_full = self._sim.get_compute_kernels(self, True)
         self._kernels_none = self._sim.get_compute_kernels(self, False)
+        self._pbc_kernels = self._sim.get_pbc_kernels(self)
 
         if self.config.output:
             self._output.save(self._sim.iteration)

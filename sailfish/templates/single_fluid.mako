@@ -185,23 +185,32 @@ ${kernel} void CollideAndPropagate(
 }
 
 <%def name="pbc_helper(axis)">
+	<%
+		if axis == 0:
+			offset = 1
+		elif axis == 1:
+			offset = arr_nx
+		else:
+			offset = arr_nx + arr_ny
+	%>
+
 	// TODO(michalj): Generalize this for grids with e_i > 1.
 	// From low idx to high idx.
-	%for i in sym.get_prop_dists(grid, 1, axis):
+	%for i in sym.get_prop_dists(grid, -1, axis):
 		float f${grid.idx_name[i]} = ${get_dist('dist', i, 'gi_low')};
 	%endfor
 
-	%for i in sym.get_prop_dists(grid, 1, axis):
+	%for i in sym.get_prop_dists(grid, -1, axis):
 		${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
 	%endfor
 
 	// From high idx to low idx.
-	%for i in sym.get_prop_dists(grid, -1, axis):
-		float f${grid.idx_name[i]} = ${get_dist('dist', i, '(gi_high+1)')};
+	%for i in sym.get_prop_dists(grid, 1, axis):
+		float f${grid.idx_name[i]} = ${get_dist('dist', i, 'gi_high', offset)};
 	%endfor
 
-	%for i in sym.get_prop_dists(grid, -1, axis):
-		${get_dist('dist', i, '(gi_low+1)')} = f${grid.idx_name[i]};
+	%for i in sym.get_prop_dists(grid, 1, axis):
+		${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
 	%endfor
 </%def>
 
@@ -218,10 +227,12 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 	// layer is alawys 1.
 	%if dim == 2:
 		if (axis == 0) {
+			if (idx1 >= ${lat_ny}) { return; }
 			gi_low = getGlobalIdx(0, idx1);
 			gi_high = getGlobalIdx(${lat_nx-2}, idx1);
 			${pbc_helper(0)}
 		} else if (axis == 1) {
+			if (idx1 >= ${lat_nx}) { return; }
 			gi_low = getGlobalIdx(idx1, 0);
 			gi_high = getGlobalIdx(idx1, ${lat_ny-2});
 			${pbc_helper(1)}
@@ -229,14 +240,17 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 	%else:
 		int idx2 = get_global_id(1);
 		if (axis == 0) {
+			if (idx1 >= ${lat_ny} || idx2 >= ${lat_nz}) { return; }
 			gi_low = getGlobalIdx(0, idx1, idx2);
 			gi_high = getGlobalIdx(${lat_nx-2}, idx1, idx2);
 			${pbc_helper(0)}
 		} else if (axis == 1) {
+			if (idx1 >= ${lat_nx} || idx2 >= ${lat_nz}) { return; }
 			gi_low = getGlobalIdx(idx1, 0, idx2);
 			gi_high = getGlobalIdx(idx1, ${lat_ny-2}, idx2);
 			${pbc_helper(1)}
 		} else {
+			if (idx1 >= ${lat_nx} || idx2 >= ${lat_ny}) { return; }
 			gi_low = getGlobalIdx(idx1, idx2, 0);
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});
 			${pbc_helper(2)}

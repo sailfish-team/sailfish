@@ -240,9 +240,6 @@ class LBGeometryProcessor(object):
                 self._coord_map_list[i].setdefault(coord, []).append(block)
 
     def _connect_blocks(self, config):
-        if len(self.blocks) <= 1:
-            return
-
         connected = [False] * len(self.blocks)
 
         def try_connect(block1, block2, geo=None):

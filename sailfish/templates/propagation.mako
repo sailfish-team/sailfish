@@ -69,7 +69,7 @@
 	%endfor
 </%def>
 
-<%def name="rel_offset(x, y, z)">
+<%def name="rel_offset(x, y, z)" filter="trim">
 	%if grid.dim == 2:
 		${x + y * arr_nx}
 	%else:
@@ -77,7 +77,7 @@
 	%endif
 </%def>
 
-<%def name="get_odist(dist_out, idir, xoff=0, yoff=0, zoff=0, offset=0)">
+<%def name="get_odist(dist_out, idir, xoff=0, yoff=0, zoff=0, offset=0)" filter="trim">
 	${dist_out}[gi + ${dist_size*idir + offset} + ${rel_offset(xoff, yoff, zoff)}]
 </%def>
 
@@ -140,7 +140,9 @@
 
 	// E propagation in shared memory
 	if (gx < ${lat_nx-1}) {
-		if (lx < ${block_size-1}) {
+		// Note: propagation to ghost nodes is done directly in global memory as there
+		// are no threads running for the ghost nodes.
+		if (lx < ${block_size-1} && gx != ${lat_nx-1-envelope_size}) {
 			%for i in sym.get_prop_dists(grid, 1):
 				prop_${grid.idx_name[i]}[lx+1] = ${dist_in}.${grid.idx_name[i]};
 			%endfor
@@ -180,7 +182,9 @@
 	${barrier()}
 
 	// W propagation in shared memory
-	if (lx > 0) {
+	// Note: propagation to ghost nodes is done directly in global memory as there
+	// are no threads running for the ghost nodes.
+	if (lx > ${envelope_size} || (lx > 0 && gx >= ${block_size})) {
 		%for i in sym.get_prop_dists(grid, -1):
 			prop_${grid.idx_name[i]}[lx-1] = ${dist_in}.${grid.idx_name[i]};
 		%endfor

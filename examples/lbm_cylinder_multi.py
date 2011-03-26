@@ -43,8 +43,8 @@ class CylinderSimulation(LBFluidSim, LBForcedSim):
         defaults.update({
             'lat_nx': 256,
             'lat_ny': 128,
-            'visc': 0.1})
-        #            'periodic_x': True})
+            'visc': 0.1,
+            'periodic_x': True})
 
 
     def __init__(self, config):
