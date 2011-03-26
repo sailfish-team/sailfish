@@ -6,7 +6,7 @@ from sailfish import codegen
 class BlockRunner(object):
     """Runs the simulation for a single LBBlock
     """
-    def __init__(self, simulation, block, output, backend):
+    def __init__(self, simulation, block, output, backend, quit_event):
         # Create a 2-way connection between the LBBlock and this BlockRunner
         self._block = block
         block.runner = self
@@ -28,6 +28,7 @@ class BlockRunner(object):
         self._gpu_grids_primary = []
         self._gpu_grids_secondary = []
         self._vis_map_cache = None
+        self._quit_event = quit_event
 
     @property
     def config(self):
@@ -319,6 +320,10 @@ class BlockRunner(object):
 
             if (self.config.max_iters > 0 and self._sim.iteration >=
                     self.config.max_iters):
+                break
+
+            if self._quit_event.is_set():
+                self.config.logger.info("Simulation termination requested.")
                 break
 
             # TODO: recv data from other blocks
