@@ -329,6 +329,6 @@ class BlockRunner(object):
             # TODO: recv data from other blocks
 
         self.config.logger.info(
-            "Simulation completed after {} iterations.".format(
+            "Simulation completed after {0} iterations.".format(
                 self._sim.iteration))
 

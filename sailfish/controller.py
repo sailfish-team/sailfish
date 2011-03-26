@@ -12,8 +12,8 @@ from sailfish.geo import LBGeometry2D, LBGeometry3D
 def _get_backends():
     for backend in ['cuda', 'opencl']:
         try:
-            module = 'sailfish.backend_{}'.format(backend)
-            __import__('sailfish', fromlist=['backend_{}'.format(backend)])
+            module = 'sailfish.backend_{0}'.format(backend)
+            __import__('sailfish', fromlist=['backend_{0}'.format(backend)])
             yield sys.modules[module].backend
         except ImportError:
             pass
@@ -21,8 +21,8 @@ def _get_backends():
 def _get_visualization_engines():
     for engine in ['2d']:
         try:
-            module = 'sailfish.vis_{}'.format(engine)
-            __import__('sailfish', fromlist=['vis_{}'.format(engine)])
+            module = 'sailfish.vis_{0}'.format(engine)
+            __import__('sailfish', fromlist=['vis_{0}'.format(engine)])
             yield sys.modules[module].engine
         except ImportError:
             pass
@@ -187,7 +187,7 @@ class LBMachineMaster(object):
         for block in self.blocks:
             output = output_initializer(block)
             p = Process(target=_start_block_runner,
-                        name='Block/{}'.format(block.id),
+                        name='Block/{0}'.format(block.id),
                         args=(block, self.config, sim,
                               backend_cls, block2gpu[block.id],
                               output, self._quit_event))
@@ -365,12 +365,12 @@ class LBSimulationController(object):
         # Backend options
         for backend in _get_backends():
             group = self.conf.add_group(
-                    "'{}' backend options".format(backend.name))
+                    "'{0}' backend options".format(backend.name))
             backend.add_options(group)
 
         for engine in _get_visualization_engines():
             group = self.conf.add_group(
-                    "'{}' visualization engine".format(engine.name))
+                    "'{0}' visualization engine".format(engine.name))
             engine.add_options(group)
 
         # Set default values defined by the simulation-specific class.
@@ -393,7 +393,7 @@ class LBSimulationController(object):
 
         # TODO(michalj): do this over MPI
         p = Process(target=_start_machine_master,
-                    name='Master/{}'.format(platform.node()),
+                    name='Master/{0}'.format(platform.node()),
                     args=(self.conf, blocks, self._lb_class))
         p.start()
         p.join()
