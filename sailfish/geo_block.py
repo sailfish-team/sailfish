@@ -253,7 +253,7 @@ class LBBlock2D(LBBlock):
 
     def update_context(self, ctx):
         ctx['dim'] = self.dim
-
+        ctx['envelope_size'] = self.envelope_size
 
 class LBBlock3D(LBBlock):
     dim = 3
@@ -272,6 +272,7 @@ class LBBlock3D(LBBlock):
 
     def update_context(self, ctx):
         ctx['dim'] = self.dim
+        ctx['envelope_size'] = self.envelope_size
 
 
 class GeoEncoder(object):

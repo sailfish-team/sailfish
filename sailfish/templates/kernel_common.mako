@@ -20,12 +20,21 @@
 %endif
 </%def>
 
+## Convenience function to call getGlobalIdx without an explicit conditional
+## clause in the template code.
+<%def name="get_global_idx(x='gx', y='gy', z='gz')" filter="trim">
+	%if dim == 2:
+		getGlobalIdx(${x}, ${y})
+	%else:
+		getGlobalIdx(${x}, ${y}, ${z})
+	%endif
+</%def>
+
 <%def name="local_indices()">
 	int lx = get_local_id(0);	// ID inside the current block
 	%if dim == 2:
 		int gx = get_global_id(0);
 		int gy = get_group_id(1);
-		int gi = gx + ${arr_nx}*gy;
 	%else:
 		// This is a workaround for the limitations of current CUDA devices.
 		// We would like the grid to be 3 dimensional, but only 2 dimensions
@@ -39,16 +48,18 @@
 		int gx = get_global_id(0) % ${arr_nx};
 		int gy = get_global_id(0) / ${arr_nx};
 		int gz = get_global_id(1);
-
-		## FIXME: there should be a single mako function for calculating the
-		## global index.
-		int gi = gx + gy*${arr_nx} + ${arr_nx*arr_ny}*gz;
 	%endif
+
+	int gi = ${get_global_idx()};
 
 	// Nothing to do if we're outside of the simulation domain.
 	if (gx > ${lat_nx-1}) {
 		return;
 	}
+</%def>
+
+<%def name="get_dist(array, i, idx)" filter="trim">
+	${array}[${idx} + DIST_SIZE * ${i}]
 </%def>
 
 ## FIXME: This should work in 3D.  Right now, there is no use case for that

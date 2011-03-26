@@ -864,12 +864,12 @@ def zouhe_fixup(grid, orientation):
     return ret
 
 
-def get_prop_dists(grid, dir):
+def get_prop_dists(grid, dir_, axis=0):
     """Compute a list of base vectors with a specific value of the X component (`dir`)."""
     ret = []
 
     for i, ei in enumerate(grid.basis):
-        if ei[0] == dir and i > 0:
+        if ei[axis] == dir_ and i > 0:
             ret.append(i)
 
     return ret
