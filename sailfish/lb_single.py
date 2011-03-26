@@ -136,17 +136,31 @@ class LBFluidSim(LBSim):
         args2 = [gpu_map, gpu_dist1b, gpu_dist1a, gpu_rho] + gpu_v
 
         if full_output:
-            args1 += [np.uint32(1)]
-            args2 += [np.uint32(1)]
+            args1.append(np.uint32(1))
+            args2.append(np.uint32(1))
         else:
-            args1 += [np.uint32(0)]
-            args2 += [np.uint32(0)]
+            args1.append(np.uint32(0))
+            args2.append(np.uint32(0))
 
         kernels = []
         kernels.append(runner.get_kernel(
                 'CollideAndPropagate', args1, 'P'*(len(args1)-1)+'i'))
         kernels.append(runner.get_kernel(
                 'CollideAndPropagate', args2, 'P'*(len(args2)-1)+'i'))
+        return kernels
+
+    def get_pbc_kernels(self, runner):
+        gpu_dist1a = runner.gpu_dist(0, 0)
+        gpu_dist1b = runner.gpu_dist(0, 1)
+
+        kernels = []
+        for i in range(0, 3):
+            kernels.append(runner.get_kernel(
+                'ApplyPeriodicBoundaryConditions', [gpu_dist1a, np.uint32(i)], 'Pi'))
+        for i in range(0, 3):
+            kernels.append(runner.get_kernel(
+                'ApplyPeriodicBoundaryConditions', [gpu_dist1b, np.uint32(i)], 'Pi'))
+
         return kernels
 
     def init_fields(self, runner):

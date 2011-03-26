@@ -99,10 +99,10 @@ ${device_func} inline int encodeBoundaryNode(int dir_mask, int obj_id) {
 
 %if dim == 2:
 	${device_func} inline int getGlobalIdx(int gx, int gy) {
-		return gx * ${arr_nx} * gy;
+		return gx + ${arr_nx} * gy;
 	}
 %else:
 	${device_func} inline int getGlobalIdx(int gx, int gy, int gz) {
-		return gx * ${arr_nx} * gy + ${arr_nx * arr_ny} * gz;
+		return gx + ${arr_nx} * gy + ${arr_nx * arr_ny} * gz;
 	}
 %endif

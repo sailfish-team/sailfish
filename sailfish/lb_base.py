@@ -1,4 +1,5 @@
 """Base class for all lattice Boltzman simulations in Sailfish."""
+
 from sailfish import sym
 
 __author__ = 'Michal Januszewski'

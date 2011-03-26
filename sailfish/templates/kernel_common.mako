@@ -58,8 +58,8 @@
 	}
 </%def>
 
-<%def name="get_dist(array, i, idx)" filter="trim">
-	${array}[${idx} + DIST_SIZE * ${i}]
+<%def name="get_dist(array, i, idx, offset=0)" filter="trim">
+	${array}[${idx} + DIST_SIZE * ${i} + ${offset}]
 </%def>
 
 ## FIXME: This should work in 3D.  Right now, there is no use case for that
