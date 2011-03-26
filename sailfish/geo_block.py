@@ -436,7 +436,7 @@ class GeoBlock(object):
         # Cache the unencoded type map for visualization.
         self._type_vis_map[:] = self._type_map_view[:]
 
-#        self._postprocess_nodes()
+        self._postprocess_nodes()
         self._define_ghosts()
 
         # TODO: At this point, we should decide which GeoEncoder class to use.

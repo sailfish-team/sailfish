@@ -48,7 +48,7 @@ class BlockRunner(object):
         ctx['arr_nx'] = self._physical_size[-1]
         ctx['arr_ny'] = self._physical_size[-2]
 
-        bnd_limits = list(self._block.size[:])
+        bnd_limits = list(self._block.actual_size[:])
 
         if self._block.dim == 3:
             ctx['lat_nz'] = self._lat_size[-3]
@@ -151,13 +151,13 @@ class BlockRunner(object):
                                        self.config.block_size)
 
         # CUDA block/grid size for standard kernel call.
-        self._kernel_grid_size = list(self._block.actual_size)
+        self._kernel_grid_size = list(reversed(self._physical_size))
         self._kernel_grid_size[0] /= self.config.block_size
 
         self._kernel_block_size = [1] * len(self._lat_size)
         self._kernel_block_size[0] = self.config.block_size
 
-        # Global grid size.
+        # Global grid size as seen by the simulation class.
         if self._block.dim == 2:
             self._global_size = (self.config.lat_ny, self.config.lat_nx)
         else:
@@ -213,8 +213,6 @@ class BlockRunner(object):
 
         self._gpu_geo_map = self.backend.alloc_buf(
                 like=self._geo_block.encoded_map())
-
-        print self._geo_block.encoded_map()
 
     def gpu_field(self, field):
         """Returns the GPU copy of a field."""
