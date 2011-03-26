@@ -27,12 +27,13 @@ def _get_visualization_engines():
         except ImportError:
             pass
 
-def _start_block_runner(block, config, sim, backend_class, gpu_id, output):
+def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
+        quit_event):
     # We instantiate the backend class here (instead in the machine
     # master), so that the backend object is created within the
     # context of the new process.
     backend = backend_class(config, gpu_id)
-    runner = block_runner.BlockRunner(sim, block, output, backend)
+    runner = block_runner.BlockRunner(sim, block, output, backend, quit_event)
     runner.run()
 
 
@@ -64,7 +65,8 @@ class LBMachineMaster(object):
         self._block_id_to_runner = {}
         self._pipes = []
         self._vis_process = None
-        self._quit_event = None
+        self._vis_quit_event = None
+        self._quit_event = Event()
         self.config.logger = logging.getLogger('saifish')
         formatter = logging.Formatter("[%(relativeCreated)6d %(levelname)5s %(processName)s] %(message)s")
         handler = logging.StreamHandler()
@@ -150,10 +152,11 @@ class LBMachineMaster(object):
         vis_class = _get_visualization_engines().next()
 
         # Event to singal that the visualization process should be terminated.
-        self._quit_event = Event()
+        self._vis_quit_event = Event()
         self._vis_process = Process(
                 target=lambda: vis_class(
-                    self.config, self.blocks, self._quit_event, vis_buffer,
+                    self.config, self.blocks, self._vis_quit_event,
+                    self._quit_event, vis_buffer,
                     vis_geo_buffer, vis_config).run(),
                 name='VisEngine')
         self._vis_process.start()
@@ -165,7 +168,7 @@ class LBMachineMaster(object):
         if self.config.mode != 'visualization':
             return
 
-        self._quit_event.set()
+        self._vis_quit_event.set()
         self._vis_process.join()
 
     def run(self):
@@ -187,7 +190,7 @@ class LBMachineMaster(object):
                         name='Block/{}'.format(block.id),
                         args=(block, self.config, sim,
                               backend_cls, block2gpu[block.id],
-                              output))
+                              output, self._quit_event))
             self.runners.append(p)
             self._block_id_to_runner[block.id] = p
 
