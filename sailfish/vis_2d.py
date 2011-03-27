@@ -238,8 +238,6 @@ class Fluid2DVis(vis.FluidVis):
         v_max = np.max(tmp)
         v_min = 0.0
 
-        print v_max, v_min
-
         tmp[:] = (tmp - v_min) / (v_max - v_min)
         tmp[tmp > 1.0]  = 1.0
         tmp = np.abs(tmp)

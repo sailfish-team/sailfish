@@ -6,7 +6,7 @@ __license__ = 'LGPLv3'
 
 import numpy as np
 
-from sailfish import sym
+from sailfish import sym, util
 from sailfish.lb_base import LBSim
 
 class GridError(Exception):
@@ -76,16 +76,13 @@ class LBFluidSim(LBSim):
     def __init__(self, config):
         super(LBFluidSim, self).__init__(config)
 
-        self.grids = []
-        for x in sym.KNOWN_GRIDS:
-            if x.__name__ == config.grid:
-                self.grids.append(x)
-                break
+        grid = util.get_grid_from_config(config)
 
-        if not self.grids:
-            raise GridError('Invalid grid selected: {}'.format(config.grid))
+        if grid is None:
+            raise GridError('Invalid grid selected: {0}'.format(config.grid))
 
-        self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grids[0])
+        self.grids = [grid]
+        self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(grid)
 
     @property
     def grid(self):
