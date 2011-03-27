@@ -36,6 +36,9 @@ class LBBlock(object):
         self._clear_connections()
         self._clear_connectors()
 
+        self.vis_buffer = None
+        self.vis_geo_buffer = None
+
     @property
     def runner(self):
         return self._runner
@@ -107,6 +110,9 @@ class LBBlock(object):
         self.actual_size = [x + 2 * envelope_size for x in self.size]
         self.envelope_size = envelope_size
 
+    def set_vis_buffers(self, vis_buffer, vis_geo_buffer):
+        self.vis_buffer = vis_buffer
+        self.vis_geo_buffer = vis_geo_buffer
 
 class LBBlock2D(LBBlock):
     dim = 2

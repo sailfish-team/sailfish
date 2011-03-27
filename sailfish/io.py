@@ -2,12 +2,12 @@ import math
 import numpy as np
 import operator
 import ctypes
-from ctypes import Structure, c_uint16, c_int32, c_uint8
+from ctypes import Structure, c_uint16, c_int32, c_uint8, c_bool
 
 class VisConfig(Structure):
     MAX_NAME_SIZE = 64
     _fields_ = [('iteration', c_int32), ('block', c_uint16), ('field', c_uint8),
-            ('fields', c_uint8), ('field_name',
+            ('all_blocks', c_bool), ('fields', c_uint8), ('field_name',
                 type(ctypes.create_string_buffer(MAX_NAME_SIZE)))]
 
 class LBOutput(object):
@@ -32,11 +32,11 @@ class VisualizationWrapper(LBOutput):
 
     # TODO(michalj): Add support for visualization fields different from these
     # used for the output file.
-    def __init__(self, config, block, vis_buffer, geo_buffer, vis_config, output_cls):
+    def __init__(self, config, block, vis_config, output_cls):
         self._output = output_cls(config)
-        self._vis_buffer = vis_buffer
+        self._vis_buffer = block.vis_buffer
         self._vis_config = vis_config
-        self._geo_buffer = geo_buffer
+        self._geo_buffer = block.vis_geo_buffer
         self._first_save = True
         self.block = block
         self.nodes = reduce(operator.mul, block.size)
@@ -65,7 +65,7 @@ class VisualizationWrapper(LBOutput):
 
         # Only update the buffer if the block to which we belong is
         # currently being visualized.
-        if self.block.id == self._vis_config.block:
+        if self._vis_config.all_blocks or self.block.id == self._vis_config.block:
             self._vis_config.iteration = i
             requested_field = self._vis_config.field
             self._vis_config.field_name = self._field_names[requested_field]
