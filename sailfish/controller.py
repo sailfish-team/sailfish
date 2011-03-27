@@ -5,6 +5,7 @@ import platform
 import sys
 import multiprocessing as mp
 from multiprocessing import Process, Array, Event, Value
+import numpy as np
 
 from sailfish import codegen, config, io, block_runner, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
@@ -152,7 +153,7 @@ class LBMachineMaster(object):
         # data to be visualized.
         max_size = reduce(max,
                 (reduce(operator.mul, x.size) for x in self.blocks), 0)
-        vis_lock = mp.RLock()
+        vis_lock = mp.Lock()
         vis_buffer = Array(ctypes.c_float, max_size, lock=vis_lock)
         vis_geo_buffer = Array(ctypes.c_uint8, max_size, lock=vis_lock)
 
