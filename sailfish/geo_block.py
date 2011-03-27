@@ -497,8 +497,8 @@ class GeoBlock2D(GeoBlock):
         GeoBlock.__init__(self, grid_shape, block, *args, **kwargs)
 
     def _get_mgrid(self):
-        return reversed(np.mgrid[self.block.ox:self.block.oy + self.block.ny,
-                                 self.block.oy:self.block.ox + self.block.nx])
+        return reversed(np.mgrid[self.block.oy:self.block.oy + self.block.ny,
+                                 self.block.ox:self.block.ox + self.block.nx])
 
     def _define_ghosts(self):
         assert not self._type_map_encoded

@@ -281,6 +281,16 @@ class Fluid2DVis(vis.FluidVis):
                     new_field = self._vis_config.field + 1
                     new_field %= self._vis_config.fields
                     self._vis_config.field = new_field
+                # Previous block.
+                elif event.key == pygame.K_j:
+                    new_block = self._vis_config.block - 1
+                    new_block %= len(self._blocks)
+                    self._vis_config.block = new_block
+                # Next block.
+                elif event.key == pygame.K_k:
+                    new_block = self._vis_config.block + 1
+                    new_block %= len(self._blocks)
+                    self._vis_config.block = new_block
                 elif event.key == pygame.K_LEFTBRACKET:
                     n = len(self.field.vals)
                     idx = cmaps[n].keys().index(self._cmap[n]) - 1
