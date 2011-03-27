@@ -48,10 +48,17 @@ class LBBlockConnector(object):
         self._recv_ev = recv_ev
 
     def send(self, data):
+        #self._send_array[:] = data
         self._send_ev.set()
 
-    def recv(self, data):
-        self._recv_ev.wait()
+    def recv(self, data, quit_ev):
+        # If the quit event is set, do not wait for the data transfer.
+        while self._recv_ev.wait(0.01) != True:
+            if quit_ev.is_set():
+                return False
+        self._recv_ev.clear()
+        return True
+        #data[:] = self._recv_array[:]
 
 
 class LBMachineMaster(object):
@@ -100,10 +107,12 @@ class LBMachineMaster(object):
         # A set to keep track which connections are already created.
         _block_conns = set()
 
+        # TOOD(michalj): Fix this for multi-grid models.
         grid = util.get_grid_from_config(self.config)
 
         for i, block in enumerate(self.blocks):
-            for axis, nbid in block.connecting_blocks():
+            connecting_blocks = block.connecting_blocks()
+            for axis, nbid in connecting_blocks:
                 if (block.id, nbid) in _block_conns:
                     continue
 
@@ -114,13 +123,22 @@ class LBMachineMaster(object):
                 # to be transferred is the same both ways.
                 size = block.connection_buf_size(grid, axis, nbid)
                 ctype = self._get_ctypes_float()
+
+                opp_axis = block.opposite_axis_dir(axis)
+                if (opp_axis, nbid) in connecting_blocks:
+                    size *= 2
+                    axis_str = '{0} and {1}'.format(axis, opp_axis)
+                else:
+                    axis_str = str(axis)
+
                 array1 = Array(ctype, size)
                 array2 = Array(ctype, size)
                 ev1 = Event()
                 ev2 = Event()
 
                 self.config.logger.debug("Block connection: {0} <-> {1}: {2}"
-                        "-element buffer.".format(block.id, nbid, size))
+                        "-element buffer (axis {3}).".format(
+                            block.id, nbid, size, axis_str))
 
                 block.add_connector(nbid,
                         LBBlockConnector(array1, array2, ev1, ev2))

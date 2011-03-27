@@ -1,6 +1,5 @@
 #!/usr/bin/python -u
 
-import numpy as np
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import LBBlock2D, GeoBlock2D
 from sailfish.controller import LBSimulationController
