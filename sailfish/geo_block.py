@@ -77,10 +77,10 @@ class LBBlock(object):
         self._connectors = {}
 
     def add_connector(self, block_id, connector):
+        assert block_id not in self._connectors
         self._connectors[block_id] = connector
 
-    def _get_connection_span(self, axis, block_id):
-        """Method used for testing."""
+    def get_connection_span(self, axis, block_id):
         for span, bid in self._connections[axis]:
             if bid == block_id:
                 return span
@@ -243,31 +243,43 @@ class LBBlock2D(LBBlock):
 
         return False
 
+    def axis_dir_to_axis(self, axis_dir):
+        if axis_dir == self._X_HIGH or axis_dir == self._X_LOW:
+            return 0
+        elif axis_dir == self._Y_HIGH or axis_dir == self._Y_LOW:
+            return 1
+        elif axis_dir == self._Z_HIGH or axis_dir == self._Z_LOW:
+            return 2
+
+    def opposite_axis_dir(self, axis_dir):
+        opp_map = {
+            self._X_HIGH: self._X_LOW,
+            self._Y_HIGH: self._Y_LOW,
+            self._Z_HIGH: self._Z_LOW
+        }
+        opp_map.update(dict((v, k) for k, v in opp_map.iteritems()))
+        return opp_map[axis_dir]
+
     def connection_buf_size(self, grid, axis, block_id):
-        for span, b_id in self._connections[axis]:
-            if b_id != block_id:
-                continue
-
-            size = self.envelope_size
-            direction = 0
-            for coord in span:
-                # Only process slices.  If the entry is a single coordinate,
-                # it does not contribute to the buffer size calculation.
-                if type(coord) is slice:
-                    size *= max(1, coord.stop - coord.start)
+        span = self.get_connection_span(axis, block_id)
+        size = self.envelope_size
+        direction = 0
+        for coord in span:
+            # Only process slices.  If the entry is a single coordinate,
+            # it does not contribute to the buffer size calculation.
+            if type(coord) is slice:
+                size *= max(1, coord.stop - coord.start)
+            else:
+                if coord == 0:
+                    direction = -1
                 else:
-                    if coord == 0:
-                        direction = -1
-                    else:
-                        direction = 1
+                    direction = 1
 
-            # Multiply by the number of distributions that have to be
-            # transferred.
-            size *= len(sym.get_prop_dists(grid, direction, axis))
-            return size
-
-        return 0
-
+        # Multiply by the number of distributions that have to be
+        # transferred.
+        size *= len(sym.get_prop_dists(
+            grid, direction, self.axis_dir_to_axis(axis)))
+        return size
 
     def update_context(self, ctx):
         ctx['dim'] = self.dim

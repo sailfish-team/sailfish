@@ -1,7 +1,7 @@
 import math
 import operator
 import numpy as np
-from sailfish import codegen
+from sailfish import codegen, sym, util
 
 class BlockRunner(object):
     """Runs the simulation for a single LBBlock
@@ -181,6 +181,39 @@ class BlockRunner(object):
     def _get_compute_code(self):
         return self._bcg.get_code(self)
 
+    def _init_buffers(self):
+        # TOOD(michalj): Fix this for multi-grid models.
+        grid = util.get_grid_from_config(self.config)
+
+        self.block_boundaries = {0: [0], 1: [0]}
+
+        for axis, block_id in self._block.connecting_blocks():
+            span = self._block.get_connection_span(axis, block_id)
+            size = self._block.connection_buf_size(grid, axis, block_id)
+
+            direction = 0
+            for coord in span:
+                if type(coord) is int:
+                    if coord == 0:
+                        direction = -1
+                    else:
+                        direction = 1
+
+            assert direction != 0
+
+            if axis <= 1:
+                last_bnd = self.block_boundaries[axis][-1]
+                dists = len(sym.get_prop_dists(
+                    grid, direction, self._block.axis_dir_to_axis(axis)))
+                self.block_boundaries[axis].append(
+                        last_bnd + size * dists)
+            else:
+                raise ValueError('Connections along non-X axis unsupported')
+
+        size = (self.block_boundaries[0][-1] +
+                self.block_boundaries[1][-1])
+        self._x_ghost_buffer = np.zeros(size, dtype=self.float)
+
     def _init_compute(self):
         self.config.logger.debug("Initializing compute unit.")
         code = self._get_compute_code()
@@ -189,9 +222,6 @@ class BlockRunner(object):
         self._boundary_streams = (self.backend.make_stream(),
                                   self.backend.make_stream())
         self._bulk_stream = self.backend.make_stream()
-
-
-        # Allocate a transfer buffer suitable for asynchronous transfers.
 
     def _init_gpu_data(self):
         self.config.logger.debug("Initializing compute unit data.")
@@ -204,6 +234,9 @@ class BlockRunner(object):
             for component in field:
                 gpu_vector.append(self.backend.alloc_buf(like=component))
             self._gpu_field_map[id(field)] = gpu_vector
+
+        self._gpu_x_ghost_buffer = self.backend.alloc_buf(
+                like=self._x_ghost_buffer)
 
         for grid in self._sim.grids:
             size = self._get_dist_bytes(grid)
@@ -314,13 +347,10 @@ class BlockRunner(object):
         for b_id, connector in self._block._connectors.iteritems():
             connector.send(None)
 
-        print "block %d: send done" % self._block.id
-
     def recv_data(self):
         for b_id, connector in self._block._connectors.iteritems():
-            connector.recv(None)
-
-        print "block %d: recv done" % self._block.id
+            if not connector.recv(None, self._quit_event):
+                break
 
     def _fields_to_host(self):
         """Copies data for all fields from the GPU to the host."""
@@ -334,6 +364,7 @@ class BlockRunner(object):
     def run(self):
         self.config.logger.info("Initializing block.")
 
+        self._init_buffers()
         self._init_geometry()
         self._init_compute()
         self.config.logger.debug("Initializing macroscopic fields.")
@@ -357,13 +388,13 @@ class BlockRunner(object):
 
         while True:
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
+
             self.step(output_req)
+            self.send_data()
 
             if output_req and self.config.output_required:
                 self._fields_to_host()
                 self._output.save(self._sim.iteration)
-
-            # TODO: send data to other blocks
 
             if (self.config.max_iters > 0 and self._sim.iteration >=
                     self.config.max_iters):
@@ -373,7 +404,10 @@ class BlockRunner(object):
                 self.config.logger.info("Simulation termination requested.")
                 break
 
-            # TODO: recv data from other blocks
+            self.recv_data()
+
+            if self._quit_event.is_set():
+                self.config.logger.info("Simulation termination requested.")
 
         self.config.logger.info(
             "Simulation completed after {0} iterations.".format(
