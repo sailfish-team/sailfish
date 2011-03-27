@@ -1,11 +1,14 @@
 import math
 import numpy as np
 import operator
-from ctypes import Structure, c_uint16, c_int32, c_uint8, c_char_p
+import ctypes
+from ctypes import Structure, c_uint16, c_int32, c_uint8
 
 class VisConfig(Structure):
+    MAX_NAME_SIZE = 64
     _fields_ = [('iteration', c_int32), ('block', c_uint16), ('field', c_uint8),
-            ('fields', c_uint8), ('field_name', c_char_p)]
+            ('fields', c_uint8), ('field_name',
+                type(ctypes.create_string_buffer(MAX_NAME_SIZE)))]
 
 class LBOutput(object):
     def __init__(self, *args, **kwargs):
@@ -27,14 +30,17 @@ class VisualizationWrapper(LBOutput):
     file."""
     format_name = 'vis'
 
-    # TODO(mjanusz): Add the option not to save data to a file.
+    # TODO(michalj): Add support for visualization fields different from these
+    # used for the output file.
     def __init__(self, config, block, vis_buffer, geo_buffer, vis_config, output_cls):
         self._output = output_cls(config)
         self._vis_buffer = vis_buffer
         self._vis_config = vis_config
         self._geo_buffer = geo_buffer
+        self._first_save = True
         self.block = block
         self.nodes = reduce(operator.mul, block.size)
+        self._dim = len(self.block.size)
 
     def register_field(self, field, name):
         self._output.register_field(field, name)
@@ -42,18 +48,38 @@ class VisualizationWrapper(LBOutput):
     def save(self, i):
         self._output.save(i)
 
+        if self._first_save:
+            self._scalar_names = self._output._scalar_fields.keys()
+            self._vector_names = self._output._vector_fields.keys()
+            self._scalar_len = len(self._scalar_names)
+            self._vector_len = len(self._vector_names) * self._dim
+            self._field_names = self._scalar_names
+            component_names = ['_x', '_y', '_z']
+            for name in self._vector_names:
+                for i in range(self._dim):
+                    self._field_names.append(
+                        '{0}{1}'.format(name, component_names[i]))
+
+            self._vis_config.fields = self._scalar_len + self._vector_len
+            self._first_save = False
+
         # Only update the buffer if the block to which we belong is
         # currently being visualized.
         if self.block.id == self._vis_config.block:
             self._vis_config.iteration = i
-            # TODO(michalj): Optimize this.
-            all_names = self._output._scalar_fields.keys() + self._output._vector_fields.keys()
-            self._vis_config.fields = len(all_names)
-            self._vis_config.field_name = all_names[self._vis_config.field]
+            requested_field = self._vis_config.field
+            self._vis_config.field_name = self._field_names[requested_field]
 
-            # TODO(michalj): Add the option to select a field to visualize.
-            field = self._output._vector_fields[self._output._vector_fields.keys()[0]][0]
-#            field = self._output._scalar_fields[self._output._scalar_fields.keys()[0]]
+            if requested_field < self._scalar_len:
+                name = self._scalar_names[requested_field]
+                field = self._output._scalar_fields[name]
+            else:
+                requested_field -= self._scalar_len
+                idx = requested_field / self._dim
+                name = self._vector_names[idx]
+                component = requested_field % self._dim
+                field = self._output._vector_fields[name][component]
+
             self._vis_buffer[0:self.nodes] = field[self.block._nonghost_slice].reshape(self.nodes)[:]
             self._geo_buffer[0:self.nodes] = self.block.runner.visualization_map().reshape(self.nodes)[:]
 

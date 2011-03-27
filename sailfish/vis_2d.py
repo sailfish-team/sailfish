@@ -158,12 +158,14 @@ class Fluid2DVis(vis.FluidVis):
         self._vis_config = vis_config
         self._blocks = blocks
 
+        # Whether a single block is visualized.
+        self._single_block = True
+
         self._font_color = (0, 255, 0)
         self._show_info = True
         self._show_walls = True
         self._velocity = False
         self._draw_type = 1
-        self._visfield = 0
         self._vistype = self.VIS_LINEAR
         self._cmap = [None, 'std', 'rb']
         self._cmap_scale_lock = False
@@ -176,7 +178,6 @@ class Fluid2DVis(vis.FluidVis):
 
         self._reset()
 
-        # TODO(michalj): Process screen_scale here.
         width, height = self.size
         width = int(width * self.config.scr_scale)
         height = int(height * self.config.scr_scale)
@@ -266,16 +267,20 @@ class Fluid2DVis(vis.FluidVis):
     def _process_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                sys.exit()
+                self._sim_quit_event.set()
             elif event.type == pygame.VIDEORESIZE:
                 self.set_mode(*event.size)
             elif event.type == pygame.KEYDOWN:
+                # Previous field.
                 if event.key == pygame.K_MINUS:
-                    self._visfield -= 1
-                    self._visfield %= self.num_fields
+                    new_field = self._vis_config.field - 1
+                    new_field %= self._vis_config.fields
+                    self._vis_config.field = new_field
+                # Next field.
                 elif event.key == pygame.K_EQUALS:
-                    self._visfield += 1
-                    self._visfield %= self.num_fields
+                    new_field = self._vis_config.field + 1
+                    new_field %= self._vis_config.fields
+                    self._vis_config.field = new_field
                 elif event.key == pygame.K_LEFTBRACKET:
                     n = len(self.field.vals)
                     idx = cmaps[n].keys().index(self._cmap[n]) - 1
