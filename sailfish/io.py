@@ -52,7 +52,7 @@ class VisualizationWrapper(LBOutput):
             self._vis_config.field_name = all_names[self._vis_config.field]
 
             # TODO(michalj): Add the option to select a field to visualize.
-            field = self._output._vector_fields[self._output._vector_fields.keys()[0]][1]
+            field = self._output._vector_fields[self._output._vector_fields.keys()[0]][0]
 #            field = self._output._scalar_fields[self._output._scalar_fields.keys()[0]]
             self._vis_buffer[0:self.nodes] = field[self.block._nonghost_slice].reshape(self.nodes)[:]
             self._geo_buffer[0:self.nodes] = self.block.runner.visualization_map().reshape(self.nodes)[:]

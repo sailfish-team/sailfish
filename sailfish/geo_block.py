@@ -3,6 +3,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'GPL3'
 
 import numpy as np
+from sailfish import sym
 
 def bit_len(num):
     """Returns the minimal number of bits necesary to encode `num`."""
@@ -93,6 +94,8 @@ class LBBlock(object):
         return ids
 
     def connection_buf_size(self, axis, block_id):
+        """Calculates the size of the buffer necessary to transfer data to and
+        from the block identified by `block_id`."""
         raise NotImplementedError('Method should be defined by subclass.')
 
     def update_context(self, ctx):
@@ -234,18 +237,27 @@ class LBBlock2D(LBBlock):
 
         return False
 
-    def connection_buf_size(self, axis, block_id):
-        # XXX: This is broken.
+    def connection_buf_size(self, grid, axis, block_id):
         for span, b_id in self._connections[axis]:
             if b_id != block_id:
                 continue
 
-            size = 1
+            size = self.envelope_size
+            direction = 0
             for coord in span:
+                # Only process slices.  If the entry is a single coordinate,
+                # it does not contribute to the buffer size calculation.
                 if type(coord) is slice:
                     size *= max(1, coord.stop - coord.start)
+                else:
+                    if coord == 0:
+                        direction = -1
+                    else:
+                        direction = 1
 
-            # FIXME: This should include ghost nodes.
+            # Multiply by the number of distributions that have to be
+            # transferred.
+            size *= len(sym.get_prop_dists(grid, direction, axis))
             return size
 
         return 0

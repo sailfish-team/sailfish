@@ -6,7 +6,7 @@ import sys
 import multiprocessing as mp
 from multiprocessing import Process, Array, Event, Value
 
-from sailfish import codegen, config, io, block_runner
+from sailfish import codegen, config, io, block_runner, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
 
 def _get_backends():
@@ -88,11 +88,18 @@ class LBMachineMaster(object):
 
         return block2gpu
 
+    def _get_ctypes_float(self):
+        if self.config.precision == 'double':
+            return ctypes.c_double
+        else:
+            return ctypes.c_float
 
     def _init_connectors(self):
         """Creates block connectors for all blocks connections."""
         # A set to keep track which connections are already created.
         _block_conns = set()
+
+        grid = util.get_grid_from_config(self.config)
 
         for i, block in enumerate(self.blocks):
             for axis, nbid in block.connecting_blocks():
@@ -102,12 +109,17 @@ class LBMachineMaster(object):
                 _block_conns.add((block.id, nbid))
                 _block_conns.add((nbid, block.id))
 
-                size = block.connection_buf_size(axis, nbid)
-                # FIXME: make it work for doubles as well.
-                array1 = Array('f', size)
-                array2 = Array('f', size)
+                # Note: this implicitly assumes that the amount of data that has
+                # to be transferred is the same both ways.
+                size = block.connection_buf_size(grid, axis, nbid)
+                ctype = self._get_ctypes_float()
+                array1 = Array(ctype, size)
+                array2 = Array(ctype, size)
                 ev1 = Event()
                 ev2 = Event()
+
+                self.config.logger.debug("Block connection: {0} <-> {1}: {2}"
+                        "-element buffer.".format(block.id, nbid, size))
 
                 block.add_connector(nbid,
                         LBBlockConnector(array1, array2, ev1, ev2))
