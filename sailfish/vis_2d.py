@@ -147,14 +147,12 @@ class Fluid2DVis(vis.FluidVis):
         group.add_argument('--scr_scale', help='screen scale', type=float, default=3.0)
         group.add_argument('--scr_depth', help='screen color depth', type=int, default=0)
 
-    def __init__(self, config, blocks, quit_event, sim_quit_event, vis_buffer, geo_buffer, vis_config):
+    def __init__(self, config, blocks, quit_event, sim_quit_event, vis_config):
         super(Fluid2DVis, self).__init__()
         self.config = config
         self.config.logger.info("Initializating pygame 2D vis. engine.")
         self._quit_event = quit_event
         self._sim_quit_event = sim_quit_event
-        self._buffer = vis_buffer
-        self._geo_buffer = geo_buffer
         self._vis_config = vis_config
         self._blocks = blocks
 
@@ -211,30 +209,32 @@ class Fluid2DVis(vis.FluidVis):
     def _visualize(self):
         width, height = self.size
         srf = pygame.Surface((width, height))
-        ret = [self._vis_config.field_name]
+        block = self._blocks[self._vis_config.block]
+        ret = ['block {0}'.format(block.id),
+               self._vis_config.field_name]
 
-        srf2 = self._draw_field(srf, None, None, width, height)
+        srf2 = self._draw_field(srf, width, height, block)
         pygame.transform.scale(srf2, self._screen.get_size(), self._screen)
 
         # TODO(michalj): Add support for vector fields.
         # TODO(michalj): Add support for tracer particles.
         return ret
 
-    def _draw_geometry(self, tg_buffer, width, height):
+    def _draw_geometry(self, tg_buffer, width, height, block):
         geo_map = np.zeros((height, width), dtype=np.uint8)
-        geo_map.reshape(width * height)[:] = self._geo_buffer[:]
+        geo_map.reshape(width * height)[:] = block.vis_geo_buffer[:]
 
         geo_map = np.rot90(geo_map, 3)
 
         tg_buffer[geo_map == geo_block.GeoBlock.NODE_WALL] = self._color_wall
 
-    def _draw_field(self, srf, wall_map, unused_map, width, height):
+    def _draw_field(self, srf, width, height, block):
         a = pygame.surfarray.pixels3d(srf)
 
         # FIXME(michalj): This is horribly inefficient.  We should only recreate
         # the array if the data has been updated.
         tmp = np.zeros((height, width), dtype=np.float32)
-        tmp.reshape(width * height)[:] = self._buffer[:]
+        tmp.reshape(width * height)[:] = block.vis_buffer[:]
 
         v_max = np.max(tmp)
         v_min = 0.0
@@ -248,7 +248,7 @@ class Fluid2DVis(vis.FluidVis):
         vis_field = cmaps[1]['rgb1'](tmp)
         a[:] = vis_field[:]
 
-        self._draw_geometry(a, width, height)
+        self._draw_geometry(a, width, height, block)
         # TODO(michalj): Add support for embossing.
 
         # Unlock the surface and put the picture on screen.
@@ -342,16 +342,16 @@ class Fluid2DVis(vis.FluidVis):
                 self._screen.blit(self._font.render('itr: %dk' % (curr_iter /
                     1000), True, (0, 255, 0)), (12, 12))
 
-                y = 36
+                y = 28
                 for info in ret:
                     tmp = self._font.render(info, True, (0, 255, 0))
                     self._screen.blit(tmp, (12, y))
-                    y += 12
+                    y += 14
 
                 for info in self.display_infos:
                     tmp = self._font.render(info(), True, (0, 255, 0))
                     self._screen.blit(tmp, (12, y))
-                    y += 12
+                    y += 14
 
         pygame.display.flip()
 

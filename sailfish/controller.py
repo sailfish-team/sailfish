@@ -149,17 +149,18 @@ class LBMachineMaster(object):
         if self.config.mode != 'visualization':
             return lambda block: output_cls(self.config)
 
-        # Compute the largest buffer size necessary to transfer
-        # data to be visualized.
-        max_size = reduce(max,
-                (reduce(operator.mul, x.size) for x in self.blocks), 0)
-        vis_lock = mp.Lock()
-        vis_buffer = Array(ctypes.c_float, max_size, lock=vis_lock)
-        vis_geo_buffer = Array(ctypes.c_uint8, max_size, lock=vis_lock)
+        for block in self.blocks:
+            size = reduce(operator.mul, block.size)
+            vis_lock = mp.Lock()
+            vis_buffer = Array(ctypes.c_float, size, lock=vis_lock)
+            vis_geo_buffer = Array(ctypes.c_uint8, size, lock=vis_lock)
+            block.set_vis_buffers(vis_buffer, vis_geo_buffer)
 
+        vis_lock = mp.Lock()
         vis_config = Value(io.VisConfig, lock=vis_lock)
         vis_config.iteration = -1
         vis_config.field_name = ''
+        vis_config.all_blocks = False
 
         # Start the visualizatione engine.
         vis_class = _get_visualization_engines().next()
@@ -169,13 +170,12 @@ class LBMachineMaster(object):
         self._vis_process = Process(
                 target=lambda: vis_class(
                     self.config, self.blocks, self._vis_quit_event,
-                    self._quit_event, vis_buffer,
-                    vis_geo_buffer, vis_config).run(),
+                    self._quit_event, vis_config).run(),
                 name='VisEngine')
         self._vis_process.start()
 
         return lambda block: io.VisualizationWrapper(
-                self.config, block, vis_buffer, vis_geo_buffer, vis_config, output_cls)
+                self.config, block, vis_config, output_cls)
 
     def _finish_visualization(self):
         if self.config.mode != 'visualization':
