@@ -1,5 +1,6 @@
 #!/usr/bin/python -u
 
+import numpy as np
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import LBBlock2D, GeoBlock2D
 from sailfish.controller import LBSimulationController
@@ -23,8 +24,8 @@ class CylinderBlock(GeoBlock2D):
         self.set_geo(hy == 0, self.NODE_WALL)
         self.set_geo(hy == self.gy-1, self.NODE_WALL)
 
-#        cylinder_map = np.square(hx - x0) + np.square(hy - y0) < diam**2 / 4.0
-#        self.set_geo(cylinder_map, self.NODE_WALL)
+        cylinder_map = np.square(hx - x0) + np.square(hy - y0) < diam**2 / 4.0
+        self.set_geo(cylinder_map, self.NODE_WALL)
 
     def _init_fields(self, sim, hx, hy):
         sim.rho[:] = 1.0

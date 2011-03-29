@@ -257,3 +257,27 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 		}
 	%endif
 }
+
+${kernel} void CollectXGhostData(
+		${global_ptr} int *idx_array, ${global_ptr} float *dist,
+		${global_ptr} float *buffer)
+{
+	int idx = get_global_id(0);
+	if (idx > ${distrib_collect_size-1}) {
+		return;
+	}
+	int gi = idx_array[idx];
+	buffer[idx] = dist[gi];
+}
+
+${kernel} void DistributeXGhostData(
+		${global_ptr} int *idx_array, ${global_ptr} float *dist,
+		${global_ptr} float *buffer)
+{
+	int idx = get_global_id(0);
+	if (idx > ${distrib_collect_size-1}) {
+		return;
+	}
+	int gi = idx_array[idx];
+	dist[gi] = buffer[idx];
+}
