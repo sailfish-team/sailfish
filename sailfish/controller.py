@@ -48,7 +48,7 @@ class LBBlockConnector(object):
         self._recv_ev = recv_ev
 
     def send(self, data):
-        #self._send_array[:] = data
+        self._send_array[:] = data
         self._send_ev.set()
 
     def recv(self, data, quit_ev):
@@ -56,9 +56,9 @@ class LBBlockConnector(object):
         while self._recv_ev.wait(0.01) != True:
             if quit_ev.is_set():
                 return False
+        data[:] = self._recv_array[:]
         self._recv_ev.clear()
         return True
-        #data[:] = self._recv_array[:]
 
 
 class LBMachineMaster(object):

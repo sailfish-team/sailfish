@@ -6,3 +6,12 @@ def get_grid_from_config(config):
             return x
 
     return None
+
+def span_to_direction(span):
+    for coord in span:
+        if type(coord) is int:
+            if coord == 0:
+                return -1
+            else:
+                return 1
+    return 0
