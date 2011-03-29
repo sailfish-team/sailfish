@@ -218,18 +218,14 @@ class BlockRunner(object):
         # TODO(michalj): Add a unit test for this.
         # TODO(muchalj): Extend this for 3D.
         for block_id, items in block_axis_span.iteritems():
+            axis_idx = idx
             for axis, span, size in items:
                 direction = util.span_to_direction(span)
                 dists_collect = sym.get_prop_dists(
                         grid, direction,
                         self._block.axis_dir_to_axis(axis))
 
-                dists_distrib = sym.get_prop_dists(
-                        grid, direction * -1,
-                        self._block.axis_dir_to_axis(axis))
-
                 gx = np.zeros(size, dtype=np.uint32)
-
                 if direction == -1:
                     gx[:] = span[0]
                 else:
@@ -245,18 +241,36 @@ class BlockRunner(object):
                         np.ones(num_nodes, dtype=np.uint32),
                         np.uint32(dists_collect))
 
-#                self.config.logger.debug('{0} -> {1}'.format(self._block.id,
-#                    block_id))
-#                self.config.logger.debug('{0}, {1}'.format(gx[0], gy))
-
                 gi = get_global_id(gx, gy, dist_num)
-                self._x_ghost_collect_idx[idx:idx + size] = gi
+                self._x_ghost_collect_idx[axis_idx:axis_idx + size] = gi
+                axis_idx += size
 
+            # Unless periodic conditions are applied, there is normally only a
+            # single connection per block_id so there is no ordering of 'items'.
+            # For the case of PC however, the order in the this loop has to be
+            # reversed so that the different axes match in the subbuffer.  E.g.
+            #  (PBC along the X axis)
+            #  block 1 send buffer: 0 (low), 1 (high)
+            #  block 2 recv buffer: 1 (high), 0 (low)
+            #  (low) --- block 1 --- (high) | (low) --- block 2 --- (low)
+            for axis, span, size in reversed(items):
+                direction = util.span_to_direction(span)
+                dists_distrib = sym.get_prop_dists(
+                        grid, direction * -1,
+                        self._block.axis_dir_to_axis(axis))
+
+                gx = np.zeros(size, dtype=np.uint32)
                 if direction == -1:
-                    gx += self._block.envelope_size
+                    gx = span[0] + self._block.envelope_size
                 else:
-                    gx -= self._block.envelope_size
+                    gx = span[0] + self._block.envelope_size
 
+                gy = np.uint32(
+                        range(self._block.envelope_size, self._lat_size[-2]
+                            + self._block.envelope_size)[span[1]])
+                gy = np.kron(gy, np.ones(len(dists_collect), dtype=np.uint32))
+
+                num_nodes = span[1].stop - span[1].start
                 dist_num = np.kron(
                         np.ones(num_nodes, dtype=np.uint32),
                         np.uint32(dists_distrib))
@@ -410,12 +424,7 @@ class BlockRunner(object):
     def send_data(self):
         self.backend.from_buf(self._gpu_x_ghost_send_buffer)
         for b_id, connector in self._block._connectors.iteritems():
-            tmp = np.zeros_like(self._x_ghost_send_buffer)
-            l = len(self._x_ghost_send_buffer)
-            tmp[0:l/2] = self._x_ghost_send_buffer[l/2:]
-            tmp[l/2:] = self._x_ghost_send_buffer[0:l/2]
-
-            connector.send(tmp)
+            connector.send(self._x_ghost_send_buffer)
 #self._x_ghost_send_buffer)
 
     def recv_data(self):
