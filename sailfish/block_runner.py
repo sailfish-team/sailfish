@@ -30,6 +30,9 @@ class BlockRunner(object):
         self._vis_map_cache = None
         self._quit_event = quit_event
 
+        # Indicates whether this block is connected to any other blocks.
+        self._connected = True
+
     @property
     def config(self):
         return self._sim.config
@@ -91,7 +94,10 @@ class BlockRunner(object):
                               {-1:  self.config.lat_nz * arr_ny * arr_nx,
                                 1: -self.config.lat_nz * arr_ny * arr_nx})
 
-        ctx['distrib_collect_size'] = len(self._x_ghost_recv_buffer)
+        if self._connected:
+            ctx['distrib_collect_size'] = len(self._x_ghost_recv_buffer)
+        else:
+            ctx['distrib_collect_size'] = 0
 
     def make_scalar_field(self, dtype=None, name=None):
         """Allocates a scalar NumPy array.
@@ -201,6 +207,12 @@ class BlockRunner(object):
             else:
                 raise ValueError('Connections along non-X axis unsupported')
 
+
+        # Nothing to do if there are no connecting blocks to share data with.
+        if total_size == 0:
+            self._connected = False
+            return
+
         self._x_ghost_recv_buffer = np.zeros(total_size, dtype=self.float)
         self._x_ghost_send_buffer = np.zeros(total_size, dtype=self.float)
 
@@ -301,15 +313,16 @@ class BlockRunner(object):
                 gpu_vector.append(self.backend.alloc_buf(like=component))
             self._gpu_field_map[id(field)] = gpu_vector
 
-        self._gpu_x_ghost_recv_buffer = self.backend.alloc_buf(
-                like=self._x_ghost_recv_buffer)
-        self._gpu_x_ghost_send_buffer = self.backend.alloc_buf(
-                like=self._x_ghost_send_buffer)
+        if self._connected:
+            self._gpu_x_ghost_recv_buffer = self.backend.alloc_buf(
+                    like=self._x_ghost_recv_buffer)
+            self._gpu_x_ghost_send_buffer = self.backend.alloc_buf(
+                    like=self._x_ghost_send_buffer)
 
-        self._gpu_x_ghost_collect_idx = self.backend.alloc_buf(
-                like=self._x_ghost_collect_idx)
-        self._gpu_x_ghost_distrib_idx = self.backend.alloc_buf(
-                like=self._x_ghost_distrib_idx)
+            self._gpu_x_ghost_collect_idx = self.backend.alloc_buf(
+                    like=self._x_ghost_collect_idx)
+            self._gpu_x_ghost_distrib_idx = self.backend.alloc_buf(
+                    like=self._x_ghost_distrib_idx)
 
         for grid in self._sim.grids:
             size = self._get_dist_bytes(grid)
@@ -408,9 +421,10 @@ class BlockRunner(object):
                         float(self.config.block_size))))
             self.backend.run_kernel(kernel, grid_size)
 
-        self.backend.run_kernel(
-                self._collect_kernels[self._sim.iteration & 1],
-                self._distrib_collect_grid_size)
+        if self._connected:
+            self.backend.run_kernel(
+                    self._collect_kernels[self._sim.iteration & 1],
+                    self._distrib_collect_grid_size)
 
     def _step_boundary(self):
         """Runs one simulation step for the boundary blocks.
@@ -445,6 +459,8 @@ class BlockRunner(object):
                 self.backend.from_buf(component)
 
     def _init_interblock_kernels(self):
+        if not self._connected:
+            return
         # TODO(michalj): Extend this for multi-grid models.
         self._collect_kernels = [
             self.get_kernel('CollectXGhostData',
@@ -507,7 +523,8 @@ class BlockRunner(object):
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
 
             self.step(output_req)
-            self.send_data()
+            if self._connected:
+                self.send_data()
 
             if output_req and self.config.output_required:
                 self._fields_to_host()
@@ -521,13 +538,14 @@ class BlockRunner(object):
                 self.config.logger.info("Simulation termination requested.")
                 break
 
-            self.recv_data()
-            if self._quit_event.is_set():
-                self.config.logger.info("Simulation termination requested.")
+            if self._connected:
+                self.recv_data()
+                if self._quit_event.is_set():
+                    self.config.logger.info("Simulation termination requested.")
 
-            self.backend.run_kernel(
-                self._distrib_kernels[self._sim.iteration & 1],
-                self._distrib_collect_grid_size)
+                self.backend.run_kernel(
+                    self._distrib_kernels[self._sim.iteration & 1],
+                    self._distrib_collect_grid_size)
 
         self.config.logger.info(
             "Simulation completed after {0} iterations.".format(
