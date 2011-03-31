@@ -54,6 +54,9 @@ class LBBlockConnector(object):
     def recv(self, data, quit_ev):
         # If the quit event is set, do not wait for the data transfer.
         while self._recv_ev.wait(0.01) != True:
+            # Necessary for py26- compatiblity.
+            if self._recv_ev.is_set():
+                break
             if quit_ev.is_set():
                 return False
         data[:] = self._recv_array[:]
