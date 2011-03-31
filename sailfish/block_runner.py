@@ -517,6 +517,16 @@ class BlockRunner(object):
         if not self.config.max_iters:
             self.config.logger.warning("Running infinite simulation.")
 
+        if self.config.mode == 'benchmark':
+            self.main_benchmark()
+        else:
+            self.main()
+
+        self.config.logger.info(
+            "Simulation completed after {0} iterations.".format(
+                self._sim.iteration))
+
+    def main(self):
         while True:
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
 
@@ -545,7 +555,60 @@ class BlockRunner(object):
                     self._distrib_kernels[self._sim.iteration & 1],
                     self._distrib_collect_grid_size)
 
-        self.config.logger.info(
-            "Simulation completed after {0} iterations.".format(
-                self._sim.iteration))
+    def main_benchmark(self):
+        t_comp = 0.0
+        t_total = 0.0
+        t_send = 0.0
+        t_recv = 0.0
+        t_data = 0.0
 
+        import time
+
+        for i in xrange(self.config.max_iters):
+            output_req = ((self._sim.iteration + 1) % self.config.every) == 0
+
+            t1 = time.time()
+            self.step(output_req)
+            t2 = time.time()
+
+            if self._connected:
+                self.send_data()
+
+            t3 = time.time()
+            if output_req:
+                self._fields_to_host()
+            t4 = time.time()
+
+            if self._connected:
+                self.recv_data()
+
+                self.backend.run_kernel(
+                    self._distrib_kernels[self._sim.iteration & 1],
+                    self._distrib_collect_grid_size)
+
+            t5 = time.time()
+
+            t_comp += t2 - t1
+            t_total += t5 - t1
+            t_recv += t5 - t4
+            t_send += t3 - t2
+            t_data += t4 - t3
+
+            if output_req:
+                mlups_base = self._sim.iteration * reduce(operator.mul,
+                             self._lat_size)
+                mlups_total = mlups_base / t_total * 1e-6
+                mlups_comp = mlups_base / t_comp * 1e-6
+                self.config.logger.info(
+                        'MLUPS eff/comp: {0} / {1}'.format(mlups_total,
+                            mlups_comp))
+
+                j = self._sim.iteration
+                self.config.logger.debug(
+                        'time comp/data/recv/send/total: '
+                        '{0:e} / {1:e} / {2:4} / {3:e} / {4:e}'.format(
+                            t_comp / j, t_data / j, t_recv / j, t_send / j,
+                            t_total / j))
+
+                self.config.logger.debug(
+                        'comm overhead: {0:.3f}'.format(t_total / t_comp))
