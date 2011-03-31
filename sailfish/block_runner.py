@@ -434,12 +434,10 @@ class BlockRunner(object):
 
         stream = self._boundary_stream[self._step]
 
-    # XXX: Make these functions do something useful.
     def send_data(self):
         self.backend.from_buf(self._gpu_x_ghost_send_buffer)
         for b_id, connector in self._block._connectors.iteritems():
             connector.send(self._x_ghost_send_buffer)
-#self._x_ghost_send_buffer)
 
     def recv_data(self):
         for b_id, connector in self._block._connectors.iteritems():
