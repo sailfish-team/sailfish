@@ -448,6 +448,10 @@ class GeoBlock(object):
         self._type_map_view = self._type_map.view()[block._nonghost_slice]
         self._encoder = None
 
+    @property
+    def config(self):
+        return self.block.runner.config
+
     def _define_nodes(self, *args):
         raise NotImplementedError('_define_nodes() not defined in a child'
                 'class.')

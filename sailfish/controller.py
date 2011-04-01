@@ -423,6 +423,7 @@ class LBSimulationController(object):
 
     def run(self):
         self.conf.parse()
+        self._lb_class.modify_config(self.conf)
         self.geo = self._lb_geo(self.conf)
 
         blocks = self.geo.blocks()

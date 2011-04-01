@@ -21,6 +21,10 @@ class LBSim(object):
         pass
 
     @classmethod
+    def modify_config(cls, config):
+        pass
+
+    @classmethod
     def update_defaults(cls, defaults):
         pass
 
