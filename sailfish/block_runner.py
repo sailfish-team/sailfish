@@ -600,15 +600,12 @@ class BlockRunner(object):
                 mlups_total = mlups_base / t_total * 1e-6
                 mlups_comp = mlups_base / t_comp * 1e-6
                 self.config.logger.info(
-                        'MLUPS eff/comp: {0} / {1}'.format(mlups_total,
-                            mlups_comp))
+                        'MLUPS eff:{0:.2f}  comp:{1:.2f}  overhead:{2:.3f}'.format(
+                            mlups_total, mlups_comp, t_total / t_comp - 1.0))
 
                 j = self._sim.iteration
                 self.config.logger.debug(
-                        'time comp/data/recv/send/total: '
-                        '{0:e} / {1:e} / {2:4} / {3:e} / {4:e}'.format(
+                        'time comp:{0:e}  data:{1:e}  recv:{2:e}  send:{3:e}'
+                        '  total:{4:e}'.format(
                             t_comp / j, t_data / j, t_recv / j, t_send / j,
                             t_total / j))
-
-                self.config.logger.debug(
-                        'comm overhead: {0:.3f}'.format(t_total / t_comp))

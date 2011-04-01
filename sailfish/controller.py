@@ -93,9 +93,14 @@ class LBMachineMaster(object):
 
     def _assign_blocks_to_gpus(self):
         block2gpu = {}
-        # TODO: actually assign to different GPUs here
-        for gpu, block in enumerate(self.blocks):
-            block2gpu[block.id] = 0
+
+        try:
+            gpus = len(self.config.gpus)
+            for i, block in enumerate(self.blocks):
+                block2gpu[block.id] = self.config.gpus[i % gpus]
+        except TypeError:
+            for block in self.blocks:
+                block2gpu[block.id] = 0
 
         return block2gpu
 
@@ -383,6 +388,8 @@ class LBSimulationController(object):
         group.add_argument('--visualize',
             type=str, default='2d',
             help='visualization engine to use')
+        group.add_argument('--gpus', nargs='+', default=0, type=int,
+            help='which GPUs to use')
 
         group = self.conf.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)
