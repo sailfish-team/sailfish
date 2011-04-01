@@ -18,12 +18,20 @@ class CylinderGeometry(LBGeometry2D):
 
 class CylinderBlock(GeoBlock2D):
     def _define_nodes(self, hx, hy):
-        diam = self.gy / 3
-        x0 = 2 * diam
-        y0 = self.gy / 2
+        if self.config.vertical:
+            diam = self.gx / 3
+            x0 = self.gx / 2
+            y0 = 2 * diam
 
-        self.set_geo(hy == 0, self.NODE_WALL)
-        self.set_geo(hy == self.gy-1, self.NODE_WALL)
+            self.set_geo(hx == 0, self.NODE_WALL)
+            self.set_geo(hx == self.gx - 1, self.NODE_WALL)
+        else:
+            diam = self.gy / 3
+            x0 = 2 * diam
+            y0 = self.gy / 2
+
+            self.set_geo(hy == 0, self.NODE_WALL)
+            self.set_geo(hy == self.gy - 1, self.NODE_WALL)
 
         cylinder_map = np.square(hx - x0) + np.square(hy - y0) < diam**2 / 4.0
         self.set_geo(cylinder_map, self.NODE_WALL)
@@ -40,10 +48,9 @@ class CylinderSimulation(LBFluidSim, LBForcedSim):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
-            'lat_nx': 320,
-            'lat_ny': 128,
-            'visc': 0.1,
-            'periodic_x': True})
+            'lat_nx': 256,
+            'lat_ny': 256,
+            'visc': 0.1})
 
 
     @classmethod
@@ -52,10 +59,23 @@ class CylinderSimulation(LBFluidSim, LBForcedSim):
         LBForcedSim.add_options(group, dim)
 
         group.add_argument('--blocks', type=int, default=1, help='number of blocks to use')
+        group.add_argument('--vertical', action='store_true')
+
+    @classmethod
+    def modify_config(cls, config):
+        if config.vertical:
+            config.periodic_y = True
+        else:
+            config.periodic_x = True
 
     def __init__(self, config):
         super(CylinderSimulation, self).__init__(config)
-        self.add_body_force((1e-5, 0.0))
+
+        if config.vertical:
+            self.add_body_force((0.0, 1e-5))
+        else:
+            self.add_body_force((1e-5, 0.0))
+
 
 if __name__ == '__main__':
     ctrl = LBSimulationController(CylinderSimulation, CylinderGeometry)
