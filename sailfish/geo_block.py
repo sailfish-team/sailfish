@@ -147,7 +147,7 @@ class LBBlock2D(LBBlock):
         # TODO: As an optimization, we could drop the ghost node layer in this
         # case.
 
-    def connect(self, block, geo=None):
+    def connect(self, block, geo=None, axis=None):
         """Tries to connect the current block to another block, and returns True
         if successful.
 
@@ -224,14 +224,19 @@ class LBBlock2D(LBBlock):
         # Check if a global connection across the simulation domain is
         # requested.
         if geo is not None:
-            if self.ox == 0 and tg_hx == geo.gx:
-                return block.connect(self, geo)
-            elif block.ox == 0 and hx == geo.gx:
-                return connect_x()
-            if self.oy == 0 and tg_hy == geo.gy:
-                return block.connect(self, geo)
-            elif block.oy == 0 and hy == geo.gy:
-                return connect_y()
+            assert axis is not None
+
+            if axis == 0:
+                if self.ox == 0 and tg_hx == geo.gx:
+                    return block.connect(self, geo, axis)
+                elif block.ox == 0 and hx == geo.gx:
+                    return connect_x()
+            elif axis == 1:
+                if self.oy == 0 and tg_hy == geo.gy:
+                    return block.connect(self, geo, axis)
+                elif block.oy == 0 and hy == geo.gy:
+                    return connect_y()
+
         elif hx == block.ox:
             return connect_x()
         elif tg_hx == self.ox:
@@ -242,6 +247,12 @@ class LBBlock2D(LBBlock):
             return block.connect(self)
 
         return False
+
+    def axis_dir_to_dir(self, axis_dir):
+        if axis_dir in (self._X_LOW, self._Y_LOW, self._Z_LOW):
+            return -1
+        else:
+            return 1
 
     def axis_dir_to_axis(self, axis_dir):
         if axis_dir == self._X_HIGH or axis_dir == self._X_LOW:

@@ -53,15 +53,22 @@ class BlockRunner(object):
 
         bnd_limits = list(self._block.actual_size[:])
 
+        # Used so that axis_dir values map to the limiting coordinate
+        # along a specific axis, e.g. lat_linear[_X_LOW] = 0
+        lat_linear = [0, self._lat_size[-1], 0, self._lat_size[-2]]
+
         if self._block.dim == 3:
             ctx['lat_nz'] = self._lat_size[-3]
             ctx['arr_nz'] = self._physical_size[-3]
             periodic_z = int(self._block.periodic_z)
+            lat_linear.extend([0, self._lat_size[-3]])
         else:
             ctx['lat_nz'] = 1
             ctx['arr_nz'] = 1
             periodic_z = 0
             bnd_limits.append(1)
+
+        ctx['lat_linear'] = lat_linear
 
         ctx['periodic_x'] = 0 #int(self._block.periodic_x)
         ctx['periodic_y'] = 0 #int(self._block.periodic_y)
@@ -73,6 +80,7 @@ class BlockRunner(object):
         ctx['bnd_limits'] = bnd_limits
         ctx['dist_size'] = self._get_nodes()
         ctx['sim'] = self._sim
+        ctx['block'] = self._block
 
         # FIXME Additional constants.
         ctx['constants'] = []
@@ -94,10 +102,10 @@ class BlockRunner(object):
                               {-1:  self.config.lat_nz * arr_ny * arr_nx,
                                 1: -self.config.lat_nz * arr_ny * arr_nx})
 
-        if self._connected:
-            ctx['distrib_collect_size'] = len(self._x_ghost_recv_buffer)
+        if self._x_connected:
+            ctx['distrib_collect_x_size'] = len(self._x_ghost_recv_buffer)
         else:
-            ctx['distrib_collect_size'] = 0
+            ctx['distrib_collect_x_size'] = 0
 
     def make_scalar_field(self, dtype=None, name=None):
         """Allocates a scalar NumPy array.
@@ -193,32 +201,84 @@ class BlockRunner(object):
         # TOOD(michalj): Fix this for multi-grid models.
         grid = util.get_grid_from_config(self.config)
 
+        # Maps block_id to a list of (axis, span, size).
         block_axis_span = {}
 
-        total_size = 0
+        # Maps
+        axis_span = {}
+        def max_span(axis, span_tuple):
+            if axis not in axis_span:
+                axis_span[axis] = span_tuple
+            else:
+                curr = axis_span[axis]
+                if self._block.dim == 2:
+                    axis_span[axis] = (
+                            min(curr[0], span_tuple[0]),
+                            max(curr[0], span_tuple[1]))
+                else:
+                    axis_span[axis] = (
+                            (min(curr[0][0], span_tuple[0][0]),
+                             max(curr[0][1], span_tuple[0][1])),
+                            (min(curr[1][0], span_tuple[1][0]),
+                             max(curr[1][1], span_tuple[1][1])))
 
+        def span_to_tuple(span):
+            ret = []
+            for coord in span:
+                if type(coord) is slice:
+                    ret.append((coord.start, coord.stop))
+            return tuple(ret)
+
+        total_x_size = 0
+
+        # TODO(michalj): Use the above mechanism for the X axis as well.
         for axis, block_id in self._block.connecting_blocks():
             span = self._block.get_connection_span(axis, block_id)
             size = self._block.connection_buf_size(grid, axis, block_id)
             block_axis_span.setdefault(block_id, []).append((axis, span, size))
 
-            if axis <=1:
-                total_size += size
+            if axis <= 1:
+                total_x_size += size
             else:
-                raise ValueError('Connections along non-X axis unsupported')
+                max_span(axis, span_to_tuple(span))
 
+        total_ortho_size = 0
+        # Maps axis_dir to gx_start, num_nodes, buf_offset
+        self._ghost_info = {}
+        for axis, span in axis_span.iteritems():
+            buf_size = len(sym.get_prop_dists(grid,
+                    self._block.axis_dir_to_dir(axis),
+                    self._block.axis_dir_to_axis(axis)))
+            for low, high in span:
+                buf_size *= (high - low)
+            self._ghost_info[axis] = (low, buf_size, total_ortho_size)
+            total_ortho_size += buf_size
+
+        self._connected = True
+        self._x_connected = True
+
+        self._ortho_ghost_recv_buffer = None
+        self._ortho_ghost_send_buffer = None
+
+        if total_ortho_size > 0:
+            self._ortho_ghost_recv_buffer = np.zeros(total_ortho_size,
+                dtype=self.float)
+            self._ortho_ghost_send_buffer = np.zeros(total_ortho_size,
+                dtype=self.float)
 
         # Nothing to do if there are no connecting blocks to share data with.
-        if total_size == 0:
-            self._connected = False
+        if total_x_size == 0:
+            self._x_connected = False
+            if total_ortho_size == 0:
+                self._connected = False
             return
 
-        self._x_ghost_recv_buffer = np.zeros(total_size, dtype=self.float)
-        self._x_ghost_send_buffer = np.zeros(total_size, dtype=self.float)
+        self._x_ghost_recv_buffer = np.zeros(total_x_size, dtype=self.float)
+        self._x_ghost_send_buffer = np.zeros(total_x_size, dtype=self.float)
 
         # Lookup tables for distribution of the ghost node data.
-        self._x_ghost_collect_idx = np.zeros(total_size, dtype=np.uint32)
-        self._x_ghost_distrib_idx = np.zeros(total_size, dtype=np.uint32)
+        self._x_ghost_collect_idx = np.zeros(total_x_size, dtype=np.uint32)
+        self._x_ghost_distrib_idx = np.zeros(total_x_size, dtype=np.uint32)
 
         def get_global_id(gx, gy, dist_num):
             arr_nx = self._physical_size[-1]
@@ -313,7 +373,7 @@ class BlockRunner(object):
                 gpu_vector.append(self.backend.alloc_buf(like=component))
             self._gpu_field_map[id(field)] = gpu_vector
 
-        if self._connected:
+        if self._x_connected:
             self._gpu_x_ghost_recv_buffer = self.backend.alloc_buf(
                     like=self._x_ghost_recv_buffer)
             self._gpu_x_ghost_send_buffer = self.backend.alloc_buf(
@@ -323,6 +383,12 @@ class BlockRunner(object):
                     like=self._x_ghost_collect_idx)
             self._gpu_x_ghost_distrib_idx = self.backend.alloc_buf(
                     like=self._x_ghost_distrib_idx)
+
+        if self._connected and self._ortho_ghost_recv_buffer is not None:
+            self._gpu_ortho_ghost_recv_buffer = self.backend.alloc_buf(
+                    like=self._ortho_ghost_recv_buffer)
+            self._gpu_ortho_ghost_send_buffer = self.backend.alloc_buf(
+                    like=self._ortho_ghost_send_buffer)
 
         for grid in self._sim.grids:
             size = self._get_dist_bytes(grid)
@@ -346,9 +412,13 @@ class BlockRunner(object):
     def gpu_geo_map(self):
         return self._gpu_geo_map
 
-    def get_kernel(self, name, args, args_format):
+    def get_kernel(self, name, args, args_format, block_size=None):
+        if block_size is None:
+            block = self._kernel_block_size
+        else:
+            block = block_size
         return self.backend.get_kernel(self.module, name, args=args,
-                args_format=args_format, block=self._kernel_block_size)
+                args_format=args_format, block=block)
 
     def exec_kernel(self, name, args, args_format):
         kernel = self.get_kernel(name, args, args_format)
@@ -422,9 +492,10 @@ class BlockRunner(object):
             self.backend.run_kernel(kernel, grid_size)
 
         if self._connected:
-            self.backend.run_kernel(
+            for kernel, grid in zip(
                     self._collect_kernels[self._sim.iteration & 1],
-                    self._distrib_collect_grid_size)
+                    self._distrib_grid):
+                self.backend.run_kernel(kernel, grid)
 
     def _step_boundary(self):
         """Runs one simulation step for the boundary blocks.
@@ -434,18 +505,33 @@ class BlockRunner(object):
 
         stream = self._boundary_stream[self._step]
 
+    # XXX: Fix this to process the proper buffers.
     def send_data(self):
-        self.backend.from_buf(self._gpu_x_ghost_send_buffer)
-        for b_id, connector in self._block._connectors.iteritems():
-            connector.send(self._x_ghost_send_buffer)
+        if self._x_connected:
+            self.backend.from_buf(self._gpu_x_ghost_send_buffer)
+            for b_id, connector in self._block._connectors.iteritems():
+                connector.send(self._x_ghost_send_buffer)
+
+        if self._ortho_ghost_recv_buffer is not None:
+            self.backend.from_buf(self._gpu_ortho_ghost_send_buffer)
+
+            for b_id, connector in self._block._connectors.iteritems():
+                connector.send(self._ortho_ghost_send_buffer)
 
     def recv_data(self):
-        for b_id, connector in self._block._connectors.iteritems():
-            if not connector.recv(self._x_ghost_recv_buffer,
-                    self._quit_event):
-                return
-        self.backend.to_buf(self._gpu_x_ghost_recv_buffer)
+        if self._x_connected:
+            for b_id, connector in self._block._connectors.iteritems():
+                if not connector.recv(self._x_ghost_recv_buffer,
+                        self._quit_event):
+                    return
+            self.backend.to_buf(self._gpu_x_ghost_recv_buffer)
 
+        if self._ortho_ghost_recv_buffer is not None:
+            for b_id, connector in self._block._connectors.iteritems():
+                if not connector.recv(self._ortho_ghost_recv_buffer,
+                        self._quit_event):
+                    return
+            self.backend.to_buf(self._gpu_ortho_ghost_recv_buffer)
 
     def _fields_to_host(self):
         """Copies data for all fields from the GPU to the host."""
@@ -457,39 +543,70 @@ class BlockRunner(object):
                 self.backend.from_buf(component)
 
     def _init_interblock_kernels(self):
-        if not self._connected:
-            return
         # TODO(michalj): Extend this for multi-grid models.
-        self._collect_kernels = [
-            self.get_kernel('CollectXGhostData',
-                    [self._gpu_x_ghost_collect_idx,
-                     self.gpu_dist(0, 1),
-                     self._gpu_x_ghost_send_buffer],
-                    'PPP'),
-            self.get_kernel('CollectXGhostData',
-                    [self._gpu_x_ghost_collect_idx,
-                     self.gpu_dist(0, 0),
-                     self._gpu_x_ghost_send_buffer],
-                    'PPP')
-            ]
 
-        self._distrib_kernels = [
-            self.get_kernel('DistributeXGhostData',
-                    [self._gpu_x_ghost_distrib_idx,
-                     self.gpu_dist(0, 0),
-                     self._gpu_x_ghost_recv_buffer],
-                    'PPP'),
-            self.get_kernel('DistributeXGhostData',
-                    [self._gpu_x_ghost_distrib_idx,
-                     self.gpu_dist(0, 1),
-                     self._gpu_x_ghost_recv_buffer],
-                    'PPP')
-            ]
+        collect_primary = []
+        collect_secondary = []
 
-        self._distrib_collect_grid_size = (
-                int(math.ceil(
+        distrib_primary = []
+        distrib_secondary = []
+        self._distrib_grid = []
+
+        collect_block = 32
+
+        # XXX: add a num_nodes parameter here as well.
+        if self._x_connected:
+            collect_primary.append(
+                    self.get_kernel('CollectXGhostData',
+                        [self._gpu_x_ghost_collect_idx,
+                         self.gpu_dist(0, 1),
+                         self._gpu_x_ghost_send_buffer],
+                        'PPP', (collect_block,)))
+            collect_secondary.append(
+                    self.get_kernel('CollectXGhostData',
+                        [self._gpu_x_ghost_collect_idx,
+                         self.gpu_dist(0, 0),
+                         self._gpu_x_ghost_send_buffer],
+                        'PPP', (collect_block,)))
+            distrib_primary.append(
+                    self.get_kernel('DistributeXGhostData',
+                        [self._gpu_x_ghost_distrib_idx,
+                         self.gpu_dist(0, 0),
+                         self._gpu_x_ghost_recv_buffer],
+                        'PPP', (collect_block,)))
+            distrib_secondary.append(
+                    self.get_kernel('DistributeXGhostData',
+                        [self._gpu_x_ghost_distrib_idx,
+                         self.gpu_dist(0, 1),
+                         self._gpu_x_ghost_recv_buffer],
+                        'PPP', (collect_block,)))
+            self._distrib_grid.append((int(math.ceil(
                     len(self._x_ghost_recv_buffer) /
-                    float(self.config.block_size))),)
+                    float(collect_block))),))
+
+        self._collect_kernels = (collect_primary, collect_secondary)
+        self._distrib_kernels = (distrib_primary, distrib_secondary)
+
+        for axis_dir, (gx_start, num_nodes, buf_offset) in self._ghost_info.iteritems():
+            for i in range(0, 2):
+                self._collect_kernels[i].append(
+                        self.get_kernel('CollectOrthogonalGhostData',
+                            [self.gpu_dist(0, i),
+                                np.int32(gx_start), np.int32(axis_dir),
+                                np.int32(num_nodes),
+                                long(self._gpu_ortho_ghost_recv_buffer) + buf_offset],
+                            'PiiiP', (collect_block,)))
+                self._distrib_kernels[i].append(
+                        self.get_kernel('DistributeOrthogonalGhostData',
+                            [self.gpu_dist(0, i),
+                                np.int32(gx_start),
+                                np.int32(self._block.opposite_axis_dir(axis_dir)),
+                                np.int32(num_nodes),
+                                long(self._gpu_ortho_ghost_send_buffer) + buf_offset],
+                            'PiiiP', (collect_block,)))
+            self._distrib_grid.append((int(math.ceil(
+                    num_nodes /
+                    float(collect_block))),))
 
     def run(self):
         self.config.logger.info("Initializing block.")
@@ -551,9 +668,10 @@ class BlockRunner(object):
                 if self._quit_event.is_set():
                     self.config.logger.info("Simulation termination requested.")
 
-                self.backend.run_kernel(
-                    self._distrib_kernels[self._sim.iteration & 1],
-                    self._distrib_collect_grid_size)
+                for kernel, grid in zip(
+                        self._distrib_kernels[self._sim.iteration & 1],
+                        self._distrib_grid):
+                    self.backend.run_kernel(kernel, grid)
 
     def main_benchmark(self):
         t_comp = 0.0
@@ -582,9 +700,10 @@ class BlockRunner(object):
             if self._connected:
                 self.recv_data()
 
-                self.backend.run_kernel(
-                    self._distrib_kernels[self._sim.iteration & 1],
-                    self._distrib_collect_grid_size)
+                for kernel, grid in zip(
+                        self._distrib_kernels[self._sim.iteration & 1],
+                        self._distrib_grid):
+                    self.backend.run_kernel(kernel, grid)
 
             t5 = time.time()
 

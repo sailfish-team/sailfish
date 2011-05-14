@@ -258,12 +258,95 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 	%endif
 }
 
+## TODO(michalj): Extend this for 3D.
+// Collects ghost node data for connections along axes other than X.
+// dist: distributions array
+// base_gy: where along the X axis to start collecting the data
+// axis_dir: see LBBlock class constants
+// buffer: buffer where the data is to be saved
+${kernel} void CollectOrthogonalGhostData(
+		${global_ptr} float *dist, int base_gx,
+		int axis_dir, int max_idx, ${global_ptr} float *buffer)
+{
+	int idx = get_global_id(0);
+	int gi;
+	float tmp;
+
+	if (idx >= max_idx) {
+		return;
+	}
+
+	switch (axis_dir) {
+	%for axis in range(2, 2*dim):
+		case ${axis}: {
+			<%
+				prop_dists = sym.get_prop_dists(grid,
+						block.axis_dir_to_dir(axis),
+						block.axis_dir_to_axis(axis))
+			%>
+			int dist_size = get_global_size(0) / ${len(prop_dists)};
+			int dist_num = idx / dist_size;
+			int gx = idx % dist_size;
+			switch (dist_num) {
+				%for prop_dist in prop_dists:
+				case ${prop_dist}: {
+					gi = getGlobalIdx(base_gx + gx, ${lat_linear[axis]});
+					tmp = ${get_dist('dist', prop_dist, 'gi')};
+					break;
+				}
+				%endfor
+			}
+			buffer[idx] = tmp;
+			break;
+		}
+	%endfor
+	}
+}
+
+${kernel} void DistributeOrthogonalGhostData(
+		${global_ptr} float *dist, int base_gx,
+		int axis_dir, int max_idx, ${global_ptr} float *buffer)
+{
+	int idx = get_global_id(0);
+	int gi;
+	float tmp = buffer[idx];
+
+	if (idx >= max_idx) {
+		return;
+	}
+
+	switch (axis_dir) {
+	%for axis in range(2, 2*dim):
+		case ${axis}: {
+			<%
+				prop_dists = sym.get_prop_dists(grid,
+						block.axis_dir_to_dir(axis),
+						block.axis_dir_to_axis(axis))
+			%>
+			int dist_size = get_global_size(0) / ${len(prop_dists)};
+			int dist_num = idx / dist_size;
+			int gx = idx % dist_size;
+			switch (dist_num) {
+				%for prop_dist in prop_dists:
+				case ${prop_dist}: {
+					gi = getGlobalIdx(base_gx + gx, ${lat_linear[axis]});
+					${get_dist('dist', prop_dist, 'gi')} = tmp;
+					break;
+				}
+				%endfor
+			}
+			break;
+		}
+	%endfor
+	}
+}
+
 ${kernel} void CollectXGhostData(
 		${global_ptr} int *idx_array, ${global_ptr} float *dist,
 		${global_ptr} float *buffer)
 {
 	int idx = get_global_id(0);
-	if (idx > ${distrib_collect_size-1}) {
+	if (idx > ${distrib_collect_x_size-1}) {
 		return;
 	}
 	int gi = idx_array[idx];
@@ -275,7 +358,7 @@ ${kernel} void DistributeXGhostData(
 		${global_ptr} float *buffer)
 {
 	int idx = get_global_id(0);
-	if (idx > ${distrib_collect_size-1}) {
+	if (idx > ${distrib_collect_x_size-1}) {
 		return;
 	}
 	int gi = idx_array[idx];
