@@ -193,6 +193,7 @@ class Fluid2DVis(vis.FluidVis):
         self._draw_type = 1
         self.sim = sim
         self._reset()
+        self._quit_request = False
 
         pygame.key.set_repeat(100,50)
         from sailfish import lbm
@@ -370,7 +371,7 @@ class Fluid2DVis(vis.FluidVis):
     def _process_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                sys.exit()
+                self._quit_request = True
             elif event.type == pygame.VIDEORESIZE:
                 self.set_mode(*event.size)
             elif event.type == pygame.MOUSEBUTTONUP:
@@ -419,7 +420,7 @@ class Fluid2DVis(vis.FluidVis):
                     if self._paused:
                         print 'Simulation paused @ iter = %d.' % self.sim.iter_
                 elif event.key == pygame.K_q:
-                    sys.exit()
+                    self._quit_request = True
                 elif event.key == pygame.K_r:
                     self._reset()
                     self.sim.geo.reset()
@@ -500,7 +501,7 @@ class Fluid2DVis(vis.FluidVis):
         avg_mlups = 0.0
         mlups = 0.0
 
-        while 1:
+        while not self._quit_request:
             self._process_events()
             i = self.sim.iter_
 

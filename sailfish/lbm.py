@@ -224,6 +224,8 @@ class LBMSim(object):
         group.add_option('--use_mako_cache', dest='mako_cache',
                 help='cache the generated Mako templates in /tmp/sailfish_modules-$USER', action='store_true',
                 default=False)
+        group.add_option('--save_checkpoint', help='base name of the checkpoint file', type='string', default='')
+        group.add_option('--restore_checkpoint', help='name of the checkpoint file from which to restore the starting state of the simulation', type='string', default='')
         parser.add_option_group(group)
 
         if class_options is not None:
@@ -915,7 +917,10 @@ class LBMSim(object):
         self._init_code()
         self._init_compute_fields()
         self._init_compute_kernels()
-        self._init_compute_ic()
+        if self.options.restore_checkpoint:
+            self.restore_checkpoint(self.options.restore_checkpoint)
+        else:
+            self._init_compute_ic()
         self._init_output()
 
         self._timed_print('Starting the simulation...')
@@ -931,6 +936,41 @@ class LBMSim(object):
             self._run_batch()
         else:
             self.vis.main()
+
+        if self.options.save_checkpoint:
+            self.save_checkpoint(self.options.save_checkpoint)
+
+    def save_checkpoint(self, base_fname):
+        self._timed_print('Creating checkpoint file...')
+
+        if not self._ic_fields:
+            raise NotImplementedError()
+
+        state = {}
+        state['cmdline'] = ' '.join(sys.argv)
+        state['iteration'] = self.iter_
+
+        for i, dist in enumerate(self.curr_dists()):
+            arr = self.make_dist(self.grid)
+            self.backend.from_buf(dist, arr)
+            state['grid%d' % i] = arr
+
+        numpy.savez(base_fname, **state)
+
+    def restore_checkpoint(self, fname):
+        self._timed_print('Restoring state from a checkpoint file...')
+        state = numpy.load(fname)
+        self._timed_print('Previous invocation was: %s' % state['cmdline'])
+        self.iter_ = 1
+        dist_arrays = []
+        for i, dist in enumerate(self.curr_dists()):
+            arr = self.make_dist(self.grid)
+            arr[:] = state['grid%d' % i]
+            dist_arrays.append(arr)
+            self.backend.to_buf(dist, arr)
+        self.iter_ = 0
+        for i, dist in enumerate(self.curr_dists()):
+            self.backend.to_buf(dist, dist_arrays[i])
 
     def add_body_force(self, force, grid=0, accel=True):
         """Add a constant global force field acting on the fluid.

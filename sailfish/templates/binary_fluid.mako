@@ -208,18 +208,23 @@ ${kernel} void PrepareMacroFields(
 	%if bc_wall == 'fullbb':
 		getDist(&fi, dist2_in, helper_idx);
 		get0thMoment(&fi, type, orientation, &out);
-		if (helper_idx != gi) {
-			ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-		} else {
+		%if simtype == 'free-energy':
+			if (helper_idx != gi) {
+				ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+			} else
+		%endif
+		{
 			ophi[gi] = out;
 		}
 	%elif bc_wall == 'halfbb':
 		getDist(&fi, dist2_in, gi);
 		get0thMoment(&fi, type, orientation, &out);
 		ophi[gi] = out;
-		if (helper_idx != gi) {
-			ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-		}
+		%if simtype == 'free-energy':
+			if (helper_idx != gi) {
+				ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+			}
+		%endif
 	%endif
 }
 
