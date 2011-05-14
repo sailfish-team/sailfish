@@ -9,10 +9,16 @@ from sailfish.lb_single import LBFluidSim, LBForcedSim
 class CylinderGeometry(LBGeometry2D):
     def blocks(self, n=None):
         blocks = []
-        q = self.gx / self.config.blocks
+        if self.config.vertical:
+            q = self.gy / self.config.blocks
+        else:
+            q = self.gx / self.config.blocks
 
         for i in range(0, self.config.blocks):
-            blocks.append(LBBlock2D((i * q, 0), (q, self.gy)))
+            if self.config.vertical:
+                blocks.append(LBBlock2D((0, i * q), (self.gx, q)))
+            else:
+                blocks.append(LBBlock2D((i * q, 0), (q, self.gy)))
         return blocks
 
 

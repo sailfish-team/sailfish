@@ -281,8 +281,8 @@ class LBGeometryProcessor(object):
     def _connect_blocks(self, config):
         connected = [False] * len(self.blocks)
 
-        def try_connect(block1, block2, geo=None):
-            if block1.connect(block2, geo):
+        def try_connect(block1, block2, geo=None, axis=None):
+            if block1.connect(block2, geo, axis):
                 connected[block1.id] = True
                 connected[block2.id] = True
 
@@ -312,7 +312,7 @@ class LBGeometryProcessor(object):
                     for candidate in candidates:
                        if (candidate.location[0] + candidate.size[0]
                                == self.geo.gx):
-                            try_connect(block, candidate, self.geo)
+                            try_connect(block, candidate, self.geo, 0)
 
         if config.periodic_y:
             for block in self._coord_map_list[1][0]:
@@ -324,7 +324,7 @@ class LBGeometryProcessor(object):
                     for candidate in candidates:
                        if (candidate.location[1] + candidate.size[1]
                                == self.geo.gy):
-                            try_connect(block, candidate, self.geo)
+                            try_connect(block, candidate, self.geo, 1)
 
         if self.dim > 2 and config.periodic_z:
             for block in self._coord_map_list[2][0]:
@@ -336,7 +336,7 @@ class LBGeometryProcessor(object):
                     for candidate in candidates:
                        if (candidate.location[2] + candidate.size[2]
                                == self.geo.gz):
-                            try_connect(block, candidate, self.geo)
+                            try_connect(block, candidate, self.geo, 2)
 
         # Ensure every block is connected to at least one other block.
         if not all(connected) and len(connected) > 1:
