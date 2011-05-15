@@ -543,6 +543,8 @@ def accel_vector(grid, grid_num):
 
 def free_energy_external_force(sim, grid_num=0):
     grid = sim.grid
+    # TODO: verify is this needs to be an accel or force vector;
+    # add references
     ea = accel_vector(grid, grid_num)
     ret = []
     sum_ = 0
@@ -596,6 +598,8 @@ def bgk_external_force(grid, grid_num=0):
     """
     pref = Symbol('pref')
 
+    # FIXME: this is misguiding, as it is actually a force vector, not an accel
+    # vector
     ea = accel_vector(grid, grid_num)
     ret = []
 
@@ -1043,17 +1047,28 @@ def fluid_accel(sim, i, dim, forces, force_couplings):
     else:
         return 0.0
 
-def body_force_accel(i, dim, forces):
+def body_force_accel(i, dim, forces, accel=True):
+    """
+    :param i: grid number
+    :param forces: forces dictionary (see lbm.py)
+    :param accel: if True, returns an acceleration expression; returns a force
+            expresssion otherwise
+    """
     t = 0
 
     if i in forces:
         # Force
         if False in forces[i]:
-            t += forces[i][False][dim] / Symbol('g%dm0' % i)
-
+            if accel:
+                t += forces[i][False][dim] / Symbol('g%dm0' % i)
+            else:
+                t += forces[i][False][dim]
         # Acceleration
         if True in forces[i]:
-            t += forces[i][True][dim]
+            if accel:
+                t += forces[i][True][dim]
+            else:
+                t += forces[i][True][dim] * Symbol('g%dm0' % i)
 
     return t
 

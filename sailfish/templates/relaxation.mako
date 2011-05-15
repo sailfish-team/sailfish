@@ -22,18 +22,24 @@
 	%endif
 </%def>
 
-<%def name="body_force()">
-	// Body force acceleration.
+<%def name="body_force(accel=True, need_vars_declaration=True, grid_id=None)">
+	%if accel:
+		// Body force acceleration.
+	%else:
+		// Body force.
+	%endif
 	%for i in range(0, len(grids)):
-		%if sym.needs_accel(i, forces, force_couplings):
+		%if (grid_id is None or grid_id == i) and sym.needs_accel(i, forces, force_couplings):
 			%if not sym.needs_coupling_accel(i, force_couplings):
-				float ea${i}[${dim}];
+				%if need_vars_declaration:
+					float ea${i}[${dim}];
+				%endif
 				%for j in range(0, dim):
-					ea${i}[${j}] = ${cex(sym.body_force_accel(i, j, forces), vectors=True)};
+					ea${i}[${j}] = ${cex(sym.body_force_accel(i, j, forces, accel=accel), vectors=True)};
 				%endfor
 			%else:
 				%for j in range(0, dim):
-					ea${i}[${j}] += ${cex(sym.body_force_accel(i, j, forces), vectors=True)};
+					ea${i}[${j}] += ${cex(sym.body_force_accel(i, j, forces, accel=accel), vectors=True)};
 				%endfor
 			%endif
 		%endif
@@ -273,6 +279,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 		## Is there a force acting on the current grid?
 		%if sym.needs_accel(i, forces, force_couplings):
 			${fluid_velocity(i)};
+			${body_force(accel=False, need_vars_declaration=False, grid_id=i)}
 
 			%if simtype == 'shan-chen':
 			{
@@ -295,6 +302,8 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			%endif
 		%endif
 	%endfor
+
+	${body_force(need_vars_declaration=False)}
 
 	// FIXME: This should be moved to postcollision boundary conditions.
 	%if bc_pressure == 'guo':
