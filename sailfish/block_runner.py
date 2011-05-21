@@ -198,7 +198,7 @@ class BlockRunner(object):
         return self._bcg.get_code(self)
 
     def _init_buffers(self):
-        # TOOD(michalj): Fix this for multi-grid models.
+        # TODO(michalj): Fix this for multi-grid models.
         grid = util.get_grid_from_config(self.config)
 
         # Maps block_id to a list of (axis, span, size).
@@ -214,7 +214,7 @@ class BlockRunner(object):
                 if self._block.dim == 2:
                     axis_span[axis] = (
                             min(curr[0], span_tuple[0]),
-                            max(curr[0], span_tuple[1]))
+                            max(curr[1], span_tuple[1]))
                 else:
                     axis_span[axis] = (
                             (min(curr[0][0], span_tuple[0][0]),
@@ -228,6 +228,19 @@ class BlockRunner(object):
                 if type(coord) is slice:
                     ret.append((coord.start, coord.stop))
             return tuple(ret)
+
+        def tuple_to_span(span):
+            ret = []
+            for coord in span:
+                ret.append(slice(coord[0], coord[1]))
+            return ret
+
+        def relative_span(span1, span2):
+            if self._block.dim == 2:
+                return ((span2[0][0] - span1[0][0], span2[0][1] - span1[0][0]),)
+            else:
+                return ((span2[0][0] - span1[0][0], span2[0][1] - span1[0][0]),
+                        (span2[1][0] - span1[1][0], span2[1][1] - span1[1][0]))
 
         total_x_size = 0
 
@@ -243,7 +256,9 @@ class BlockRunner(object):
                 max_span(axis, span_to_tuple(span))
 
         total_ortho_size = 0
-        # Maps axis_dir to gx_start, num_nodes, buf_offset
+        # Maps face to gx_start, num_nodes * num_dists, buf_offset
+        #  gx_start: coordinates of the first node in the ghost patch on a face
+        #  buf_offset: item offset in the global ghost buffer for all faces
         self._ghost_info = {}
         for axis, span in axis_span.iteritems():
             buf_size = len(sym.get_prop_dists(grid,
@@ -265,6 +280,44 @@ class BlockRunner(object):
                 dtype=self.float)
             self._ortho_ghost_send_buffer = np.zeros(total_ortho_size,
                 dtype=self.float)
+
+            face2view = {}
+            for face, (_, buf_size, offset) in self._ghost_info.iteritems():
+                span = axis_span[face]
+                recv_view = self._ortho_ghost_recv_buffer.view()
+                recv_view = recv_view[offset:offset + buf_size]
+                send_view = self._ortho_ghost_send_buffer.view()
+                send_view = send_view[offset:offset + buf_size]
+
+                nodes = 1
+                for low, high in span:
+                    nodes *= (high - low)
+                dists = buf_size / nodes
+
+                recv_view = recv_view.reshape(dists, nodes)
+                send_view = send_view.reshape(dists, nodes)
+
+                # For 2D blocks, there is no need to reshape the view, which
+                # is already a 1D array.
+                # XXX: this is off by prop_dists
+                if self._block.dim == 3:
+                    recv_view = recv_view.reshape(
+                            (span[0][1]-span[0][0], span[1][1]-span[1][0]))
+                    send_view = send_view.reshape(
+                            (span[0][1]-span[0][0], span[1][1]-span[1][0]))
+
+                face2view[face] = (recv_view, send_view)
+
+            self._blockface2view = {}
+            for block_id, item_list in block_axis_span.iteritems():
+                for face, span, _ in item_list:
+                    view = face2view[face]
+                    global_span = axis_span[face]
+                    rel_span = relative_span(global_span, span_to_tuple(span))
+                    rel_span = tuple_to_span(rel_span)
+
+                    self._blockface2view.setdefault(block_id, []).append(
+                            (face, view[0][:][rel_span], view[1][:][rel_span]))
 
         # Nothing to do if there are no connecting blocks to share data with.
         if total_x_size == 0:
@@ -319,7 +372,7 @@ class BlockRunner(object):
 
             # Unless periodic conditions are applied, there is normally only a
             # single connection per block_id so there is no ordering of 'items'.
-            # For the case of PC however, the order in the this loop has to be
+            # For the case of PBC however, the order in the this loop has to be
             # reversed so that the different axes match in the subbuffer.  E.g.
             #  (PBC along the X axis)
             #  block 1 send buffer: 0 (low), 1 (high)
@@ -505,7 +558,6 @@ class BlockRunner(object):
 
         stream = self._boundary_stream[self._step]
 
-    # XXX: Fix this to process the proper buffers.
     def send_data(self):
         if self._x_connected:
             self.backend.from_buf(self._gpu_x_ghost_send_buffer)
@@ -516,8 +568,14 @@ class BlockRunner(object):
             self.backend.from_buf(self._gpu_ortho_ghost_send_buffer)
 
             for b_id, connector in self._block._connectors.iteritems():
-                connector.send(self._ortho_ghost_send_buffer)
+                faces = self._blockface2view[b_id]
+                if len(faces) > 1:
+                    connector.send(np.hstack([x[2].flatten() for x in faces]))
+                else:
+                    connector.send(faces[0][2].flatten())
 
+    # XXX: distinguish between X/ortho connections here!
+    # with the current code, every connection could be processed twice
     def recv_data(self):
         if self._x_connected:
             for b_id, connector in self._block._connectors.iteritems():
@@ -528,9 +586,19 @@ class BlockRunner(object):
 
         if self._ortho_ghost_recv_buffer is not None:
             for b_id, connector in self._block._connectors.iteritems():
-                if not connector.recv(self._ortho_ghost_recv_buffer,
-                        self._quit_event):
-                    return
+                faces = self._blockface2view[b_id]
+                if len(faces) > 1:
+                    dest = np.hstack([x[1].flatten() for x in reversed(faces)])
+                    if not connector.recv(dest, self._quit_event):
+                        return
+                    idx = 0
+                    for views in reversed(faces):
+                        dst_view = views[1].view().flatten()
+                        dst_view[:] = dest[idx:idx + dst_view.shape[0]]
+                        idx += dst_view.shape[0]
+                else:
+                    if not connector.recv(faces[0][1].flatten(), self._quit_event):
+                        return
             self.backend.to_buf(self._gpu_ortho_ghost_recv_buffer)
 
     def _fields_to_host(self):
@@ -588,13 +656,13 @@ class BlockRunner(object):
         self._distrib_kernels = (distrib_primary, distrib_secondary)
 
         for axis_dir, (gx_start, num_nodes, buf_offset) in self._ghost_info.iteritems():
-            for i in range(0, 2):
+            for i in range(0, 2):  # primary, secondary
                 self._collect_kernels[i].append(
                         self.get_kernel('CollectOrthogonalGhostData',
                             [self.gpu_dist(0, i),
                                 np.int32(gx_start), np.int32(axis_dir),
                                 np.int32(num_nodes),
-                                long(self._gpu_ortho_ghost_recv_buffer) + buf_offset],
+                                long(self._gpu_ortho_ghost_send_buffer) + buf_offset],
                             'PiiiP', (collect_block,)))
                 self._distrib_kernels[i].append(
                         self.get_kernel('DistributeOrthogonalGhostData',
@@ -602,7 +670,7 @@ class BlockRunner(object):
                                 np.int32(gx_start),
                                 np.int32(self._block.opposite_axis_dir(axis_dir)),
                                 np.int32(num_nodes),
-                                long(self._gpu_ortho_ghost_send_buffer) + buf_offset],
+                                long(self._gpu_ortho_ghost_recv_buffer) + buf_offset],
                             'PiiiP', (collect_block,)))
             self._distrib_grid.append((int(math.ceil(
                     num_nodes /
