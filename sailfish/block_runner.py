@@ -315,7 +315,6 @@ class BlockRunner(object):
                     global_span = axis_span[face]
                     rel_span = relative_span(global_span, span_to_tuple(span))
                     rel_span = tuple_to_span(rel_span)
-
                     self._blockface2view.setdefault(block_id, []).append(
                             (face, view[0][:][rel_span], view[1][:][rel_span]))
 
@@ -570,9 +569,9 @@ class BlockRunner(object):
             for b_id, connector in self._block._connectors.iteritems():
                 faces = self._blockface2view[b_id]
                 if len(faces) > 1:
-                    connector.send(np.hstack([x[2].flatten() for x in faces]))
+                    connector.send(np.hstack([np.ravel(x[2]) for x in faces]))
                 else:
-                    connector.send(faces[0][2].flatten())
+                    connector.send(np.ravel(faces[0][2]))
 
     # XXX: distinguish between X/ortho connections here!
     # with the current code, every connection could be processed twice
@@ -588,17 +587,18 @@ class BlockRunner(object):
             for b_id, connector in self._block._connectors.iteritems():
                 faces = self._blockface2view[b_id]
                 if len(faces) > 1:
-                    dest = np.hstack([x[1].flatten() for x in reversed(faces)])
+                    dest = np.hstack([np.ravel(x[1]) for x in reversed(faces)])
                     if not connector.recv(dest, self._quit_event):
                         return
                     idx = 0
                     for views in reversed(faces):
-                        dst_view = views[1].view().flatten()
+                        dst_view = np.ravel(views[1])
                         dst_view[:] = dest[idx:idx + dst_view.shape[0]]
                         idx += dst_view.shape[0]
                 else:
-                    if not connector.recv(faces[0][1].flatten(), self._quit_event):
+                    if not connector.recv(np.ravel(faces[0][1]), self._quit_event):
                         return
+
             self.backend.to_buf(self._gpu_ortho_ghost_recv_buffer)
 
     def _fields_to_host(self):
