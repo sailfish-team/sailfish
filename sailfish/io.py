@@ -33,7 +33,7 @@ class VisualizationWrapper(LBOutput):
     # TODO(michalj): Add support for visualization fields different from these
     # used for the output file.
     def __init__(self, config, block, vis_config, output_cls):
-        self._output = output_cls(config)
+        self._output = output_cls(config, block.id)
         self._vis_buffer = block.vis_buffer
         self._vis_config = vis_config
         self._geo_buffer = block.vis_geo_buffer
@@ -80,8 +80,9 @@ class VisualizationWrapper(LBOutput):
                 component = requested_field % self._dim
                 field = self._output._vector_fields[name][component]
 
-            self._vis_buffer[0:self.nodes] = field[self.block._nonghost_slice].reshape(self.nodes)[:]
-            self._geo_buffer[0:self.nodes] = self.block.runner.visualization_map().reshape(self.nodes)[:]
+            self._vis_buffer[0:self.nodes] = np.ravel(field)
+            self._geo_buffer[0:self.nodes] = np.ravel(self.block.runner.visualization_map())
+
 
 # TODO: Correctly process vector and scalar fields in these clases.
 class HDF5FlatOutput(LBOutput):
@@ -200,10 +201,10 @@ class NPYOutput(LBOutput):
     """Saves simulation data as np arrays."""
     format_name = 'npy'
 
-    def __init__(self, config):
+    def __init__(self, config, block_id):
         LBOutput.__init__(self)
         self.digits = _get_fname_digits(config.max_iters)
-        self.fname = config.output
+        self.fname = '%s_blk%s_' % (config.output, block_id)
 
     def save(self, i):
         fname = ('%s%0' + self.digits + 'd') % (self.fname, i)
@@ -217,10 +218,10 @@ class MatlabOutput(LBOutput):
     """Ssves simulation data as Matlab .mat files."""
     format_name = 'mat'
 
-    def __init__(self, config):
+    def __init__(self, config, block_id):
         LBOutput.__init__(self)
         self.digits = _get_fname_digits(config.max_iters)
-        self.fname = config.output
+        self.fname = '%s_blk%s_' % (config.output, block_id)
 
     def save(self, i):
         import scipy.io

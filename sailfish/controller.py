@@ -173,7 +173,7 @@ class LBMachineMaster(object):
             output_cls = io.LBOutput
 
         if self.config.mode != 'visualization':
-            return lambda block: output_cls(self.config)
+            return lambda block: output_cls(self.config, block.id)
 
         for block in self.blocks:
             size = reduce(operator.mul, block.size)
