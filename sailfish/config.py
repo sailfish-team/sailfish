@@ -20,9 +20,9 @@ class LBConfig(argparse.Namespace):
             desc += " " + description
         self._parser = argparse.ArgumentParser(description=description)
 
-        self._parser.add_argument('-q', '--quiet', dest='quiet',
+        self._parser.add_argument('-q', '--quiet',
                 help='reduce verbosity', action='store_true', default=False)
-        self._parser.add_argument('-v', '--verbose', dest='verbose',
+        self._parser.add_argument('-v', '--verbose',
                 help='print additional info about the simulation',
                 action='store_true', default=False)
 

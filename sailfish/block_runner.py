@@ -118,7 +118,8 @@ class BlockRunner(object):
                            dtype=dtype, strides=strides)
 
         if name is not None:
-            self._output.register_field(field, name)
+            f_view = field.view()[self._block._nonghost_slice]
+            self._output.register_field(f_view, name)
 
         self._scalar_fields.append(field)
         return field
@@ -126,12 +127,15 @@ class BlockRunner(object):
     def make_vector_field(self, name=None, output=False):
         """Allocates several scalar arrays representing a vector field."""
         components = []
+        view_components = []
 
         for x in range(0, self._block.dim):
-            components.append(self.make_scalar_field(self.float))
+            field = self.make_scalar_field(self.float)
+            components.append(field)
+            view_components.append(field.view()[self._block._nonghost_slice])
 
         if name is not None:
-            self._output.register_field(components, name)
+            self._output.register_field(view_components, name)
 
         self._vector_fields.append(components)
         return components
