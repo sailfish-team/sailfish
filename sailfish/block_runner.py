@@ -55,13 +55,15 @@ class BlockRunner(object):
 
         # Used so that axis_dir values map to the limiting coordinate
         # along a specific axis, e.g. lat_linear[_X_LOW] = 0
-        lat_linear = [0, self._lat_size[-1], 0, self._lat_size[-2]]
+        lat_linear = [0, self._lat_size[-1]-1, 0, self._lat_size[-2]-1]
+        lat_linear_dist = [self._lat_size[-1]-2, 1,  self._lat_size[-2]-2, 1]
 
         if self._block.dim == 3:
             ctx['lat_nz'] = self._lat_size[-3]
             ctx['arr_nz'] = self._physical_size[-3]
             periodic_z = int(self._block.periodic_z)
-            lat_linear.extend([0, self._lat_size[-3]])
+            lat_linear.extend([0, self._lat_size[-3]-1])
+            lat_linear_dist.extend([self._lat_size[-3]-2, 1])
         else:
             ctx['lat_nz'] = 1
             ctx['arr_nz'] = 1
@@ -69,6 +71,7 @@ class BlockRunner(object):
             bnd_limits.append(1)
 
         ctx['lat_linear'] = lat_linear
+        ctx['lat_linear_dist'] = lat_linear_dist
 
         ctx['periodic_x'] = 0 #int(self._block.periodic_x)
         ctx['periodic_y'] = 0 #int(self._block.periodic_y)
@@ -587,11 +590,11 @@ class BlockRunner(object):
             for b_id, connector in self._block._connectors.iteritems():
                 faces = self._blockface2view[b_id]
                 if len(faces) > 1:
-                    dest = np.hstack([np.ravel(x[1]) for x in reversed(faces)])
+                    dest = np.hstack([np.ravel(x[1]) for x in faces])
                     if not connector.recv(dest, self._quit_event):
                         return
                     idx = 0
-                    for views in reversed(faces):
+                    for views in faces:
                         dst_view = np.ravel(views[1])
                         dst_view[:] = dest[idx:idx + dst_view.shape[0]]
                         idx += dst_view.shape[0]
@@ -655,23 +658,25 @@ class BlockRunner(object):
         self._collect_kernels = (collect_primary, collect_secondary)
         self._distrib_kernels = (distrib_primary, distrib_secondary)
 
+        # TODO(michalj): Can the buffer and offset be merge into a single
+        # field?
         for axis_dir, (gx_start, num_nodes, buf_offset) in self._ghost_info.iteritems():
             for i in range(0, 2):  # primary, secondary
                 self._collect_kernels[i].append(
                         self.get_kernel('CollectOrthogonalGhostData',
-                            [self.gpu_dist(0, i),
+                            [self.gpu_dist(0, 1-i),
                                 np.int32(gx_start), np.int32(axis_dir),
                                 np.int32(num_nodes),
-                                long(self._gpu_ortho_ghost_send_buffer) + buf_offset],
-                            'PiiiP', (collect_block,)))
+                                self._gpu_ortho_ghost_send_buffer, buf_offset],
+                            'PiiiPi', (collect_block,)))
                 self._distrib_kernels[i].append(
                         self.get_kernel('DistributeOrthogonalGhostData',
                             [self.gpu_dist(0, i),
                                 np.int32(gx_start),
-                                np.int32(self._block.opposite_axis_dir(axis_dir)),
+                                np.int32(axis_dir),
                                 np.int32(num_nodes),
-                                long(self._gpu_ortho_ghost_recv_buffer) + buf_offset],
-                            'PiiiP', (collect_block,)))
+                                self._gpu_ortho_ghost_recv_buffer, buf_offset],
+                            'PiiiPi', (collect_block,)))
             self._distrib_grid.append((int(math.ceil(
                     num_nodes /
                     float(collect_block))),))
@@ -740,6 +745,7 @@ class BlockRunner(object):
                         self._distrib_kernels[self._sim.iteration & 1],
                         self._distrib_grid):
                     self.backend.run_kernel(kernel, grid)
+
 
     def main_benchmark(self):
         t_comp = 0.0
