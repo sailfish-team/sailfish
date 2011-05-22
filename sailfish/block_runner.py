@@ -53,25 +53,18 @@ class BlockRunner(object):
 
         bnd_limits = list(self._block.actual_size[:])
 
-        # Used so that axis_dir values map to the limiting coordinate
-        # along a specific axis, e.g. lat_linear[_X_LOW] = 0
-        lat_linear = [0, self._lat_size[-1]-1, 0, self._lat_size[-2]-1]
-        lat_linear_dist = [self._lat_size[-1]-2, 1,  self._lat_size[-2]-2, 1]
-
         if self._block.dim == 3:
             ctx['lat_nz'] = self._lat_size[-3]
             ctx['arr_nz'] = self._physical_size[-3]
             periodic_z = int(self._block.periodic_z)
-            lat_linear.extend([0, self._lat_size[-3]-1])
-            lat_linear_dist.extend([self._lat_size[-3]-2, 1])
         else:
             ctx['lat_nz'] = 1
             ctx['arr_nz'] = 1
             periodic_z = 0
             bnd_limits.append(1)
 
-        ctx['lat_linear'] = lat_linear
-        ctx['lat_linear_dist'] = lat_linear_dist
+        ctx['lat_linear'] = self.lat_linear
+        ctx['lat_linear_dist'] = self.lat_linear_dist
 
         ctx['periodic_x'] = 0 #int(self._block.periodic_x)
         ctx['periodic_y'] = 0 #int(self._block.periodic_y)
@@ -182,6 +175,16 @@ class BlockRunner(object):
             self._global_size = (self.config.lat_nz, self.config.lat_ny,
                     self.config.lat_nx)
 
+        # Used so that axis_dir values map to the limiting coordinate
+        # along a specific axis, e.g. lat_linear[_X_LOW] = 0
+        # TODO(michalj): Should this use _block.envelope_size instead of -1?
+        self.lat_linear = [0, self._lat_size[-1]-1, 0, self._lat_size[-2]-1]
+        self.lat_linear_dist = [self._lat_size[-1]-2, 1,  self._lat_size[-2]-2, 1]
+
+        if self._block.dim == 3:
+            self.lat_linear.extend([0, self._lat_size[-3]-1])
+            self.lat_linear_dist.extend([self._lat_size[-3]-2, 1])
+
     def _get_strides(self, type_):
         """Returns a list of strides for the NumPy array storing the lattice."""
         t = type_().nbytes
@@ -289,11 +292,15 @@ class BlockRunner(object):
         if total_x_size > 0:
             self._x_ghost_recv_buffer = np.zeros(total_x_size, dtype=self.float)
             self._x_ghost_send_buffer = np.zeros(total_x_size, dtype=self.float)
+            # Lookup tables for distribution of the ghost node data.
+            self._x_ghost_collect_idx = np.zeros(total_x_size, dtype=np.uint32)
+            self._x_ghost_distrib_idx = np.zeros(total_x_size, dtype=np.uint32)
 
         face2view = {}
         for face, (_, buf_size, offset) in self._ghost_info.iteritems():
             span = axis_span[face]
 
+            print "%s -> face %s off %s" % (self._block.id, face, offset)
             if face < 2:
                 recv_view = self._x_ghost_recv_buffer.view()
                 send_view = self._x_ghost_send_buffer.view()
@@ -323,9 +330,30 @@ class BlockRunner(object):
 
             face2view[face] = (recv_view, send_view)
 
+        def get_global_indices_array(face, span, gx_map):
+            dists = sym.get_prop_dists(grid,
+                    self._block.axis_dir_to_dir(face),
+                    self._block.axis_dir_to_axis(face))
+            gx = gx_map[face]
+            gy = np.uint32(
+                    range(self._block.envelope_size,
+                          self._lat_size[-2] + self._block.envelope_size)[span[1]])
+            gy = np.kron(gy, np.ones(len(dists), dtype=np.uint32))
+            num_nodes = span[1].stop - span[1].start
+            dist_num = np.kron(
+                    np.ones(num_nodes, dtype=np.uint32),
+                    np.uint32(dists))
+            return get_global_id(gx, gy, dist_num)
+
+        def get_global_id(gx, gy, dist_num):
+            arr_nx = self._physical_size[-1]
+            return gx + arr_nx * gy + self._get_nodes() * dist_num
+
         self._blockface2view = {}
+        idx = 0
+
         for block_id, item_list in block_axis_span.iteritems():
-            for face, span, _ in item_list:
+            for face, span, size in item_list:
                 view = face2view[face]
                 global_span = axis_span[face]
                 rel_span = relative_span(global_span, span_to_tuple(span))
@@ -333,84 +361,14 @@ class BlockRunner(object):
                 self._blockface2view.setdefault(block_id, []).append(
                         (face, view[0][:][rel_span], view[1][:][rel_span]))
 
-        # Nothing to do if there are no connecting blocks to share data with.
-        if not self._x_connected:
-            return
-
-        # Lookup tables for distribution of the ghost node data.
-        self._x_ghost_collect_idx = np.zeros(total_x_size, dtype=np.uint32)
-        self._x_ghost_distrib_idx = np.zeros(total_x_size, dtype=np.uint32)
-
-        def get_global_id(gx, gy, dist_num):
-            arr_nx = self._physical_size[-1]
-            return gx + arr_nx * gy + self._get_nodes() * dist_num
-
-        idx = 0
-
-        # TODO(michalj): Move this to block class?
-        # TODO(michalj): Add a unit test for this.
-        # TODO(muchalj): Extend this for 3D.
-        for block_id, items in block_axis_span.iteritems():
-            axis_idx = idx
-            for axis, span, size in items:
-                direction = util.span_to_direction(span)
-                dists_collect = sym.get_prop_dists(
-                        grid, direction,
-                        self._block.axis_dir_to_axis(axis))
-
-                gx = np.zeros(size, dtype=np.uint32)
-                if direction == -1:
-                    gx[:] = span[0]
-                else:
-                    gx[:] = span[0] + 2 * self._block.envelope_size
-
-                gy = np.uint32(
-                        range(self._block.envelope_size, self._lat_size[-2]
-                            + self._block.envelope_size)[span[1]])
-                gy = np.kron(gy, np.ones(len(dists_collect), dtype=np.uint32))
-
-                num_nodes = span[1].stop - span[1].start
-                dist_num = np.kron(
-                        np.ones(num_nodes, dtype=np.uint32),
-                        np.uint32(dists_collect))
-
-                gi = get_global_id(gx, gy, dist_num)
-                self._x_ghost_collect_idx[axis_idx:axis_idx + size] = gi
-                axis_idx += size
-
-            # Unless periodic conditions are applied, there is normally only a
-            # single connection per block_id so there is no ordering of 'items'.
-            # For the case of PBC however, the order in the this loop has to be
-            # reversed so that the different axes match in the subbuffer.  E.g.
-            #  (PBC along the X axis)
-            #  block 1 send buffer: 0 (low), 1 (high)
-            #  block 2 recv buffer: 1 (high), 0 (low)
-            #  (low) --- block 1 --- (high) | (low) --- block 2 --- (low)
-            for axis, span, size in reversed(items):
-                direction = util.span_to_direction(span)
-                dists_distrib = sym.get_prop_dists(
-                        grid, direction * -1,
-                        self._block.axis_dir_to_axis(axis))
-
-                gx = np.zeros(size, dtype=np.uint32)
-                if direction == -1:
-                    gx = span[0] + self._block.envelope_size
-                else:
-                    gx = span[0] + self._block.envelope_size
-
-                gy = np.uint32(
-                        range(self._block.envelope_size, self._lat_size[-2]
-                            + self._block.envelope_size)[span[1]])
-                gy = np.kron(gy, np.ones(len(dists_collect), dtype=np.uint32))
-
-                num_nodes = span[1].stop - span[1].start
-                dist_num = np.kron(
-                        np.ones(num_nodes, dtype=np.uint32),
-                        np.uint32(dists_distrib))
-
-                gi = get_global_id(gx, gy, dist_num)
-                self._x_ghost_distrib_idx[idx:idx + size] = gi
-                idx += size
+                if face < 2:
+                    self._x_ghost_collect_idx[idx:idx + size] = \
+                            get_global_indices_array(face, span, self.lat_linear)
+                    self._x_ghost_distrib_idx[idx:idx + size] = \
+                            get_global_indices_array(
+                                    self._block.opposite_axis_dir(face), span,
+                                    self.lat_linear_dist)
+                    idx += size
 
     def _init_compute(self):
         self.config.logger.debug("Initializing compute unit.")
@@ -566,51 +524,41 @@ class BlockRunner(object):
 
         stream = self._boundary_stream[self._step]
 
-    # XXX: process subarrays of X here, like for ortho arrays.
     def send_data(self):
         if self._x_connected:
             self.backend.from_buf(self._gpu_x_ghost_send_buffer)
-            for b_id, connector in self._block._connectors.iteritems():
-                connector.send(self._x_ghost_send_buffer)
 
         if self._ortho_ghost_recv_buffer is not None:
             self.backend.from_buf(self._gpu_ortho_ghost_send_buffer)
 
-            for b_id, connector in self._block._connectors.iteritems():
-                faces = self._blockface2view[b_id]
-                if len(faces) > 1:
-                    connector.send(np.hstack([np.ravel(x[2]) for x in faces]))
-                else:
-                    connector.send(np.ravel(faces[0][2]))
+        for b_id, connector in self._block._connectors.iteritems():
+            faces = self._blockface2view[b_id]
+            if len(faces) > 1:
+                connector.send(np.hstack([np.ravel(x[2]) for x in faces]))
+            else:
+                connector.send(np.ravel(faces[0][2]))
 
-    # XXX: distinguish between X/ortho connections here!
-    # with the current code, every connection could be processed twice
     def recv_data(self):
-        if self._x_connected:
-            for b_id, connector in self._block._connectors.iteritems():
-                if not connector.recv(self._x_ghost_recv_buffer,
-                        self._quit_event):
+        for b_id, connector in self._block._connectors.iteritems():
+            faces = self._blockface2view[b_id]
+            if len(faces) > 1:
+                dest = np.hstack([np.ravel(x[1]) for x in faces])
+                if not connector.recv(dest, self._quit_event):
                     return
+                idx = 0
+                # If there are two connections between the blocks,
+                # reverse the order of faces in the buffer.
+                for views in reversed(faces):
+                    dst_view = np.ravel(views[1])
+                    dst_view[:] = dest[idx:idx + dst_view.shape[0]]
+                    idx += dst_view.shape[0]
+            else:
+                if not connector.recv(np.ravel(faces[0][1]), self._quit_event):
+                    return
+
+        if self._x_connected:
             self.backend.to_buf(self._gpu_x_ghost_recv_buffer)
-
         if self._ortho_ghost_recv_buffer is not None:
-            for b_id, connector in self._block._connectors.iteritems():
-                faces = self._blockface2view[b_id]
-                if len(faces) > 1:
-                    dest = np.hstack([np.ravel(x[1]) for x in faces])
-                    if not connector.recv(dest, self._quit_event):
-                        return
-                    idx = 0
-                    # If there are two connections between the blocks,
-                    # reverse the order of faces in the buffer.
-                    for views in reversed(faces):
-                        dst_view = np.ravel(views[1])
-                        dst_view[:] = dest[idx:idx + dst_view.shape[0]]
-                        idx += dst_view.shape[0]
-                else:
-                    if not connector.recv(np.ravel(faces[0][1]), self._quit_event):
-                        return
-
             self.backend.to_buf(self._gpu_ortho_ghost_recv_buffer)
 
     def _fields_to_host(self):
@@ -753,6 +701,10 @@ class BlockRunner(object):
             if self._connected:
                 self.send_data()
 
+            if self._block.id == 0:
+                print self._x_ghost_send_buffer[0]
+                print self._x_ghost_collect_idx[0]
+
             if output_req and self.config.output_required:
                 self._fields_to_host()
                 self._output.save(self._sim.iteration)
@@ -774,6 +726,11 @@ class BlockRunner(object):
                         self._distrib_kernels[self._sim.iteration & 1],
                         self._distrib_grid):
                     self.backend.run_kernel(kernel, grid)
+
+            if self._block.id == 1:
+                print self._x_ghost_distrib_idx[768 + 0]
+                print self._x_ghost_recv_buffer[0]
+
 
 
     def main_benchmark(self):
