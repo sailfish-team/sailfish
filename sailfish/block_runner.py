@@ -263,13 +263,13 @@ class BlockRunner(object):
         #  gx_start: coordinates of the first node in the ghost patch on a face
         #  buf_offset: item offset in the global ghost buffer for all faces
         self._ghost_info = {}
-        for axis, span in axis_span.iteritems():
+        for face, span in axis_span.iteritems():
             buf_size = len(sym.get_prop_dists(grid,
                     self._block.axis_dir_to_dir(axis),
                     self._block.axis_dir_to_axis(axis)))
             for low, high in span:
                 buf_size *= (high - low)
-            self._ghost_info[axis] = (low, buf_size, total_ortho_size)
+            self._ghost_info[face] = (low, buf_size, total_ortho_size)
             total_ortho_size += buf_size
 
         self._connected = True
@@ -560,6 +560,7 @@ class BlockRunner(object):
 
         stream = self._boundary_stream[self._step]
 
+    # XXX: process subarrays of X here, like for ortho arrays.
     def send_data(self):
         if self._x_connected:
             self.backend.from_buf(self._gpu_x_ghost_send_buffer)
@@ -658,14 +659,15 @@ class BlockRunner(object):
         self._collect_kernels = (collect_primary, collect_secondary)
         self._distrib_kernels = (distrib_primary, distrib_secondary)
 
-        # TODO(michalj): Can the buffer and offset be merge into a single
+        # TODO(michalj): Can the buffer and offset be merged into a single
         # field?
-        for axis_dir, (gx_start, num_nodes, buf_offset) in self._ghost_info.iteritems():
+        for face, (gx_start, num_nodes, buf_offset) in self._ghost_info.iteritems():
             for i in range(0, 2):  # primary, secondary
                 self._collect_kernels[i].append(
                         self.get_kernel('CollectOrthogonalGhostData',
                             [self.gpu_dist(0, 1-i),
-                                np.int32(gx_start), np.int32(axis_dir),
+                                np.int32(gx_start),
+                                np.int32(face),
                                 np.int32(num_nodes),
                                 self._gpu_ortho_ghost_send_buffer, buf_offset],
                             'PiiiPi', (collect_block,)))
@@ -673,13 +675,28 @@ class BlockRunner(object):
                         self.get_kernel('DistributeOrthogonalGhostData',
                             [self.gpu_dist(0, i),
                                 np.int32(gx_start),
-                                np.int32(axis_dir),
+                                np.int32(face),
                                 np.int32(num_nodes),
                                 self._gpu_ortho_ghost_recv_buffer, buf_offset],
                             'PiiiPi', (collect_block,)))
             self._distrib_grid.append((int(math.ceil(
                     num_nodes /
                     float(collect_block))),))
+
+    def _debug_get_dist(self, output=True):
+        """Copies the distributions from the GPU to a properly structured host array.
+        :param output: if True, returns the contents of the distributions set *after*
+                the current simulation step
+        """
+        iter_idx = self._sim.iteration & 1
+        if not output:
+            iter_idx = 1 - iter_idx
+
+        dbuf = np.zeros(self._get_dist_bytes(self._sim.grids[0]) / self.float().nbytes,
+             dtype=self.float)
+        dbuf = dbuf.reshape([self._sim.grids[0].Q] + self._physical_size)
+        self.backend.from_buf(self.gpu_dist(0, iter_idx), dbuf)
+        return dbuf
 
     def run(self):
         self.config.logger.info("Initializing block.")
