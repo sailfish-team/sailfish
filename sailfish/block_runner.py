@@ -296,11 +296,33 @@ class BlockRunner(object):
             self._x_ghost_collect_idx = np.zeros(total_x_size, dtype=np.uint32)
             self._x_ghost_distrib_idx = np.zeros(total_x_size, dtype=np.uint32)
 
+        def get_global_indices_array(face, span, gx_map):
+            dists = sym.get_prop_dists(grid,
+                    self._block.axis_dir_to_dir(face),
+                    self._block.axis_dir_to_axis(face))
+            gx = gx_map[face]
+            gy = np.uint32(
+                    range(self._block.envelope_size,
+                          self._lat_size[-2] +
+                          self._block.envelope_size)[tuple_to_span(span)[0]])
+            gy = np.kron(gy, np.ones(len(dists), dtype=np.uint32))
+            num_nodes = span[0][1] - span[0][0]
+            dist_num = np.kron(
+                    np.ones(num_nodes, dtype=np.uint32),
+                    np.uint32(dists))
+            return get_global_id(gx, gy, dist_num)
+
+        def get_global_id(gx, gy, dist_num):
+            arr_nx = self._physical_size[-1]
+            return gx + arr_nx * gy + self._get_nodes() * dist_num
+
+        self._blockface2view = {}
+
         face2view = {}
+        idx = 0
         for face, (_, buf_size, offset) in self._ghost_info.iteritems():
             span = axis_span[face]
 
-            print "%s -> face %s off %s" % (self._block.id, face, offset)
             if face < 2:
                 recv_view = self._x_ghost_recv_buffer.view()
                 send_view = self._x_ghost_send_buffer.view()
@@ -330,27 +352,15 @@ class BlockRunner(object):
 
             face2view[face] = (recv_view, send_view)
 
-        def get_global_indices_array(face, span, gx_map):
-            dists = sym.get_prop_dists(grid,
-                    self._block.axis_dir_to_dir(face),
-                    self._block.axis_dir_to_axis(face))
-            gx = gx_map[face]
-            gy = np.uint32(
-                    range(self._block.envelope_size,
-                          self._lat_size[-2] + self._block.envelope_size)[span[1]])
-            gy = np.kron(gy, np.ones(len(dists), dtype=np.uint32))
-            num_nodes = span[1].stop - span[1].start
-            dist_num = np.kron(
-                    np.ones(num_nodes, dtype=np.uint32),
-                    np.uint32(dists))
-            return get_global_id(gx, gy, dist_num)
-
-        def get_global_id(gx, gy, dist_num):
-            arr_nx = self._physical_size[-1]
-            return gx + arr_nx * gy + self._get_nodes() * dist_num
-
-        self._blockface2view = {}
-        idx = 0
+            # Add global indicies for connections along the X axis.
+            if face < 2:
+                self._x_ghost_collect_idx[idx:idx + size] = \
+                        get_global_indices_array(face, span, self.lat_linear)
+                self._x_ghost_distrib_idx[idx:idx + size] = \
+                        get_global_indices_array(
+                                self._block.opposite_axis_dir(face), span,
+                                self.lat_linear_dist)
+                idx += size
 
         for block_id, item_list in block_axis_span.iteritems():
             for face, span, size in item_list:
@@ -361,14 +371,6 @@ class BlockRunner(object):
                 self._blockface2view.setdefault(block_id, []).append(
                         (face, view[0][:][rel_span], view[1][:][rel_span]))
 
-                if face < 2:
-                    self._x_ghost_collect_idx[idx:idx + size] = \
-                            get_global_indices_array(face, span, self.lat_linear)
-                    self._x_ghost_distrib_idx[idx:idx + size] = \
-                            get_global_indices_array(
-                                    self._block.opposite_axis_dir(face), span,
-                                    self.lat_linear_dist)
-                    idx += size
 
     def _init_compute(self):
         self.config.logger.debug("Initializing compute unit.")
@@ -658,6 +660,15 @@ class BlockRunner(object):
         self.backend.from_buf(self.gpu_dist(0, iter_idx), dbuf)
         return dbuf
 
+
+    def _debug_global_idx_to_tuple(self, gi):
+        dist_num = gi / self._get_nodes()
+        rest = gi % self._get_nodes()
+        arr_nx = self._physical_size[-1]
+        gx = rest % arr_nx
+        gy = rest / arr_nx
+        return dist_num, gy, gx
+
     def run(self):
         self.config.logger.info("Initializing block.")
 
@@ -701,10 +712,6 @@ class BlockRunner(object):
             if self._connected:
                 self.send_data()
 
-            if self._block.id == 0:
-                print self._x_ghost_send_buffer[0]
-                print self._x_ghost_collect_idx[0]
-
             if output_req and self.config.output_required:
                 self._fields_to_host()
                 self._output.save(self._sim.iteration)
@@ -726,12 +733,6 @@ class BlockRunner(object):
                         self._distrib_kernels[self._sim.iteration & 1],
                         self._distrib_grid):
                     self.backend.run_kernel(kernel, grid)
-
-            if self._block.id == 1:
-                print self._x_ghost_distrib_idx[768 + 0]
-                print self._x_ghost_recv_buffer[0]
-
-
 
     def main_benchmark(self):
         t_comp = 0.0
