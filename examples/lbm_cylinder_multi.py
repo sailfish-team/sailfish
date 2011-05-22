@@ -11,14 +11,20 @@ class CylinderGeometry(LBGeometry2D):
         blocks = []
         if self.config.vertical:
             q = self.gy / self.config.blocks
+            diff = self.gy % self.config.blocks
         else:
             q = self.gx / self.config.blocks
+            diff = self.gx % self.config.blocks
 
         for i in range(0, self.config.blocks):
+            size = q
+            if i == self.config.blocks-1:
+                size += diff
+
             if self.config.vertical:
-                blocks.append(LBBlock2D((0, i * q), (self.gx, q)))
+                blocks.append(LBBlock2D((0, i * q), (self.gx, size)))
             else:
-                blocks.append(LBBlock2D((i * q, 0), (q, self.gy)))
+                blocks.append(LBBlock2D((i * q, 0), (size, self.gy)))
         return blocks
 
 

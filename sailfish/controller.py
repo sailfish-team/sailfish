@@ -308,9 +308,12 @@ class LBGeometryProcessor(object):
                     block.enable_local_periodicity(0)
                     continue
 
+                # Iterate over all blocks, for each one calculate the location
+                # of its top boundary and compare it to the size of the whole
+                # simulation domain.
                 for x0, candidates in self._coord_map_list[0].iteritems():
                     for candidate in candidates:
-                       if (candidate.location[0] + candidate.size[0]
+                        if (candidate.location[0] + candidate.size[0]
                                == self.geo.gx):
                             try_connect(block, candidate, self.geo, 0)
 
@@ -322,7 +325,7 @@ class LBGeometryProcessor(object):
 
                 for y0, candidates in self._coord_map_list[1].iteritems():
                     for candidate in candidates:
-                       if (candidate.location[1] + candidate.size[1]
+                        if (candidate.location[1] + candidate.size[1]
                                == self.geo.gy):
                             try_connect(block, candidate, self.geo, 1)
 
@@ -334,7 +337,7 @@ class LBGeometryProcessor(object):
 
                 for z0, candidates in self._coord_map_list[2].iteritems():
                     for candidate in candidates:
-                       if (candidate.location[2] + candidate.size[2]
+                        if (candidate.location[2] + candidate.size[2]
                                == self.geo.gz):
                             try_connect(block, candidate, self.geo, 2)
 
