@@ -245,35 +245,37 @@ class BlockRunner(object):
                 return ((span2[0][0] - span1[0][0], span2[0][1] - span1[0][0]),
                         (span2[1][0] - span1[1][0], span2[1][1] - span1[1][0]))
 
-        total_x_size = 0
 
-        # TODO(michalj): Use the above mechanism for the X axis as well.
-        for axis, block_id in self._block.connecting_blocks():
-            span = self._block.get_connection_span(axis, block_id)
-            size = self._block.connection_buf_size(grid, axis, block_id)
-            block_axis_span.setdefault(block_id, []).append((axis, span, size))
+        for face, block_id in self._block.connecting_blocks():
+            span = self._block.get_connection_span(face, block_id)
+            size = self._block.connection_buf_size(grid, face, block_id)
+            block_axis_span.setdefault(block_id, []).append((face, span, size))
 
-            if axis <= 1:
-                total_x_size += size
-            else:
-                max_span(axis, span_to_tuple(span))
+            max_span(face, span_to_tuple(span))
 
         total_ortho_size = 0
+        total_x_size = 0
+
         # Maps face to gx_start, num_nodes * num_dists, buf_offset
         #  gx_start: coordinates of the first node in the ghost patch on a face
         #  buf_offset: item offset in the global ghost buffer for all faces
         self._ghost_info = {}
         for face, span in axis_span.iteritems():
             buf_size = len(sym.get_prop_dists(grid,
-                    self._block.axis_dir_to_dir(axis),
-                    self._block.axis_dir_to_axis(axis)))
+                    self._block.axis_dir_to_dir(face),
+                    self._block.axis_dir_to_axis(face)))
             for low, high in span:
                 buf_size *= (high - low)
-            self._ghost_info[face] = (low, buf_size, total_ortho_size)
-            total_ortho_size += buf_size
 
-        self._connected = True
-        self._x_connected = True
+            if face < 2:
+                self._ghost_info[face] = (low, buf_size, total_x_size)
+                total_x_size += buf_size
+            else:
+                self._ghost_info[face] = (low, buf_size, total_ortho_size)
+                total_ortho_size += buf_size
+
+        self._x_connected = total_x_size > 0
+        self._connected = (total_ortho_size > 0) or self._x_connected
 
         self._ortho_ghost_recv_buffer = None
         self._ortho_ghost_send_buffer = None
@@ -284,52 +286,56 @@ class BlockRunner(object):
             self._ortho_ghost_send_buffer = np.zeros(total_ortho_size,
                 dtype=self.float)
 
-            face2view = {}
-            for face, (_, buf_size, offset) in self._ghost_info.iteritems():
-                span = axis_span[face]
+        if total_x_size > 0:
+            self._x_ghost_recv_buffer = np.zeros(total_x_size, dtype=self.float)
+            self._x_ghost_send_buffer = np.zeros(total_x_size, dtype=self.float)
+
+        face2view = {}
+        for face, (_, buf_size, offset) in self._ghost_info.iteritems():
+            span = axis_span[face]
+
+            if face < 2:
+                recv_view = self._x_ghost_recv_buffer.view()
+                send_view = self._x_ghost_send_buffer.view()
+            else:
                 recv_view = self._ortho_ghost_recv_buffer.view()
-                recv_view = recv_view[offset:offset + buf_size]
                 send_view = self._ortho_ghost_send_buffer.view()
-                send_view = send_view[offset:offset + buf_size]
 
-                nodes = 1
-                for low, high in span:
-                    nodes *= (high - low)
-                dists = buf_size / nodes
+            recv_view = recv_view[offset:offset + buf_size]
+            send_view = send_view[offset:offset + buf_size]
 
-                recv_view = recv_view.reshape(dists, nodes)
-                send_view = send_view.reshape(dists, nodes)
+            nodes = 1
+            for low, high in span:
+                nodes *= (high - low)
+            dists = buf_size / nodes
 
-                # For 2D blocks, there is no need to reshape the view, which
-                # is already a 1D array.
-                # XXX: this is off by prop_dists
-                if self._block.dim == 3:
-                    recv_view = recv_view.reshape(
-                            (span[0][1]-span[0][0], span[1][1]-span[1][0]))
-                    send_view = send_view.reshape(
-                            (span[0][1]-span[0][0], span[1][1]-span[1][0]))
+            recv_view = recv_view.reshape(dists, nodes)
+            send_view = send_view.reshape(dists, nodes)
 
-                face2view[face] = (recv_view, send_view)
+            # For 2D blocks, there is no need to reshape the view, which
+            # is already a 1D array.
+            # XXX: this is off by prop_dists
+            if self._block.dim == 3:
+                recv_view = recv_view.reshape(
+                        (span[0][1]-span[0][0], span[1][1]-span[1][0]))
+                send_view = send_view.reshape(
+                        (span[0][1]-span[0][0], span[1][1]-span[1][0]))
 
-            self._blockface2view = {}
-            for block_id, item_list in block_axis_span.iteritems():
-                for face, span, _ in item_list:
-                    view = face2view[face]
-                    global_span = axis_span[face]
-                    rel_span = relative_span(global_span, span_to_tuple(span))
-                    rel_span = tuple_to_span(rel_span)
-                    self._blockface2view.setdefault(block_id, []).append(
-                            (face, view[0][:][rel_span], view[1][:][rel_span]))
+            face2view[face] = (recv_view, send_view)
+
+        self._blockface2view = {}
+        for block_id, item_list in block_axis_span.iteritems():
+            for face, span, _ in item_list:
+                view = face2view[face]
+                global_span = axis_span[face]
+                rel_span = relative_span(global_span, span_to_tuple(span))
+                rel_span = tuple_to_span(rel_span)
+                self._blockface2view.setdefault(block_id, []).append(
+                        (face, view[0][:][rel_span], view[1][:][rel_span]))
 
         # Nothing to do if there are no connecting blocks to share data with.
-        if total_x_size == 0:
-            self._x_connected = False
-            if total_ortho_size == 0:
-                self._connected = False
+        if not self._x_connected:
             return
-
-        self._x_ghost_recv_buffer = np.zeros(total_x_size, dtype=self.float)
-        self._x_ghost_send_buffer = np.zeros(total_x_size, dtype=self.float)
 
         # Lookup tables for distribution of the ghost node data.
         self._x_ghost_collect_idx = np.zeros(total_x_size, dtype=np.uint32)
@@ -664,6 +670,10 @@ class BlockRunner(object):
         # TODO(michalj): Can the buffer and offset be merged into a single
         # field?
         for face, (gx_start, num_nodes, buf_offset) in self._ghost_info.iteritems():
+            # X-faces are already processed above.
+            if face < 2:
+                continue
+
             for i in range(0, 2):  # primary, secondary
                 self._collect_kernels[i].append(
                         self.get_kernel('CollectOrthogonalGhostData',
