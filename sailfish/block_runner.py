@@ -595,7 +595,9 @@ class BlockRunner(object):
                     if not connector.recv(dest, self._quit_event):
                         return
                     idx = 0
-                    for views in faces:
+                    # If there are two connections between the blocks,
+                    # reverse the order of faces in the buffer.
+                    for views in reversed(faces):
                         dst_view = np.ravel(views[1])
                         dst_view[:] = dest[idx:idx + dst_view.shape[0]]
                         idx += dst_view.shape[0]
@@ -675,7 +677,7 @@ class BlockRunner(object):
                         self.get_kernel('DistributeOrthogonalGhostData',
                             [self.gpu_dist(0, i),
                                 np.int32(gx_start),
-                                np.int32(face),
+                                np.int32(self._block.opposite_axis_dir(face)),
                                 np.int32(num_nodes),
                                 self._gpu_ortho_ghost_recv_buffer, buf_offset],
                             'PiiiPi', (collect_block,)))
