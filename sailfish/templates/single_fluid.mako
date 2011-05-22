@@ -2,6 +2,8 @@
     from sailfish import sym
 %>
 
+extern int printf (__const char *__restrict __format, ...);
+
 %if 'gravity' in context.keys():
 	${const_var} float gravity = ${gravity}f;
 %endif
@@ -266,7 +268,7 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 // buffer: buffer where the data is to be saved
 ${kernel} void CollectOrthogonalGhostData(
 		${global_ptr} float *dist, int base_gx,
-		int axis_dir, int max_idx, ${global_ptr} float *buffer)
+		int axis_dir, int max_idx, ${global_ptr} float *buffer, int offset)
 {
 	int idx = get_global_id(0);
 	int gi;
@@ -284,19 +286,20 @@ ${kernel} void CollectOrthogonalGhostData(
 						block.axis_dir_to_dir(axis),
 						block.axis_dir_to_axis(axis))
 			%>
-			int dist_size = get_global_size(0) / ${len(prop_dists)};
+			int dist_size = max_idx / ${len(prop_dists)};
 			int dist_num = idx / dist_size;
 			int gx = idx % dist_size;
+
 			switch (dist_num) {
-				%for prop_dist in prop_dists:
-				case ${prop_dist}: {
+				%for i, prop_dist in enumerate(prop_dists):
+				case ${i}: {
 					gi = getGlobalIdx(base_gx + gx, ${lat_linear[axis]});
 					tmp = ${get_dist('dist', prop_dist, 'gi')};
 					break;
 				}
 				%endfor
 			}
-			buffer[idx] = tmp;
+			buffer[offset + idx] = tmp;
 			break;
 		}
 	%endfor
@@ -305,11 +308,11 @@ ${kernel} void CollectOrthogonalGhostData(
 
 ${kernel} void DistributeOrthogonalGhostData(
 		${global_ptr} float *dist, int base_gx,
-		int axis_dir, int max_idx, ${global_ptr} float *buffer)
+		int axis_dir, int max_idx, ${global_ptr} float *buffer, int offset)
 {
 	int idx = get_global_id(0);
 	int gi;
-	float tmp = buffer[idx];
+	float tmp = buffer[offset + idx];
 
 	if (idx >= max_idx) {
 		return;
@@ -323,18 +326,20 @@ ${kernel} void DistributeOrthogonalGhostData(
 						block.axis_dir_to_dir(axis),
 						block.axis_dir_to_axis(axis))
 			%>
-			int dist_size = get_global_size(0) / ${len(prop_dists)};
+			int dist_size = max_idx / ${len(prop_dists)};
 			int dist_num = idx / dist_size;
 			int gx = idx % dist_size;
+
 			switch (dist_num) {
-				%for prop_dist in prop_dists:
-				case ${prop_dist}: {
-					gi = getGlobalIdx(base_gx + gx, ${lat_linear[axis]});
+				%for i, prop_dist in enumerate(prop_dists):
+				case ${i}: {
+					gi = getGlobalIdx(base_gx + gx, ${lat_linear_dist[axis]});
 					${get_dist('dist', prop_dist, 'gi')} = tmp;
 					break;
 				}
 				%endfor
 			}
+
 			break;
 		}
 	%endfor
