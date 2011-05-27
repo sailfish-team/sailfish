@@ -213,6 +213,9 @@ class NPYOutput(LBOutput):
         data.update(self._vector_fields)
         np.savez(fname, **data)
 
+    def dump_dists(self, dists, i):
+        fname = ('%sdist_dump%0' + self.digits + 'd') % (self.fname, i)
+        np.save(fname, dists)
 
 class MatlabOutput(LBOutput):
     """Ssves simulation data as Matlab .mat files."""
