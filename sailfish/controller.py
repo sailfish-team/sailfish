@@ -393,6 +393,9 @@ class LBSimulationController(object):
             help='visualization engine to use')
         group.add_argument('--gpus', nargs='+', default=0, type=int,
             help='which GPUs to use')
+        group.add_argument('--debug_dump_dists', action='store_true',
+                default=False, help='dump the contents of the distribution '
+                'arrays to files'),
 
         group = self.conf.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)

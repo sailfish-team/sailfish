@@ -712,6 +712,10 @@ class BlockRunner(object):
         while True:
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
 
+            if output_req and self.config.debug_dump_dists:
+                dbuf = self._debug_get_dist(self)
+                self._output.dump_dists(dbuf, self._sim.iteration)
+
             self.step(output_req)
             if self._connected:
                 self.send_data()
