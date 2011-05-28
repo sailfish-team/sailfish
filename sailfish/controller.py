@@ -1,8 +1,10 @@
 import ctypes
 import logging
 import operator
+import os
 import platform
 import sys
+import tempfile
 import multiprocessing as mp
 from multiprocessing import Process, Array, Event, Value
 import numpy as np
@@ -30,6 +32,7 @@ def _get_visualization_engines():
 
 def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
         quit_event):
+    os.environ['TMPDIR'] = tempfile.mkdtemp()
     # We instantiate the backend class here (instead in the machine
     # master), so that the backend object is created within the
     # context of the new process.
@@ -41,14 +44,19 @@ def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
 class LBBlockConnector(object):
     """Handles data exchange between two blocks."""
 
-    def __init__(self, send_array, recv_array, send_ev, recv_ev):
+    def __init__(self, send_array, recv_array, send_ev, recv_ev, conf_ev,
+            remote_conf_ev):
         self._send_array = send_array
         self._recv_array = recv_array
         self._send_ev = send_ev
         self._recv_ev = recv_ev
+        self._conf_ev = conf_ev
+        self._remote_conf_ev = remote_conf_ev
 
     def send(self, data):
+        self._remote_conf_ev.wait()
         self._send_array[:] = data
+        self._remote_conf_ev.clear()
         self._send_ev.set()
 
     def recv(self, data, quit_ev):
@@ -61,6 +69,7 @@ class LBBlockConnector(object):
                 return False
         data[:] = self._recv_array[:]
         self._recv_ev.clear()
+        self._conf_ev.set()
         return True
 
 
@@ -143,15 +152,19 @@ class LBMachineMaster(object):
                 array2 = Array(ctype, size)
                 ev1 = Event()
                 ev2 = Event()
+                ev3 = Event()
+                ev4 = Event()
+                ev3.set()
+                ev4.set()
 
                 self.config.logger.debug("Block connection: {0} <-> {1}: {2}"
                         "-element buffer (axis {3}).".format(
                             block.id, nbid, size, axis_str))
 
                 block.add_connector(nbid,
-                        LBBlockConnector(array1, array2, ev1, ev2))
+                        LBBlockConnector(array1, array2, ev1, ev2, ev3, ev4))
                 self.blocks[nbid].add_connector(block.id,
-                        LBBlockConnector(array2, array1, ev2, ev1))
+                        LBBlockConnector(array2, array1, ev2, ev1, ev4, ev3))
 
     def _init_block_envelope(self, sim):
         """Sets the size of the ghost node envelope for all blocks."""
