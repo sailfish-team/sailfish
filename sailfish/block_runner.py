@@ -257,7 +257,6 @@ class BlockRunner(object):
             span = self._block.get_connection_span(face, block_id)
             size = self._block.connection_buf_size(grid, face, block_id)
             block_axis_span.setdefault(block_id, []).append((face, span, size))
-
             max_span(face, span_to_tuple(span))
 
         total_ortho_size = 0
@@ -632,7 +631,7 @@ class BlockRunner(object):
                 self._collect_kernels[i].append(
                         self.get_kernel('CollectOrthogonalGhostData',
                             [self.gpu_dist(0, 1-i),
-                                np.int32(gx_start),
+                                np.int32(gx_start + self._block.envelope_size),
                                 np.int32(face),
                                 np.int32(num_nodes),
                                 self._gpu_ortho_ghost_send_buffer, buf_offset],
@@ -640,7 +639,7 @@ class BlockRunner(object):
                 self._distrib_kernels[i].append(
                         self.get_kernel('DistributeOrthogonalGhostData',
                             [self.gpu_dist(0, i),
-                                np.int32(gx_start),
+                                np.int32(gx_start + self._block.envelope_size),
                                 np.int32(self._block.opposite_axis_dir(face)),
                                 np.int32(num_nodes),
                                 self._gpu_ortho_ghost_recv_buffer, buf_offset],
