@@ -15,11 +15,17 @@ class LBOutput(object):
         self._scalar_fields = {}
         self._vector_fields = {}
 
-    def register_field(self, field, name):
-        if type(field) is list:
-            self._vector_fields[name] = field
+        # Additional scalar fields used for visualization.
+        self._visualization_fields = {}
+
+    def register_field(self, field, name, visualization=False):
+        if visualization:
+            self._visualization_fields[name] = field
         else:
-            self._scalar_fields[name] = field
+            if type(field) is list:
+                self._vector_fields[name] = field
+            else:
+                self._scalar_fields[name] = field
 
     def save(self, i):
         pass
@@ -42,25 +48,27 @@ class VisualizationWrapper(LBOutput):
         self.nodes = reduce(operator.mul, block.size)
         self._dim = len(self.block.size)
 
-    def register_field(self, field, name):
-        self._output.register_field(field, name)
+    def register_field(self, field, name, visualization=False):
+        self._output.register_field(field, name, visualization)
 
     def save(self, i):
         self._output.save(i)
 
         if self._first_save:
             self._scalar_names = self._output._scalar_fields.keys()
+            self._vis_names    = self._output._visualization_fields.keys()
             self._vector_names = self._output._vector_fields.keys()
             self._scalar_len = len(self._scalar_names)
+            self._vis_len    = len(self._vis_names)
             self._vector_len = len(self._vector_names) * self._dim
-            self._field_names = self._scalar_names
+            self._field_names = self._scalar_names + self._vis_names
             component_names = ['_x', '_y', '_z']
             for name in self._vector_names:
                 for i in range(self._dim):
                     self._field_names.append(
                         '{0}{1}'.format(name, component_names[i]))
 
-            self._vis_config.fields = self._scalar_len + self._vector_len
+            self._vis_config.fields = self._scalar_len + self._vis_len + self._vector_len
             self._first_save = False
 
         # Only update the buffer if the block to which we belong is
@@ -73,8 +81,12 @@ class VisualizationWrapper(LBOutput):
             if requested_field < self._scalar_len:
                 name = self._scalar_names[requested_field]
                 field = self._output._scalar_fields[name]
-            else:
+            elif requested_field < self._scalar_len + self._vis_len:
                 requested_field -= self._scalar_len
+                name = self._vis_names[requested_field]
+                field = self._output._visualization_fields[name]()
+            else:
+                requested_field -= self._scalar_len + self._vis_len
                 idx = requested_field / self._dim
                 name = self._vector_names[idx]
                 component = requested_field % self._dim
