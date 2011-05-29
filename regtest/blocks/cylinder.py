@@ -48,9 +48,6 @@ class TestInterblockPropagation(unittest.TestCase):
         cls.vvx  = cls.vref['v'][0]
         cls.vvy  = cls.vref['v'][1]
 
-
-        cls.atol = 1e-6
-
     def test_horiz_2blocks(self):
         global blocks, vertical, output
         output = os.path.join(tmpdir, 'horiz_2block')
@@ -65,9 +62,9 @@ class TestInterblockPropagation(unittest.TestCase):
         vx = np.hstack([testdata0['v'][0], testdata1['v'][0]])
         vy = np.hstack([testdata0['v'][1], testdata1['v'][1]])
 
-        np.testing.assert_allclose(rho, self.hrho, atol=self.atol)
-        np.testing.assert_allclose(vx, self.hvx, atol=self.atol)
-        np.testing.assert_allclose(vy, self.hvy, atol=self.atol)
+        np.testing.assert_array_almost_equal(rho, self.hrho)
+        np.testing.assert_array_almost_equal(vx, self.hvx)
+        np.testing.assert_array_almost_equal(vy, self.hvy)
 
     def test_horiz_3blocks(self):
         global blocks, vertical, output
@@ -84,9 +81,9 @@ class TestInterblockPropagation(unittest.TestCase):
         vx = np.hstack([testdata0['v'][0], testdata1['v'][0], testdata2['v'][0]])
         vy = np.hstack([testdata0['v'][1], testdata1['v'][1], testdata2['v'][1]])
 
-        np.testing.assert_allclose(rho, self.hrho, atol=self.atol)
-        np.testing.assert_allclose(vx, self.hvx, atol=self.atol)
-        np.testing.assert_allclose(vy, self.hvy, atol=self.atol)
+        np.testing.assert_array_almost_equal(rho, self.hrho)
+        np.testing.assert_array_almost_equal(vx, self.hvx)
+        np.testing.assert_array_almost_equal(vy, self.hvy)
 
     def test_vert_2blocks(self):
         global blocks, vertical, output
@@ -102,9 +99,9 @@ class TestInterblockPropagation(unittest.TestCase):
         vx = np.vstack([testdata0['v'][0], testdata1['v'][0]])
         vy = np.vstack([testdata0['v'][1], testdata1['v'][1]])
 
-        np.testing.assert_allclose(rho, self.vrho, atol=self.atol)
-        np.testing.assert_allclose(vx, self.vvx, atol=self.atol)
-        np.testing.assert_allclose(vy, self.vvy, atol=self.atol)
+        np.testing.assert_array_almost_equal(rho, self.vrho)
+        np.testing.assert_array_almost_equal(vx, self.vvx)
+        np.testing.assert_array_almost_equal(vy, self.vvy)
 
     def test_vert_3blocks(self):
         global blocks, vertical, output
@@ -121,9 +118,9 @@ class TestInterblockPropagation(unittest.TestCase):
         vx = np.vstack([testdata0['v'][0], testdata1['v'][0], testdata2['v'][0]])
         vy = np.vstack([testdata0['v'][1], testdata1['v'][1], testdata2['v'][1]])
 
-        np.testing.assert_allclose(rho, self.vrho, atol=self.atol)
-        np.testing.assert_allclose(vx, self.vvx, atol=self.atol)
-        np.testing.assert_allclose(vy, self.vvy, atol=self.atol)
+        np.testing.assert_array_almost_equal(rho, self.vrho)
+        np.testing.assert_array_almost_equal(vx, self.vvx)
+        np.testing.assert_array_almost_equal(vy, self.vvy)
 
 
 if __name__ == '__main__':
