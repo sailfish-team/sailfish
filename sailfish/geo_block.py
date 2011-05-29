@@ -2,6 +2,7 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'GPL3'
 
+from collections import defaultdict
 import numpy as np
 from sailfish import sym
 
@@ -350,8 +351,13 @@ class GeoEncoderConst(GeoEncoder):
         self._bits_orientation = 0
         self._bits_param = 0
         self._type_map = None
+        self._param_map = None
+        self._geo_params = []
+        self._num_params = 0
+        # TODO: Generalize this.
+        self._num_velocities = 0
 
-    def prepare_encode(self, type_map):
+    def prepare_encode(self, type_map, param_map, param_dict):
         """
         Args:
           type_map: uint32 array representing node type information
@@ -363,12 +369,40 @@ class GeoEncoderConst(GeoEncoder):
 
         self._bits_type = bit_len(uniq_types.size)
         self._type_map = type_map
+        self._param_map = param_map
+
+        # Group parameters by type.
+        type_dict = defaultdict(list)
+        for param_hash, (node_type, val) in param_dict.iteritems():
+            type_dict[node_type].append((param_hash, val))
+
+        max_len = 0
+        for node_type, values in type_dict.iteritems():
+            l = len(values)
+            self._num_params += l
+            if node_type == GeoBlock.NODE_VELOCITY:
+                self._num_velocities = l
+            max_len = max(max_len, l)
+        self._bits_param = bit_len(max_len)
+
+        # TODO(michalj): Genealize this to other node types.
+        for param_hash, val in type_dict[GeoBlock.NODE_VELOCITY]:
+            self._geo_params.extend(val)
+        for param_hash, val in type_dict[GeoBlock.NODE_PRESSURE]:
+            self._geo_params.append(val)
+
+        self._type_dict = type_dict
 
     def encode(self):
         assert self._type_map is not None
 
-        # TODO: process params and orientation here.
+        # TODO: optimize this using numpy's built-in routines
         param = np.zeros_like(self._type_map)
+        for node_type, values in self._type_dict.iteritems():
+            for i, (hash_value, _) in enumerate(values):
+                param[self._param_map == hash_value] = i
+
+        # TODO: process orientation here.
         orientation = np.zeros_like(self._type_map)
 
         # Remap type IDs.
@@ -398,7 +432,9 @@ class GeoEncoderConst(GeoEncoder):
             'geo_param_shift': self._bits_param,
             'geo_obj_shift': 0,
             'geo_dir_other': 0,
-            'geo_num_velocities': 0,
+            'geo_num_velocities': self._num_velocities,
+            'num_params': self._num_params,
+            'geo_params': self._geo_params
         })
 
     def _encode_node(self, orientation, param, node_type):
@@ -409,6 +445,7 @@ class GeoEncoderConst(GeoEncoder):
         """
         misc_data = (orientation << self._bits_param) | param
         return node_type | (misc_data << self._bits_type)
+
 
 # TODO: Implement this class.
 class GeoEncoderBuffer(GeoEncoder):
@@ -434,8 +471,6 @@ class GeoBlock(object):
     NODE_MISC_MASK = 0
     NODE_MISC_SHIFT = 1
     NODE_TYPE_MASK = 2
-    # TODO: Note: a ghost node should be able to carry information about
-    # the normal node type.
 
     @classmethod
     def add_options(cls, group):
@@ -457,6 +492,9 @@ class GeoBlock(object):
                 dtype=np.uint8)
         self._type_map_encoded = False
         self._type_map_view = self._type_map.view()[block._nonghost_slice]
+        self._param_map = block.runner.make_scalar_field(np.uint32)
+        self._param_map_view = self._param_map.view()[block._nonghost_slice]
+        self._params = {}
         self._encoder = None
 
     @property
@@ -473,6 +511,9 @@ class GeoBlock(object):
         # TODO: if type_ is a class, we should just store its ID; if it's
         # an object, the ID should be dynamically assigned
         self._type_map_view[where] = type_
+        key = (type_, params)
+        self._param_map_view[where] = hash(key)
+        self._params[hash(key)] = key
 
     def reset(self):
         self._type_map_encoded = False
@@ -487,7 +528,8 @@ class GeoBlock(object):
 
         # TODO: At this point, we should decide which GeoEncoder class to use.
         self._encoder = GeoEncoderConst()
-        self._encoder.prepare_encode(self._type_map)
+        self._encoder.prepare_encode(self._type_map, self._param_map_view,
+                self._params)
 
     def init_fields(self, sim):
         mgrid = self._get_mgrid()
@@ -501,6 +543,7 @@ class GeoBlock(object):
         # FIXME(michalj)
         ctx.update({
                 'bc_wall': 'fullbb',
+                'bc_velocity': 'fullbb',
                 'bc_wall_': BCWall,
                 'bc_velocity_': BCWall,
                 'bc_pressure_': BCWall,
@@ -515,6 +558,7 @@ class GeoBlock(object):
 
     def visualization_map(self):
         return self._type_vis_map
+
 
 class GeoBlock2D(GeoBlock):
     dim = 2
@@ -565,6 +609,7 @@ class GeoBlock3D(GeoBlock):
     def _define_ghosts(self):
         assert not self._type_map_encoded
         # TODO: actually define ghost nodes here
+        raise NotImplementedError('_define_ghosts')
 
     def _postprocess_nodes(self):
         raise NotImplementedError("_postprocess_nodes()")

@@ -110,8 +110,6 @@ class BlockCodeGenerator(object):
 
         return ctx
 
-#        ctx['num_params'] = len(self.geo_params)
-#        ctx['geo_params'] = self.geo_params
 #        ctx['backend'] = self.options.backend
 #        ctx['dist_size'] = self.get_dist_size()
 #        ctx['grid'] = self.grid
