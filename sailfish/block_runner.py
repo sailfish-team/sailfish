@@ -81,10 +81,6 @@ class BlockRunner(object):
         # FIXME Additional constants.
         ctx['constants'] = []
 
-        # FIXME: Geometry parameters.
-        ctx['num_params'] = 0
-        ctx['geo_params'] = []
-
         arr_nx = self._physical_size[-1]
         arr_ny = self._physical_size[-2]
 
