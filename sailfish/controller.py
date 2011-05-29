@@ -1,7 +1,6 @@
 import ctypes
 import logging
 import operator
-import os
 import platform
 import sys
 import tempfile
@@ -32,7 +31,10 @@ def _get_visualization_engines():
 
 def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
         quit_event):
-    os.environ['TMPDIR'] = tempfile.mkdtemp()
+    # Make sure each block has its own temporary directory.  This is
+    # particularly important with Numpy 1.3.0, where there is a race
+    # condition when saving npz files.
+    tempfile.tempdir = tempfile.mkdtemp()
     # We instantiate the backend class here (instead in the machine
     # master), so that the backend object is created within the
     # context of the new process.
