@@ -99,6 +99,11 @@ class BlockRunner(object):
         else:
             ctx['distrib_collect_x_size'] = 0
 
+    def add_visualization_field(self, field_cb, name):
+        self._output.register_field(
+                lambda: field_cb().view()[self._block._nonghost_slice],
+                name, visualization=True)
+
     def make_scalar_field(self, dtype=None, name=None):
         """Allocates a scalar NumPy array.
 
