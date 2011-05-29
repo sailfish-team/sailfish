@@ -323,8 +323,9 @@ class GeoEncoder(object):
 
     This is an abstract class.  Its implementations provide a specific encoding
     scheme."""
-    def __init__(self):
+    def __init__(self, geo_block):
         self._type_id_map = {}
+        self.geo_block = geo_block
 
     def encode(self):
         raise NotImplementedError("encode() should be implemented in a subclass")
@@ -344,11 +345,10 @@ class GeoEncoderConst(GeoEncoder):
     of a node into a single uint32.  Optional parameters are stored in const
     memory."""
 
-    def __init__(self):
-        GeoEncoder.__init__(self)
+    def __init__(self, geo_block):
+        GeoEncoder.__init__(self, geo_block)
 
         self._bits_type = 0
-        self._bits_orientation = 0
         self._bits_param = 0
         self._type_map = None
         self._param_map = None
@@ -402,8 +402,25 @@ class GeoEncoderConst(GeoEncoder):
             for i, (hash_value, _) in enumerate(values):
                 param[self._param_map == hash_value] = i
 
-        # TODO: process orientation here.
         orientation = np.zeros_like(self._type_map)
+        cnt = np.zeros_like(self._type_map)
+
+        for i, vec in enumerate(self.geo_block.grid.basis):
+            l = len(list(vec)) - 1
+            shifted_map = self._type_map
+            for j, shift in enumerate(vec):
+                shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
+
+            cnt[(shifted_map == GeoBlock.NODE_WALL)] += 1
+            # FIXME: we're currently only processing the primary directions
+            # here
+            if vec.dot(vec) == 1:
+                idx = np.logical_and(self._type_map != GeoBlock.NODE_FLUID,
+                        shifted_map == GeoBlock.NODE_FLUID)
+                orientation[idx] = self.geo_block.grid.vec_to_dir(list(vec))
+
+            # Mark any nodes completely surrounded by walls as unused.
+            self._type_map[(cnt == self.geo_block.grid.Q)] = GeoBlock.NODE_UNUSED
 
         # Remap type IDs.
         max_type_code = max(self._type_id_map.keys())
@@ -527,7 +544,7 @@ class GeoBlock(object):
         self._define_ghosts()
 
         # TODO: At this point, we should decide which GeoEncoder class to use.
-        self._encoder = GeoEncoderConst()
+        self._encoder = GeoEncoderConst(self)
         self._encoder.prepare_encode(self._type_map, self._param_map_view,
                 self._params)
 
@@ -543,7 +560,7 @@ class GeoBlock(object):
         # FIXME(michalj)
         ctx.update({
                 'bc_wall': 'fullbb',
-                'bc_velocity': 'fullbb',
+                'bc_velocity': 'equilibrium',
                 'bc_wall_': BCWall,
                 'bc_velocity_': BCWall,
                 'bc_pressure_': BCWall,
