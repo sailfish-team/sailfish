@@ -110,6 +110,23 @@ class TestBlock2D(unittest.TestCase):
         # TODO(michalj): Consider more complex tests here like in
         # test_block_connection_*
 
+    def test_2d_corner_block_connection(self):
+        b1 = LBBlock2D((0, 0), (10, 10), id_=0)
+        b2 = LBBlock2D((10, 0), (10, 10), id_=1)
+        b3 = LBBlock2D((0, 10), (10, 10), id_=2)
+        b4 = LBBlock2D((10, 10), (10, 10), id_=3)
+
+        self.assertTrue(b1.connect(b2))
+        self.assertTrue(b1.connect(b3))
+        self.assertTrue(b1.connect(b4))
+
+        gcs = b1.get_connection_span
+        self.assertEqual(gcs(LBBlock2D._X_HIGH, b2.id), (9, slice(0, 10, None)))
+        self.assertEqual(gcs(LBBlock2D._X_HIGH, b4.id), (9, slice(10, 10, None)))
+        self.assertEqual(b1.connecting_blocks(),
+                [(LBBlock2D._X_HIGH, b2.id), (LBBlock2D._X_HIGH, b4.id),
+                 (LBBlock2D._Y_HIGH, b3.id)])
+
 
 if __name__ == '__main__':
     unittest.main()
