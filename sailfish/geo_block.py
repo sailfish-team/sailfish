@@ -25,13 +25,13 @@ class LBBlock(object):
     _Z_LOW = 4
     _Z_HIGH = 5
 
-    def __init__(self, location, size, *args, **kwargs):
+    def __init__(self, location, size, envelope_size=None, id_=None, *args, **kwargs):
         self.location = location
         self.size = size
         # Actual size of the simulation domain, including the envelope (ghost
         # nodes).  This is set later when the envelope size is known.
         self.actual_size = None
-        self.envelope_size = None
+        self.envelope_size = envelope_size
         self._runner = None
         self._id = None
         self._clear_connections()
@@ -39,6 +39,7 @@ class LBBlock(object):
 
         self.vis_buffer = None
         self.vis_geo_buffer = None
+        self.id = id_
 
     @property
     def runner(self):
