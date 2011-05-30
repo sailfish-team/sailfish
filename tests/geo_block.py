@@ -70,10 +70,10 @@ class TestBlock2D(unittest.TestCase):
         self.assertFalse(base.connect(bf3))
         self.assertFalse(base.connect(bf4))
 
-    def test_block_connectio_x_high(self):
+    def test_block_connection_x_high(self):
         self._connection_helper(20, LBBlock2D._X_HIGH, 9, True)
 
-    def test_block_connectio_x_low(self):
+    def test_block_connection_x_low(self):
         self._connection_helper(5, LBBlock2D._X_LOW, 0, True)
 
     def test_block_connection_y_high(self):
