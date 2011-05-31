@@ -222,10 +222,11 @@ class BlockRunner(object):
                 axis_span[axis] = span_tuple
             else:
                 curr = axis_span[axis]
+
                 if self._block.dim == 2:
-                    axis_span[axis] = (
-                            min(curr[0], span_tuple[0]),
-                            max(curr[1], span_tuple[1]))
+                    axis_span[axis] = ((
+                            min(curr[0][1], span_tuple[0][0]),
+                            max(curr[0][1], span_tuple[0][1])),)
                 else:
                     axis_span[axis] = (
                             (min(curr[0][0], span_tuple[0][0]),
@@ -246,6 +247,25 @@ class BlockRunner(object):
                 ret.append(slice(coord[0], coord[1]))
             return ret
 
+        # Corner connections are signified by empty slices.  Here we convert
+        # them to 1-element slices so that they match the connecting node
+        # coorrectly.
+        def handle_corner_span(span):
+            ret = []
+            for coord in span:
+                if type(coord) is slice:
+                    start = coord.start
+                    stop  = coord.stop
+                    if coord.start == coord.stop:
+                        if start == 0:
+                            stop += 1
+                        else:
+                            start -= 1
+                    ret.append(slice(start, stop))
+                else:
+                    ret.append(coord)
+            return ret
+
         def relative_span(span1, span2):
             if self._block.dim == 2:
                 return ((span2[0][0] - span1[0][0], span2[0][1] - span1[0][0]),)
@@ -257,6 +277,7 @@ class BlockRunner(object):
         for face, block_id in self._block.connecting_blocks():
             span = self._block.get_connection_span(face, block_id)
             size = self._block.connection_buf_size(grid, face, block_id)
+            span = handle_corner_span(span)
             block_axis_span.setdefault(block_id, []).append((face, span, size))
             max_span(face, span_to_tuple(span))
 
@@ -272,6 +293,7 @@ class BlockRunner(object):
                     self._block.axis_dir_to_dir(face),
                     self._block.axis_dir_to_axis(face)))
             for low, high in span:
+                assert high != low
                 buf_size *= (high - low)
 
             if face < 2:
@@ -339,6 +361,7 @@ class BlockRunner(object):
 
             nodes = 1
             for low, high in span:
+                assert high != low
                 nodes *= (high - low)
             dists = buf_size / nodes
 
