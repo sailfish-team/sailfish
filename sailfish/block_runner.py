@@ -225,7 +225,7 @@ class BlockRunner(object):
 
                 if self._block.dim == 2:
                     axis_span[axis] = ((
-                            min(curr[0][1], span_tuple[0][0]),
+                            min(curr[0][0], span_tuple[0][0]),
                             max(curr[0][1], span_tuple[0][1])),)
                 else:
                     axis_span[axis] = (
@@ -281,6 +281,10 @@ class BlockRunner(object):
             block_axis_span.setdefault(block_id, []).append((face, span, size))
             max_span(face, span_to_tuple(span))
 
+            self.config.logger.debug('face {0}: (block {1}) new span: {2} '
+                    'total face span: {3}'.format(face, block_id, span_to_tuple(span),
+                    axis_span[face]))
+
         total_ortho_size = 0
         total_x_size = 0
 
@@ -302,6 +306,12 @@ class BlockRunner(object):
             else:
                 self._ghost_info[face] = (low, buf_size, total_ortho_size)
                 total_ortho_size += buf_size
+
+            self.config.logger.debug('face {0}: {1}-item '
+                    'connection'.format(face, buf_size))
+
+        self.config.logger.debug('total conn buffer sizes: {0} (x), {1} '
+                '(ortho)'.format(total_x_size, total_ortho_size))
 
         self._x_connected = total_x_size > 0
         self._connected = (total_ortho_size > 0) or self._x_connected
@@ -342,8 +352,11 @@ class BlockRunner(object):
             arr_nx = self._physical_size[-1]
             return gx + arr_nx * gy + self._get_nodes() * dist_num
 
-        self._blockface2view = {}
-
+        # Maps face to recv view and send view (views of the relevant
+        # parts of the recv and send buffers for that face, respectively.
+        # Note that the buffers for the face can be larger than the sum
+        # of the buffers used to transfer data between blokcs, i.e. there
+        # might be some unused space in the face buffers.
         face2view = {}
         idx = 0
         for face, (_, buf_size, offset) in self._ghost_info.iteritems():
@@ -365,6 +378,9 @@ class BlockRunner(object):
                 nodes *= (high - low)
             dists = buf_size / nodes
 
+            self.config.logger.debug('face {0}: {1} nodes with {2} '
+                    'dists'.format(face, nodes, dists))
+
             recv_view = recv_view.reshape(dists, nodes)
             send_view = send_view.reshape(dists, nodes)
 
@@ -379,7 +395,7 @@ class BlockRunner(object):
 
             face2view[face] = (recv_view, send_view)
 
-            # Add global indicies for connections along the X axis.
+            # Add global indices for connections along the X axis.
             if face < 2:
                 self._x_ghost_collect_idx[idx:idx + size] = \
                         get_global_indices_array(face, span, self.lat_linear)
@@ -389,14 +405,28 @@ class BlockRunner(object):
                                 self.lat_linear_dist)
                 idx += size
 
+        # Maps block ID to list of tuples: (face, recv_view, send_view).
+        # The views correspond exactly to areas used for transferring data
+        # for the block identified by the key of the dict.
+        self._blockface2view = {}
         for block_id, item_list in block_axis_span.iteritems():
             for face, span, size in item_list:
                 view = face2view[face]
                 global_span = axis_span[face]
                 rel_span = relative_span(global_span, span_to_tuple(span))
                 rel_span = tuple_to_span(rel_span)
+
+                # XXX rel_span[0] is going to be invalid for 3D
+                recv_view = view[0][:,rel_span[0]]
+                send_view = view[1][:,rel_span[0]]
+
+                self.config.logger.debug('face {0}: block {1} with views '
+                        '{2} (orig {4}), {3} (orig {5})'.format(
+                            face, block_id, recv_view.shape,
+                            send_view.shape, view[0].shape, view[1].shape))
+
                 self._blockface2view.setdefault(block_id, []).append(
-                        (face, view[0][:][rel_span], view[1][:][rel_span]))
+                        (face, recv_view, send_view))
 
 
     def _init_compute(self):
