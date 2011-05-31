@@ -70,6 +70,9 @@ class LBBlock(object):
         raise NotImplementedError('Method should be defined by subclass.')
 
     def _add_connection(self, axis, span, block_id):
+        if axis in self._connections:
+            if (span, block_id) in self._connections[axis]:
+                return
         self._connections.setdefault(axis, []).append((span, block_id))
 
     def _clear_connections(self):
@@ -179,6 +182,9 @@ class LBBlock2D(LBBlock):
             else:
                 span_min_tg = 0
                 span_min = tg_od - sf_od
+
+            assert span_min >= 0
+            assert span_min_tg >= 0
 
             if sf_hd > tg_hd:
                 span_max = tg_hd - sf_od
