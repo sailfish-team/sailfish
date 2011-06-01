@@ -1,7 +1,8 @@
 import math
 import operator
 import numpy as np
-from sailfish import codegen, sym, util
+from sailfish import codegen, util
+from sailfish.geo_block import tuple_to_span, span_to_tuple
 
 class BlockRunner(object):
     """Runs the simulation for a single LBBlock
@@ -234,18 +235,6 @@ class BlockRunner(object):
                             (min(curr[1][0], span_tuple[1][0]),
                              max(curr[1][1], span_tuple[1][1])))
 
-        def span_to_tuple(span):
-            ret = []
-            for coord in span:
-                if type(coord) is slice:
-                    ret.append((coord.start, coord.stop))
-            return tuple(ret)
-
-        def tuple_to_span(span):
-            ret = []
-            for coord in span:
-                ret.append(slice(coord[0], coord[1]))
-            return ret
 
         # Corner connections are signified by empty slices.  Here we convert
         # them to 1-element slices so that they match the connecting node
@@ -277,13 +266,16 @@ class BlockRunner(object):
         for face, block_id in self._block.connecting_blocks():
             span = self._block.get_connection_span(face, block_id)
             size = self._block.connection_buf_size(grid, face, block_id)
-            span = handle_corner_span(span)
-            block_axis_span.setdefault(block_id, []).append((face, span, size))
-            max_span(face, span_to_tuple(span))
+            new_span = handle_corner_span(span)
+
+            # XXX handle corner nodes separately here
+            # XXX XXX
+            block_axis_span.setdefault(block_id, []).append((face, new_span, size))
+            max_span(face, span_to_tuple(new_span))
 
             self.config.logger.debug('face {0}: (block {1}) new span: {2} '
-                    'total face span: {3}'.format(face, block_id, span_to_tuple(span),
-                    axis_span[face]))
+                    'total face span: {3}'.format(face, block_id,
+                        span_to_tuple(new_span), axis_span[face]))
 
         total_ortho_size = 0
         total_x_size = 0
@@ -293,12 +285,10 @@ class BlockRunner(object):
         #  buf_offset: item offset in the global ghost buffer for all faces
         self._ghost_info = {}
         for face, span in axis_span.iteritems():
-            buf_size = len(sym.get_prop_dists(grid,
-                    self._block.axis_dir_to_dir(face),
-                    self._block.axis_dir_to_axis(face)))
-            for low, high in span:
-                assert high != low
-                buf_size *= (high - low)
+            buf_size = self._block.connection_buf_size(grid, face, span_tuple=span)
+
+            # XXX: fix this for 3D
+            low = span[0][0]
 
             if face < 2:
                 self._ghost_info[face] = (low, buf_size, total_x_size)
@@ -333,9 +323,8 @@ class BlockRunner(object):
             self._x_ghost_distrib_idx = np.zeros(total_x_size, dtype=np.uint32)
 
         def get_global_indices_array(face, span, gx_map):
-            dists = sym.get_prop_dists(grid,
-                    self._block.axis_dir_to_dir(face),
-                    self._block.axis_dir_to_axis(face))
+            dists = self._block.connection_dists(grid, face, span)
+            self.config.logger.debug(dists)
             gx = gx_map[face]
             gy = np.uint32(
                     range(self._block.envelope_size,
