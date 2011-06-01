@@ -15,6 +15,20 @@ def bit_len(num):
     return max(length, 1)
 
 
+def span_to_tuple(span):
+    ret = []
+    for coord in span:
+        if type(coord) is slice:
+            ret.append((coord.start, coord.stop))
+    return tuple(ret)
+
+def tuple_to_span(span):
+    ret = []
+    for coord in span:
+        ret.append(slice(coord[0], coord[1]))
+    return ret
+
+
 class LBBlock(object):
     dim = None
 
@@ -279,30 +293,53 @@ class LBBlock2D(LBBlock):
         opp_map.update(dict((v, k) for k, v in opp_map.iteritems()))
         return opp_map[axis_dir]
 
-    def connection_buf_size(self, grid, axis, block_id):
-        span = self.get_connection_span(axis, block_id)
-        size = self.envelope_size
-        direction = 0
-        for coord in span:
-            # Only process slices.  If the entry is a single coordinate,
-            # it does not contribute to the buffer size calculation.
-            if type(coord) is slice:
-                size *= max(1, coord.stop - coord.start)
-            else:
-                if coord == 0:
-                    direction = -1
-                else:
-                    direction = 1
+    # XXX, fix this for 3D
+    def _direction_from_span_face(self, face, span):
+        def is_corner_span(span):
+            for coord in span:
+                if type(coord) is slice:
+                    if coord.start == coord.stop:
+                        if coord.start == 0:
+                            return True, -1
+                        else:
+                            return True, 1
+            return False, None
 
-        # Multiply by the number of distributions that have to be
-        # transferred.
-        size *= len(sym.get_prop_dists(
-            grid, direction, self.axis_dir_to_axis(axis)))
-        return size
+        comp = self.axis_dir_to_dir(face)
+        pos  = self.axis_dir_to_axis(face)
+        direction = [0, 0]
+        direction[pos] = comp
+
+        corner, corner_dir = is_corner_span(span)
+        if corner:
+            direction[1 - pos] = corner_dir
+        return direction
+
+    def connection_dists(self, grid, face, span):
+        return sym.get_interblock_dists(grid,
+                self._direction_from_span_face(face, span))
+
+    def connection_buf_size(self, grid, face, block_id=None, span_tuple=None):
+        if block_id is not None:
+            assert span_tuple is None
+            span = self.get_connection_span(face, block_id)
+            span_tuple = span_to_tuple(span)
+        else:
+            assert span_tuple is not None
+            span = tuple_to_span(span_tuple)
+
+        buf_size = len(self.connection_dists(grid, face, span))
+        for low, high in span_tuple:
+            # Corner nodes are 0-elem spans and would multiply by 1 here.
+            if high != low:
+                buf_size *= (high - low)
+
+        return buf_size
 
     def update_context(self, ctx):
         ctx['dim'] = self.dim
         ctx['envelope_size'] = self.envelope_size
+
 
 class LBBlock3D(LBBlock):
     dim = 3
