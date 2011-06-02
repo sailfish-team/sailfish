@@ -316,9 +316,9 @@ class LBBlock2D(LBBlock):
             direction[1 - pos] = corner_dir
         return direction
 
-    def connection_dists(self, grid, face, span):
+    def connection_dists(self, grid, face, span, opposite=False):
         return sym.get_interblock_dists(grid,
-                self._direction_from_span_face(face, span))
+                self._direction_from_span_face(face, span), opposite)
 
     def connection_buf_size(self, grid, face, block_id=None, span_tuple=None):
         if block_id is not None:

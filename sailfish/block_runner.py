@@ -1,3 +1,4 @@
+import inspect
 import math
 import operator
 import numpy as np
@@ -331,7 +332,7 @@ class BlockRunner(object):
                     ret.append(coord)
             return ret
 
-        def get_global_indices_array(face, span_tuple, gx_map):
+        def get_global_indices_array(face, span_tuple, gx_map, opposite=False):
             """
             face: identifies the face (i.e x == 0 or x == lat_nx-1)
             span_tuple: identifies the area on the face for which the indices are to
@@ -340,7 +341,11 @@ class BlockRunner(object):
                     located
             """
             span = tuple_to_span(span_tuple)
-            dists = self._block.connection_dists(grid, face, span)
+            dists = self._block.connection_dists(grid, face, span, opposite)
+
+            self.config.logger.debug('{0}: dists: {1}'.format(inspect.stack()[0][3],
+                    dists))
+
             gx = gx_map[face]
             # The range starts at envelope_size so that 'span' only selects
             # 0
@@ -448,7 +453,6 @@ class BlockRunner(object):
             send_view = self._x_ghost_send_buffer.view()
             recv_view = recv_view[offset:offset + size]
             send_view = send_view[offset:offset + size]
-            offset += size
 
             recv_view = recv_view.reshape(1, 1)
             send_view = send_view.reshape(1, 1)
@@ -456,12 +460,16 @@ class BlockRunner(object):
             self._blockface2view.setdefault(block_id, []).append(
                     (face, recv_view, send_view))
 
+            self.config.logger.debug('face {0}: block {1} (X-corner) @ offset '
+                    '{2}, size {3}'.format(face, block_id, offset, size))
+
             self._x_ghost_collect_idx[idx:idx + size] = \
                     get_global_indices_array(face, span_to_tuple(span), self.lat_linear)
             self._x_ghost_distrib_idx[idx:idx + size] = \
-                    get_global_indices_array(self._block.opposite_axis_dir(face),
-                            span_to_tuple(span), self.lat_linear_dist)
+                    get_global_indices_array(face, span_to_tuple(span),
+                            self.lat_linear_dist, opposite=True)
             idx += size
+            offset += size
 
     def _init_compute(self):
         self.config.logger.debug("Initializing compute unit.")
