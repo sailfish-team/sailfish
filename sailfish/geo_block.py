@@ -28,6 +28,17 @@ def tuple_to_span(span):
         ret.append(slice(coord[0], coord[1]))
     return ret
 
+# XXX fix this for 3D
+def is_corner_span(span):
+    for coord in span:
+        if type(coord) is slice:
+            if coord.start == coord.stop:
+                if coord.start == 0:
+                    return True, -1
+                else:
+                    return True, 1
+    return False, None
+
 
 class LBBlock(object):
     dim = None
@@ -295,16 +306,6 @@ class LBBlock2D(LBBlock):
 
     # XXX, fix this for 3D
     def _direction_from_span_face(self, face, span):
-        def is_corner_span(span):
-            for coord in span:
-                if type(coord) is slice:
-                    if coord.start == coord.stop:
-                        if coord.start == 0:
-                            return True, -1
-                        else:
-                            return True, 1
-            return False, None
-
         comp = self.axis_dir_to_dir(face)
         pos  = self.axis_dir_to_axis(face)
         direction = [0, 0]
