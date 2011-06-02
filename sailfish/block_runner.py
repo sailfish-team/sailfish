@@ -760,6 +760,12 @@ class BlockRunner(object):
         self.backend.from_buf(self.gpu_dist(0, iter_idx), dbuf)
         return dbuf
 
+    def _debug_set_dist(self, dbuf, output=True):
+        iter_idx = self._sim.iteration & 1
+        if not output:
+            iter_idx = 1 - iter_idx
+
+        self.backend.to_buf(self.gpu_dist(0, iter_idx), dbuf)
 
     def _debug_global_idx_to_tuple(self, gi):
         dist_num = gi / self._get_nodes()

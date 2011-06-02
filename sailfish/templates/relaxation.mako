@@ -350,7 +350,9 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 
 ## TODO: This could be optimized.
 <%def name="relaxate(bgk_args)">
-	if (isWetNode(type)) {
-		${_relaxate(bgk_args)}
-	}
+	%if relaxation_enabled
+		if (isWetNode(type)) {
+			${_relaxate(bgk_args)}
+		}
+	%endif
 </%def>
