@@ -39,6 +39,7 @@ def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
     # master), so that the backend object is created within the
     # context of the new process.
     backend = backend_class(config, gpu_id)
+
     runner = block_runner.BlockRunner(sim, block, output, backend, quit_event)
     runner.run()
 

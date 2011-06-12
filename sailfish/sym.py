@@ -57,7 +57,11 @@ class DxQy(object):
     @classmethod
     def vec_to_dir(cls, vec):
         """Convert a primary direction vector (n-tuple) into a direction number."""
-        return cls.vecidx2dir[cls.basis.index(Matrix((vec,)))]
+        return cls.vecidx2dir[cls.vec_idx(vec)]
+
+    @classmethod
+    def vec_idx(cls, vec):
+        return cls.basis.index(Matrix((vec,)))
 
     @classmethod
     def dir_to_vec(cls, dir):
