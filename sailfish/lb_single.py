@@ -83,7 +83,6 @@ class LBFluidSim(LBSim):
 
         self.grids = [grid]
         self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(grid)
-        self.relaxation_enabled = True
 
     @property
     def grid(self):
@@ -102,7 +101,7 @@ class LBFluidSim(LBSim):
         ctx['bgk_equilibrium'] = self.equilibrium
         ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
 
-        ctx['relaxation_enabled'] = self.relaxation_enabled
+        ctx['relaxation_enabled'] = self.config.relaxation_enabled
         ctx['force_couplings'] = {}
         ctx['force_for_eq'] = {}
         ctx['image_fields'] = set()

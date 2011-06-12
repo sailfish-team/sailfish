@@ -35,6 +35,10 @@ class LBConfig(argparse.Namespace):
     def parse(self):
         self._parser.parse_args(namespace=self)
 
+        # Additional internal config options, not settable via
+        # command line parameters.
+        self.relaxation_enabled = True
+
     @property
     def output_required(self):
         return self.output or self.mode == 'visualization'
