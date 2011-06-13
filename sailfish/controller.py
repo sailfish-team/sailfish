@@ -96,6 +96,11 @@ class LBMachineMaster(object):
         handler.setFormatter(formatter)
         self.config.logger.addHandler(handler)
 
+        if self.config.log:
+            handler = logging.FileHandler(self.config.log)
+            handler.setFormatter(formatter)
+            self.config.logger.addHandler(handler)
+
         if config.verbose:
             self.config.logger.setLevel(logging.DEBUG)
         elif config.quiet:
@@ -412,6 +417,8 @@ class LBSimulationController(object):
         group.add_argument('--debug_dump_dists', action='store_true',
                 default=False, help='dump the contents of the distribution '
                 'arrays to files'),
+        group.add_argument('--log', type=str, default='',
+                help='name of the file to which data is to be logged')
 
         group = self.conf.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)
