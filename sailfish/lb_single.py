@@ -107,8 +107,8 @@ class LBFluidSim(LBSim):
         ctx['image_fields'] = set()
 
     def initial_conditions(self, runner):
-        gpu_rho = runner.gpu_field(self.rho)
-        gpu_v = runner.gpu_field(self.v)
+        gpu_rho = runner.gpu_field(self._rho)
+        gpu_v = runner.gpu_field(self._v)
         gpu_dist1a = runner.gpu_dist(0, 0)
         gpu_dist1b = runner.gpu_dist(0, 1)
 
@@ -124,8 +124,8 @@ class LBFluidSim(LBSim):
           full_output: if True, returns kernels that prepare fields for
               visualization or saving into a file
         """
-        gpu_rho = runner.gpu_field(self.rho)
-        gpu_v = runner.gpu_field(self.v)
+        gpu_rho = runner.gpu_field(self._rho)
+        gpu_v = runner.gpu_field(self._v)
         gpu_dist1a = runner.gpu_dist(0, 0)
         gpu_dist1b = runner.gpu_dist(0, 1)
         gpu_map = runner.gpu_geo_map()
@@ -162,9 +162,10 @@ class LBFluidSim(LBSim):
         return kernels
 
     def init_fields(self, runner):
-        self.rho = runner.make_scalar_field(name='rho')
-        self.v = runner.make_vector_field(name='v')
+        self._rho, self.rho = runner.make_scalar_field(name='rho')
+        self._v, self.v = runner.make_vector_field(name='v')
         self.vx, self.vy = self.v
+        self._vx, self._vy = self._v
         runner.add_visualization_field(
                 lambda: np.square(self.vx) + np.square(self.vy),
                 name='v^2')

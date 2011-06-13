@@ -401,6 +401,7 @@ class GeoEncoderConst(GeoEncoder):
         self._num_params = 0
         # TODO: Generalize this.
         self._num_velocities = 0
+        self.config = geo_block.block.runner.config
 
     def prepare_encode(self, type_map, param_map, param_dict):
         """
@@ -549,13 +550,11 @@ class GeoBlock(object):
         # The type map allocated by the block runner already includes
         # ghost nodes, and is formatted in a way that makes it suitable
         # for copying to the compute device.
-        self._type_map = block.runner.make_scalar_field(np.uint32)
+        self._type_map, self._type_map_view = block.runner.make_scalar_field(np.uint32)
         self._type_vis_map = np.zeros(list(reversed(block.size)),
                 dtype=np.uint8)
         self._type_map_encoded = False
-        self._type_map_view = self._type_map.view()[block._nonghost_slice]
-        self._param_map = block.runner.make_scalar_field(np.uint32)
-        self._param_map_view = self._param_map.view()[block._nonghost_slice]
+        self._param_map, self._param_map_view = block.runner.make_scalar_field(np.uint32)
         self._params = {}
         self._encoder = None
 

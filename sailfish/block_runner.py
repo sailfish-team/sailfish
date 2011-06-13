@@ -119,13 +119,15 @@ class BlockRunner(object):
 
         field = np.ndarray(self._physical_size, buffer=np.zeros(size, dtype=dtype),
                            dtype=dtype, strides=strides)
+        f_view = field.view()[self._block._nonghost_slice]
 
         if name is not None:
-            f_view = field.view()[self._block._nonghost_slice]
             self._output.register_field(f_view, name)
 
         self._scalar_fields.append(field)
-        return field
+        # XXX: make this return field object that does the right thing,
+        # depending on the context
+        return field, f_view
 
     def make_vector_field(self, name=None, output=False):
         """Allocates several scalar arrays representing a vector field."""
@@ -133,15 +135,15 @@ class BlockRunner(object):
         view_components = []
 
         for x in range(0, self._block.dim):
-            field = self.make_scalar_field(self.float)
+            field, f_view = self.make_scalar_field(self.float)
             components.append(field)
-            view_components.append(field.view()[self._block._nonghost_slice])
+            view_components.append(f_view)
 
         if name is not None:
             self._output.register_field(view_components, name)
 
         self._vector_fields.append(components)
-        return components
+        return components, view_components
 
     def visualization_map(self):
         if self._vis_map_cache is None:
