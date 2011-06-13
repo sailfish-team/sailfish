@@ -332,26 +332,27 @@ ${kernel} void DistributeOrthogonalGhostData(
 			int dist_num = idx / dist_size;
 			int gx = idx % dist_size;
 
-			if (gx == ${lat_linear_dist[1]}) {
+			// Skip corner dists, which will be written separately.
+			if (base_gx + gx == ${lat_linear_dist[1]}) {
 				<%
 					direction[0] = 1
 					corner_dists = sym.get_interblock_dists(grid, direction)
 				%>
 				if (0
 					%for corner_dist in corner_dists:
-						|| dist_num == ${corner_dist}
+						|| dist_num == ${prop_dists.index(corner_dist)}
 					%endfor
 				) {
 					return;
 				}
-			} else if (gx == ${lat_linear_dist[0]}) {
+			} else if (base_gx + gx == ${lat_linear_dist[0]}) {
 				<%
 					direction[0] = -1
 					corner_dists = sym.get_interblock_dists(grid, direction)
 				%>
 				if (0
 					%for corner_dist in corner_dists:
-						|| dist_num == ${corner_dist}
+						|| dist_num == ${prop_dists.index(corner_dist)}
 					%endfor
 				) {
 					return;
