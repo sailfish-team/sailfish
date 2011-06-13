@@ -85,7 +85,9 @@ class BlockCodeGenerator(object):
             src = _convert_to_double(src)
 
         if self.config.save_src:
-            self.save_code(src, self.config.save_src,
+            self.save_code(src, '{0}/blk{1}_{2}'.format(
+                    os.path.dirname(self.config.save_src),
+                    block_runner._block.id, os.path.basename(self.config.save_src)),
                            self.config.format_src)
 
         return src
