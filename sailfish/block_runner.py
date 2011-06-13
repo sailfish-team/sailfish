@@ -2,7 +2,7 @@ import inspect
 import math
 import operator
 import numpy as np
-from sailfish import codegen, util
+from sailfish import codegen, util, sym
 from sailfish.geo_block import tuple_to_span, span_to_tuple, is_corner_span
 
 class BlockRunner(object):
@@ -316,7 +316,7 @@ class BlockRunner(object):
         # Corner connections are signified by empty slices.  Here we convert
         # them to 1-element slices so that they match the connecting node
         # coorrectly.
-        def handle_corner_span(span):
+        def handle_corner_span(span, opposite):
             ret = []
             for coord in span:
                 if type(coord) is slice:
@@ -325,8 +325,18 @@ class BlockRunner(object):
                     if coord.start == coord.stop:
                         if start == 0:
                             stop += 1
+                            if opposite:
+                                start += self._block.envelope_size
+                                stop  += self._block.envelope_size
                         else:
-                            start -= 1
+                            if opposite:
+                                stop += 1
+                            else:
+                                start += self._block.envelope_size
+                                stop  += self._block.envelope_size + 1
+                    else:
+                        start += self._block.envelope_size
+                        stop  += self._block.envelope_size
                     ret.append(slice(start, stop))
                 else:
                     ret.append(coord)
@@ -346,15 +356,15 @@ class BlockRunner(object):
             self.config.logger.debug('{0}: dists: {1}'.format(inspect.stack()[0][3],
                     dists))
 
-            gx = gx_map[face]
-            # The range starts at envelope_size so that 'span' only selects
-            # 0
-            span = handle_corner_span(tuple_to_span(span_tuple))
-            gy = np.uint32(
-                    range(self._block.envelope_size,
-                          self._lat_size[-2] +
+            if opposite:
+                gx = gx_map[self._block.opposite_axis_dir(face)]
+            else:
+                gx = gx_map[face]
+            span = handle_corner_span(tuple_to_span(span_tuple), opposite)
+            gy = np.uint32(range(0, self._lat_size[-2] +
                           self._block.envelope_size)[span[0]])
             gy = np.kron(gy, np.ones(len(dists), dtype=np.uint32))
+
             new_span_tuple = span_to_tuple(span)
             num_nodes = new_span_tuple[0][1] - new_span_tuple[0][0]
             dist_num = np.kron(
@@ -423,6 +433,18 @@ class BlockRunner(object):
                                 self.lat_linear_dist)
                 idx += buf_size
 
+        # Clear distrib entries for corner nodes.
+        if total_x_size > 0:
+            for gx, x_dir in zip(self.lat_linear_dist[0:2], (-1, 1)):
+                for gy, y_dir in zip(self.lat_linear_dist[2:4], (-1, 1)):
+                    direction = [x_dir, y_dir]
+                    corner_dists = sym.get_interblock_dists(self._sim.grids[0], direction)
+                    for dist_num in corner_dists:
+                        glb_idx = get_global_id(gx, gy, dist_num)
+                        self.config.logger.debug('clearing {0}: {1} x {2} x {3} (dir {4})'.format(
+                            glb_idx, gx, gy, dist_num, direction))
+                        self._x_ghost_distrib_idx[self._x_ghost_distrib_idx == glb_idx] = 0
+
         # Maps block ID to list of tuples: (face, recv_view, send_view).
         # The views correspond exactly to areas used for transferring data
         # for the block identified by the key of the dict.
@@ -461,15 +483,23 @@ class BlockRunner(object):
                     (face, recv_view, send_view))
 
             self.config.logger.debug('face {0}: block {1} (X-corner) @ offset '
-                    '{2}, size {3}'.format(face, block_id, offset, size))
+                    '{2}, size {3}, span {4}'.format(face, block_id, offset,
+                        size, span_to_tuple(span)))
 
             self._x_ghost_collect_idx[idx:idx + size] = \
                     get_global_indices_array(face, span_to_tuple(span), self.lat_linear)
             self._x_ghost_distrib_idx[idx:idx + size] = \
                     get_global_indices_array(face, span_to_tuple(span),
                             self.lat_linear_dist, opposite=True)
+
             idx += size
             offset += size
+
+        # Make sure there are no duplicates in the distribution index array.
+        # Special value 0 is ignored.
+        if total_x_size > 0:
+            xgdi = self._x_ghost_distrib_idx
+            assert np.all(np.unique(xgdi[xgdi != 0]) == np.sort(xgdi[xgdi != 0]))
 
     def _init_compute(self):
         self.config.logger.debug("Initializing compute unit.")
@@ -616,6 +646,8 @@ class BlockRunner(object):
                     self._collect_kernels[self._sim.iteration & 1],
                     self._distrib_grid):
                 self.backend.run_kernel(kernel, grid)
+                self.config.logger.debug('collect kernel args: {0} / grid: {1}'.format(
+                        kernel.args, grid))
 
     def _step_boundary(self):
         """Runs one simulation step for the boundary blocks.
@@ -754,10 +786,12 @@ class BlockRunner(object):
         if not output:
             iter_idx = 1 - iter_idx
 
+        self.config.logger.debug('getting dist {0} ({1})'.format(iter_idx,
+            self.gpu_dist(0, iter_idx)))
         dbuf = np.zeros(self._get_dist_bytes(self._sim.grids[0]) / self.float().nbytes,
-             dtype=self.float)
-        dbuf = dbuf.reshape([self._sim.grids[0].Q] + self._physical_size)
+            dtype=self.float)
         self.backend.from_buf(self.gpu_dist(0, iter_idx), dbuf)
+        dbuf = dbuf.reshape([self._sim.grids[0].Q] + self._physical_size)
         return dbuf
 
     def _debug_set_dist(self, dbuf, output=True):
@@ -842,6 +876,8 @@ class BlockRunner(object):
                 for kernel, grid in zip(
                         self._distrib_kernels[self._sim.iteration & 1],
                         self._distrib_grid):
+                    self.config.logger.debug('distrib kernel args: {0} / grid {1}'.format(
+                            kernel.args, grid))
                     self.backend.run_kernel(kernel, grid)
 
     def main_benchmark(self):
