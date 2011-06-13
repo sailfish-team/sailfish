@@ -1,9 +1,14 @@
+import os
+import tempfile
 import unittest
+
+import numpy as np
 
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import LBBlock2D, GeoBlock2D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
+from sailfish.sym import D2Q9
 
 #
 #  b1  b3
@@ -28,6 +33,10 @@ class BlockTest(GeoBlock2D):
     def _init_fields(self, sim, hx, hy):
         pass
 
+tmpdir = None
+
+vi = lambda x, y: D2Q9.vec_idx([x, y])
+
 class SimulationTest(LBFluidSim, LBForcedSim):
     geo = BlockTest
 
@@ -37,36 +46,112 @@ class SimulationTest(LBFluidSim, LBForcedSim):
 
     @classmethod
     def update_defaults(cls, defaults):
+        global tmpdir
         defaults.update({
             'lat_nx': 256,
             'lat_ny': 256,
-            'max_iters': 3,
+            'max_iters': 2,
             'every': 1,
             'quiet': True,
-            'output': '/tmp/foo',
+            'output': os.path.join(tmpdir, 'test_out'),
             'debug_dump_dists': True,
-            })
+        })
 
     def initial_conditions(self, runner):
         dbuf = runner._debug_get_dist()
         dbuf[:] = 0.0
 
+        # dbuf indices are: dist, y, x
+        # vec indices are: x, y
         if runner._block.id == 0:
-            dist_idx = self.grid.vec_idx([1, 1])
-            dbuf[dist_idx,128,128] = 0.11
+            dbuf[vi(1, 1), 128, 128] = 0.11
         elif runner._block.id == 1:
-            dist_idx = self.grid.vec_idx([1, -1])
-            dbuf[dist_idx,128,1] = 0.22
+            dbuf[vi(1, -1), 1, 128] = 0.22
         elif runner._block.id == 2:
-            dist_idx = self.grid.vec_idx([-1, 1])
-            dbuf[dist_idx,1,128] = 0.33
+            dbuf[vi(-1, 1), 128, 1] = 0.33
         else:
-            dist_idx = self.grid.vec_idx([-1, -1])
-            dbuf[dist_idx,1,1] = 0.44
+            dbuf[vi(-1, -1), 1, 1] = 0.44
 
         runner._debug_set_dist(dbuf)
         runner._debug_set_dist(dbuf, False)
 
+class TestCornerPropagation(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        global tmpdir
+        tmpdir = tempfile.mkdtemp()
 
-ctrl = LBSimulationController(SimulationTest, GeometryTest)
-ctrl.run()
+    def test_4corners(self):
+        global tmpdir
+        ctrl = LBSimulationController(SimulationTest, GeometryTest)
+        ctrl.run()
+
+        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
+        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        b2 = np.load(os.path.join(tmpdir, 'test_out_blk2_dist_dump1.npy'))
+        b3 = np.load(os.path.join(tmpdir, 'test_out_blk3_dist_dump1.npy'))
+
+        np.testing.assert_equal(b0[vi(-1, -1), 128, 128], np.float32(0.44))
+        np.testing.assert_equal(b1[vi(-1, 1), 1, 128], np.float32(0.33))
+        np.testing.assert_equal(b2[vi(1, -1), 128, 1], np.float32(0.22))
+        np.testing.assert_equal(b3[vi(1, 1), 1, 1], np.float32(0.11))
+
+    def test_b0_spread(self):
+        global tmpdir
+        def ic(self, runner):
+            dbuf = runner._debug_get_dist()
+            dbuf[:] = 0.0
+
+            if runner._block.id == 0:
+                # Top right corner
+                dbuf[vi(1, 1), 128, 128] = 0.11
+                dbuf[vi(0, 1), 128, 128] = 0.01
+                dbuf[vi(1, 0), 128, 128] = 0.10
+                dbuf[vi(0, -1), 128, 128] = 0.02
+                dbuf[vi(-1, 0), 128, 128] = 0.20
+                dbuf[vi(1, -1), 128, 128] = 0.30
+                dbuf[vi(-1, 1), 128, 128] = 0.40
+
+                # Bottom right corner
+                dbuf[vi(1, 1), 1, 128] = 0.50
+                dbuf[vi(1, -1), 1, 128] = 0.51
+                dbuf[vi(1, 0), 1, 128] = 0.52
+            elif runner._block.id == 1:
+                dbuf[vi(1, 0), 127, 128] = 0.60
+                dbuf[vi(1, 1), 127, 128] = 0.61
+                dbuf[vi(1, -1), 127, 128] = 0.62
+                dbuf[vi(1 ,0), 128, 128] = 0.70
+                dbuf[vi(1, -1), 128, 128] = 0.71
+
+            runner._debug_set_dist(dbuf)
+            runner._debug_set_dist(dbuf, False)
+
+        RightSide = type('RightSide', (SimulationTest,), {'initial_conditions': ic})
+        ctrl = LBSimulationController(RightSide, GeometryTest)
+        ctrl.run()
+
+        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
+        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        b2 = np.load(os.path.join(tmpdir, 'test_out_blk2_dist_dump1.npy'))
+        b3 = np.load(os.path.join(tmpdir, 'test_out_blk3_dist_dump1.npy'))
+
+        ae = np.testing.assert_equal
+
+        ae(b3[vi(1, 1), 1, 1], np.float32(0.11))
+        ae(b0[vi(-1, 0), 128, 127], np.float32(0.20))
+        ae(b0[vi(0, -1), 127, 128], np.float32(0.02))
+        ae(b2[vi(1, 0), 128, 1], np.float32(0.10))
+        ae(b1[vi(0, 1), 1, 128], np.float32(0.01))
+        ae(b2[vi(1, -1), 127, 1], np.float32(0.30))
+        ae(b1[vi(-1, 1), 1, 127], np.float32(0.40))
+        ae(b2[vi(1, 1), 2, 1], np.float32(0.50))
+        ae(b2[vi(1, 0), 1, 1], np.float32(0.52))
+
+        ae(b3[vi(1, 0), 127, 1], np.float32(0.60))
+        ae(b3[vi(1, 0), 128, 1], np.float32(0.70))
+        ae(b3[vi(1, 1), 128, 1], np.float32(0.61))
+        ae(b3[vi(1, -1), 127, 1], np.float32(0.71))
+        ae(b3[vi(1, -1), 126, 1], np.float32(0.62))
+
+if __name__ == '__main__':
+    unittest.main()
