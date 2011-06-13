@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import os
 import tempfile
 import unittest
@@ -26,6 +28,14 @@ class GeometryTest(LBGeometry2D):
 
         return blocks
 
+class DoubleBlockGeometryTest(LBGeometry2D):
+    def blocks(self, n=None):
+        blocks = []
+        q = 128
+        blocks.append(LBBlock2D((0, 0), (q, 2*q)))
+        blocks.append(LBBlock2D((q, 0), (q, 2*q)))
+        return blocks
+
 class BlockTest(GeoBlock2D):
     def _define_nodes(self, hx, hy):
         pass
@@ -34,7 +44,7 @@ class BlockTest(GeoBlock2D):
         pass
 
 tmpdir = None
-
+periodic_x = False
 vi = lambda x, y: D2Q9.vec_idx([x, y])
 
 class SimulationTest(LBFluidSim, LBForcedSim):
@@ -42,7 +52,9 @@ class SimulationTest(LBFluidSim, LBForcedSim):
 
     @classmethod
     def modify_config(cls, config):
+        global periodic_x
         config.relaxation_enabled = False
+        config.periodic_x = periodic_x
 
     @classmethod
     def update_defaults(cls, defaults):
@@ -75,11 +87,130 @@ class SimulationTest(LBFluidSim, LBForcedSim):
         runner._debug_set_dist(dbuf)
         runner._debug_set_dist(dbuf, False)
 
-class TestCornerPropagation(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
+class PeriodicPropagationTest(unittest.TestCase):
+    def setUp(self):
+        global periodic_x
+        periodic_x = True
+
+    def test_horiz_spread(self):
         global tmpdir
-        tmpdir = tempfile.mkdtemp()
+
+        def ic(self, runner):
+            dbuf = runner._debug_get_dist()
+            dbuf[:] = 0.0
+
+            if runner._block.id == 1:
+                dbuf[vi(1, 0), 128, 128] = 0.11
+                dbuf[vi(1, 1), 128, 128] = 0.12
+                dbuf[vi(1, -1), 128, 128] = 0.13
+
+                # At the top
+                dbuf[vi(1, 0), 256, 128] = 0.31
+                dbuf[vi(1, 1), 256, 128] = 0.32
+                dbuf[vi(1, -1), 256, 128] = 0.33
+
+                dbuf[vi(-1, -1), 256, 128] = 0.66   # should not be overwritten
+            elif runner._block.id == 0:
+                dbuf[vi(-1, 0), 128, 1] = 0.21
+                dbuf[vi(-1, 1), 128, 1] = 0.22
+                dbuf[vi(-1, -1), 128, 1] = 0.23
+
+                # At the bottom
+                dbuf[vi(-1, 0), 1, 1] = 0.41
+                dbuf[vi(-1, 1), 1, 1] = 0.42
+                dbuf[vi(-1, -1), 1, 1] = 0.43
+
+                dbuf[vi(1, 1), 1, 1] = 0.77     # should not be overwritten
+
+            runner._debug_set_dist(dbuf)
+            runner._debug_set_dist(dbuf, False)
+
+        HorizTest = type('HorizTest', (SimulationTest,),
+                {'initial_conditions': ic})
+        ctrl = LBSimulationController(HorizTest, DoubleBlockGeometryTest)
+        ctrl.run()
+
+        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
+        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        ae = np.testing.assert_equal
+
+        ae(b0[vi(1, 0), 128, 1], np.float32(0.11))
+        ae(b0[vi(1, 1), 129, 1], np.float32(0.12))
+        ae(b0[vi(1, -1), 127, 1], np.float32(0.13))
+
+        ae(b0[vi(1, 0), 256, 1], np.float32(0.31))
+        ae(b0[vi(1, -1), 255, 1], np.float32(0.33))
+
+        ae(b1[vi(-1, 0), 128, 128], np.float32(0.21))
+        ae(b1[vi(-1, 1), 129, 128], np.float32(0.22))
+        ae(b1[vi(-1, -1), 127, 128], np.float32(0.23))
+
+        ae(b1[vi(-1, 0), 1, 128], np.float32(0.41))
+        ae(b1[vi(-1, 1), 2, 128], np.float32(0.42))
+
+        ae(b1[vi(-1, -1), 256, 128], np.float32(0.66))
+        ae(b0[vi(1, 1), 1, 1], np.float32(0.77))
+
+    # Like the test above but for a single block that is globally periodic.
+    def test_horiz_global_periodic(self):
+        global tmpdir
+
+        def ic(self, runner):
+            dbuf = runner._debug_get_dist()
+            dbuf[:] = 0.0
+
+            dbuf[vi(1, 0), 128, 256] = 0.11
+            dbuf[vi(1, 1), 128, 256] = 0.12
+            dbuf[vi(1, -1), 128, 256] = 0.13
+
+            # At the top
+            dbuf[vi(1, 0), 256, 256] = 0.31
+            dbuf[vi(1, 1), 256, 256] = 0.32
+            dbuf[vi(1, -1), 256, 256] = 0.33
+
+            dbuf[vi(-1, -1), 256, 256] = 0.66   # should not be overwritten
+            dbuf[vi(-1, 0), 128, 1] = 0.21
+            dbuf[vi(-1, 1), 128, 1] = 0.22
+            dbuf[vi(-1, -1), 128, 1] = 0.23
+
+            # At the bottom
+            dbuf[vi(-1, 0), 1, 1] = 0.41
+            dbuf[vi(-1, 1), 1, 1] = 0.42
+            dbuf[vi(-1, -1), 1, 1] = 0.43
+
+            dbuf[vi(1, 1), 1, 1] = 0.77     # should not be overwritten
+
+            runner._debug_set_dist(dbuf)
+            runner._debug_set_dist(dbuf, False)
+
+        HorizTest = type('HorizTest', (SimulationTest,),
+                {'initial_conditions': ic})
+        ctrl = LBSimulationController(HorizTest)
+        ctrl.run()
+
+        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
+        ae = np.testing.assert_equal
+
+        ae(b0[vi(1, 0), 128, 1], np.float32(0.11))
+        ae(b0[vi(1, 1), 129, 1], np.float32(0.12))
+        ae(b0[vi(1, -1), 127, 1], np.float32(0.13))
+        ae(b0[vi(1, 0), 256, 1], np.float32(0.31))
+        ae(b0[vi(1, -1), 255, 1], np.float32(0.33))
+
+        ae(b0[vi(-1, 0), 128, 256], np.float32(0.21))
+        ae(b0[vi(-1, 1), 129, 256], np.float32(0.22))
+        ae(b0[vi(-1, -1), 127, 256], np.float32(0.23))
+        ae(b0[vi(-1, 0), 1, 256], np.float32(0.41))
+        ae(b0[vi(-1, 1), 2, 256], np.float32(0.42))
+
+        ae(b0[vi(1, 1), 1, 1], np.float32(0.77))
+        ae(b0[vi(-1, -1), 256, 256], np.float32(0.66))
+
+
+class TestCornerPropagation(unittest.TestCase):
+    def setUp(self):
+        global periodic_x
+        periodic_x = False
 
     def test_4corners(self):
         global tmpdir
@@ -154,4 +285,5 @@ class TestCornerPropagation(unittest.TestCase):
         ae(b3[vi(1, -1), 126, 1], np.float32(0.62))
 
 if __name__ == '__main__':
+    tmpdir = tempfile.mkdtemp()
     unittest.main()
