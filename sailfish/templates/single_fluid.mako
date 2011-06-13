@@ -186,7 +186,7 @@ ${kernel} void CollideAndPropagate(
 	${propagate('dist_out', 'd0')}
 }
 
-<%def name="pbc_helper(axis)">
+<%def name="pbc_helper(axis, max_dim)">
 	<%
 		if axis == 0:
 			offset = 1
@@ -194,6 +194,13 @@ ${kernel} void CollideAndPropagate(
 			offset = arr_nx
 		else:
 			offset = arr_nx + arr_ny
+
+		direction = [0, 0]
+		direction[axis] = -1
+		direction[1 - axis] = 1
+		corner_dists_low = sym.get_interblock_dists(grid, direction)
+		direction[1 - axis] = -1
+		corner_dists_high = sym.get_interblock_dists(grid, direction)
 	%>
 
 	// TODO(michalj): Generalize this for grids with e_i > 1.
@@ -203,7 +210,23 @@ ${kernel} void CollideAndPropagate(
 	%endfor
 
 	%for i in sym.get_prop_dists(grid, -1, axis):
-		${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
+		%if grid.basis[i].dot(grid.basis[i]) > 1:
+			%if i in corner_dists_low:
+				// Skip distributions which are not populated.
+				if (idx1 > 1) {
+					${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
+				}
+			%elif i in corner_dists_high:
+				// Skip distributions which are not populated.
+				if (idx1 < ${max_dim}) {
+					${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
+				}
+			%else:
+				__BUG__
+			%endif
+		%else:
+			${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
+		%endif
 	%endfor
 
 	// From high idx to low idx.
@@ -211,8 +234,32 @@ ${kernel} void CollideAndPropagate(
 		float f${grid.idx_name[i]} = ${get_dist('dist', i, 'gi_high', offset)};
 	%endfor
 
+	<%
+		direction[axis] = 1
+		direction[1 - axis] = 1
+		corner_dists_low = sym.get_interblock_dists(grid, direction)
+		direction[1 - axis] = -1
+		corner_dists_high = sym.get_interblock_dists(grid, direction)
+	%>
+
 	%for i in sym.get_prop_dists(grid, 1, axis):
-		${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
+		%if grid.basis[i].dot(grid.basis[i]) > 1:
+			%if i in corner_dists_low:
+				// Skip distributions which are not populated.
+				if (idx1 > 1) {
+					${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
+				}
+			%elif i in corner_dists_high:
+				// Skip distributions which are not populated.
+				if (idx1 < ${max_dim}) {
+					${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
+				}
+			%else:
+				__BUG__
+			%endif
+		%else:
+			${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
+		%endif
 	%endfor
 </%def>
 
@@ -232,12 +279,12 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 			if (idx1 >= ${lat_ny}) { return; }
 			gi_low = getGlobalIdx(0, idx1);
 			gi_high = getGlobalIdx(${lat_nx-2}, idx1);
-			${pbc_helper(0)}
+			${pbc_helper(0, lat_ny-2)}
 		} else if (axis == 1) {
 			if (idx1 >= ${lat_nx}) { return; }
 			gi_low = getGlobalIdx(idx1, 0);
 			gi_high = getGlobalIdx(idx1, ${lat_ny-2});
-			${pbc_helper(1)}
+			${pbc_helper(1, lat_nx-2)}
 		}
 	%else:
 		int idx2 = get_global_id(1);
