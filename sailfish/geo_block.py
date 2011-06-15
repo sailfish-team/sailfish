@@ -47,6 +47,7 @@ def is_corner_span(span):
 class LBBlock(object):
     dim = None
 
+    # Face IDs.
     _X_LOW = 0
     _X_HIGH = 1
     _Y_LOW = 2
@@ -69,6 +70,7 @@ class LBBlock(object):
         self.vis_buffer = None
         self.vis_geo_buffer = None
         self.id = id_
+        self._periodicity = [False] * self.dim
 
     @property
     def runner(self):
@@ -85,6 +87,27 @@ class LBBlock(object):
     @id.setter
     def id(self, x):
         self._id = x
+
+    @property
+    def periodic_x(self):
+        """X-axis periodicity within this block."""
+        return self._periodicity[0]
+
+    @property
+    def periodic_y(self):
+        """Y-axis periodicity within this block."""
+        return self._periodicity[1]
+
+    def update_context(self, ctx):
+        ctx['dim'] = self.dim
+        ctx['envelope_size'] = self.envelope_size
+
+    def enable_local_periodicity(self, axis):
+        """Makes the block locally periodic along a given axis."""
+        assert axis <= self.dim-1
+        self._periodicity[axis] = True
+        # TODO: As an optimization, we could drop the ghost node layer in this
+        # case.
 
     def connect(self, block):
         """Creates a connection between this block and another block.
@@ -132,14 +155,6 @@ class LBBlock(object):
 
         return ids
 
-    def connection_buf_size(self, axis, block_id):
-        """Calculates the size of the buffer necessary to transfer data to and
-        from the block identified by `block_id`."""
-        raise NotImplementedError('Method should be defined by subclass.')
-
-    def update_context(self, ctx):
-        raise NotImplementedError('Method should be defined by subclass.')
-
     def set_actual_size(self, envelope_size):
         # TODO: It might be possible to optimize this a little by avoiding
         # having buffers on the sides which are not connected to other blocks.
@@ -150,13 +165,63 @@ class LBBlock(object):
         self.vis_buffer = vis_buffer
         self.vis_geo_buffer = vis_geo_buffer
 
+    def face_to_dir(self, face):
+        if face in (self._X_LOW, self._Y_LOW, self._Z_LOW):
+            return -1
+        else:
+            return 1
+
+    def face_to_axis(self, face):
+        if face == self._X_HIGH or face == self._X_LOW:
+            return 0
+        elif face == self._Y_HIGH or face == self._Y_LOW:
+            return 1
+        elif face == self._Z_HIGH or face == self._Z_LOW:
+            return 2
+
+    def opposite_face(self, face):
+        opp_map = {
+            self._X_HIGH: self._X_LOW,
+            self._Y_HIGH: self._Y_LOW,
+            self._Z_HIGH: self._Z_LOW
+        }
+        opp_map.update(dict((v, k) for k, v in opp_map.iteritems()))
+        return opp_map[face]
+
+    # XXX, fix this for 3D
+    def _direction_from_span_face(self, face, span):
+        comp = self.face_to_dir(face)
+        pos  = self.face_to_axis(face)
+        direction = [0] * self.dim
+        direction[pos] = comp
+
+        corner, corner_dir = is_corner_span(span)
+        if corner:
+            direction[1 - pos] = corner_dir
+        return direction
+
+    def connection_dists(self, grid, face, span, opposite=False):
+        return sym.get_interblock_dists(grid,
+                self._direction_from_span_face(face, span), opposite)
+
+    def connection_buf_size(self, grid, face, block_id=None, span=None):
+        if block_id is not None:
+            assert span is None
+            span = self.get_connection_selector(face, block_id)
+        else:
+            assert span is not None
+
+        buf_size = len(self.connection_dists(grid, face, span))
+        buf_size *= span_area(span)
+        return buf_size
+
+
 class LBBlock2D(LBBlock):
     dim = 2
 
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
         self.ox, self.oy = location
         self.nx, self.ny = size
-        self._periodicity = [False, False]
         LBBlock.__init__(self, location, size, envelope_size, *args, **kwargs)
 
     @property
@@ -165,23 +230,6 @@ class LBBlock2D(LBBlock):
 
         es = self.envelope_size
         return (slice(es, es + self.ny), slice(es, es + self.nx))
-
-    @property
-    def periodic_x(self):
-        """X-axis periodicity within this block."""
-        return self._periodicity[0]
-
-    @property
-    def periodic_y(self):
-        """Y-axis periodicity within this block."""
-        return self._periodicity[1]
-
-    def enable_local_periodicity(self, axis):
-        """Makes the block locally periodic along a given axis."""
-        assert axis <= self.dim-1
-        self._periodicity[axis] = True
-        # TODO: As an optimization, we could drop the ghost node layer in this
-        # case.
 
     def connect(self, block, geo=None, axis=None):
         """Tries to connect the current block to another block, and returns True
@@ -287,59 +335,6 @@ class LBBlock2D(LBBlock):
 
         return False
 
-    def axis_dir_to_dir(self, axis_dir):
-        if axis_dir in (self._X_LOW, self._Y_LOW, self._Z_LOW):
-            return -1
-        else:
-            return 1
-
-    def axis_dir_to_axis(self, axis_dir):
-        if axis_dir == self._X_HIGH or axis_dir == self._X_LOW:
-            return 0
-        elif axis_dir == self._Y_HIGH or axis_dir == self._Y_LOW:
-            return 1
-        elif axis_dir == self._Z_HIGH or axis_dir == self._Z_LOW:
-            return 2
-
-    def opposite_axis_dir(self, axis_dir):
-        opp_map = {
-            self._X_HIGH: self._X_LOW,
-            self._Y_HIGH: self._Y_LOW,
-            self._Z_HIGH: self._Z_LOW
-        }
-        opp_map.update(dict((v, k) for k, v in opp_map.iteritems()))
-        return opp_map[axis_dir]
-
-    # XXX, fix this for 3D
-    def _direction_from_span_face(self, face, span):
-        comp = self.axis_dir_to_dir(face)
-        pos  = self.axis_dir_to_axis(face)
-        direction = [0, 0]
-        direction[pos] = comp
-
-        corner, corner_dir = is_corner_span(span)
-        if corner:
-            direction[1 - pos] = corner_dir
-        return direction
-
-    def connection_dists(self, grid, face, span, opposite=False):
-        return sym.get_interblock_dists(grid,
-                self._direction_from_span_face(face, span), opposite)
-
-    def connection_buf_size(self, grid, face, block_id=None, span=None):
-        if block_id is not None:
-            assert span is None
-            span = self.get_connection_selector(face, block_id)
-        else:
-            assert span is not None
-
-        buf_size = len(self.connection_dists(grid, face, span))
-        buf_size *= span_area(span)
-        return buf_size
-
-    def update_context(self, ctx):
-        ctx['dim'] = self.dim
-        ctx['envelope_size'] = self.envelope_size
 
 
 class LBBlock3D(LBBlock):
@@ -354,12 +349,14 @@ class LBBlock3D(LBBlock):
     @property
     def _nonghost_slice(self):
         """Returns a 3-tuple of slice objects that selects all non-ghost nodes."""
-        # FIXME(michalj)
-        return slice(0, None), slice(0, None), slice(0, None)
+        es = self.envelope_size
+        return (slice(es, es + self.nz), slice(es, es + self.ny), slice(es, es + self.nx))
 
-    def update_context(self, ctx):
-        ctx['dim'] = self.dim
-        ctx['envelope_size'] = self.envelope_size
+    @property
+    def periodic_z(self):
+        """Z-axis periodicity within this block."""
+        return self._periodicity[2]
+
 
 
 class GeoEncoder(object):

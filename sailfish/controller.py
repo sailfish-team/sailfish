@@ -137,7 +137,7 @@ class LBMachineMaster(object):
 
         for i, block in enumerate(self.blocks):
             connecting_blocks = block.connecting_blocks()
-            for axis, nbid in connecting_blocks:
+            for face, nbid in connecting_blocks:
                 if (block.id, nbid) in _block_conns:
                     continue
 
@@ -146,15 +146,15 @@ class LBMachineMaster(object):
 
                 # Note: this implicitly assumes that the amount of data that has
                 # to be transferred is the same both ways.
-                size = block.connection_buf_size(grid, axis, nbid)
+                size = block.connection_buf_size(grid, face, nbid)
                 ctype = self._get_ctypes_float()
 
-                opp_axis = block.opposite_axis_dir(axis)
-                if (opp_axis, nbid) in connecting_blocks:
+                opp_face = block.opposite_face(face)
+                if (opp_face, nbid) in connecting_blocks:
                     size *= 2
-                    axis_str = '{0} and {1}'.format(axis, opp_axis)
+                    face_str = '{0} and {1}'.format(face, opp_face)
                 else:
-                    axis_str = str(axis)
+                    face_str = str(face)
 
                 array1 = Array(ctype, size)
                 array2 = Array(ctype, size)
@@ -167,7 +167,7 @@ class LBMachineMaster(object):
 
                 self.config.logger.debug("Block connection: {0} <-> {1}: {2}"
                         "-element buffer (axis {3}).".format(
-                            block.id, nbid, size, axis_str))
+                            block.id, nbid, size, face_str))
 
                 block.add_connector(nbid,
                         LBBlockConnector(array1, array2, ev1, ev2, ev3, ev4))
