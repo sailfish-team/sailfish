@@ -550,11 +550,11 @@ class GeoBlock(object):
         # The type map allocated by the block runner already includes
         # ghost nodes, and is formatted in a way that makes it suitable
         # for copying to the compute device.
-        self._type_map, self._type_map_view = block.runner.make_scalar_field(np.uint32)
+        self._type_map = block.runner.make_scalar_field(np.uint32)
         self._type_vis_map = np.zeros(list(reversed(block.size)),
                 dtype=np.uint8)
         self._type_map_encoded = False
-        self._param_map, self._param_map_view = block.runner.make_scalar_field(np.uint32)
+        self._param_map = block.runner.make_scalar_field(np.uint32)
         self._params = {}
         self._encoder = None
 
@@ -571,9 +571,9 @@ class GeoBlock(object):
 
         # TODO: if type_ is a class, we should just store its ID; if it's
         # an object, the ID should be dynamically assigned
-        self._type_map_view[where] = type_
+        self._type_map[where] = type_
         key = (type_, params)
-        self._param_map_view[where] = hash(key)
+        self._param_map[where] = hash(key)
         self._params[hash(key)] = key
 
     def reset(self):
@@ -582,14 +582,14 @@ class GeoBlock(object):
         self._define_nodes(*mgrid)
 
         # Cache the unencoded type map for visualization.
-        self._type_vis_map[:] = self._type_map_view[:]
+        self._type_vis_map[:] = self._type_map[:]
 
         self._postprocess_nodes()
         self._define_ghosts()
 
         # TODO: At this point, we should decide which GeoEncoder class to use.
         self._encoder = GeoEncoderConst(self)
-        self._encoder.prepare_encode(self._type_map, self._param_map_view,
+        self._encoder.prepare_encode(self._type_map.base, self._param_map,
                 self._params)
 
     def init_fields(self, sim):
@@ -615,7 +615,7 @@ class GeoBlock(object):
             self._encoder.encode()
             self._type_map_encoded = True
 
-        return self._type_map
+        return self._type_map.base
 
     def visualization_map(self):
         return self._type_vis_map
@@ -637,22 +637,22 @@ class GeoBlock2D(GeoBlock):
         es = self.block.envelope_size
         if not es:
             return
-        self._type_map[0:es, :] = self.NODE_GHOST
-        self._type_map[:, 0:es] = self.NODE_GHOST
-        self._type_map[es+self.block.ny:, :] = self.NODE_GHOST
-        self._type_map[:, es+self.block.nx:] = self.NODE_GHOST
+        self._type_map.base[0:es, :] = self.NODE_GHOST
+        self._type_map.base[:, 0:es] = self.NODE_GHOST
+        self._type_map.base[es+self.block.ny:, :] = self.NODE_GHOST
+        self._type_map.base[:, es+self.block.nx:] = self.NODE_GHOST
 
     def _postprocess_nodes(self):
         # Find nodes which are walls themselves and are completely surrounded by
         # walls.  These nodes are marked as unused, as they do not contribute to
         # the dynamics of the fluid in any way.
-        cnt = np.zeros_like(self._type_map).astype(np.uint32)
+        cnt = np.zeros_like(self._type_map.base).astype(np.uint32)
         for i, vec in enumerate(self.grid.basis):
-            a = np.roll(self._type_map, int(-vec[0]), axis=1)
+            a = np.roll(self._type_map.base, int(-vec[0]), axis=1)
             a = np.roll(a, int(-vec[1]), axis=0)
             cnt[(a == self.NODE_WALL)] += 1
 
-        self._type_map[(cnt == self.grid.Q)] = self.NODE_UNUSED
+        self._type_map.base[(cnt == self.grid.Q)] = self.NODE_UNUSED
 
 
 class GeoBlock3D(GeoBlock):

@@ -5,6 +5,7 @@ import numpy as np
 from sailfish import codegen, util, sym
 from sailfish.geo_block import tuple_to_span, span_to_tuple, is_corner_span
 
+
 class BlockRunner(object):
     """Runs the simulation for a single LBBlock
     """
@@ -102,15 +103,16 @@ class BlockRunner(object):
             ctx['distrib_collect_x_size'] = 0
 
     def add_visualization_field(self, field_cb, name):
-        self._output.register_field(
-                lambda: field_cb().view()[self._block._nonghost_slice],
-                name, visualization=True)
+        self._output.register_field(field_cb, name, visualization=True)
 
     def make_scalar_field(self, dtype=None, name=None):
         """Allocates a scalar NumPy array.
 
         The array includes padding adjusted for the compute device (hidden from
-        the end user), as well as space for any ghost nodes (not hidden)."""
+        the end user), as well as space for any ghost nodes.  The returned
+        object is a view into the underlying array that hides all ghost nodes.
+        Ghost nodes can still be accessed via the 'base' attribute of the
+        returned ndarray."""
         if dtype is None:
             dtype = self.float
 
@@ -119,15 +121,13 @@ class BlockRunner(object):
 
         field = np.ndarray(self._physical_size, buffer=np.zeros(size, dtype=dtype),
                            dtype=dtype, strides=strides)
-        f_view = field.view()[self._block._nonghost_slice]
+        fview = field[self._block._nonghost_slice]
 
         if name is not None:
-            self._output.register_field(f_view, name)
+            self._output.register_field(fview, name)
 
-        self._scalar_fields.append(field)
-        # XXX: make this return field object that does the right thing,
-        # depending on the context
-        return field, f_view
+        self._scalar_fields.append(fview)
+        return fview
 
     def make_vector_field(self, name=None, output=False):
         """Allocates several scalar arrays representing a vector field."""
@@ -135,15 +135,14 @@ class BlockRunner(object):
         view_components = []
 
         for x in range(0, self._block.dim):
-            field, f_view = self.make_scalar_field(self.float)
+            field = self.make_scalar_field(self.float)
             components.append(field)
-            view_components.append(f_view)
 
         if name is not None:
-            self._output.register_field(view_components, name)
+            self._output.register_field(components, name)
 
         self._vector_fields.append(components)
-        return components, view_components
+        return components
 
     def visualization_map(self):
         if self._vis_map_cache is None:
@@ -517,12 +516,12 @@ class BlockRunner(object):
         self.config.logger.debug("Initializing compute unit data.")
 
         for field in self._scalar_fields:
-            self._gpu_field_map[id(field)] = self.backend.alloc_buf(like=field)
+            self._gpu_field_map[id(field)] = self.backend.alloc_buf(like=field.base)
 
         for field in self._vector_fields:
             gpu_vector = []
             for component in field:
-                gpu_vector.append(self.backend.alloc_buf(like=component))
+                gpu_vector.append(self.backend.alloc_buf(like=component.base))
             self._gpu_field_map[id(field)] = gpu_vector
 
         if self._x_connected:
