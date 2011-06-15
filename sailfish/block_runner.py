@@ -472,10 +472,8 @@ class BlockRunner(object):
         # Create X distrib/collect entries for the corner nodes.
         offset = corners_offset
         for face, block_id, span, size in corners:
-            recv_view = self._x_ghost_recv_buffer.view()
-            send_view = self._x_ghost_send_buffer.view()
-            recv_view = recv_view[offset:offset + size]
-            send_view = send_view[offset:offset + size]
+            recv_view = self._x_ghost_recv_buffer[offset:offset + size]
+            send_view = self._x_ghost_send_buffer[offset:offset + size]
 
             recv_view = recv_view.reshape(1, 1)
             send_view = send_view.reshape(1, 1)
