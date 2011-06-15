@@ -1,5 +1,5 @@
 
-.PHONY: clean regtest2d_single regtest2d_double regtest3d_single regtest3d_double regtest
+.PHONY: clean regtest2d_single regtest2d_double regtest3d_single regtest3d_double regtest presubmit
 
 regtest2d_single:
 	python -u regtest/poiseuille.py --dim=2
@@ -53,6 +53,8 @@ regtest:
 	python regtest/blocks/2d_ldc.py
 	python regtest/blocks/cylinder.py
 	python regtest/blocks/propagation.py
+
+presubmit: test regtest
 
 clean:
 	rm -f sailfish/*.pyc

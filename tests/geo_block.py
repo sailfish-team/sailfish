@@ -46,7 +46,7 @@ class TestBlock2D(unittest.TestCase):
         self.assertTrue(base.connect(b7))
         self.assertTrue(base.connect(b8))
 
-        gcs = base.get_connection_span
+        gcs = base.get_connection_selector
         self.assertEqual(gcs(type_, b1.id), f(span, slice(0, 10)))
         self.assertEqual(gcs(type_, b2.id), f(span, slice(0, 5)))
         self.assertEqual(gcs(type_, b3.id), f(span, slice(0, 10)))
@@ -94,17 +94,17 @@ class TestBlock2D(unittest.TestCase):
         b2.id = 2
         self.assertTrue(b1.connect(b2, geo, axis=0))
 
-        span = b1.get_connection_span(LBBlock2D._X_LOW, b2.id)
+        span = b1.get_connection_selector(LBBlock2D._X_LOW, b2.id)
         self.assertEqual(span, (0, slice(0, 32)))
-        span = b2.get_connection_span(LBBlock2D._X_HIGH, b1.id)
+        span = b2.get_connection_selector(LBBlock2D._X_HIGH, b1.id)
         self.assertEqual(span, (31, slice(0, 32)))
 
         b3 = LBBlock2D((0, 32), (32, 32))
         b3.id = 3
         self.assertTrue(b3.connect(b1, geo, axis=1))
-        span = b1.get_connection_span(LBBlock2D._Y_LOW, b3.id)
+        span = b1.get_connection_selector(LBBlock2D._Y_LOW, b3.id)
         self.assertEqual(span, (slice(0, 32), 0))
-        span = b3.get_connection_span(LBBlock2D._Y_HIGH, b1.id)
+        span = b3.get_connection_selector(LBBlock2D._Y_HIGH, b1.id)
         self.assertEqual(span, (slice(0, 32), 31))
 
         # TODO(michalj): Consider more complex tests here like in
@@ -120,7 +120,7 @@ class TestBlock2D(unittest.TestCase):
         self.assertTrue(b1.connect(b3))
         self.assertTrue(b1.connect(b4))
 
-        gcs = b1.get_connection_span
+        gcs = b1.get_connection_selector
         self.assertEqual(gcs(LBBlock2D._X_HIGH, b2.id), (9, slice(0, 10, None)))
         self.assertEqual(gcs(LBBlock2D._X_HIGH, b4.id), (9, slice(10, 10, None)))
         self.assertEqual(b1.connecting_blocks(),
