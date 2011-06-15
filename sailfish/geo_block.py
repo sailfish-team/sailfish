@@ -14,18 +14,22 @@ def bit_len(num):
         length += 1
     return max(length, 1)
 
+def span_area(span):
+    area = 1
+    for elem in span:
+        if type(elem) is int:
+            continue
+        # Corner nodes are 0-elem spans and would multiply by 1 here.
+        if elem.start != elem.stop:
+            area *= elem.stop - elem.start
+    return area
 
-def span_to_tuple(span):
+def full_selector_to_face_selector(sel):
     ret = []
-    for coord in span:
-        if type(coord) is slice:
-            ret.append((coord.start, coord.stop))
-    return tuple(ret)
-
-def tuple_to_span(span):
-    ret = []
-    for coord in span:
-        ret.append(slice(coord[0], coord[1]))
+    for elem in sel:
+        if type(elem) is int:
+            continue
+        ret.append(elem)
     return ret
 
 # XXX fix this for 3D
@@ -110,10 +114,12 @@ class LBBlock(object):
         assert block_id not in self._connectors
         self._connectors[block_id] = connector
 
-    def get_connection_span(self, axis, block_id):
-        for span, bid in self._connections[axis]:
+    def get_connection_selector(self, face, block_id):
+        """Returns a list of slices/ints which can be used to select
+        nodes that propagate data to block 'block_id' via face 'face'"""
+        for sel, bid in self._connections[face]:
             if bid == block_id:
-                return span
+                return sel
         return None
 
     def connecting_blocks(self):
@@ -320,21 +326,15 @@ class LBBlock2D(LBBlock):
         return sym.get_interblock_dists(grid,
                 self._direction_from_span_face(face, span), opposite)
 
-    def connection_buf_size(self, grid, face, block_id=None, span_tuple=None):
+    def connection_buf_size(self, grid, face, block_id=None, span=None):
         if block_id is not None:
-            assert span_tuple is None
-            span = self.get_connection_span(face, block_id)
-            span_tuple = span_to_tuple(span)
+            assert span is None
+            span = self.get_connection_selector(face, block_id)
         else:
-            assert span_tuple is not None
-            span = tuple_to_span(span_tuple)
+            assert span is not None
 
         buf_size = len(self.connection_dists(grid, face, span))
-        for low, high in span_tuple:
-            # Corner nodes are 0-elem spans and would multiply by 1 here.
-            if high != low:
-                buf_size *= (high - low)
-
+        buf_size *= span_area(span)
         return buf_size
 
     def update_context(self, ctx):

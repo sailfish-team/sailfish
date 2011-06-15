@@ -3,8 +3,7 @@ import math
 import operator
 import numpy as np
 from sailfish import codegen, util, sym
-from sailfish.geo_block import tuple_to_span, span_to_tuple, is_corner_span
-
+from sailfish.geo_block import is_corner_span, span_area, full_selector_to_face_selector
 
 class BlockRunner(object):
     """Runs the simulation for a single LBBlock
@@ -220,44 +219,48 @@ class BlockRunner(object):
 
         # Maps
         axis_span = {}
-        def max_span(axis, span_tuple):
+        def max_span(axis, span):
             if axis not in axis_span:
-                axis_span[axis] = span_tuple
+                axis_span[axis] = span
             else:
                 curr = axis_span[axis]
 
                 if self._block.dim == 2:
-                    axis_span[axis] = ((
-                            min(curr[0][0], span_tuple[0][0]),
-                            max(curr[0][1], span_tuple[0][1])),)
+                    axis_span[axis] = (
+                            slice(min(curr[0].start, span[0].start),
+                                  max(curr[0].stop, span[0].stop)),)
                 else:
                     axis_span[axis] = (
-                            (min(curr[0][0], span_tuple[0][0]),
-                             max(curr[0][1], span_tuple[0][1])),
-                            (min(curr[1][0], span_tuple[1][0]),
-                             max(curr[1][1], span_tuple[1][1])))
+                            slice(min(curr[0].start, span[0].start),
+                                  max(curr[0].stop, span[0].stop)),
+                            slice(min(curr[1].start, span[1].start),
+                                  max(curr[1].stop, span[1].stop)))
 
 
         def relative_span(span1, span2):
             if self._block.dim == 2:
-                return ((span2[0][0] - span1[0][0], span2[0][1] - span1[0][0]),)
+                return (slice(span2[0].start - span1[0].start,
+                              span2[0].stop - span1[0].start),)
             else:
-                return ((span2[0][0] - span1[0][0], span2[0][1] - span1[0][0]),
-                        (span2[1][0] - span1[1][0], span2[1][1] - span1[1][0]))
+                return (slice(span2[0].start - span1[0].start,
+                              span2[0].stop - span1[0].start),
+                        slice(span2[1].start - span1[1].start,
+                              span2[1].stop - span1[1].start))
 
         corners = []
 
         # Compute max spans for every face connecting to other blocks.
         for face, block_id in self._block.connecting_blocks():
-            span = self._block.get_connection_span(face, block_id)
+            span = self._block.get_connection_selector(face, block_id)
+            span = full_selector_to_face_selector(span)
             size = self._block.connection_buf_size(grid, face, block_id)
 
             if not is_corner_span(span)[0]:
-                max_span(face, span_to_tuple(span))
+                max_span(face, span)
                 block_axis_span.setdefault(block_id, []).append((face, span, size))
                 self.config.logger.debug('face {0}: (block {1}) new span: {2} '
                         'max span {3}'.format(face, block_id,
-                            span_to_tuple(span), axis_span[face]))
+                            span, axis_span[face]))
             else:
                 corners.append((face, block_id, span, size))
 
@@ -273,10 +276,10 @@ class BlockRunner(object):
         #  buf_offset: item offset in the global ghost buffer for all faces
         self._ghost_info = {}
         for face, span in axis_span.iteritems():
-            buf_size = self._block.connection_buf_size(grid, face, span_tuple=span)
+            buf_size = self._block.connection_buf_size(grid, face, span=span)
 
             # XXX: fix this for 3D
-            low = span[0][0]
+            low = span[0].start
 
             if face < 2:
                 self._ghost_info[face] = (low, buf_size, total_x_size)
@@ -343,15 +346,14 @@ class BlockRunner(object):
                     ret.append(coord)
             return ret
 
-        def get_global_indices_array(face, span_tuple, gx_map, opposite=False):
+        def get_global_indices_array(face, span, gx_map, opposite=False):
             """
             face: identifies the face (i.e x == 0 or x == lat_nx-1)
-            span_tuple: identifies the area on the face for which the indices are to
+            span: identifies the area on the face for which the indices are to
                     be generated
             gx_map: gx_map[face] == limiting coordinate at which the face is
                     located
             """
-            span = tuple_to_span(span_tuple)
             dists = self._block.connection_dists(grid, face, span, opposite)
 
             self.config.logger.debug('{0}: dists: {1}'.format(inspect.stack()[0][3],
@@ -361,13 +363,11 @@ class BlockRunner(object):
                 gx = gx_map[self._block.opposite_axis_dir(face)]
             else:
                 gx = gx_map[face]
-            span = handle_corner_span(tuple_to_span(span_tuple), opposite)
+            span = handle_corner_span(span, opposite)
             gy = np.uint32(range(0, self._lat_size[-2] +
                           self._block.envelope_size)[span[0]])
             gy = np.kron(gy, np.ones(len(dists), dtype=np.uint32))
-
-            new_span_tuple = span_to_tuple(span)
-            num_nodes = new_span_tuple[0][1] - new_span_tuple[0][0]
+            num_nodes = span_area(span)
             dist_num = np.kron(
                     np.ones(num_nodes, dtype=np.uint32),
                     np.uint32(dists))
@@ -385,7 +385,7 @@ class BlockRunner(object):
         face2view = {}
         idx = 0
         for face, (_, buf_size, offset) in self._ghost_info.iteritems():
-            span_tuple = axis_span[face]
+            selector = axis_span[face]
 
             if face < 2:
                 recv_view = self._x_ghost_recv_buffer.view()
@@ -397,10 +397,7 @@ class BlockRunner(object):
             recv_view = recv_view[offset:offset + buf_size]
             send_view = send_view[offset:offset + buf_size]
 
-            nodes = 1
-            for low, high in span_tuple:
-                assert high != low
-                nodes *= (high - low)
+            nodes = span_area(selector)
             dists = buf_size / nodes
 
             self.config.logger.debug('face {0}: {1} nodes with {2} '
@@ -414,23 +411,25 @@ class BlockRunner(object):
             # XXX: this is off by prop_dists
             if self._block.dim == 3:
                 recv_view = recv_view.reshape(
-                        (span_tuple[0][1]-span_tuple[0][0], span_tuple[1][1]-span_tuple[1][0]))
+                        (selector[0].stop - selector[0].start,
+                         selector[1].stop - selector[1].start))
                 send_view = send_view.reshape(
-                        (span_tuple[0][1]-span_tuple[0][0], span_tuple[1][1]-span_tuple[1][0]))
+                        (selector[0].stop - selector[0].start,
+                         selector[1].stop - selector[1].start))
 
             face2view[face] = (recv_view, send_view)
 
             # Add global indices for connections along the X axis.
             if face < 2:
                 self._x_ghost_collect_idx[idx:idx + buf_size] = \
-                        get_global_indices_array(face, span_tuple, self.lat_linear)
+                        get_global_indices_array(face, selector, self.lat_linear)
                 # The face here is reversed, as for every distribution that we
                 # send out, the opposite distribution has to be received from
                 # the other block.
                 self._x_ghost_distrib_idx[idx:idx + buf_size] = \
                         get_global_indices_array(
                                 self._block.opposite_axis_dir(face),
-                                span_tuple,
+                                selector,
                                 self.lat_linear_dist)
                 idx += buf_size
 
@@ -454,8 +453,7 @@ class BlockRunner(object):
             for face, span, size in item_list:
                 view = face2view[face]
                 global_span = axis_span[face]
-                rel_span = relative_span(global_span, span_to_tuple(span))
-                rel_span = tuple_to_span(rel_span)
+                rel_span = relative_span(global_span, span)
 
                 # XXX rel_span[0] is going to be invalid for 3D
                 recv_view = view[0][:,rel_span[0]]
@@ -483,12 +481,12 @@ class BlockRunner(object):
 
             self.config.logger.debug('face {0}: block {1} (X-corner) @ offset '
                     '{2}, size {3}, span {4}'.format(face, block_id, offset,
-                        size, span_to_tuple(span)))
+                        size, span))
 
             self._x_ghost_collect_idx[idx:idx + size] = \
-                    get_global_indices_array(face, span_to_tuple(span), self.lat_linear)
+                    get_global_indices_array(face, span, self.lat_linear)
             self._x_ghost_distrib_idx[idx:idx + size] = \
-                    get_global_indices_array(face, span_to_tuple(span),
+                    get_global_indices_array(face, span,
                             self.lat_linear_dist, opposite=True)
 
             idx += size
