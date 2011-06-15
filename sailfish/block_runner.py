@@ -182,7 +182,7 @@ class BlockRunner(object):
             self._global_size = (self.config.lat_nz, self.config.lat_ny,
                     self.config.lat_nx)
 
-        # Used so that axis_dir values map to the limiting coordinate
+        # Used so that face values map to the limiting coordinate
         # along a specific axis, e.g. lat_linear[_X_LOW] = 0
         # TODO(michalj): Should this use _block.envelope_size instead of -1?
         self.lat_linear = [0, self._lat_size[-1]-1, 0, self._lat_size[-2]-1]
@@ -360,7 +360,7 @@ class BlockRunner(object):
                     dists))
 
             if opposite:
-                gx = gx_map[self._block.opposite_axis_dir(face)]
+                gx = gx_map[self._block.opposite_face(face)]
             else:
                 gx = gx_map[face]
             span = handle_corner_span(span, opposite)
@@ -428,7 +428,7 @@ class BlockRunner(object):
                 # the other block.
                 self._x_ghost_distrib_idx[idx:idx + buf_size] = \
                         get_global_indices_array(
-                                self._block.opposite_axis_dir(face),
+                                self._block.opposite_face(face),
                                 selector,
                                 self.lat_linear_dist)
                 idx += buf_size
@@ -766,7 +766,7 @@ class BlockRunner(object):
                         self.get_kernel('DistributeOrthogonalGhostData',
                             [self.gpu_dist(0, i),
                                 np.int32(gx_start + self._block.envelope_size),
-                                np.int32(self._block.opposite_axis_dir(face)),
+                                np.int32(self._block.opposite_face(face)),
                                 np.int32(num_nodes),
                                 self._gpu_ortho_ghost_recv_buffer, buf_offset],
                             'PiiiPi', (collect_block,)))

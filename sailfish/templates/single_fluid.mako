@@ -311,11 +311,11 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 // Collects ghost node data for connections along axes other than X.
 // dist: distributions array
 // base_gy: where along the X axis to start collecting the data
-// axis_dir: see LBBlock class constants
+// face: see LBBlock class constants
 // buffer: buffer where the data is to be saved
 ${kernel} void CollectOrthogonalGhostData(
 		${global_ptr} float *dist, int base_gx,
-		int axis_dir, int max_idx, ${global_ptr} float *buffer, int offset)
+		int face, int max_idx, ${global_ptr} float *buffer, int offset)
 {
 	int idx = get_global_id(0);
 	int gi;
@@ -325,13 +325,13 @@ ${kernel} void CollectOrthogonalGhostData(
 		return;
 	}
 
-	switch (axis_dir) {
+	switch (face) {
 	%for axis in range(2, 2*dim):
 		case ${axis}: {
 			<%
 				prop_dists = sym.get_prop_dists(grid,
-						block.axis_dir_to_dir(axis),
-						block.axis_dir_to_axis(axis))
+						block.face_to_dir(axis),
+						block.face_to_axis(axis))
 			%>
 			int dist_size = max_idx / ${len(prop_dists)};
 			int dist_num = idx / dist_size;
@@ -369,8 +369,8 @@ ${kernel} void DistributeOrthogonalGhostData(
 	%for axis in range(2, 2*dim):
 		case ${axis}: {
 			<%
-				comp = block.axis_dir_to_dir(axis)
-				pos = block.axis_dir_to_axis(axis)
+				comp = block.face_to_dir(axis)
+				pos = block.face_to_axis(axis)
 				prop_dists = sym.get_prop_dists(grid, comp, pos)
 				direction = [0, 0]
 				direction[pos] = comp
