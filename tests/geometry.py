@@ -227,4 +227,5 @@ class Test3DNodeProcessing(unittest.TestCase):
         self.assertEqual(self.geo._get_map((24, 22, 16)), self.geo.NODE_PRESSURE)
 
 if __name__ == '__main__':
-    unittest.main()
+    #unittest.main()
+    print "Test disabled until it is ported to the new framework."
