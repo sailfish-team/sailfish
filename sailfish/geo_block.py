@@ -382,7 +382,9 @@ class GeoEncoder(object):
         if node_type in self._type_id_map:
             return self._type_id_map[node_type]
         else:
-            return 0xffffffff
+            # Does not end with 0xff to make sure the compiler will not complain
+            # that x < <val> always evaluates true.
+            return 0xfffffffe
 
 
 class GeoEncoderConst(GeoEncoder):
