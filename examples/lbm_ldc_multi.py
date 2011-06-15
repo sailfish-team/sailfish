@@ -13,7 +13,7 @@ class LDCGeometry(LBGeometry2D):
         bps = int(math.sqrt(self.config.blocks))
 
         if bps**2 != self.config.blocks:
-            print ('Only configutaions with '
+            print ('Only configurations with '
                     'square-of-interger numbers of blocks are supported. '
                     'Falling back to {} x {} blocks.'.format(bps, bps))
 
@@ -38,7 +38,7 @@ class LDCGeometry(LBGeometry2D):
 
 
 class LDCBlock(GeoBlock2D):
-    """Lid-driven cavity geometry."""
+    """2D Lid-driven cavity geometry."""
 
     max_v = 0.1
 
