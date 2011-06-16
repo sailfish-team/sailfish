@@ -51,7 +51,7 @@ class OpenCLBackend(object):
             self.buffers[buf] = hbuf
             self.to_buf(buf)
             if wrap_in_array:
-                self.arrays[buf] = clarray.Array(like.shape, like.dtype, data=buf)
+                self.arrays[buf] = clarray.Array(self.ctx, like.shape, like.dtype, data=buf)
         else:
             buf = cl.Buffer(self.ctx, mf.READ_WRITE, size)
 
