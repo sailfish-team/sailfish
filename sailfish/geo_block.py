@@ -111,18 +111,6 @@ class LBBlock(object):
         # TODO: As an optimization, we could drop the ghost node layer in this
         # case.
 
-    def connect(self, block):
-        """Creates a connection between this block and another block.
-
-        A connection can only be created when the blocks are next to each
-        other.
-
-        :param block: block object to connect to
-        :returns: True if the connection was successful
-        :rtype: bool
-        """
-        raise NotImplementedError('Method should be defined by subclass.')
-
     def _add_connection(self, axis, span, block_id):
         if axis in self._connections:
             if (span, block_id) in self._connections[axis]:
@@ -217,163 +205,38 @@ class LBBlock(object):
         buf_size *= span_area(span)
         return buf_size
 
-
-class LBBlock2D(LBBlock):
-    dim = 2
-
-    def __init__(self, location, size, envelope_size=None, *args, **kwargs):
-        self.ox, self.oy = location
-        self.nx, self.ny = size
-        LBBlock.__init__(self, location, size, envelope_size, *args, **kwargs)
-
-    @property
-    def _nonghost_slice(self):
-        """Returns a 2-tuple of slice objects that selects all non-ghost nodes."""
-
-        es = self.envelope_size
-        return (slice(es, es + self.ny), slice(es, es + self.nx))
-
     def connect(self, block, geo=None, axis=None):
-        """Tries to connect the current block to another block, and returns True
-        if successful.
+        """Creates a connection between this block and another block.
 
+        A connection can only be created when the blocks are next to each
+        other.
+
+        :param block: block object to connect to
         :param `geo`: None for a local block connection; for a global
                connection due to lattice periodicity, a LBGeometry object
+        :returns: True if the connection was successful
+        :rtype: bool
         """
         hx = self.nx + self.ox
         hy = self.ny + self.oy
+        if self.dim == 3:
+            hz = self.nz + self.oz
+            hlp = [hx, hy, hz]
+        else:
+            hlp = [hx, hy]
 
         tg_hx = block.nx + block.ox
         tg_hy = block.ny + block.oy
-
-        assert block.id != self.id
-
-        def get_span(tg_od, sf_od, tg_hd, sf_hd, tg_nd, sf_nd):
-            """Calculates the connection slices for both blocks.
-
-            The arguments names follow the scheme:
-            tg; target (block)
-            sf: self
-            hd: max position (hx, hy)
-            nd: min position (nx, ny)
-            """
-            if tg_od < sf_od:
-                span_min_tg = sf_od - tg_od
-                span_min = 0
-            else:
-                span_min_tg = 0
-                span_min = tg_od - sf_od
-
-            assert span_min >= 0
-            assert span_min_tg >= 0
-
-            if sf_hd > tg_hd:
-                span_max = tg_hd - sf_od
-                span_max_tg = tg_nd
-            else:
-                span_max = sf_nd
-                span_max_tg = sf_hd - tg_od
-
-            return span_min, span_max, span_min_tg, span_max_tg
-
-        def connect_x():
-            """Connects the blocks along the X axis.  The wall at the highest X
-            coordinate of `self` is connected to the wall at the lowest X
-            coordinate of `block`."""
-            span_min, span_max, span_min_tg, span_max_tg = get_span(
-                block.oy, self.oy, tg_hy, hy, block.ny, self.ny)
-
-            if span_max < span_min or span_max_tg < span_min_tg:
-                return False
-
-            span = slice(span_min, span_max)
-            span_tg = slice(span_min_tg, span_max_tg)
-
-            self._add_connection(self._X_HIGH, (self.nx-1, span), block.id)
-            block._add_connection(self._X_LOW, (0, span_tg), self.id)
-            return True
-
-        def connect_y():
-            """Connects the blocks along the Y axis.  The wall at the highest Y
-            coordinate of `self` is connected to the wall at the lowest Y
-            coordinate of `block`."""
-            span_min, span_max, span_min_tg, span_max_tg = get_span(
-                    block.ox, self.ox, tg_hx, hx, block.nx, self.nx)
-
-            if span_max < span_min or span_max_tg < span_min_tg:
-                return False
-
-            span = slice(span_min, span_max)
-            span_tg = slice(span_min_tg, span_max_tg)
-
-            self._add_connection(self._Y_HIGH, (span, self.ny-1), block.id)
-            block._add_connection(self._Y_LOW, (span_tg, 0), self.id)
-            return True
-
-        # Check if a global connection across the simulation domain is
-        # requested.
-        if geo is not None:
-            assert axis is not None
-
-            if axis == 0:
-                if self.ox == 0 and tg_hx == geo.gx:
-                    return block.connect(self, geo, axis)
-                elif block.ox == 0 and hx == geo.gx:
-                    return connect_x()
-            elif axis == 1:
-                if self.oy == 0 and tg_hy == geo.gy:
-                    return block.connect(self, geo, axis)
-                elif block.oy == 0 and hy == geo.gy:
-                    return connect_y()
-
-        elif hx == block.ox:
-            return connect_x()
-        elif tg_hx == self.ox:
-            return block.connect(self)
-        elif hy == block.oy:
-            return connect_y()
-        elif tg_hy == self.oy:
-            return block.connect(self)
-
-        return False
-
-
-
-class LBBlock3D(LBBlock):
-    dim = 3
-
-    def __init__(self, location, size, envelope_size=None, *args, **kwargs):
-        self.ox, self.oy, self.oz = location
-        self.nx, self.ny, self.nz = size
-        self._periodicity = [False, False, False]
-        LBBlock.__init__(self, location, size, envelope_size, *args, **kwargs)
-
-    @property
-    def _nonghost_slice(self):
-        """Returns a 3-tuple of slice objects that selects all non-ghost nodes."""
-        es = self.envelope_size
-        return (slice(es, es + self.nz), slice(es, es + self.ny), slice(es, es + self.nx))
-
-    @property
-    def periodic_z(self):
-        """Z-axis periodicity within this block."""
-        return self._periodicity[2]
-
-    def connect(self, block, geo=None, axis=None):
-        hx = self.nx + self.ox
-        hy = self.ny + self.oy
-        hz = self.nz + self.oz
-        hlp = [hx, hy, hz]
-
-        tg_hx = block.nx + block.ox
-        tg_hy = block.ny + block.oy
-        tg_hz = block.nz + block.oz
-        tg_hlp = [tg_hx, tg_hy, tg_hz]
+        if self.dim == 3:
+            tg_hz = block.nz + block.oz
+            tg_hlp = [tg_hx, tg_hy, tg_hz]
+        else:
+            tg_hlp = [tg_hx, tg_hy]
 
         assert block.id != self.id
 
         def get_span(connection_axis):
-            span_axes = [0, 1, 2]
+            span_axes = range(0, self.dim)
             span_axes.remove(connection_axis)
 
             span = []
@@ -412,9 +275,12 @@ class LBBlock3D(LBBlock):
             span, span_tg = get_span(1)
             if span is None:
                 return False
-            self._add_connection(self._Y_HIGH, [span[0], self.ny-1, span[1]],
-                block.id)
-            block._add_connection(self._Y_LOW, [span_tg[0], 0, span_tg[1]], self.id)
+            if self.dim == 3:
+                self._add_connection(self._Y_HIGH, [span[0], self.ny-1, span[1]], block.id)
+                block._add_connection(self._Y_LOW, [span_tg[0], 0, span_tg[1]], self.id)
+            else:
+                self._add_connection(self._Y_HIGH, [span[0], self.ny-1], block.id)
+                block._add_connection(self._Y_LOW, [span_tg[0], 0], self.id)
             return True
 
         def connect_z():
@@ -451,12 +317,50 @@ class LBBlock3D(LBBlock):
             return connect_y()
         elif tg_hy == self.oy:
             return block.connect(self)
-        elif hz == block.oz:
-            return connect_z()
-        elif tg_hz == self.oz:
-            return block.connect(self)
+        elif self.dim == 3:
+            if hz == block.oz:
+                return connect_z()
+            elif tg_hz == self.oz:
+                return block.connect(self)
 
         return False
+
+class LBBlock2D(LBBlock):
+    dim = 2
+
+    def __init__(self, location, size, envelope_size=None, *args, **kwargs):
+        self.ox, self.oy = location
+        self.nx, self.ny = size
+        LBBlock.__init__(self, location, size, envelope_size, *args, **kwargs)
+
+    @property
+    def _nonghost_slice(self):
+        """Returns a 2-tuple of slice objects that selects all non-ghost nodes."""
+
+        es = self.envelope_size
+        return (slice(es, es + self.ny), slice(es, es + self.nx))
+
+
+class LBBlock3D(LBBlock):
+    dim = 3
+
+    def __init__(self, location, size, envelope_size=None, *args, **kwargs):
+        self.ox, self.oy, self.oz = location
+        self.nx, self.ny, self.nz = size
+        self._periodicity = [False, False, False]
+        LBBlock.__init__(self, location, size, envelope_size, *args, **kwargs)
+
+    @property
+    def _nonghost_slice(self):
+        """Returns a 3-tuple of slice objects that selects all non-ghost nodes."""
+        es = self.envelope_size
+        return (slice(es, es + self.nz), slice(es, es + self.ny), slice(es, es + self.nx))
+
+    @property
+    def periodic_z(self):
+        """Z-axis periodicity within this block."""
+        return self._periodicity[2]
+
 
 
 class GeoEncoder(object):

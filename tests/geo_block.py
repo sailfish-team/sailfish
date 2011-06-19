@@ -11,11 +11,11 @@ class TestBlock3D(unittest.TestCase):
         """
         def f(a, b, c):
             if axis == 0:
-                return a, b, c
+                return [a, b, c]
             elif axis == 1:
-                return b, a, c
+                return [b, a, c]
             else:
-                return c, b, a
+                return [c, b, a]
 
         base = LBBlock3D((10, 10, 10), (10, 10, 10), id_=0)
         b1 = LBBlock3D(f(c0, 10, 10), f(5, 10, 10), id_=1)     # exact match
@@ -33,12 +33,12 @@ class TestBlock3D(unittest.TestCase):
         self.assertTrue(base.connect(b6))
 
         gcs = base.get_connection_selector
-        self.assertEqual(gcs(type_, b1.id), list(f(conn_loc, slice(0, 10), slice(0, 10))))
-        self.assertEqual(gcs(type_, b2.id), list(f(conn_loc, slice(0, 5), slice(0, 5))))
-        self.assertEqual(gcs(type_, b3.id), list(f(conn_loc, slice(0, 10), slice(0, 10))))
-        self.assertEqual(gcs(type_, b4.id), list(f(conn_loc, slice(0, 5), slice(0, 5))))
-        self.assertEqual(gcs(type_, b5.id), list(f(conn_loc, slice(5, 8), slice(4, 6))))
-        self.assertEqual(gcs(type_, b6.id), list(f(conn_loc, slice(5, 10), slice(4, 10))))
+        self.assertEqual(gcs(type_, b1.id), f(conn_loc, slice(0, 10), slice(0, 10)))
+        self.assertEqual(gcs(type_, b2.id), f(conn_loc, slice(0, 5), slice(0, 5)))
+        self.assertEqual(gcs(type_, b3.id), f(conn_loc, slice(0, 10), slice(0, 10)))
+        self.assertEqual(gcs(type_, b4.id), f(conn_loc, slice(0, 5), slice(0, 5)))
+        self.assertEqual(gcs(type_, b5.id), f(conn_loc, slice(5, 8), slice(4, 6)))
+        self.assertEqual(gcs(type_, b6.id), f(conn_loc, slice(5, 10), slice(4, 10)))
 
         bf1 = LBBlock3D(f(c0, 21, 5), f(5, 10, 20))     # too far along Y
         bf2 = LBBlock3D(f(c0, 5, 21), f(5, 20, 10))     # too far along Z
@@ -66,10 +66,10 @@ class TestBlock3D(unittest.TestCase):
         self.assertTrue(base.connect(b10))
 
         if axis == 0:
-            self.assertEqual(gcs(type_, b7.id), list(f(conn_loc, slice(0, 0), slice(0, 10))))
-            self.assertEqual(gcs(type_, b8.id), list(f(conn_loc, slice(0, 10), slice(0, 0))))
-            self.assertEqual(gcs(type_, b9.id), list(f(conn_loc, slice(10, 10), slice(0, 10))))
-            self.assertEqual(gcs(type_, b10.id), list(f(conn_loc, slice(0, 10), slice(10, 10))))
+            self.assertEqual(gcs(type_, b7.id), f(conn_loc, slice(0, 0), slice(0, 10)))
+            self.assertEqual(gcs(type_, b8.id), f(conn_loc, slice(0, 10), slice(0, 0)))
+            self.assertEqual(gcs(type_, b9.id), f(conn_loc, slice(10, 10), slice(0, 10)))
+            self.assertEqual(gcs(type_, b10.id), f(conn_loc, slice(0, 10), slice(10, 10)))
         elif axis == 1:
             self.assertEqual(gcs(type_, b8.id), [slice(0, 10), conn_loc, slice(0, 0)])
             self.assertEqual(gcs(type_, b10.id), [slice(0, 10), conn_loc, slice(10, 10)])
@@ -94,12 +94,10 @@ class TestBlock3D(unittest.TestCase):
         # Corners are always X-axis connections
         if axis == 0:
             # Corner connections are signified by empty slices.
-            self.assertEqual(gcs(type_, b11.id), list(f(conn_loc, slice(0, 0), slice(0, 0))))
-            self.assertEqual(gcs(type_, b12.id), list(f(conn_loc, slice(0, 0), slice(10, 10))))
-            self.assertEqual(gcs(type_, b13.id), list(f(conn_loc, slice(10, 10), slice(0, 0))))
-            self.assertEqual(gcs(type_, b14.id), list(f(conn_loc, slice(10, 10), slice(10, 10))))
-
-
+            self.assertEqual(gcs(type_, b11.id), f(conn_loc, slice(0, 0), slice(0, 0)))
+            self.assertEqual(gcs(type_, b12.id), f(conn_loc, slice(0, 0), slice(10, 10)))
+            self.assertEqual(gcs(type_, b13.id), f(conn_loc, slice(10, 10), slice(0, 0)))
+            self.assertEqual(gcs(type_, b14.id), f(conn_loc, slice(10, 10), slice(10, 10)))
 
     def test_block_connection_x_high(self):
         self._connection_helper(20, LBBlock3D._X_HIGH, 9, 0)
@@ -127,9 +125,9 @@ class TestBlock2D(unittest.TestCase):
         """
         def f(a, b):
             if x_axis:
-                return a, b
+                return [a, b]
             else:
-                return b, a
+                return [b, a]
 
         base = LBBlock2D(f(10, 10), f(10, 10), id_=0)
 
@@ -205,17 +203,17 @@ class TestBlock2D(unittest.TestCase):
         self.assertTrue(b1.connect(b2, geo, axis=0))
 
         span = b1.get_connection_selector(LBBlock2D._X_LOW, b2.id)
-        self.assertEqual(span, (0, slice(0, 32)))
+        self.assertEqual(span, [0, slice(0, 32)])
         span = b2.get_connection_selector(LBBlock2D._X_HIGH, b1.id)
-        self.assertEqual(span, (31, slice(0, 32)))
+        self.assertEqual(span, [31, slice(0, 32)])
 
         b3 = LBBlock2D((0, 32), (32, 32))
         b3.id = 3
         self.assertTrue(b3.connect(b1, geo, axis=1))
         span = b1.get_connection_selector(LBBlock2D._Y_LOW, b3.id)
-        self.assertEqual(span, (slice(0, 32), 0))
+        self.assertEqual(span, [slice(0, 32), 0])
         span = b3.get_connection_selector(LBBlock2D._Y_HIGH, b1.id)
-        self.assertEqual(span, (slice(0, 32), 31))
+        self.assertEqual(span, [slice(0, 32), 31])
 
         # TODO(michalj): Consider more complex tests here like in
         # test_block_connection_*
@@ -231,8 +229,8 @@ class TestBlock2D(unittest.TestCase):
         self.assertTrue(b1.connect(b4))
 
         gcs = b1.get_connection_selector
-        self.assertEqual(gcs(LBBlock2D._X_HIGH, b2.id), (9, slice(0, 10, None)))
-        self.assertEqual(gcs(LBBlock2D._X_HIGH, b4.id), (9, slice(10, 10, None)))
+        self.assertEqual(gcs(LBBlock2D._X_HIGH, b2.id), [9, slice(0, 10, None)])
+        self.assertEqual(gcs(LBBlock2D._X_HIGH, b4.id), [9, slice(10, 10, None)])
         self.assertEqual(b1.connecting_blocks(),
                 [(LBBlock2D._X_HIGH, b2.id), (LBBlock2D._X_HIGH, b4.id),
                  (LBBlock2D._Y_HIGH, b3.id)])
