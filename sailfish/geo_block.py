@@ -63,14 +63,16 @@ class LBBlock(object):
         self.actual_size = None
         self.envelope_size = envelope_size
         self._runner = None
-        self._id = None
+        self._id = id_
         self._clear_connections()
         self._clear_connectors()
 
         self.vis_buffer = None
         self.vis_geo_buffer = None
-        self.id = id_
         self._periodicity = [False] * self.dim
+
+    def __str__(self):
+        return '{0}({1}, {2})'.format(self.__class__.__name__, self.location, self.size)
 
     @property
     def runner(self):
@@ -357,6 +359,104 @@ class LBBlock3D(LBBlock):
         """Z-axis periodicity within this block."""
         return self._periodicity[2]
 
+    def connect(self, block, geo=None, axis=None):
+        hx = self.nx + self.ox
+        hy = self.ny + self.oy
+        hz = self.nz + self.oz
+        hlp = [hx, hy, hz]
+
+        tg_hx = block.nx + block.ox
+        tg_hy = block.ny + block.oy
+        tg_hz = block.nz + block.oz
+        tg_hlp = [tg_hx, tg_hy, tg_hz]
+
+        assert block.id != self.id
+
+        def get_span(connection_axis):
+            span_axes = [0, 1, 2]
+            span_axes.remove(connection_axis)
+
+            span = []
+            span_tg = []
+
+            for axis in span_axes:
+                span_min = max(0, block.location[axis] - self.location[axis])
+                span_min_tg = max(0, self.location[axis] - block.location[axis])
+
+                # The currrent block spans beyond the end of the other one.
+                if hlp[axis] > tg_hlp[axis]:
+                    span_max = tg_hlp[axis] - self.location[axis]
+                    span_max_tg = block.size[axis]
+                # The other block spans beyond the end of the current one.
+                else:
+                    span_max = self.size[axis]
+                    span_max_tg = hlp[axis] - block.location[axis]
+
+                if span_max < span_min or span_max_tg < span_min_tg:
+                    return None, None
+
+                span.append(slice(span_min, span_max))
+                span_tg.append(slice(span_min_tg, span_max_tg))
+
+            return span, span_tg
+
+        def connect_x():
+            span, span_tg = get_span(0)
+            if span is None:
+                return False
+            self._add_connection(self._X_HIGH, [self.nx-1] + span, block.id)
+            block._add_connection(self._X_LOW, [0] + span_tg, self.id)
+            return True
+
+        def connect_y():
+            span, span_tg = get_span(1)
+            if span is None:
+                return False
+            self._add_connection(self._Y_HIGH, [span[0], self.ny-1, span[1]],
+                block.id)
+            block._add_connection(self._Y_LOW, [span_tg[0], 0, span_tg[1]], self.id)
+            return True
+
+        def connect_z():
+            span, span_tg = get_span(2)
+            if span is None:
+                return False
+            self._add_connection(self._Z_HIGH, span + [self.nz-1], block.id)
+            block._add_connection(self._Z_LOW, span_tg + [0], self.id)
+            return True
+
+        if geo is not None:
+            assert axis is not None
+            if axis == 0:
+                if self.ox == 0 and tg_hx == geo.gx:
+                    return block.connect(self, geo, axis)
+                elif block.ox == 0 and hx == geo.gx:
+                    return connect_x()
+            elif axis == 1:
+                if self.oy == 0 and tg_hy == geo.gy:
+                    return block.connect(self, geo, axis)
+                elif block.oy == 0 and hy == geo.gy:
+                    return connect_y()
+            elif axis == 2:
+                if self.oz == 0 and tg_hz == geo.gz:
+                    return block.connect(self, geo, axis)
+                elif block.oz == 0 and hz == geo.gz:
+                    return connect_z()
+
+        elif hx == block.ox:
+            return connect_x()
+        elif tg_hx == self.ox:
+            return block.connect(self)
+        elif hy == block.oy:
+            return connect_y()
+        elif tg_hy == self.oy:
+            return block.connect(self)
+        elif hz == block.oz:
+            return connect_z()
+        elif tg_hz == self.oz:
+            return block.connect(self)
+
+        return False
 
 
 class GeoEncoder(object):
