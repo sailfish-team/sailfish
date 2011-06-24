@@ -456,6 +456,8 @@ class LBSimulationController(object):
         self.geo = self._lb_geo(self.conf)
 
         blocks = self.geo.blocks()
+        assert blocks is not None
+        assert len(blocks) > 0
         proc = LBGeometryProcessor(blocks, self.dim, self.geo)
         blocks = proc.transform(self.conf)
 

@@ -186,21 +186,55 @@ ${kernel} void CollideAndPropagate(
 	${propagate('dist_out', 'd0')}
 }
 
-<%def name="pbc_helper(axis, max_dim)">
+<%def name="pbc_helper(axis, max_dim, max_dim2=None)">
 	<%
 		if axis == 0:
 			offset = 1
 		elif axis == 1:
 			offset = arr_nx
 		else:
-			offset = arr_nx + arr_ny
+			offset = arr_nx * arr_ny
 
-		direction = [0, 0]
-		direction[axis] = -1
-		direction[1 - axis] = 1
-		corner_dists_low = sym.get_interblock_dists(grid, direction)
-		direction[1 - axis] = -1
-		corner_dists_high = sym.get_interblock_dists(grid, direction)
+		other_axes = [[1,2], [0,2], [0,1]]
+
+		def make_cond_to_dists(axis_direction):
+			direction = [0] * dim
+			direction[axis] = axis_direction
+
+			cond_to_dists = {}
+
+			if dim == 2:
+				direction[1 - axis] = 1
+				corner_dists = sym.get_interblock_dists(grid, direction)
+				cond_to_dists['idx1 > 1'] = corner_dists
+				direction[1 - axis] = -1
+				corner_dists = sym.get_interblock_dists(grid, direction)
+				cond_to_dists['idx1 < {0}'.format(max_dim)] = corner_dists
+			else:
+				for i in (1, 0, -1):
+					for j in (1, 0, -1):
+						if i == 0 and j == 0:
+							continue
+						direction[other_axes[axis][0]] = i
+						direction[other_axes[axis][1]] = j
+						corner_dists = sym.get_interblock_dists(grid, direction)
+						conds = []
+						if i == -1:
+							conds.append('idx1 > 1')
+						elif i == 1:
+							conds.append('idx1 < {0}'.format(max_dim))
+						if j == -1:
+							conds.append('idx2 > 1')
+						elif j == 1:
+							conds.append('idx2 < {0}'.format(max_dim2))
+						cond = ' && '.join(conds)
+						cond_to_dists[cond] = corner_dists
+
+			return cond_to_dists
+
+		cond_to_dists = make_cond_to_dists(-1)
+		done = False
+		done_dists = set()
 	%>
 
 	// TODO(michalj): Generalize this for grids with e_i > 1.
@@ -211,17 +245,23 @@ ${kernel} void CollideAndPropagate(
 
 	%for i in sym.get_prop_dists(grid, -1, axis):
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
-			%if i in corner_dists_low:
-				// Skip distributions which are not populated.
-				if (idx1 > 1) {
-					${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
-				}
-			%elif i in corner_dists_high:
-				// Skip distributions which are not populated.
-				if (idx1 < ${max_dim}) {
-					${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
-				}
-			%else:
+			%for cond, dists in cond_to_dists.iteritems():
+				%if i in dists:
+					// Skip distributions which are not populated.
+					if (${cond}) {
+						${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
+					}
+					<%
+						done = True
+						# Keep track of the distributions and make sure no distribution
+						# appears with two different conditiosn.
+						assert i not in done_dists
+						done_dists.add(i)
+					%>
+				%endif
+			%endfor
+
+			%if not done:
 				__BUG__
 			%endif
 		%else:
@@ -235,26 +275,30 @@ ${kernel} void CollideAndPropagate(
 	%endfor
 
 	<%
-		direction[axis] = 1
-		direction[1 - axis] = 1
-		corner_dists_low = sym.get_interblock_dists(grid, direction)
-		direction[1 - axis] = -1
-		corner_dists_high = sym.get_interblock_dists(grid, direction)
+		cond_to_dists = make_cond_to_dists(1)
+		done = False
+		done_dists = set()
 	%>
 
 	%for i in sym.get_prop_dists(grid, 1, axis):
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
-			%if i in corner_dists_low:
-				// Skip distributions which are not populated.
-				if (idx1 > 1) {
-					${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
-				}
-			%elif i in corner_dists_high:
-				// Skip distributions which are not populated.
-				if (idx1 < ${max_dim}) {
-					${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
-				}
-			%else:
+			%for cond, dists in cond_to_dists.iteritems():
+				%if i in dists:
+					// Skip distributions which are not populated.
+					if (${cond}) {
+						${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
+					}
+					<%
+						done = True
+						# Keep track of the distributions and make sure no distribution
+						# appears with two different conditiosn.
+						assert i not in done_dists
+						done_dists.add(i)
+					%>
+				%endif
+			%endfor
+
+			%if not done:
 				__BUG__
 			%endif
 		%else:
@@ -273,7 +317,7 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 	int gi_low, gi_high;
 
 	// For single block PBC, the envelope size (width of the ghost node
-	// layer is alawys 1.
+	// layer is always 1.
 	%if dim == 2:
 		if (axis == 0) {
 			if (idx1 >= ${lat_ny}) { return; }
@@ -292,17 +336,17 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 			if (idx1 >= ${lat_ny} || idx2 >= ${lat_nz}) { return; }
 			gi_low = getGlobalIdx(0, idx1, idx2);
 			gi_high = getGlobalIdx(${lat_nx-2}, idx1, idx2);
-			${pbc_helper(0)}
+			${pbc_helper(0, lat_ny-2, lat_nz-2)}
 		} else if (axis == 1) {
 			if (idx1 >= ${lat_nx} || idx2 >= ${lat_nz}) { return; }
 			gi_low = getGlobalIdx(idx1, 0, idx2);
 			gi_high = getGlobalIdx(idx1, ${lat_ny-2}, idx2);
-			${pbc_helper(1)}
+			${pbc_helper(1, lat_nx-2, lat_nz-2)}
 		} else {
 			if (idx1 >= ${lat_nx} || idx2 >= ${lat_ny}) { return; }
 			gi_low = getGlobalIdx(idx1, idx2, 0);
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});
-			${pbc_helper(2)}
+			${pbc_helper(2, lat_nx-2, lat_ny-2)}
 		}
 	%endif
 }
@@ -372,7 +416,7 @@ ${kernel} void DistributeOrthogonalGhostData(
 				comp = block.face_to_dir(axis)
 				pos = block.face_to_axis(axis)
 				prop_dists = sym.get_prop_dists(grid, comp, pos)
-				direction = [0, 0]
+				direction = [0] * dim
 				direction[pos] = comp
 			%>
 			int dist_size = max_idx / ${len(prop_dists)};
