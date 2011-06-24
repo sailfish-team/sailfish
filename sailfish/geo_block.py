@@ -642,8 +642,8 @@ class GeoBlock2D(GeoBlock):
             return
         self._type_map.base[0:es, :] = self.NODE_GHOST
         self._type_map.base[:, 0:es] = self.NODE_GHOST
-        self._type_map.base[es+self.block.ny:, :] = self.NODE_GHOST
-        self._type_map.base[:, es+self.block.nx:] = self.NODE_GHOST
+        self._type_map.base[es + self.block.ny:, :] = self.NODE_GHOST
+        self._type_map.base[:, es + self.block.nx:] = self.NODE_GHOST
 
     def _postprocess_nodes(self):
         # Find nodes which are walls themselves and are completely surrounded by
@@ -672,11 +672,29 @@ class GeoBlock3D(GeoBlock):
 
     def _define_ghosts(self):
         assert not self._type_map_encoded
-        # TODO: actually define ghost nodes here
-        raise NotImplementedError('_define_ghosts')
+        es = self.block.envelope_size
+        if not es:
+            return
+        self._type_map.base[0:es, :, :] = self.NODE_GHOST
+        self._type_map.base[:, 0:es, :] = self.NODE_GHOST
+        self._type_map.base[:, :, 0:es] = self.NODE_GHOST
+        self._type_map.base[es + self.block.nz:, :, :] = self.NODE_GHOST
+        self._type_map.base[:, es + self.block.ny:, :] = self.NODE_GHOST
+        self._type_map.base[:, :, es + self.block.nx:] = self.NODE_GHOST
 
     def _postprocess_nodes(self):
-        raise NotImplementedError("_postprocess_nodes()")
+        # Find nodes which are walls themselves and are completely surrounded by
+        # walls.  These nodes are marked as unused, as they do not contribute to
+        # the dynamics of the fluid in any way.
+        cnt = np.zeros_like(self._type_map.base).astype(np.uint32)
+        for i, vec in enumerate(self.grid.basis):
+            a = np.roll(self._type_map.base, int(-vec[0]), axis=2)
+            a = np.roll(a, int(-vec[1]), axis=1)
+            a = np.roll(a, int(-vec[2]), axis=0)
+            cnt[(a == self.NODE_WALL)] += 1
+
+        self._type_map.base[(cnt == self.grid.Q)] = self.NODE_UNUSED
+
 
 # TODO: Finish this.
 #

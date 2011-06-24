@@ -878,7 +878,6 @@ def get_prop_dists(grid, dir_, axis=0):
 
     return ret
 
-# XXX: fix this for 3D
 def get_interblock_dists(grid, direction, opposite=False):
     d = Matrix((direction,))
 
@@ -888,15 +887,11 @@ def get_interblock_dists(grid, direction, opposite=False):
         else:
             return dists
 
-    if d.dot(d) == 1:
-        ret = []
-        for i, ei in enumerate(grid.basis):
-            if ei.dot(d) > 0:
-                ret.append(i)
-        return process_dists(ret)
-    else:
-        # Corner node -- just a single distribution in D2Q9.
-        return process_dists([grid.basis.index(d)])
+    ret = []
+    for i, ei in enumerate(grid.basis):
+        if ei.dot(d) >= d.dot(d):
+            ret.append(i)
+    return process_dists(ret)
 
 
 #
