@@ -169,11 +169,14 @@ class BlockRunner(object):
                                        self.config.block_size)
 
         # CUDA block/grid size for standard kernel call.
-        self._kernel_grid_size = list(reversed(self._physical_size))
+        if self._block.dim == 2:
+            self._kernel_grid_size = list(reversed(self._physical_size))
+        else:
+            self._kernel_grid_size = [self._physical_size[2] *
+                    self._physical_size[1],  self._physical_size[0]]
         self._kernel_grid_size[0] /= self.config.block_size
 
-        self._kernel_block_size = [1] * len(self._lat_size)
-        self._kernel_block_size[0] = self.config.block_size
+        self._kernel_block_size = (self.config.block_size, 1)
 
         # Global grid size as seen by the simulation class.
         if self._block.dim == 2:

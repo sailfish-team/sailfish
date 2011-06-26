@@ -351,7 +351,7 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 	%endif
 }
 
-## TODO(michalj): Extend this for 3D.
+%if dim == 2:
 // Collects ghost node data for connections along axes other than X.
 // dist: distributions array
 // base_gy: where along the X axis to start collecting the data
@@ -396,14 +396,94 @@ ${kernel} void CollectOrthogonalGhostData(
 	%endfor
 	}
 }
+%else:
+<%def name="_get_global_idx(axis)">
+	## Y-axis
+	%if axis < 4:
+		gi = getGlobalIdx(base_gx + gx, ${lat_linear[axis]}, base_other + other);
+	## Z-axis
+	%else:
+		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear[axis]});
+	%endif
+</%def>
 
+// The data is collected from a rectangular area of the plane corresponding to 'face'.
+// The grid with which the kernel is to be called has the following dimensions:
+//
+//  x: # nodes along the X direction + any padding (real # nodes is identified by max_gx)
+//  y: # nodes along the Y/Z direction * # of dists to transfer + any padding
+//
+// The data will be placed into buffer + offset, in the following linear layout:
+//
+// (x0, y0, d0), (x1, y0, d0), .. (xN, y0, d0),
+// (x0, y1, d0), (x1, y1, d0), .. (xN, y1, d0),
+// ..
+// (x0, yM, d0), (x1, yM, d0). .. (xN, yM, d0),
+// (x0, y0, d1), (x1, y0, d1), .. (xN, y0, d1),
+// ...
+${kernel} void CollectOrthogonalGhostData(
+	${global_ptr} float *dist, int base_gx, int base_other,
+	int face, int max_gx, int max_other, ${global_ptr} float *buffer, int offset)
+{
+	int gx = get_global_id(0);
+	int idx = get_global_id(1);
+	int gi;
+	float tmp;
+
+	if (gx >= max_gx || idx >= max_other) {
+		return;
+	}
+
+	// TODO: consider intrabuffer padding to increase efficiency of writes
+	switch (face) {
+	%for axis in range(2, 2*dim):
+		case ${axis}: {
+			<%
+				prop_dists = sym.get_prop_dists(grid,
+						block.face_to_dir(axis),
+						block.face_to_axis(axis))
+			%>
+			int dist_size = max_other / ${len(prop_dists)};
+			int dist_num = idx / dist_size;
+			int other = idx % dist_size;
+
+			switch (dist_num) {
+				%for i, prop_dist in enumerate(prop_dists):
+				case ${i}: {
+					${_get_global_idx(axis)};
+					tmp = ${get_dist('dist', prop_dist, 'gi')};
+					break;
+				}
+				%endfor
+			}
+
+			idx = (other * max_gx + gx) * dist_num;
+			buffer[offset + idx] = tmp;
+			break;
+		}
+	%endfor
+	}
+}
+%endif
+
+<%def name="skip_dists_for_direction(direction, prop_dists)">
+	<% corner_dists = sym.get_interblock_dists(grid, direction) %>
+	if (0
+		%for corner_dist in corner_dists:
+			|| dist_num == ${prop_dists.index(corner_dist)}
+		%endfor
+	) {
+		return;
+	}
+</%def>
+
+%if dim == 2:
 ${kernel} void DistributeOrthogonalGhostData(
 		${global_ptr} float *dist, int base_gx,
 		int face, int max_idx, ${global_ptr} float *buffer, int offset)
 {
 	int idx = get_global_id(0);
 	int gi;
-	float tmp = buffer[offset + idx];
 
 	if (idx >= max_idx) {
 		return;
@@ -425,31 +505,14 @@ ${kernel} void DistributeOrthogonalGhostData(
 
 			// Skip corner dists, which will be written separately.
 			if (base_gx + gx == ${lat_linear_dist[1]}) {
-				<%
-					direction[0] = 1
-					corner_dists = sym.get_interblock_dists(grid, direction)
-				%>
-				if (0
-					%for corner_dist in corner_dists:
-						|| dist_num == ${prop_dists.index(corner_dist)}
-					%endfor
-				) {
-					return;
-				}
+				<% direction[0] = 1 %>
+				${skip_dists_for_direction(direction, prop_dists)}
 			} else if (base_gx + gx == ${lat_linear_dist[0]}) {
-				<%
-					direction[0] = -1
-					corner_dists = sym.get_interblock_dists(grid, direction)
-				%>
-				if (0
-					%for corner_dist in corner_dists:
-						|| dist_num == ${prop_dists.index(corner_dist)}
-					%endfor
-				) {
-					return;
-				}
+				<% direction[0] = -1 %>
+				${skip_dists_for_direction(direction, prop_dists)}
 			}
 
+			float tmp = buffer[offset + idx];
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(prop_dists):
 				case ${i}: {
@@ -465,12 +528,112 @@ ${kernel} void DistributeOrthogonalGhostData(
 	%endfor
 	}
 }
+%else:
+<%def name="_get_global_dist_idx(axis)">
+	## Y-axis
+	%if axis < 4:
+		gi = getGlobalIdx(base_gx + gx, ${lat_linear_dist[axis]}, base_other + other);
+	## Z-axis
+	%else:
+		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_dist[axis]});
+	%endif
+</%def>
+
+// Layout of the data in the buffer is the same as in the output buffer of
+// CollectOrthogonalGhostData.
+${kernel} void DistributeOrthogonalGhostData(
+		${global_ptr} float *dist, int base_gx, int base_other,
+		int face, int max_gx, int max_other, ${global_ptr} float *buffer, int offset)
+{
+	int gx = get_global_id(0);
+	int idx = get_global_id(1);
+	int gi;
+
+	if (gx >= max_gx || idx >= max_other) {
+		return;
+	}
+
+	switch (face) {
+	%for axis in range(2, 2*dim):
+		case ${axis}: {
+			<%
+				component = block.face_to_dir(axis)
+				position = block.face_to_axis(axis)
+				if position == 1:
+					other_pos = 2
+				else:
+					other_pos = 1
+				prop_dists = sym.get_prop_dists(grid, component, position)
+				direction = [0] * dim
+				direction[position] = component
+			%>
+
+			int dist_size = max_other / ${len(prop_dists)};
+			int dist_num = idx / dist_size;
+			int other = idx % dist_size;
+
+			// Skip corner/edge dists, which are handled by the *XGhostData functions.
+			if (base_gx + gx == ${lat_linear_dist[1]}) {
+				<% direction[0] = 1 %>
+				${skip_dists_for_direction(direction, prop_dists)}
+				if (base_other + other == ${lat_linear_dist[2*other_pos+1]}) {
+					<% direction[other_pos] = 1 %>
+					${skip_dists_for_direction(direction, prop_dists)}
+				} else if (base_other + other == ${lat_linear_dist[2*other_pos]}) {
+					<% direction[other_pos] = -1 %>
+					${skip_dists_for_direction(direction, prop_dists)}
+				}
+				<% direction[other_pos] = 0 %>
+			} else if (base_gx + gx == ${lat_linear_dist[0]}) {
+				<% direction[0] = -1 %>
+				${skip_dists_for_direction(direction, prop_dists)}
+				if (base_other + other == ${lat_linear_dist[2*other_pos+1]}) {
+					<% direction[other_pos] = 1 %>
+					${skip_dists_for_direction(direction, prop_dists)}
+				} else if (base_other + other == ${lat_linear_dist[2*other_pos]}) {
+					<% direction[other_pos] = -1 %>
+					${skip_dists_for_direction(direction, prop_dists)}
+				}
+				<%
+					direction[other_pos] = 0
+					direction[0] = 0
+				%>
+			} else if (base_other + other == ${lat_linear_dist[2*other_pos+1]}) {
+				<% direction[other_pos] = 1 %>
+				${skip_dists_for_direction(direction, prop_dists)}
+			} else if (base_other + other == ${lat_linear_dist[2*other_pos]}) {
+				<% direction[other_pos] = -1 %>
+				${skip_dists_for_direction(direction, prop_dists)}
+			}
+
+			float tmp = buffer[offset + (other * max_gx + gx) * dist_num];
+			switch (dist_num) {
+				%for i, prop_dist in enumerate(prop_dists):
+				case ${i}: {
+					${_get_global_dist_idx(axis)}
+					${get_dist('dist', prop_dist, 'gi')} = tmp;
+					break;
+				}
+				%endfor
+			}
+			break;
+		}
+	%endfor
+	}
+}
+
+
+%endif
 
 ${kernel} void CollectXGhostData(
 		${global_ptr} int *idx_array, ${global_ptr} float *dist,
 		${global_ptr} float *buffer)
 {
 	int idx = get_global_id(0);
+	%if dim > 2:
+		idx += get_global_size(0) * get_global_id(1);
+	%endif
+
 	if (idx > ${distrib_collect_x_size-1}) {
 		return;
 	}
@@ -483,6 +646,9 @@ ${kernel} void DistributeXGhostData(
 		${global_ptr} float *buffer)
 {
 	int idx = get_global_id(0);
+	%if dim > 2:
+		idx += get_global_size(0) * get_global_id(1);
+	%endif
 	if (idx > ${distrib_collect_x_size-1}) {
 		return;
 	}

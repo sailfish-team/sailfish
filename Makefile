@@ -48,6 +48,7 @@ perf_block_plots:
 test:
 	python tests/block_runner.py
 	python tests/geo_block.py
+	python tests/sym.py
 
 regtest:
 	python regtest/blocks/2d_ldc.py

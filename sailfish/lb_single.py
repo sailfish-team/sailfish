@@ -164,9 +164,16 @@ class LBFluidSim(LBSim):
     def init_fields(self, runner):
         self.rho = runner.make_scalar_field(name='rho')
         self.v = runner.make_vector_field(name='v')
-        self.vx, self.vy = self.v
-        runner.add_visualization_field(
-                lambda: np.square(self.vx) + np.square(self.vy),
-                name='v^2')
+
+        if self.grid.dim == 2:
+            self.vx, self.vy = self.v
+            runner.add_visualization_field(
+                    lambda: np.square(self.vx) + np.square(self.vy),
+                    name='v^2')
+        else:
+            self.vx, self.vy, self.vz = self.v
+            runner.add_visualization_field(
+                    lambda: np.square(self.vx) + np.square(self.vy) +
+                    np.square(self.vz), name='v^2')
 
 # TODO(michalj): Port the single-phase Shan-Chen class.
