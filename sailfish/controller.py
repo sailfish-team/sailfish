@@ -456,8 +456,10 @@ class LBSimulationController(object):
         self.geo = self._lb_geo(self.conf)
 
         blocks = self.geo.blocks()
-        assert blocks is not None
-        assert len(blocks) > 0
+        assert blocks is not None, \
+                "Make sure the block list is returned in geo_class.blocks()"
+        assert len(blocks) > 0, \
+                "Make sure at least one block is returned in geo_class.blocks()"
         proc = LBGeometryProcessor(blocks, self.dim, self.geo)
         blocks = proc.transform(self.conf)
 
