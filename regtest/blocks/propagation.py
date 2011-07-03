@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import os
 import tempfile
@@ -351,7 +351,8 @@ class TestThreeBlockPropagation(unittest.TestCase):
         ae(b2[vi(1, 0), 64, 1], np.float32(0.12))
         ae(b2[vi(1, 0), 64+128, 1], np.float32(0.23))
         ae(b0[vi(-1, 0), 64, 128], np.float32(0.31))
-
+        ae(b2[vi(1, 1), 129, 1], np.float32(0.11))
+        ae(b2[vi(1, -1), 127, 1], np.float32(0.22))
 
 if __name__ == '__main__':
     tmpdir = tempfile.mkdtemp()
