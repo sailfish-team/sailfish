@@ -16,7 +16,7 @@ output = ''
 class SimulationTest(LDCSim):
     @classmethod
     def update_defaults(cls, defaults):
-        global blocks, vertical, output
+        global blocks, output
         LDCSim.update_defaults(defaults)
         defaults['blocks'] = blocks
         defaults['max_iters'] = 100
@@ -27,7 +27,7 @@ class SimulationTest(LDCSim):
 class TestInterblockPropagation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        global blocks, vertical, output
+        global blocks, output
         output = os.path.join(tmpdir, 'ref')
         blocks = 1
         ctrl = LBSimulationController(SimulationTest, LDCGeometry)
@@ -38,7 +38,7 @@ class TestInterblockPropagation(unittest.TestCase):
         cls.vy  = cls.ref['v'][1]
 
     def test_4blocks(self):
-        global blocks, vertical, output
+        global blocks, output
         output = os.path.join(tmpdir, 'horiz_2block')
         blocks = 4
         ctrl = LBSimulationController(SimulationTest, LDCGeometry)
@@ -59,6 +59,28 @@ class TestInterblockPropagation(unittest.TestCase):
         vy_p1  = np.vstack([testdata0['v'][1], testdata1['v'][1]])
         vy_p2  = np.vstack([testdata2['v'][1], testdata3['v'][1]])
         vy     = np.hstack([vy_p1, vy_p2])
+
+        np.testing.assert_array_almost_equal(rho, self.rho)
+        np.testing.assert_array_almost_equal(vx, self.vx)
+        np.testing.assert_array_almost_equal(vy, self.vy)
+
+    def test_3blocks(self):
+        global blocks, output
+        blocks = 3
+        ctrl = LBSimulationController(SimulationTest, LDCGeometry)
+        ctrl.run()
+        testdata0 = np.load('%s_blk0_100.npz' % output)
+        testdata1 = np.load('%s_blk1_100.npz' % output)
+        testdata2 = np.load('%s_blk2_100.npz' % output)
+
+        rho_p1 = np.vstack([testdata0['rho'], testdata1['rho']])
+        rho    = np.hstack([rho_p1, testdata2['rho']])
+
+        vx_p1  = np.vstack([testdata0['v'][0], testdata1['v'][0]])
+        vx     = np.hstack([vx_p1, testdata2['v'][0]])
+
+        vy_p1  = np.vstack([testdata0['v'][1], testdata1['v'][1]])
+        vy     = np.hstack([vx_p1, testdata2['v'][1]])
 
         np.testing.assert_array_almost_equal(rho, self.rho)
         np.testing.assert_array_almost_equal(vx, self.vx)

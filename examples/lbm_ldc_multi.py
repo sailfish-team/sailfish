@@ -12,6 +12,18 @@ class LDCGeometry(LBGeometry2D):
         blocks = []
         bps = int(math.sqrt(self.config.blocks))
 
+        # Special case.
+        if self.config.blocks == 3:
+            w1 = self.gx / 2
+            w2 = self.gx - w1
+            h1 = self.gy / 2
+            h2 = self.gy - h1
+
+            blocks.append(LBBlock2D((0, 0), (w1, h1)))
+            blocks.append(LBBlock2D((0, h1), (w1, h2)))
+            blocks.append(LBBlock2D((w1, 0), (w2, self.gy)))
+            return blocks
+
         if bps**2 != self.config.blocks:
             print ('Only configurations with '
                     'square-of-interger numbers of blocks are supported. '
