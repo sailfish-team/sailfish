@@ -607,6 +607,12 @@ ${kernel} void DistributeOrthogonalGhostData(
 			}
 
 			float tmp = buffer[offset + (other * max_gx + gx) * dist_num];
+			// Ignore parts of the buffer that do not contain data transferred from
+			// the neighbours.
+			if (tmp == -1.0f) {
+				return;
+			}
+
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(prop_dists):
 				case ${i}: {
@@ -653,5 +659,10 @@ ${kernel} void DistributeXGhostData(
 		return;
 	}
 	int gi = idx_array[idx];
-	dist[gi] = buffer[idx];
+	float tmp = buffer[idx];
+
+	// FIXME: This should never happen.
+	if (tmp != -1.0f) {
+		dist[gi] = tmp;
+	}
 }
