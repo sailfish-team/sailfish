@@ -178,13 +178,13 @@ class LBBlock(object):
         opp_map.update(dict((v, k) for k, v in opp_map.iteritems()))
         return opp_map[face]
 
-    # XXX, fix this for 3D
     def _direction_from_span_face(self, face, span):
         comp = self.face_to_dir(face)
         pos  = self.face_to_axis(face)
         direction = [0] * self.dim
         direction[pos] = comp
 
+        # XXX, fix this for 3D
         corner, corner_dir = is_corner_span(span)
         if corner:
             direction[1 - pos] = corner_dir
@@ -478,7 +478,7 @@ class GeoEncoderConst(GeoEncoder):
             type_choice_map[orig_code] = new_code
 
         self._type_map[:] = self._encode_node(orientation, param,
-                np.choose(self._type_map, type_choice_map))
+                np.choose(np.int32(self._type_map), type_choice_map))
 
         # Drop the reference to the map array.
         self._type_map = None
