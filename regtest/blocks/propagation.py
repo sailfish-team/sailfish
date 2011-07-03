@@ -17,7 +17,6 @@ from sailfish.sym import D2Q9
 #
 #  b0  b2
 #
-
 class GeometryTest(LBGeometry2D):
     def blocks(self, n=None):
         blocks = []
@@ -33,6 +32,15 @@ class DoubleBlockGeometryTest(LBGeometry2D):
         blocks = []
         q = 128
         blocks.append(LBBlock2D((0, 0), (q, 2*q)))
+        blocks.append(LBBlock2D((q, 0), (q, 2*q)))
+        return blocks
+
+class ThreeBlocksGeometryTest(LBGeometry2D):
+    def blocks(self, n=None):
+        blocks = []
+        q = 128
+        blocks.append(LBBlock2D((0, 0), (q, q)))
+        blocks.append(LBBlock2D((0, q), (q, q)))
         blocks.append(LBBlock2D((q, 0), (q, 2*q)))
         return blocks
 
@@ -87,7 +95,7 @@ class SimulationTest(LBFluidSim, LBForcedSim):
         runner._debug_set_dist(dbuf)
         runner._debug_set_dist(dbuf, False)
 
-class PeriodicPropagationTest(unittest.TestCase):
+class PeriodicPropagationTest(object): #unittest.TestCase):
     def setUp(self):
         global periodic_x
         periodic_x = True
@@ -207,7 +215,7 @@ class PeriodicPropagationTest(unittest.TestCase):
         ae(b0[vi(-1, -1), 256, 256], np.float32(0.66))
 
 
-class TestCornerPropagation(unittest.TestCase):
+class TestCornerPropagation(object): #unittest.TestCase):
     def setUp(self):
         global periodic_x
         periodic_x = False
@@ -283,6 +291,67 @@ class TestCornerPropagation(unittest.TestCase):
         ae(b3[vi(1, 1), 128, 1], np.float32(0.61))
         ae(b3[vi(1, -1), 127, 1], np.float32(0.71))
         ae(b3[vi(1, -1), 126, 1], np.float32(0.62))
+
+
+class ThreeBlocksSimulationTest(LBFluidSim, LBForcedSim):
+    geo = BlockTest
+
+    @classmethod
+    def modify_config(cls, config):
+        config.relaxation_enabled = False
+
+    @classmethod
+    def update_defaults(cls, defaults):
+        global tmpdir
+        defaults.update({
+            'lat_nx': 256,
+            'lat_ny': 256,
+            'max_iters': 2,
+            'every': 1,
+            'quiet': True,
+            'output': os.path.join(tmpdir, 'test_out'),
+            'debug_dump_dists': True,
+        })
+
+    def initial_conditions(self, runner):
+        dbuf = runner._debug_get_dist()
+        dbuf[:] = 0.0
+
+        # dbuf indices are: dist, y, x
+        # vec indices are: x, y
+        if runner._block.id == 0:
+            dbuf[vi(1, 1), 128, 128] = 0.11
+            dbuf[vi(1, 0), 64, 128] = 0.12
+            dbuf[vi(0, 1), 128, 64] = 0.13
+        elif runner._block.id == 1:
+            dbuf[vi(1, -1), 1, 128] = 0.22
+            dbuf[vi(0, -1), 1, 64] = 0.21
+            dbuf[vi(1, 0), 64, 128] = 0.23
+        elif runner._block.id == 2:
+            dbuf[vi(-1, 0), 64, 1] = 0.31
+
+        runner._debug_set_dist(dbuf)
+        runner._debug_set_dist(dbuf, False)
+
+
+class TestThreeBlockPropagation(unittest.TestCase):
+    def test_propagation(self):
+        global tmpdir
+        ctrl = LBSimulationController(ThreeBlocksSimulationTest, ThreeBlocksGeometryTest)
+        ctrl.run()
+
+        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
+        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        b2 = np.load(os.path.join(tmpdir, 'test_out_blk2_dist_dump1.npy'))
+
+        ae = np.testing.assert_equal
+
+        ae(b0[vi(0, -1), 128, 64], np.float32(0.21))
+        ae(b1[vi(0, 1),  1, 64], np.float32(0.13))
+        ae(b2[vi(1, 0), 64, 1], np.float32(0.12))
+        ae(b2[vi(1, 0), 64+128, 1], np.float32(0.23))
+        ae(b0[vi(-1, 0), 64, 128], np.float32(0.31))
+
 
 if __name__ == '__main__':
     tmpdir = tempfile.mkdtemp()
