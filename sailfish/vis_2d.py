@@ -175,11 +175,7 @@ class Fluid2DVis(vis.FluidVis):
         self._mouse_vel = 0,0
 
         self._reset()
-
-        width, height = self.size
-        width = int(width * self.config.scr_scale)
-        height = int(height * self.config.scr_scale)
-        self.set_mode(width, height)
+        self.resize()
 
         pygame.key.set_repeat(100,50)
         pygame.display.set_caption('Sailfish v%s' % lb_base.__version__)
@@ -192,6 +188,12 @@ class Fluid2DVis(vis.FluidVis):
         else:
             self._screen = pygame.display.set_mode((width, height),
                     pygame.RESIZABLE)
+
+    def resize(self):
+        width, height = self.size
+        width = int(width * self.config.scr_scale)
+        height = int(height * self.config.scr_scale)
+        self.set_mode(width, height)
 
     def _reset(self):
         self._cmap_scale = [1.0] * self.num_fields
@@ -286,11 +288,13 @@ class Fluid2DVis(vis.FluidVis):
                     new_block = self._vis_config.block - 1
                     new_block %= len(self._blocks)
                     self._vis_config.block = new_block
+                    self.resize()
                 # Next block.
                 elif event.key == pygame.K_k:
                     new_block = self._vis_config.block + 1
                     new_block %= len(self._blocks)
                     self._vis_config.block = new_block
+                    self.resize()
                 elif event.key == pygame.K_LEFTBRACKET:
                     n = len(self.field.vals)
                     idx = cmaps[n].keys().index(self._cmap[n]) - 1
