@@ -131,12 +131,12 @@ class TestBlock2D(unittest.TestCase):
 
         base = LBBlock2D(f(10, 10), f(10, 10), id_=0)
 
-        b1 = LBBlock2D(f(c0, 10), f(5, 10), id_=1)
-        b2 = LBBlock2D(f(c0, 5), f(5, 10), id_=2)
-        b3 = LBBlock2D(f(c0, 5), f(5, 20), id_=3)
-        b4 = LBBlock2D(f(c0, 10), f(5, 5), id_=4)
-        b5 = LBBlock2D(f(c0, 15), f(5, 3), id_=5)
-        b6 = LBBlock2D(f(c0, 15), f(5, 10), id_=6)
+        b1 = LBBlock2D(f(c0, 10), f(5, 10), id_=1)  # exact match
+        b2 = LBBlock2D(f(c0, 5), f(5, 10), id_=2)   # half overlap
+        b3 = LBBlock2D(f(c0, 5), f(5, 20), id_=3)   # full overlap (2nd block is larger)
+        b4 = LBBlock2D(f(c0, 10), f(5, 5), id_=4)   # half overlap (fully contained)
+        b5 = LBBlock2D(f(c0, 15), f(5, 3), id_=5)   # full overlap (2nd block is smaller)
+        b6 = LBBlock2D(f(c0, 15), f(5, 10), id_=6)  # half overlap
 
         #   rr
         # bb
