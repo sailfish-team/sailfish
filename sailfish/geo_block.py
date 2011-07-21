@@ -125,7 +125,7 @@ class LBConnection(object):
         for dist_idx, dist_map in dist_idx_to_dist_map.iteritems():
             partial_nodes = src_coords[np.logical_and(dist_map,
                                             np.logical_not(full_map))]
-            if np.any(partial_nodes):
+            if len(partial_nodes) > 0:
                 partial_nodes -= buf_min_loc
                 dst_partial_map[dist_idx] = partial_nodes
 
@@ -368,7 +368,7 @@ class LBBlock(object):
 
         def connect_y():
             c1 = LBConnection.make(self, block, self._Y_HIGH, grid)
-            c2 = LBConnection.make(block, self, self._X_LOW, grid)
+            c2 = LBConnection.make(block, self, self._Y_LOW, grid)
 
             if c1 is None:
                 return False
