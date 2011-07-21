@@ -302,8 +302,11 @@ class LBGeometryProcessor(object):
     def _connect_blocks(self, config):
         connected = [False] * len(self.blocks)
 
+        # TOOD(michalj): Fix this for multi-grid models.
+        grid = util.get_grid_from_config(self.config)
+
         def try_connect(block1, block2, geo=None, axis=None):
-            if block1.connect(block2, geo, axis):
+            if block1.connect(block2, geo, axis, grid):
                 connected[block1.id] = True
                 connected[block2.id] = True
 
