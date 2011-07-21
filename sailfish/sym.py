@@ -879,7 +879,7 @@ def get_prop_dists(grid, dir_, axis=0):
     return ret
 
 def get_interblock_dists(grid, direction, opposite=False):
-    """Computes a list of indices of the distributions that would be transffered
+    """Computes a list of indices of the distributions that would be transferred
     to a node pointed to by the vector 'direction'.
     """
     d = Matrix((direction,))

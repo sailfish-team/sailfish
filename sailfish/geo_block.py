@@ -2,7 +2,7 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'GPL3'
 
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 import numpy as np
 from sailfish import sym
 
@@ -19,9 +19,7 @@ def span_area(span):
     for elem in span:
         if type(elem) is int:
             continue
-        # Corner nodes are 0-elem spans and would multiply by 1 here.
-        if elem.start != elem.stop:
-            area *= elem.stop - elem.start
+        area *= elem.stop - elem.start
     return area
 
 def full_selector_to_face_selector(sel):
@@ -42,6 +40,150 @@ def is_corner_span(span):
                 else:
                     return True, 1
     return False, None
+
+
+ConnectionPair = namedtuple('ConnectionPair', 'src dst')
+
+# TODO(michalj): Add support for data about complementary distributions and
+# additional macroscopic variables (necessary for multifluid models).
+class LBConnection(object):
+    """Container object for detailed data about a directed connection between two
+    blocks (at the level of the LB model)."""
+
+    @classmethod
+    def make(cls, b1, b2, face, grid):
+        """Tries to create an LBCollection for the face 'face' of block b1 to
+        block2.  If no connection exists, returns None.  Otherwise, returns
+        a new instance of LBConnection describing the connection details.
+        """
+        dim = b1.dim
+        slice_axes = range(0, dim)
+        conn_axis = b1.face_to_axis(face)
+        slice_axes.remove(conn_axis)
+
+        src_slice = []
+        src_slice_global = []
+
+        for axis in slice_axes:
+            b1_min = b1.location[axis] - b1.envelope_size
+            b1_max = b1.end_location[axis]-1 + b1.envelope_size
+
+            b2_min = b2.location[axis]
+            b2_max = b2.end_location[axis]-1
+
+            # In global simulation coordinates.
+            global_span_min = max(b1_min, b2_min)
+            global_span_max = min(b1_max, b2_max)
+
+            # No overlap, bail out.
+            if global_span_min > b1_max or global_span_max < b1_min:
+                return None
+
+            src_slice.append(slice(global_span_min - b1_min,
+                global_span_max - b1_min+1))
+            src_slice_global.append(slice(global_span_min,
+                global_span_max+1))
+
+        normal = b1.face_to_normal(face)
+        dists = sym.get_interblock_dists(grid, normal)
+
+        # Create an array where the entry at [x,y] is the global coordinate pair
+        # corresponding to the node [x,y] in the transfer buffer.
+        src_coords = np.mgrid[src_slice_global]
+        src_coords = np.rollaxis(src_coords, 0, len(src_coords.shape))
+        min_loc = []
+        max_loc = []
+
+        for axis in slice_axes:
+            min_loc.append(b1.location[axis])
+            max_loc.append(b1.end_location[axis])
+
+        # Location of the b1 block in global coordinates.
+        min_loc = np.uint32(min_loc)
+        max_loc = np.uint32(max_loc)
+        last_axis = len(src_coords.shape)-1
+        full_map = np.ones(src_coords.shape[-1], dtype=np.bool)
+
+        dst_partial_map = {}
+        dist_idx_to_dist_map = {}
+
+        for dist_idx in dists:
+            basis_vec = list(grid.basis[dist_idx])
+            del basis_vec[conn_axis]
+
+            src_block_node = src_coords - basis_vec
+            dist_map = np.logical_and(src_block_node >= min_loc,
+                                      src_block_node < max_loc)
+            dist_map = np.logical_and.reduce(dist_map, last_axis)
+            full_map = np.logical_and(full_map, dist_map)
+            dist_idx_to_dist_map[dist_idx] = dist_map
+
+        buf_min_loc = []
+        for span in src_slice_global:
+            buf_min_loc.append(span.start)
+
+        for dist_idx, dist_map in dist_idx_to_dist_map.iteritems():
+            partial_nodes = src_coords[np.logical_and(dist_map,
+                                            np.logical_not(full_map))]
+            if np.any(partial_nodes):
+                partial_nodes -= buf_min_loc
+                dst_partial_map[dist_idx] = partial_nodes
+
+        # Slice selecting part of the buffer with nodes containing information
+        # about all distributions.
+        dst_slice = []
+        dst_full_buf_slice = []
+        dst_low = []
+        for i, global_pos in enumerate(src_slice_global):
+            b2_start = b2.location[slice_axes[i]]
+            dst_low.append(global_pos.start - b2_start)
+
+        full_idxs = np.argwhere(full_map)
+        if len(full_idxs) > 0:
+            full_min = np.min(full_idxs, 0)
+            full_max = np.max(full_idxs, 0)
+            for i, (lo, hi) in enumerate(zip(full_min, full_max)):
+                b1_start = b1.location[slice_axes[i]]
+                b2_start = b2.location[slice_axes[i]]
+                curr_to_dist = src_slice_global[i].start - b2_start
+                dst_slice.append(slice(lo+curr_to_dist, hi+1+curr_to_dist))
+                dst_full_buf_slice.append(slice(lo, hi+1))
+
+        return LBConnection(dists, src_slice, dst_low, dst_slice, dst_full_buf_slice,
+                dst_partial_map, b1.id)
+
+    def __init__(self, dists, src_slice, dst_low, dst_slice, dst_full_buf_slice,
+            dst_partial_map, src_id):
+        """
+        dists: indices of distributions to be transferred
+        src_slice: slice in the full buffer of the source block,
+        dst_low: position of the buffer in the non-ghost coordinate system of
+            the dest block
+        dst_slice: slice in the non-ghost buffer of the dest block, to which
+            full dists can be written
+        dst_full_buf_slice: slice in the buffer selecting nodes with all dists;
+            by definition: size(dst_full_buf_slice) == size(dst_slice)
+        dst_partial_map: dict mapping distribution indices to list of positions
+            in the transfer buffer
+        """
+        self.dists = dists
+        self.src_slice = src_slice
+        self.dst_low = dst_low
+        self.dst_slice = dst_slice
+        self.dst_full_buf_slice = dst_full_buf_slice
+        self.dst_partial_map = dst_partial_map
+        self.block_id = src_id
+
+    @property
+    def size(self):
+        """Size of the connection buffer in elements."""
+        return len(self.dists.send) * span_area(self.src_slice)
+
+    @property
+    def transfer_shape(self):
+        """Logical shape of the transfer buffer."""
+        return [self.dists.send] + map(lambda x: x.stop - x.start,
+                self.src_slice)
 
 
 class LBBlock(object):
@@ -111,11 +253,14 @@ class LBBlock(object):
         # TODO: As an optimization, we could drop the ghost node layer in this
         # case.
 
-    def _add_connection(self, axis, span, block_id):
-        if axis in self._connections:
-            if (span, block_id) in self._connections[axis]:
-                return
-        self._connections.setdefault(axis, []).append((span, block_id))
+    def _add_connection(self, face, cpair):
+        if face in self._connections:
+            for connnection, bid in self._connections[face]:
+                # We already have a connection for this face.
+                # TODO(michalj): Make this an assertion.
+                if cpair.dst.block_id == bid:
+                    return
+        self._connections.setdefault(face, []).append(cpair)
 
     def _clear_connections(self):
         self._connections = {}
@@ -127,22 +272,20 @@ class LBBlock(object):
         assert block_id not in self._connectors
         self._connectors[block_id] = connector
 
-    def get_connection_selector(self, face, block_id):
-        """Returns a list of slices/ints which can be used to select
-        nodes that propagate data to block 'block_id' via face 'face'"""
-        for sel, bid in self._connections[face]:
-            if bid == block_id:
-                return sel
-        return None
+    def get_connection(self, face, block_id):
+        """Returns a LBConnection object describing the connection to 'block_id'
+        via 'face'."""
+        for pair in self._connections[face]:
+            if pair.dst.block_id == block_id:
+                return pair
 
     def connecting_blocks(self):
-        """Returns a list of pairs: (block IDs, axis) representing connections
+        """Returns a list of pairs: (face, block ID) representing connections
         to different blocks."""
         ids = []
-        for axis, v in self._connections.iteritems():
-            for span, bid in v:
-                ids.append((axis, bid))
-
+        for face, v in self._connections.iteritems():
+            for pair in v:
+                ids.append((face, pair.dst.block_id))
         return ids
 
     def set_actual_size(self, envelope_size):
@@ -162,12 +305,21 @@ class LBBlock(object):
             return 1
 
     def face_to_axis(self, face):
+        """Returns the axis number corresponding to a face constant."""
         if face == self._X_HIGH or face == self._X_LOW:
             return 0
         elif face == self._Y_HIGH or face == self._Y_LOW:
             return 1
         elif face == self._Z_HIGH or face == self._Z_LOW:
             return 2
+
+    def face_to_normal(self, face):
+        """Returns the normal vector for a face."""
+        comp = self.face_to_dir(face)
+        pos  = self.face_to_axis(face)
+        direction = [0] * self.dim
+        direction[pos] = comp
+        return direction
 
     def opposite_face(self, face):
         opp_map = {
@@ -183,29 +335,13 @@ class LBBlock(object):
         pos  = self.face_to_axis(face)
         direction = [0] * self.dim
         direction[pos] = comp
-
         # XXX, fix this for 3D
         corner, corner_dir = is_corner_span(span)
         if corner:
             direction[1 - pos] = corner_dir
         return direction
 
-    def connection_dists(self, grid, face, span, opposite=False):
-        return sym.get_interblock_dists(grid,
-                self._direction_from_span_face(face, span), opposite)
-
-    def connection_buf_size(self, grid, face, block_id=None, span=None):
-        if block_id is not None:
-            assert span is None
-            span = self.get_connection_selector(face, block_id)
-        else:
-            assert span is not None
-
-        buf_size = len(self.connection_dists(grid, face, span))
-        buf_size *= span_area(span)
-        return buf_size
-
-    def connect(self, block, geo=None, axis=None):
+    def connect(self, block, geo=None, axis=None, grid=None):
         """Creates a connection between this block and another block.
 
         A connection can only be created when the blocks are next to each
@@ -217,111 +353,72 @@ class LBBlock(object):
         :returns: True if the connection was successful
         :rtype: bool
         """
-        hx = self.nx + self.ox
-        hy = self.ny + self.oy
-        if self.dim == 3:
-            hz = self.nz + self.oz
-            hlp = [hx, hy, hz]
-        else:
-            hlp = [hx, hy]
-
-        tg_hx = block.nx + block.ox
-        tg_hy = block.ny + block.oy
-        if self.dim == 3:
-            tg_hz = block.nz + block.oz
-            tg_hlp = [tg_hx, tg_hy, tg_hz]
-        else:
-            tg_hlp = [tg_hx, tg_hy]
-
         assert block.id != self.id
 
-        def get_span(connection_axis):
-            span_axes = range(0, self.dim)
-            span_axes.remove(connection_axis)
-
-            span = []
-            span_tg = []
-
-            for axis in span_axes:
-                span_min = max(0, block.location[axis] - self.location[axis])
-                span_min_tg = max(0, self.location[axis] - block.location[axis])
-
-                # The currrent block spans beyond the end of the other one.
-                if hlp[axis] > tg_hlp[axis]:
-                    span_max = tg_hlp[axis] - self.location[axis]
-                    span_max_tg = block.size[axis]
-                # The other block spans beyond the end of the current one.
-                else:
-                    span_max = self.size[axis]
-                    span_max_tg = hlp[axis] - block.location[axis]
-
-                if span_max < span_min or span_max_tg < span_min_tg:
-                    return None, None
-
-                span.append(slice(span_min, span_max))
-                span_tg.append(slice(span_min_tg, span_max_tg))
-
-            return span, span_tg
-
         def connect_x():
-            span, span_tg = get_span(0)
-            if span is None:
+            c1 = LBConnection.make(self, block, self._X_HIGH, grid)
+            c2 = LBConnection.make(block, self, self._X_LOW, grid)
+
+            if c1 is None:
                 return False
-            self._add_connection(self._X_HIGH, [self.nx-1] + span, block.id)
-            block._add_connection(self._X_LOW, [0] + span_tg, self.id)
+
+            self._add_connection(self._X_HIGH, ConnectionPair(c1, c2))
+            block._add_connection(self._X_LOW, ConnectionPair(c2, c1))
             return True
 
         def connect_y():
-            span, span_tg = get_span(1)
-            if span is None:
+            c1 = LBConnection.make(self, block, self._Y_HIGH, grid)
+            c2 = LBConnection.make(block, self, self._X_LOW, grid)
+
+            if c1 is None:
                 return False
-            if self.dim == 3:
-                self._add_connection(self._Y_HIGH, [span[0], self.ny-1, span[1]], block.id)
-                block._add_connection(self._Y_LOW, [span_tg[0], 0, span_tg[1]], self.id)
-            else:
-                self._add_connection(self._Y_HIGH, [span[0], self.ny-1], block.id)
-                block._add_connection(self._Y_LOW, [span_tg[0], 0], self.id)
+
+            self._add_connection(self._Y_HIGH, ConnectionPair(c1, c2))
+            block._add_connection(self._Y_LOW, ConnectionPair(c2, c1))
             return True
 
         def connect_z():
-            span, span_tg = get_span(2)
-            if span is None:
+            c1 = LBConnection.make(self, block, self._Z_HIGH, grid)
+            c2 = LBConnection.make(block, self, self._Z_LOW, grid)
+
+            if c1 is None:
                 return False
-            self._add_connection(self._Z_HIGH, span + [self.nz-1], block.id)
-            block._add_connection(self._Z_LOW, span_tg + [0], self.id)
+
+            self._add_connection(self._Z_HIGH, ConnectionPair(c1, c2))
+            block._add_connection(self._Z_LOW, ConnectionPair(c2, c1))
             return True
 
         if geo is not None:
             assert axis is not None
             if axis == 0:
-                if self.ox == 0 and tg_hx == geo.gx:
-                    return block.connect(self, geo, axis)
-                elif block.ox == 0 and hx == geo.gx:
+                if self.ox == 0 and block.ex == geo.gx:
+                    return block.connect(self, geo, axis, grid)
+                elif block.ox == 0 and self.ex == geo.gx:
                     return connect_x()
             elif axis == 1:
-                if self.oy == 0 and tg_hy == geo.gy:
-                    return block.connect(self, geo, axis)
-                elif block.oy == 0 and hy == geo.gy:
+                if self.oy == 0 and block.ey == geo.gy:
+                    return block.connect(self, geo, axis, grid)
+                elif block.oy == 0 and self.ey == geo.gy:
                     return connect_y()
             elif axis == 2:
-                if self.oz == 0 and tg_hz == geo.gz:
-                    return block.connect(self, geo, axis)
-                elif block.oz == 0 and hz == geo.gz:
+                if self.oz == 0 and block.ez == geo.gz:
+                    return block.connect(self, geo, axis, grid)
+                elif block.oz == 0 and self.ez == geo.gz:
                     return connect_z()
 
-        elif hx == block.ox:
+        elif self.ex == block.ox:
             return connect_x()
-        elif tg_hx == self.ox:
-            return block.connect(self)
-        elif hy == block.oy:
+        elif block.ex == self.ox:
+            return block.connect(self, grid=grid)
+        elif self.ey == block.oy:
             return connect_y()
-        elif tg_hy == self.oy:
-            return block.connect(self)
+        elif block.ey == self.oy:
+            return block.connect(self, grid=grid)
         elif self.dim == 3:
-            if hz == block.oz:
+            if self.ez == block.oz:
                 return connect_z()
-            elif tg_hz == self.oz:
-                return block.connect(self)
+            elif block.ez == self.oz:
+                return block.connect(self, grid=grid)
 
         return False
 
@@ -331,6 +428,9 @@ class LBBlock2D(LBBlock):
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
         self.ox, self.oy = location
         self.nx, self.ny = size
+        self.ex = self.ox + self.nx
+        self.ey = self.oy + self.ny
+        self.end_location = [self.ex, self.ey]  # first node outside the block
         LBBlock.__init__(self, location, size, envelope_size, *args, **kwargs)
 
     @property
@@ -347,6 +447,10 @@ class LBBlock3D(LBBlock):
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
         self.ox, self.oy, self.oz = location
         self.nx, self.ny, self.nz = size
+        self.ex = self.ox + self.nx
+        self.ey = self.oy + self.ny
+        self.ez = self.oz + self.nz
+        self.end_location = [self.ex, self.ey, self.ez]  # first node outside the block
         self._periodicity = [False, False, False]
         LBBlock.__init__(self, location, size, envelope_size, *args, **kwargs)
 
