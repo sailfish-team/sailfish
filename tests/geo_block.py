@@ -102,33 +102,17 @@ class TestBlock3D(unittest.TestCase):
             self.assertEqual(gcs(type_, b13.id), f(conn_loc, slice(10, 10), slice(0, 0)))
             self.assertEqual(gcs(type_, b14.id), f(conn_loc, slice(10, 10), slice(10, 10)))
 
-    def test_block_connection_x_high(self):
-        self._connection_helper(20, LBBlock3D._X_HIGH, 9, 0)
 
-    def test_block_connection_x_low(self):
-        self._connection_helper(5, LBBlock3D._X_LOW, 0, 0)
-
-    def test_block_connection_y_high(self):
-        self._connection_helper(20, LBBlock3D._Y_HIGH, 9, 1)
-
-    def test_block_connection_y_low(self):
-        self._connection_helper(5, LBBlock3D._Y_LOW, 0, 1)
-
-    def test_block_connection_z_high(self):
-        self._connection_helper(20, LBBlock3D._Z_HIGH, 9, 2)
-
-    def test_block_connection_z_low(self):
-        self._connection_helper(5, LBBlock3D._Z_LOW, 0, 2)
 
 class TestBlock2D(unittest.TestCase):
 
-    def _verify_partial_map(self, cpair, expected_map):
-        self.assertEqual(cpair.src.dst_partial_map.keys(),
+    def _verify_partial_map(self, conn, expected_map):
+        self.assertEqual(conn.dst_partial_map.keys(),
                 expected_map.keys())
         for key, val in expected_map.iteritems():
-            self.assertTrue(np.all(val == cpair.src.dst_partial_map[key]))
+            self.assertTrue(np.all(val == conn.dst_partial_map[key]))
 
-    def _test_block_conn(self, axis, dir):
+    def _test_block_conn(self, axis):
         # All coordinate tuples below are specified for the case
         # in which the two blocks are connected along the X axis.
         # Y-axis connection requires a swap.
@@ -138,68 +122,41 @@ class TestBlock2D(unittest.TestCase):
             else:
                 return (b,a)
 
-        def idx(a):
-            if axis == 0:
-                if dir == -1:
-                    return vi(-1, a)
-                else:
-                    return vi(1, a)
-            else:
-                if dir == -1:
-                    return vi(a, -1)
-                else:
-                    return vi(a, 1)
-
+        face_hi = LBBlock2D.axis_dir_to_face(axis, 1)
+        face_lo = LBBlock2D.axis_dir_to_face(axis, -1)
         base = LBBlock2D(f(10, 10), f(10, 10), envelope_size=1, id_=0)
 
         # exact match
         b1 = LBBlock2D(f(20, 10), f(5, 10), envelope_size=1, id_=1)
         self.assertTrue(base.connect(b1, grid=D2Q9))
-        cpair = base.get_connection(LBBlock2D._X_HIGH, b1.id)
+        cpair = base.get_connection(face_hi, b1.id)
         self.assertEqual(set(cpair.src.dists),
-                         set([idx(0), idx(1), idx(-1)]))
+                         set([vi(*f(1,0)), vi(*f(1,1)), vi(*f(1,-1))]))
         self.assertEqual(cpair.src.src_slice, [slice(1, 11)])
         self.assertEqual(cpair.src.dst_low, [0])
         self.assertEqual(cpair.src.dst_slice, [slice(1, 9)])
         self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 9)])
-        expected_map = {idx(-1): np.array([[0]]),
-                        idx(1): np.array([[9]]),
-                        idx(0): np.array([[0],[9]])}
-        self._verify_partial_map(cpair, expected_map)
-
-    def test_block_connection_x_high(self):
-        base = LBBlock2D((10, 10), (10, 10), envelope_size=1, id_=0)
-
-        # exact match
-        b1 = LBBlock2D((20, 10), (5, 10), envelope_size=1, id_=1)
-        self.assertTrue(base.connect(b1, grid=D2Q9))
-        cpair = base.get_connection(LBBlock2D._X_HIGH, b1.id)
-        self.assertEqual(set(cpair.src.dists),
-                         set([vi(1,0), vi(1,1), vi(1,-1)]))
-        self.assertEqual(cpair.src.src_slice, [slice(1, 11)])
-        self.assertEqual(cpair.src.dst_low, [0])
-        self.assertEqual(cpair.src.dst_slice, [slice(1, 9)])
-        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 9)])
-        expected_map = {vi(1,-1): np.array([[0]]),
-                        vi(1,1): np.array([[9]]),
-                        vi(1,0): np.array([[0],[9]])}
-        self._verify_partial_map(cpair, expected_map)
+        expected_map = {vi(*f(1,-1)): np.array([[0]]),
+                        vi(*f(1,1)): np.array([[9]]),
+                        vi(*f(1,0)): np.array([[0],[9]])}
+        self._verify_partial_map(cpair.src, expected_map)
 
         # partal overlap
-        b2 = LBBlock2D((20, 5), (5, 10), envelope_size=1, id_=2)
+        b2 = LBBlock2D(f(20, 5), f(5, 10), envelope_size=1, id_=2)
         self.assertTrue(base.connect(b2, grid=D2Q9))
-        cpair = base.get_connection(LBBlock2D._X_HIGH, b2.id)
+        cpair = base.get_connection(face_hi, b2.id)
         self.assertEqual(cpair.src.src_slice, [slice(0, 6)])
         self.assertEqual(cpair.src.dst_low, [4])
         self.assertEqual(cpair.src.dst_slice, [slice(6, 10)])
         self.assertEqual(cpair.src.dst_full_buf_slice, [slice(2, 6)])
-        expected_map = {vi(1,-1): np.array([[0], [1]]), vi(1,0): np.array([[1]])}
-        self._verify_partial_map(cpair, expected_map)
+        expected_map = {vi(*f(1,-1)): np.array([[0], [1]]),
+                        vi(*f(1,0)): np.array([[1]])}
+        self._verify_partial_map(cpair.src, expected_map)
 
         # full overlap (2nd block is smaller)
-        b3 = LBBlock2D((20, 12), (5, 7), envelope_size=1, id_=3)
+        b3 = LBBlock2D(f(20, 12), f(5, 7), envelope_size=1, id_=3)
         self.assertTrue(base.connect(b3, grid=D2Q9))
-        cpair = base.get_connection(LBBlock2D._X_HIGH, b3.id)
+        cpair = base.get_connection(face_hi, b3.id)
         self.assertEqual(cpair.src.src_slice, [slice(3, 10)])
         self.assertEqual(cpair.src.dst_low, [0])
         self.assertEqual(cpair.src.dst_slice, [slice(0, 7)])
@@ -207,32 +164,50 @@ class TestBlock2D(unittest.TestCase):
         self.assertFalse(cpair.src.dst_partial_map)
 
         # full overlap (2nd block is larger)
-        b4 = LBBlock2D((20, 8), (5, 14), envelope_size=1, id_=4)
+        b4 = LBBlock2D(f(20, 8), f(5, 14), envelope_size=1, id_=4)
         self.assertTrue(base.connect(b4, grid=D2Q9))
-        cpair = base.get_connection(LBBlock2D._X_HIGH, b4.id)
+        cpair = base.get_connection(face_hi, b4.id)
         self.assertEqual(cpair.src.src_slice, [slice(0, 12)])
         self.assertEqual(cpair.src.dst_low, [1])
         self.assertEqual(cpair.src.dst_slice, [slice(3, 11)])
         self.assertEqual(cpair.src.dst_full_buf_slice, [slice(2, 10)])
         expected_map = {
-                vi(1,-1): np.array([[0], [1]]),
-                vi(1, 0): np.array([[1], [10]]),
-                vi(1, 1): np.array([[10], [11]])}
-        self._verify_partial_map(cpair, expected_map)
+                vi(*f(1,-1)): np.array([[0], [1]]),
+                vi(*f(1,0)): np.array([[1], [10]]),
+                vi(*f(1,1)): np.array([[10], [11]])}
+        self._verify_partial_map(cpair.src, expected_map)
 
         # exact match at the bottom
-        b5 = LBBlock2D((20, 10), (5, 5), envelope_size=1, id_=5)
+        b5 = LBBlock2D(f(20, 10), f(5, 5), envelope_size=1, id_=5)
         self.assertTrue(base.connect(b5, grid=D2Q9))
-        cpair = base.get_connection(LBBlock2D._X_HIGH, b5.id)
+        cpair = base.get_connection(face_hi, b5.id)
         self.assertEqual(cpair.src.src_slice, [slice(1, 6)])
         self.assertEqual(cpair.src.dst_low, [0])
         self.assertEqual(cpair.src.dst_slice, [slice(1, 5)])
         self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 5)])
         expected_map = {
-                vi(1,-1): np.array([[0]]),
-                vi(1, 0): np.array([[0]])}
-        self._verify_partial_map(cpair, expected_map)
+                vi(*f(1,-1)): np.array([[0]]),
+                vi(*f(1,0)): np.array([[0]])}
+        self._verify_partial_map(cpair.src, expected_map)
 
+        # disconnected blocks
+        bf1 = LBBlock2D(f(20, 21), f(5, 10), envelope_size=1)
+        bf2 = LBBlock2D(f(20, 5),  f(5, 4), envelope_size=1)
+        bf3 = LBBlock2D(f(19, 10), f(5, 10), envelope_size=1)
+        bf4 = LBBlock2D(f(21, 10), f(5, 10), envelope_size=1)
+        self.assertFalse(base.connect(bf1))
+        self.assertFalse(base.connect(bf2))
+        self.assertFalse(base.connect(bf3))
+        self.assertFalse(base.connect(bf4))
+
+    def test_block_connection_x(self):
+        self._test_block_conn(0)
+
+    def test_block_connection_y(self):
+        self._test_block_conn(1)
+
+    def test_corner_connection(self):
+        base = LBBlock2D((10, 10), (10, 10), envelope_size=1, id_=0)
         # corner match (low)
         b6 = LBBlock2D((20, 5), (5, 5), envelope_size=1, id_=6)
         self.assertTrue(base.connect(b6, grid=D2Q9))
@@ -243,7 +218,15 @@ class TestBlock2D(unittest.TestCase):
         self.assertEqual(cpair.src.dst_full_buf_slice, [])
         expected_map = {
                 vi(1,-1): np.array([0])}
-        self._verify_partial_map(cpair, expected_map)
+        self._verify_partial_map(cpair.src, expected_map)
+
+        self.assertEqual(cpair.dst.src_slice, [slice(6, 7)])
+        self.assertEqual(cpair.dst.dst_low, [0])
+        self.assertEqual(cpair.dst.dst_slice, [])
+        self.assertEqual(cpair.dst.dst_full_buf_slice, [])
+        expected_map = {
+                vi(-1,1): np.array([0])}
+        self._verify_partial_map(cpair.dst, expected_map)
 
         # corner match (high)
         b7 = LBBlock2D((20, 20), (5, 5), envelope_size=1, id_=7)
@@ -255,17 +238,15 @@ class TestBlock2D(unittest.TestCase):
         self.assertEqual(cpair.src.dst_full_buf_slice, [])
         expected_map = {
                 vi(1,1): np.array([0])}
-        self._verify_partial_map(cpair, expected_map)
+        self._verify_partial_map(cpair.src, expected_map)
 
-        # disconnected blocks
-        bf1 = LBBlock2D((20, 21), (5, 10), envelope_size=1)
-        bf2 = LBBlock2D((20, 5),  (5, 4), envelope_size=1)
-        bf3 = LBBlock2D((19, 10), (5, 10), envelope_size=1)
-        bf4 = LBBlock2D((21, 10), (5, 10), envelope_size=1)
-        self.assertFalse(base.connect(bf1))
-        self.assertFalse(base.connect(bf2))
-        self.assertFalse(base.connect(bf3))
-        self.assertFalse(base.connect(bf4))
+        self.assertEqual(cpair.dst.src_slice, [slice(0, 1)])
+        self.assertEqual(cpair.dst.dst_low, [9])
+        self.assertEqual(cpair.dst.dst_slice, [])
+        self.assertEqual(cpair.dst.dst_full_buf_slice, [])
+        expected_map = {
+                vi(-1,-1): np.array([0])}
+        self._verify_partial_map(cpair.dst, expected_map)
 
     def test_global_block_connection_xy(self):
         config = LBConfig()
@@ -291,7 +272,7 @@ class TestBlock2D(unittest.TestCase):
                 vi(-1,-1): np.array([[0]]),
                 vi(-1, 0): np.array([[0],[31]]),
                 vi(-1, 1): np.array([[31]])}
-        self._verify_partial_map(cpair, expected_map)
+        self._verify_partial_map(cpair.src, expected_map)
 
         cpair = b2.get_connection(LBBlock2D._X_HIGH, b1.id)
         _verify_slices(cpair)
@@ -299,7 +280,7 @@ class TestBlock2D(unittest.TestCase):
                 vi(1,-1): np.array([[0]]),
                 vi(1, 0): np.array([[0],[31]]),
                 vi(1, 1): np.array([[31]])}
-        self._verify_partial_map(cpair, expected_map)
+        self._verify_partial_map(cpair.src, expected_map)
 
         b3 = LBBlock2D((0, 32), (32, 32), envelope_size=1, id_=3)
         self.assertTrue(b3.connect(b1, geo, axis=1, grid=D2Q9))
@@ -309,7 +290,7 @@ class TestBlock2D(unittest.TestCase):
                 vi(-1,-1): np.array([[0]]),
                 vi(0, -1): np.array([[0], [31]]),
                 vi(1, -1): np.array([[31]])}
-        self._verify_partial_map(cpair, expected_map)
+        self._verify_partial_map(cpair.src, expected_map)
 
         cpair = b3.get_connection(LBBlock2D._Y_HIGH, b1.id)
         _verify_slices(cpair)
@@ -317,7 +298,7 @@ class TestBlock2D(unittest.TestCase):
                 vi(-1,1): np.array([[0]]),
                 vi(0, 1): np.array([[0], [31]]),
                 vi(1, 1): np.array([[31]])}
-        self._verify_partial_map(cpair, expected_map)
+        self._verify_partial_map(cpair.src, expected_map)
 
 
 if __name__ == '__main__':

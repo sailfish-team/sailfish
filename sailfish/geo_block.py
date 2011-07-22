@@ -298,19 +298,21 @@ class LBBlock(object):
         self.vis_buffer = vis_buffer
         self.vis_geo_buffer = vis_geo_buffer
 
-    def face_to_dir(self, face):
-        if face in (self._X_LOW, self._Y_LOW, self._Z_LOW):
+    @classmethod
+    def face_to_dir(cls, face):
+        if face in (cls._X_LOW, cls._Y_LOW, cls._Z_LOW):
             return -1
         else:
             return 1
 
-    def face_to_axis(self, face):
+    @classmethod
+    def face_to_axis(cls, face):
         """Returns the axis number corresponding to a face constant."""
-        if face == self._X_HIGH or face == self._X_LOW:
+        if face == cls._X_HIGH or face == cls._X_LOW:
             return 0
-        elif face == self._Y_HIGH or face == self._Y_LOW:
+        elif face == cls._Y_HIGH or face == cls._Y_LOW:
             return 1
-        elif face == self._Z_HIGH or face == self._Z_LOW:
+        elif face == cls._Z_HIGH or face == cls._Z_LOW:
             return 2
 
     def face_to_normal(self, face):
@@ -329,6 +331,25 @@ class LBBlock(object):
         }
         opp_map.update(dict((v, k) for k, v in opp_map.iteritems()))
         return opp_map[face]
+
+    @classmethod
+    def axis_dir_to_face(cls, axis, dir_):
+        if axis == 0:
+            if dir_ == -1:
+                return cls._X_LOW
+            elif dir_ == 1:
+                return cls._X_HIGH
+        elif axis == 1:
+            if dir_ == -1:
+                return cls._Y_LOW
+            elif dir_ == 1:
+                return cls._Y_HIGH
+        elif axis == 2:
+            if dir_ == -1:
+                return cls._Z_LOW
+            elif dir_ == -1:
+                return cls._Z_HIGH
+
 
     def _direction_from_span_face(self, face, span):
         comp = self.face_to_dir(face)
