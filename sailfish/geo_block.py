@@ -102,7 +102,7 @@ class LBConnection(object):
         min_loc = np.uint32(min_loc)
         max_loc = np.uint32(max_loc)
         last_axis = len(src_coords.shape)-1
-        full_map = np.ones(src_coords.shape[-1], dtype=np.bool)
+        full_map = np.ones(src_coords.shape[:-1], dtype=np.bool)
 
         dst_partial_map = {}
         dist_idx_to_dist_map = {}
@@ -148,6 +148,11 @@ class LBConnection(object):
                 curr_to_dist = src_slice_global[i].start - b2_start
                 dst_slice.append(slice(lo+curr_to_dist, hi+1+curr_to_dist))
                 dst_full_buf_slice.append(slice(lo, hi+1))
+
+        # No full or partial connection means that the topology of the grid
+        # is such that there are not distributions pointing to the 2nd block.
+        if not dst_slice and not dst_partial_map:
+            return None
 
         return LBConnection(dists, src_slice, dst_low, dst_slice, dst_full_buf_slice,
                 dst_partial_map, b1.id)

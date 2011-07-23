@@ -3,9 +3,10 @@ import unittest
 from sailfish.config import LBConfig
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import LBBlock2D, LBBlock3D
-from sailfish.sym import D2Q9
+from sailfish.sym import D2Q9, D3Q19
 
 vi = lambda x, y: D2Q9.vec_idx([x, y])
+vi3 = lambda x, y, z: D3Q19.vec_idx([x, y, z])
 
 class TestBlock3D(unittest.TestCase):
     def _connection_helper(self, c0, type_, conn_loc, axis):
@@ -102,6 +103,134 @@ class TestBlock3D(unittest.TestCase):
             self.assertEqual(gcs(type_, b13.id), f(conn_loc, slice(10, 10), slice(0, 0)))
             self.assertEqual(gcs(type_, b14.id), f(conn_loc, slice(10, 10), slice(10, 10)))
 
+    def _verify_partial_map(self, conn, expected_map):
+        self.assertEqual(set(conn.dst_partial_map.keys()),
+                set(expected_map.keys()))
+        for key, val in expected_map.iteritems():
+            self.assertEqual(
+                    set([tuple(x) for x in val]),
+                    set([tuple(x) for x in conn.dst_partial_map[key]]))
+
+    def test_block_connection_x(self):
+        base = LBBlock3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
+        face_hi = LBBlock3D._X_HIGH
+
+        # exact match
+        b1 = LBBlock3D((20, 10, 10), (5, 10, 10), envelope_size=1, id_=1)
+        self.assertTrue(base.connect(b1, grid=D3Q19))
+        cpair = base.get_connection(face_hi, b1.id)
+        self.assertEqual(set(cpair.src.dists),
+                         set([vi3(1,0,0), vi3(1,1,0), vi3(1,-1,0),
+                              vi3(1,0,1), vi3(1,0,-1)]))
+        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(1, 11)])
+        self.assertEqual(cpair.src.dst_low, [0,0])
+        self.assertEqual(cpair.src.dst_slice, [slice(1,9), slice(1, 9)])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 9), slice(1, 9)])
+
+        # Edges
+        l = [(y, 0) for y in range(1, 9)]
+        r = [(y, 9) for y in range(1, 9)]
+        t = [(9, z) for z in range(1, 9)]
+        b = [(0, z) for z in range(1, 9)]
+
+        # Corners
+        tl = [(9, 0)]
+        tr = [(9, 9)]
+        bl = [(0, 0)]
+        br = [(0, 9)]
+
+        expected_map = {
+                vi3(1,0,0): l + r + t + b + tl + tr + br + bl,
+                vi3(1,1,0): l + r + t + tl + tr,
+                vi3(1,-1,0): l + r + b + bl + br,
+                vi3(1,0,1): r + t + b + tr + br,
+                vi3(1,0,-1): l + t + b + tl + bl,
+            }
+        self._verify_partial_map(cpair.src, expected_map)
+
+        # full overlap (2nd block is smaller)
+        b2 = LBBlock3D((20, 12, 14), (5, 6, 4), envelope_size=1, id_=2)
+        self.assertTrue(base.connect(b2, grid=D3Q19))
+        cpair = base.get_connection(face_hi, b2.id)
+        self.assertEqual(cpair.src.src_slice, [slice(3, 9), slice(5, 9)])
+        self.assertEqual(cpair.src.dst_low, [0,0])
+        self.assertEqual(cpair.src.dst_slice, [slice(0, 6), slice(0, 4)])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(0, 6), slice(0, 4)])
+
+        # full overlap (2nd block is larger)
+        b3 = LBBlock3D((20, 8, 9), (5, 14, 15), envelope_size=1, id_=3)
+        self.assertTrue(base.connect(b3, grid=D3Q19))
+        cpair = base.get_connection(face_hi, b3.id)
+        self.assertEqual(cpair.src.src_slice, [slice(0, 12), slice(0, 12)])
+        self.assertEqual(cpair.src.dst_low, [1, 0])
+        self.assertEqual(cpair.src.dst_slice, [slice(3, 11), slice(2, 10)])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(2, 10), slice(2, 10)])
+
+        # Edges
+        l = [(y, 1) for y in range(2, 10)]
+        r = [(y, 10) for y in range(2, 10)]
+        t = [(10, z) for z in range(2, 10)]
+        b = [(1, z) for z in range(2, 10)]
+
+        le = [(y, 0) for y in range(1, 11)]
+        re = [(y, 11) for y in range(1, 11)]
+        te = [(11, z) for z in range(1, 11)]
+        be = [(0, z) for z in range(1, 11)]
+
+        # Corners
+        tl = [(10, 1)]
+        tr = [(10, 10)]
+        bl = [(1, 1)]
+        br = [(1, 10)]
+
+        expected_map = {
+                vi3(1,0,0): l + r + t + b + tl + tr + br + bl,
+                vi3(1,1,0): l + r + t + tl + tr + te,
+                vi3(1,-1,0): l + r + b + bl + br + be,
+                vi3(1,0,1): r + t + b + tr + br + re,
+                vi3(1,0,-1): l + t + b + tl + bl + le,
+            }
+        self._verify_partial_map(cpair.src, expected_map)
+
+        # bottom edge match
+        b4 = LBBlock3D((20, 5, 10), (5, 5, 10), envelope_size=1, id_=4)
+        self.assertTrue(base.connect(b4, grid=D3Q19))
+        cpair = base.get_connection(face_hi, b4.id)
+        self.assertEqual(cpair.src.src_slice, [slice(0, 1), slice(1, 11)])
+        self.assertEqual(cpair.src.dst_low, [4, 0])
+        self.assertEqual(cpair.src.dst_slice, [])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [])
+
+        expected_map = {
+                vi3(1,-1,0): [(0, z) for z in range(0, 10)]
+            }
+        self._verify_partial_map(cpair.src, expected_map)
+
+        # right edge match
+        b5 = LBBlock3D((20, 10, 20), (5, 10, 5), envelope_size=1, id_=5)
+        self.assertTrue(base.connect(b5, grid=D3Q19))
+        cpair = base.get_connection(face_hi, b5.id)
+        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(11, 12)])
+        self.assertEqual(cpair.src.dst_low, [0, 0])
+        self.assertEqual(cpair.src.dst_slice, [])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [])
+
+        expected_map = {
+                vi3(1,0,1): [(y, 0) for y in range(0, 10)]
+            }
+        self._verify_partial_map(cpair.src, expected_map)
+
+        # top-left corner match (no connection in D3Q19 topology)
+        bf1 = LBBlock3D((20, 20, 5), (5, 5, 5), envelope_size=1)
+        self.assertFalse(base.connect(bf1, grid=D3Q19))
+
+        # too far along X axis
+        bf2 = LBBlock3D((21, 10, 10), (5, 10, 10), envelope_size=1)
+        self.assertFalse(base.connect(bf2, grid=D3Q19))
+
+        # too far along Y axis
+        bf3 = LBBlock3D((20, 21, 10), (5, 10, 10), envelope_size=1)
+        self.assertFalse(base.connect(bf3, grid=D3Q19))
 
 
 class TestBlock2D(unittest.TestCase):
