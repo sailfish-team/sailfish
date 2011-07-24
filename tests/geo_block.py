@@ -270,6 +270,9 @@ class TestBlock2D(unittest.TestCase):
                         vi(*f(1,0)): np.array([[0],[9]])}
         self._verify_partial_map(cpair.src, expected_map)
 
+        self.assertEqual(cpair.src.elements, 30)
+        self.assertEqual(cpair.src.transfer_shape, [3, 10])
+
         # partal overlap
         b2 = LBBlock2D(f(20, 5), f(5, 10), envelope_size=1, id_=2)
         self.assertTrue(base.connect(b2, grid=D2Q9))
