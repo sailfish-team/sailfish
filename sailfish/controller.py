@@ -146,7 +146,8 @@ class LBMachineMaster(object):
 
                 # Note: this implicitly assumes that the amount of data that has
                 # to be transferred is the same both ways.
-                size = block.connection_buf_size(grid, face, nbid)
+                cpair = block.get_connection(face, nbid)
+                size = cpair.src.elements
                 ctype = self._get_ctypes_float()
 
                 opp_face = block.opposite_face(face)
