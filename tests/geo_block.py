@@ -205,64 +205,79 @@ class TestBlock3D(unittest.TestCase):
         bf3 = LBBlock3D((20, 21, 10), (5, 10, 10), envelope_size=1)
         self.assertFalse(base.connect(bf3, grid=D3Q19))
 
-    def test_block_connection_edge(self):
+    def _x_edge_helper(self, face):
+        """Tests connections along the edges of one of the faces orthogonal
+        to the X axis."""
         base = LBBlock3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
 
+        if face == LBBlock3D._X_LOW:
+            x_low = 5
+            x_dir = -1
+        else:
+            x_low = 20
+            x_dir = 1
+
         # bottom edge match
-        b1 = LBBlock3D((20, 5, 10), (5, 5, 10), envelope_size=1, id_=1)
+        b1 = LBBlock3D((x_low, 5, 10), (5, 5, 10), envelope_size=1, id_=1)
         self.assertTrue(base.connect(b1, grid=D3Q19))
-        cpair = base.get_connection(LBBlock3D._X_HIGH, b1.id)
+        cpair = base.get_connection(face, b1.id)
         self.assertEqual(cpair.src.src_slice, [slice(0, 1), slice(1, 11)])
         self.assertEqual(cpair.src.dst_low, [4, 0])
         self.assertEqual(cpair.src.dst_slice, [])
         self.assertEqual(cpair.src.dst_full_buf_slice, [])
 
         expected_map = {
-                vi3(1,-1,0): [(0, z) for z in range(0, 10)]
+                vi3(x_dir,-1,0): [(0, z) for z in range(0, 10)]
             }
         self._verify_partial_map(cpair.src, expected_map)
 
         # top edge match
-        b2 = LBBlock3D((20, 20, 10), (5, 5, 10), envelope_size=1, id_=2)
+        b2 = LBBlock3D((x_low, 20, 10), (5, 5, 10), envelope_size=1, id_=2)
         self.assertTrue(base.connect(b2, grid=D3Q19))
-        cpair = base.get_connection(LBBlock3D._X_HIGH, b2.id)
+        cpair = base.get_connection(face, b2.id)
         self.assertEqual(cpair.src.src_slice, [slice(11, 12), slice(1, 11)])
         self.assertEqual(cpair.src.dst_low, [0, 0])
         self.assertEqual(cpair.src.dst_slice, [])
         self.assertEqual(cpair.src.dst_full_buf_slice, [])
 
         expected_map = {
-                vi3(1,1,0): [(0, z) for z in range(0, 10)]
+                vi3(x_dir,1,0): [(0, z) for z in range(0, 10)]
             }
         self._verify_partial_map(cpair.src, expected_map)
 
         # right edge match
-        b3 = LBBlock3D((20, 10, 20), (5, 10, 5), envelope_size=1, id_=3)
+        b3 = LBBlock3D((x_low, 10, 20), (5, 10, 5), envelope_size=1, id_=3)
         self.assertTrue(base.connect(b3, grid=D3Q19))
-        cpair = base.get_connection(LBBlock3D._X_HIGH, b3.id)
+        cpair = base.get_connection(face, b3.id)
         self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(11, 12)])
         self.assertEqual(cpair.src.dst_low, [0, 0])
         self.assertEqual(cpair.src.dst_slice, [])
         self.assertEqual(cpair.src.dst_full_buf_slice, [])
 
         expected_map = {
-                vi3(1,0,1): [(y, 0) for y in range(0, 10)]
+                vi3(x_dir,0,1): [(y, 0) for y in range(0, 10)]
             }
         self._verify_partial_map(cpair.src, expected_map)
 
         # left edge match
-        b4 = LBBlock3D((20, 10, 5), (5, 10, 5), envelope_size=1, id_=4)
+        b4 = LBBlock3D((x_low, 10, 5), (5, 10, 5), envelope_size=1, id_=4)
         self.assertTrue(base.connect(b4, grid=D3Q19))
-        cpair = base.get_connection(LBBlock3D._X_HIGH, b4.id)
+        cpair = base.get_connection(face, b4.id)
         self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(0, 1)])
         self.assertEqual(cpair.src.dst_low, [0, 4])
         self.assertEqual(cpair.src.dst_slice, [])
         self.assertEqual(cpair.src.dst_full_buf_slice, [])
 
         expected_map = {
-                vi3(1,0,-1): [(y, 0) for y in range(0, 10)]
+                vi3(x_dir,0,-1): [(y, 0) for y in range(0, 10)]
             }
         self._verify_partial_map(cpair.src, expected_map)
+
+    def test_block_connection_edge_x_low(self):
+        self._x_edge_helper(LBBlock3D._X_LOW)
+
+    def test_block_connection_edge_x_high(self):
+        self._x_edge_helper(LBBlock3D._X_HIGH)
 
 
 class TestBlock2D(unittest.TestCase):
