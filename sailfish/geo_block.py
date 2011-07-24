@@ -180,14 +180,14 @@ class LBConnection(object):
         self.block_id = src_id
 
     @property
-    def size(self):
+    def elements(self):
         """Size of the connection buffer in elements."""
-        return len(self.dists.send) * span_area(self.src_slice)
+        return len(self.dists) * span_area(self.src_slice)
 
     @property
     def transfer_shape(self):
         """Logical shape of the transfer buffer."""
-        return [self.dists.send] + map(lambda x: x.stop - x.start,
+        return [len(self.dists)] + map(lambda x: x.stop - x.start,
                 self.src_slice)
 
 
