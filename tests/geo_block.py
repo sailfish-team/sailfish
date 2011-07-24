@@ -279,6 +279,56 @@ class TestBlock3D(unittest.TestCase):
     def test_block_connection_edge_x_high(self):
         self._x_edge_helper(LBBlock3D._X_HIGH)
 
+    def test_block_connection_edge_non_x(self):
+        base = LBBlock3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
+        b1 = LBBlock3D((10, 5, 5), (10, 5, 5), envelope_size=1, id_=1)
+        self.assertTrue(base.connect(b1, grid=D3Q19))
+        cpair = base.get_connection(LBBlock3D._Y_LOW, b1.id)
+        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(0, 1)])
+        self.assertEqual(cpair.src.dst_low, [0, 4])
+        self.assertEqual(cpair.src.dst_slice, [])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [])
+        expected_map = {
+                vi3(0, -1, -1): [(x, 0) for x in range(0, 10)]
+            }
+        self._verify_partial_map(cpair.src, expected_map)
+
+        b2 = LBBlock3D((10, 20, 5), (10, 5, 5), envelope_size=1, id_=2)
+        self.assertTrue(base.connect(b2, grid=D3Q19))
+        cpair = base.get_connection(LBBlock3D._Y_HIGH, b2.id)
+        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(0, 1)])
+        self.assertEqual(cpair.src.dst_low, [0, 4])
+        self.assertEqual(cpair.src.dst_slice, [])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [])
+        expected_map = {
+                vi3(0, 1, -1): [(x, 0) for x in range(0, 10)]
+            }
+        self._verify_partial_map(cpair.src, expected_map)
+
+        b3 = LBBlock3D((10, 5, 20), (10, 5, 5), envelope_size=1, id_=3)
+        self.assertTrue(base.connect(b3, grid=D3Q19))
+        cpair = base.get_connection(LBBlock3D._Y_LOW, b3.id)
+        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(11, 12)])
+        self.assertEqual(cpair.src.dst_low, [0, 0])
+        self.assertEqual(cpair.src.dst_slice, [])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [])
+        expected_map = {
+                vi3(0, -1, 1): [(x, 0) for x in range(0, 10)]
+            }
+        self._verify_partial_map(cpair.src, expected_map)
+
+        b4 = LBBlock3D((10, 20, 20), (10, 5, 5), envelope_size=1, id_=4)
+        self.assertTrue(base.connect(b4, grid=D3Q19))
+        cpair = base.get_connection(LBBlock3D._Y_HIGH, b4.id)
+        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(11, 12)])
+        self.assertEqual(cpair.src.dst_low, [0, 0])
+        self.assertEqual(cpair.src.dst_slice, [])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [])
+        expected_map = {
+                vi3(0, 1, 1): [(x, 0) for x in range(0, 10)]
+            }
+        self._verify_partial_map(cpair.src, expected_map)
+
 
 class TestBlock2D(unittest.TestCase):
 
