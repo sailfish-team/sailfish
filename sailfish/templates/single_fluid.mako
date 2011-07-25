@@ -357,15 +357,15 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 // base_gy: where along the X axis to start collecting the data
 // face: see LBBlock class constants
 // buffer: buffer where the data is to be saved
-${kernel} void CollectOrthogonalGhostData(
-		${global_ptr} float *dist, int base_gx,
-		int face, int max_idx, ${global_ptr} float *buffer, int offset)
+${kernel} void CollectContinuousData(
+		${global_ptr} float *dist, int face, int base_gx,
+		int max_lx, ${global_ptr} float *buffer)
 {
 	int idx = get_global_id(0);
 	int gi;
 	float tmp;
 
-	if (idx >= max_idx) {
+	if (idx >= max_lx) {
 		return;
 	}
 
@@ -373,16 +373,15 @@ ${kernel} void CollectOrthogonalGhostData(
 	%for axis in range(2, 2*dim):
 		case ${axis}: {
 			<%
-				prop_dists = sym.get_prop_dists(grid,
-						block.face_to_dir(axis),
-						block.face_to_axis(axis))
+				normal = block.face_to_normal(axis)
+				dists = sym.get_interblock_dists(grid, normal)
 			%>
-			int dist_size = max_idx / ${len(prop_dists)};
+			int dist_size = max_lx / ${len(dists)};
 			int dist_num = idx / dist_size;
 			int gx = idx % dist_size;
 
 			switch (dist_num) {
-				%for i, prop_dist in enumerate(prop_dists):
+				%for i, prop_dist in enumerate(dists):
 				case ${i}: {
 					gi = getGlobalIdx(base_gx + gx, ${lat_linear[axis]});
 					tmp = ${get_dist('dist', prop_dist, 'gi')};
@@ -390,7 +389,7 @@ ${kernel} void CollectOrthogonalGhostData(
 				}
 				%endfor
 			}
-			buffer[offset + idx] = tmp;
+			buffer[idx] = tmp;
 			break;
 		}
 	%endfor
@@ -421,16 +420,16 @@ ${kernel} void CollectOrthogonalGhostData(
 // (x0, yM, d0), (x1, yM, d0). .. (xN, yM, d0),
 // (x0, y0, d1), (x1, y0, d1), .. (xN, y0, d1),
 // ...
-${kernel} void CollectOrthogonalGhostData(
-	${global_ptr} float *dist, int base_gx, int base_other,
-	int face, int max_gx, int max_other, ${global_ptr} float *buffer, int offset)
+${kernel} void CollectContinuousData(
+	${global_ptr} float *dist, int face, int base_gx, int base_other,
+	int max_lx, int max_other, ${global_ptr} float *buffer)
 {
 	int gx = get_global_id(0);
 	int idx = get_global_id(1);
 	int gi;
 	float tmp;
 
-	if (gx >= max_gx || idx >= max_other) {
+	if (gx >= max_lx || idx >= max_other) {
 		return;
 	}
 
@@ -439,16 +438,15 @@ ${kernel} void CollectOrthogonalGhostData(
 	%for axis in range(2, 2*dim):
 		case ${axis}: {
 			<%
-				prop_dists = sym.get_prop_dists(grid,
-						block.face_to_dir(axis),
-						block.face_to_axis(axis))
+				normal = block.face_to_normal(axis)
+				dists = sym.get_interblock_dists(grid, normal)
 			%>
-			int dist_size = max_other / ${len(prop_dists)};
+			int dist_size = max_other / ${len(dists)};
 			int dist_num = idx / dist_size;
 			int other = idx % dist_size;
 
 			switch (dist_num) {
-				%for i, prop_dist in enumerate(prop_dists):
+				%for i, prop_dist in enumerate(dists):
 				case ${i}: {
 					${_get_global_idx(axis)};
 					tmp = ${get_dist('dist', prop_dist, 'gi')};
@@ -458,7 +456,7 @@ ${kernel} void CollectOrthogonalGhostData(
 			}
 
 			idx = (other * max_gx + gx) * dist_num;
-			buffer[offset + idx] = tmp;
+			buffer[idx] = tmp;
 			break;
 		}
 	%endfor
@@ -466,26 +464,15 @@ ${kernel} void CollectOrthogonalGhostData(
 }
 %endif
 
-<%def name="skip_dists_for_direction(direction, prop_dists)">
-	<% corner_dists = sym.get_interblock_dists(grid, direction) %>
-	if (0
-		%for corner_dist in corner_dists:
-			|| dist_num == ${prop_dists.index(corner_dist)}
-		%endfor
-	) {
-		return;
-	}
-</%def>
-
 %if dim == 2:
-${kernel} void DistributeOrthogonalGhostData(
-		${global_ptr} float *dist, int base_gx,
-		int face, int max_idx, ${global_ptr} float *buffer, int offset)
+${kernel} void DistributeContinuousData(
+		${global_ptr} float *dist, int face, int base_gx,
+		int max_lx, ${global_ptr} float *buffer)
 {
 	int idx = get_global_id(0);
 	int gi;
 
-	if (idx >= max_idx) {
+	if (idx >= max_lx) {
 		return;
 	}
 
@@ -493,28 +480,15 @@ ${kernel} void DistributeOrthogonalGhostData(
 	%for axis in range(2, 2*dim):
 		case ${axis}: {
 			<%
-				comp = block.face_to_dir(axis)
-				pos = block.face_to_axis(axis)
-				prop_dists = sym.get_prop_dists(grid, comp, pos)
-				direction = [0] * dim
-				direction[pos] = comp
+				normal = block.face_to_normal(axis)
+				dists = sym.get_interblock_dists(grid, normal)
 			%>
-			int dist_size = max_idx / ${len(prop_dists)};
+			int dist_size = max_lx / ${len(dists)};
 			int dist_num = idx / dist_size;
 			int gx = idx % dist_size;
-
-			// Skip corner dists, which will be written separately.
-			if (base_gx + gx == ${lat_linear_dist[1]}) {
-				<% direction[0] = 1 %>
-				${skip_dists_for_direction(direction, prop_dists)}
-			} else if (base_gx + gx == ${lat_linear_dist[0]}) {
-				<% direction[0] = -1 %>
-				${skip_dists_for_direction(direction, prop_dists)}
-			}
-
-			float tmp = buffer[offset + idx];
+			float tmp = buffer[idx];
 			switch (dist_num) {
-				%for i, prop_dist in enumerate(prop_dists):
+				%for i, prop_dist in enumerate(dists):
 				case ${i}: {
 					gi = getGlobalIdx(base_gx + gx, ${lat_linear_dist[axis]});
 					${get_dist('dist', prop_dist, 'gi')} = tmp;
@@ -541,9 +515,9 @@ ${kernel} void DistributeOrthogonalGhostData(
 
 // Layout of the data in the buffer is the same as in the output buffer of
 // CollectOrthogonalGhostData.
-${kernel} void DistributeOrthogonalGhostData(
-		${global_ptr} float *dist, int base_gx, int base_other,
-		int face, int max_gx, int max_other, ${global_ptr} float *buffer, int offset)
+${kernel} void DistributeContinuousData(
+		${global_ptr} float *dist, int face, int base_gx, int base_other,
+		int max_lx, int max_other, ${global_ptr} float *buffer)
 {
 	int gx = get_global_id(0);
 	int idx = get_global_id(1);
@@ -557,64 +531,16 @@ ${kernel} void DistributeOrthogonalGhostData(
 	%for axis in range(2, 2*dim):
 		case ${axis}: {
 			<%
-				component = block.face_to_dir(axis)
-				position = block.face_to_axis(axis)
-				if position == 1:
-					other_pos = 2
-				else:
-					other_pos = 1
-				prop_dists = sym.get_prop_dists(grid, component, position)
-				direction = [0] * dim
-				direction[position] = component
+				normal = block.face_to_normal(axis)
+				dists = sym.get_interblock_dists(grid, normal)
 			%>
-
-			int dist_size = max_other / ${len(prop_dists)};
+			int dist_size = max_other / ${len(dists)};
 			int dist_num = idx / dist_size;
 			int other = idx % dist_size;
-
-			// Skip corner/edge dists, which are handled by the *XGhostData functions.
-			if (base_gx + gx == ${lat_linear_dist[1]}) {
-				<% direction[0] = 1 %>
-				${skip_dists_for_direction(direction, prop_dists)}
-				if (base_other + other == ${lat_linear_dist[2*other_pos+1]}) {
-					<% direction[other_pos] = 1 %>
-					${skip_dists_for_direction(direction, prop_dists)}
-				} else if (base_other + other == ${lat_linear_dist[2*other_pos]}) {
-					<% direction[other_pos] = -1 %>
-					${skip_dists_for_direction(direction, prop_dists)}
-				}
-				<% direction[other_pos] = 0 %>
-			} else if (base_gx + gx == ${lat_linear_dist[0]}) {
-				<% direction[0] = -1 %>
-				${skip_dists_for_direction(direction, prop_dists)}
-				if (base_other + other == ${lat_linear_dist[2*other_pos+1]}) {
-					<% direction[other_pos] = 1 %>
-					${skip_dists_for_direction(direction, prop_dists)}
-				} else if (base_other + other == ${lat_linear_dist[2*other_pos]}) {
-					<% direction[other_pos] = -1 %>
-					${skip_dists_for_direction(direction, prop_dists)}
-				}
-				<%
-					direction[other_pos] = 0
-					direction[0] = 0
-				%>
-			} else if (base_other + other == ${lat_linear_dist[2*other_pos+1]}) {
-				<% direction[other_pos] = 1 %>
-				${skip_dists_for_direction(direction, prop_dists)}
-			} else if (base_other + other == ${lat_linear_dist[2*other_pos]}) {
-				<% direction[other_pos] = -1 %>
-				${skip_dists_for_direction(direction, prop_dists)}
-			}
-
-			float tmp = buffer[offset + (other * max_gx + gx) * dist_num];
-			// Ignore parts of the buffer that do not contain data transferred from
-			// the neighbours.
-			if (tmp == -1.0f) {
-				return;
-			}
+			float tmp = buffer[(other * max_lx + gx) * dist_num];
 
 			switch (dist_num) {
-				%for i, prop_dist in enumerate(prop_dists):
+				%for i, prop_dist in enumerate(dists):
 				case ${i}: {
 					${_get_global_dist_idx(axis)}
 					${get_dist('dist', prop_dist, 'gi')} = tmp;
@@ -627,42 +553,35 @@ ${kernel} void DistributeOrthogonalGhostData(
 	%endfor
 	}
 }
-
-
 %endif
 
-${kernel} void CollectXGhostData(
+${kernel} void CollectSparseData(
 		${global_ptr} int *idx_array, ${global_ptr} float *dist,
-		${global_ptr} float *buffer)
+		${global_ptr} float *buffer, int max_idx)
 {
 	int idx = get_global_id(0);
 	%if dim > 2:
 		idx += get_global_size(0) * get_global_id(1);
 	%endif
 
-	if (idx > ${distrib_collect_x_size-1}) {
+	if (idx >= max_idx) {
 		return;
 	}
 	int gi = idx_array[idx];
 	buffer[idx] = dist[gi];
 }
 
-${kernel} void DistributeXGhostData(
+${kernel} void DistributeSparseData(
 		${global_ptr} int *idx_array, ${global_ptr} float *dist,
-		${global_ptr} float *buffer)
+		${global_ptr} float *buffer, int max_idx)
 {
 	int idx = get_global_id(0);
 	%if dim > 2:
 		idx += get_global_size(0) * get_global_id(1);
 	%endif
-	if (idx > ${distrib_collect_x_size-1}) {
+	if (idx >= max_idx) {
 		return;
 	}
 	int gi = idx_array[idx];
-	float tmp = buffer[idx];
-
-	// FIXME: This should never happen.
-	if (tmp != -1.0f) {
-		dist[gi] = tmp;
-	}
+	dist[gi] = buffer[idx];
 }
