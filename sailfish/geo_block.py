@@ -22,14 +22,6 @@ def span_area(span):
         area *= elem.stop - elem.start
     return area
 
-def full_selector_to_face_selector(sel):
-    ret = []
-    for elem in sel:
-        if type(elem) is int:
-            continue
-        ret.append(elem)
-    return ret
-
 # XXX fix this for 3D
 def is_corner_span(span):
     for coord in span:
@@ -187,9 +179,15 @@ class LBConnection(object):
     @property
     def transfer_shape(self):
         """Logical shape of the transfer buffer."""
-        return [len(self.dists)] + map(lambda x: x.stop - x.start,
-                self.src_slice)
+        return [len(self.dists)] + map(lambda x: x.stop - x.start, self.src_slice)
 
+    @property
+    def partial_nodes(self):
+        return sum([len(v) for v in self.dst_partial_map.itervalues()])
+
+    @property
+    def full_shape(self):
+        return [len(self.dists)] + map(lambda x: x.stop - x.start, self.dst_slice)
 
 class LBBlock(object):
     dim = None
@@ -260,10 +258,10 @@ class LBBlock(object):
 
     def _add_connection(self, face, cpair):
         if face in self._connections:
-            for connnection, bid in self._connections[face]:
+            for pair in self._connections[face]:
                 # We already have a connection for this face.
                 # TODO(michalj): Make this an assertion.
-                if cpair.dst.block_id == bid:
+                if cpair.dst.block_id == pair.dst.block_id:
                     return
         self._connections.setdefault(face, []).append(cpair)
 
@@ -354,18 +352,6 @@ class LBBlock(object):
                 return cls._Z_LOW
             elif dir_ == -1:
                 return cls._Z_HIGH
-
-
-    def _direction_from_span_face(self, face, span):
-        comp = self.face_to_dir(face)
-        pos  = self.face_to_axis(face)
-        direction = [0] * self.dim
-        direction[pos] = comp
-        # XXX, fix this for 3D
-        corner, corner_dir = is_corner_span(span)
-        if corner:
-            direction[1 - pos] = corner_dir
-        return direction
 
     def connect(self, block, geo=None, axis=None, grid=None):
         """Creates a connection between this block and another block.

@@ -1,9 +1,47 @@
-import inspect
+from collections import defaultdict, namedtuple
 import math
 import operator
 import numpy as np
-from sailfish import codegen, util, sym
-from sailfish.geo_block import is_corner_span, span_area, full_selector_to_face_selector
+from sailfish import codegen, util
+from sailfish.geo_block import span_area
+
+# Used to hold a reference to a CUDA kernel and a grid on which it is
+# to be executed.
+KernelGrid = namedtuple('KernelGrid', 'kernel grid')
+
+class ConnectionBuffer(object):
+    def __init__(self, face, cpair, coll_buf, coll_idx, recv_buf,
+            dist_partial_buf, dist_partial_idx, dist_partial_sel,
+            dist_full_buf, dist_full_idx):
+        self.face = face
+        self.cpair = cpair
+        self.coll_buf = coll_buf
+        self.coll_idx = coll_idx
+        self.recv_buf = recv_buf
+        self.dist_partial_buf = dist_partial_buf
+        self.dist_partial_idx = dist_partial_idx
+        self.dist_partial_sel = dist_partial_sel
+        self.dist_full_buf = dist_full_buf
+        self.dist_full_idx = dist_full_idx
+
+    def distribute(self, backend):
+        if self.dist_partial_sel is not None:
+            self.dist_partial_buf.host[:] = self.recv_buf[self.dist_partial_sel]
+            backend.to_buf(self.dist_partial_buf.gpu)
+
+        if self.cpair.dst.dst_slice:
+            slc = [slice(0, self.recv_buf.shape[0])] + self.cpair.dst.dst_slice
+            self.dist_full_buf.host[:] = self.recv_buf[slc]
+            backend.to_buf(self.dist_full_buf.gpu)
+
+class GPUBuffer(object):
+    def __init__(self, host_buffer, backend):
+        self.host = host_buffer
+        if host_buffer is not None:
+            self.gpu = backend.alloc_buf(like=host_buffer)
+        else:
+            self.gpu = None
+
 
 class BlockRunner(object):
     """Runs the simulation for a single LBBlock
@@ -32,12 +70,13 @@ class BlockRunner(object):
         self._vis_map_cache = None
         self._quit_event = quit_event
 
-        # Indicates whether this block is connected to any other blocks.
-        self._connected = True
-
     @property
     def config(self):
         return self._sim.config
+
+    @property
+    def dim(self):
+        return self._block.dim
 
     def update_context(self, ctx):
         """Called by the codegen module."""
@@ -55,7 +94,7 @@ class BlockRunner(object):
 
         bnd_limits = list(self._block.actual_size[:])
 
-        if self._block.dim == 3:
+        if self.dim == 3:
             ctx['lat_nz'] = self._lat_size[-3]
             ctx['arr_nz'] = self._physical_size[-3]
             periodic_z = int(self._block.periodic_z)
@@ -96,10 +135,6 @@ class BlockRunner(object):
                               {-1:  self.config.lat_nz * arr_ny * arr_nx,
                                 1: -self.config.lat_nz * arr_ny * arr_nx})
 
-        if self._x_connected:
-            ctx['distrib_collect_x_size'] = len(self._x_ghost_recv_buffer)
-        else:
-            ctx['distrib_collect_x_size'] = 0
 
     def add_visualization_field(self, field_cb, name):
         self._output.register_field(field_cb, name, visualization=True)
@@ -157,12 +192,12 @@ class BlockRunner(object):
 
     def _init_shape(self):
         # Logical size of the lattice (including ghost nodes).
-        # X dimension is the last one on the list.
+        # X dimension is the last one on the list (nz, ny, nx)
         self._lat_size = list(reversed(self._block.actual_size))
 
         # Physical in-memory size of the lattice, adjusted for optimal memory
         # access from the compute unit.  Size of the X dimension is rounded up
-        # to a multiple of block_size.
+        # to a multiple of block_size.  Order is [nz], ny, nx
         self._physical_size = list(reversed(self._block.actual_size))
         self._physical_size[-1] = (int(math.ceil(float(self._physical_size[-1]) /
                                                  self.config.block_size)) *
@@ -213,301 +248,126 @@ class BlockRunner(object):
     def _get_compute_code(self):
         return self._bcg.get_code(self)
 
-
-    def _relative_span(self, span1, span2):
-        if self._block.dim == 2:
-            return (slice(span2[0].start - span1[0].start,
-                          span2[0].stop - span1[0].start),)
+    def _get_global_idx(self, location, dist_num):
+        if self.dim == 2:
+            gx, gy = location
+            arr_nx = self._physical_size[1]
+            return gx + arr_nx * gy + (self._get_nodes() * dist_num)
         else:
-            return (slice(span2[0].start - span1[0].start,
-                          span2[0].stop - span1[0].start),
-                    slice(span2[1].start - span1[1].start,
-                          span2[1].stop - span1[1].start))
+            gx, gy, gz = location
+            arr_nx = self._physical_size[2]
+            arr_ny = self._physical_size[1]
+            return ((gx + arr_nx * gy + arr_nx * arr_ny * gz) +
+                    (self._get_nodes() * dist_num))
 
-    # Corner connections are signified by empty slices.  Here we convert
-    # them to 1-element slices so that they match the connecting node
-    # coorrectly.
-    def _handle_corner_span(self, span, opposite):
-        ret = []
-        for coord in span:
-            if type(coord) is slice:
-                start = coord.start
-                stop  = coord.stop
-                if coord.start == coord.stop:
-                    if start == 0:
-                        stop += 1
-                        if opposite:
-                            start += self._block.envelope_size
-                            stop  += self._block.envelope_size
-                    else:
-                        if opposite:
-                            stop += 1
-                        else:
-                            start += self._block.envelope_size
-                            stop  += self._block.envelope_size + 1
-                else:
-                    start += self._block.envelope_size
-                    stop  += self._block.envelope_size
-                ret.append(slice(start, stop))
-            else:
-                ret.append(coord)
-        return ret
-
-    def _get_global_indices_array(self, grid, face, span, gx_map, opposite=False):
-        """
-        face: identifies the face (i.e x == 0 or x == lat_nx-1)
-        span: identifies the area on the face for which the indices are to
-                be generated
-        gx_map: gx_map[face] == limiting coordinate at which the face is
-                located
-        """
-        dists = self._block.connection_dists(grid, face, span, opposite)
-
-        self.config.logger.debug('{0}: dists: {1}'.format(inspect.stack()[0][3],
-                dists))
-
-        if opposite:
-            gx = gx_map[self._block.opposite_face(face)]
-        else:
-            gx = gx_map[face]
-        span = self._handle_corner_span(span, opposite)
-        gy = np.uint32(range(0, self._lat_size[-2] +
-                      self._block.envelope_size)[span[0]])
-        gy = np.kron(np.ones(len(dists), dtype=np.uint32), gy)
-        num_nodes = span_area(span)
+    def _idx_helper(self, gx, buf_slice, dists):
+        idx = np.mgrid[buf_slice]
+        idx = np.kron(np.ones(len(dists), dtype=np.uint32), idx)
+        num_nodes = span_area(buf_slice)
         dist_num = np.kron(
                 np.uint32(dists),
                 np.ones(num_nodes, dtype=np.uint32))
-        return self._get_global_id(gx, gy, dist_num)
+        if self.dim == 2:
+            return self._get_global_idx((gx, idx), dist_num).astype(np.uint32)
+        else:
+            return self._get_global_idx((gx, idx[0], idx[1]),
+                    dist_num).astype(np.uint32)
 
-    def _get_global_id(self, gx, gy, dist_num):
-        arr_nx = self._physical_size[-1]
-        return gx + arr_nx * gy + self._get_nodes() * dist_num
+    def _get_src_slice_indices(self, face, cpair):
+        if face in (self._block._X_LOW, self._block._X_HIGH):
+            gx = self.lat_linear[face]
+        else:
+            return None
+        return self._idx_helper(gx, cpair.src.src_slice, cpair.src.dists)
+
+    def _get_dst_slice_indices(self, face, cpair):
+        if not cpair.dst.dst_slice:
+            return None
+        if face in (self._block._X_LOW, self._block._X_HIGH):
+            gx = self.lat_linear_dist[self._block.opposite_face(face)]
+        else:
+            return None
+        low = [x + self._block.envelope_size for x in cpair.dst.dst_low]
+        dst_slice = [
+                slice(x.start + shift, x.stop + shift) for x, shift in
+                zip(cpair.dst.dst_slice, low)]
+        return self._idx_helper(gx, dst_slice, cpair.dst.dists)
+
+    def _dst_face_loc_to_full_loc(self, face, face_loc):
+        axis = self._block.face_to_axis(face)
+        missing_loc = self.lat_linear_dist[self._block.opposite_face(face)]
+        if axis == 0:
+            return [missing_loc] + face_loc
+        elif axis == 1:
+            if self.dim == 2:
+                return (face_loc[0], missing_loc)
+            else:
+                return (face_loc[0], missing_loc, face_loc[1])
+        elif axis == 2:
+            return face_loc + [missing_loc]
+
+    def _get_partial_dst_indices(self, face, cpair):
+        if cpair.dst.partial_nodes == 0:
+            return None, None, None
+        buf = np.zeros(cpair.dst.partial_nodes, dtype=self.float)
+        idx = np.zeros(cpair.dst.partial_nodes, dtype=np.uint32)
+        dst_low = [x + self._block.envelope_size for x in cpair.dst.dst_low]
+        sel = []
+        i = 0
+        for dist_num, locations in sorted(cpair.dst.dst_partial_map.items()):
+            for loc in locations:
+                dst_loc = [x + y for x, y in zip(dst_low, loc)]
+                dst_loc = self._dst_face_loc_to_full_loc(face, dst_loc)
+                sel.append([cpair.dst.dists.index(dist_num)] + list(loc))
+                idx[i] = self._get_global_idx(dst_loc, dist_num)
+                i += 1
+        sel2 = []
+        for i in range(0, len(sel[0])):
+            sel2.append([])
+
+        for loc in sel:
+            for i, coord in enumerate(loc):
+                sel2[i].append(coord)
+
+        return buf, idx, sel2
 
     def _init_buffers(self):
         # TODO(michalj): Fix this for multi-grid models.
         grid = util.get_grid_from_config(self.config)
 
-        # Maps block_id to a list of (axis, span, size).
-        block_face_span = {}
-        # Maps face to a span that covers all connections to neigbboring blocks.
-        face_span = {}
-        def max_span(face, span):
-            if face not in face_span:
-                face_span[face] = span
-            else:
-                curr = face_span[face]
-
-                if self._block.dim == 2:
-                    face_span[face] = (
-                            slice(min(curr[0].start, span[0].start),
-                                  max(curr[0].stop, span[0].stop)),)
-                else:
-                    face_span[face] = (
-                            slice(min(curr[0].start, span[0].start),
-                                  max(curr[0].stop, span[0].stop)),
-                            slice(min(curr[1].start, span[1].start),
-                                  max(curr[1].stop, span[1].stop)))
-        corners = []
-
-        # Compute max spans for every face connecting to other blocks.
+        # Maps block ID to a list of 1 or 2 ConnectionBuffer
+        # objects.  The list will contain 2 elements  only when
+        # global periodic boundary conditions are enabled).
+        self._block_to_connbuf = defaultdict(list)
         for face, block_id in self._block.connecting_blocks():
-            span = self._block.get_connection_selector(face, block_id)
-            span = full_selector_to_face_selector(span)
-            size = self._block.connection_buf_size(grid, face, block_id)
+            cpair = self._block.get_connection(face, block_id)
 
-            if not is_corner_span(span)[0]:
-                max_span(face, span)
-                block_face_span.setdefault(block_id, []).append((face, span, size))
-                self.config.logger.debug('face {0}: (block {1}) new span: {2} '
-                        'max span {3}'.format(face, block_id,
-                            span, face_span[face]))
-            else:
-                corners.append((face, block_id, span, size))
+            # Buffers for collecting and sending information.
+            # TODO(michalj): Optimize this by providing proper padding.
+            coll_buf = np.zeros(cpair.src.transfer_shape, dtype=self.float)
+            coll_idx = self._get_src_slice_indices(face, cpair)
 
-        total_ortho_size = 0
-        total_x_size = 0
+            # Buffers for receiving and distributing information.
+            recv_buf = np.zeros(cpair.dst.transfer_shape, dtype=self.float)
+            # Any partial dists are serialized into a single continuous buffer.
+            dist_partial_buf, dist_partial_idx, dist_partial_sel = \
+                    self._get_partial_dst_indices(face, cpair)
+            dist_full_buf = np.zeros(cpair.dst.full_shape, dtype=self.float)
+            dist_full_idx = self._get_dst_slice_indices(face, cpair)
 
-        # Compute buffer sizes corresponding to the max spans generated by the
-        # above loop.
+            cbuf = ConnectionBuffer(face, cpair,
+                    GPUBuffer(coll_buf, self.backend),
+                    GPUBuffer(coll_idx, self.backend),
+                    recv_buf,
+                    GPUBuffer(dist_partial_buf, self.backend),
+                    GPUBuffer(dist_partial_idx, self.backend),
+                    dist_partial_sel,
+                    GPUBuffer(dist_full_buf, self.backend),
+                    GPUBuffer(dist_full_idx, self.backend))
 
-        # Maps face to gx_start, num_nodes * num_dists, buf_offset
-        #  gx_start: coordinates of the first node in the ghost patch on a face
-        #  buf_offset: item offset in the global ghost buffer for all faces
-        self._ghost_info = {}
-        for face, span in face_span.iteritems():
-            buf_size = self._block.connection_buf_size(grid, face, span=span)
-
-            if self._block.dim == 2:
-                low = span[0].start
-            else:
-                low = (span[0].start, span[1].start)
-
-            x_size = span[0].stop - span[0].start
-
-            if face < 2:
-                self._ghost_info[face] = (low, buf_size, total_x_size, x_size)
-                total_x_size += buf_size
-            else:
-                self._ghost_info[face] = (low, buf_size, total_ortho_size, x_size)
-                total_ortho_size += buf_size
-
-            self.config.logger.debug('face {0}: {1}-item '
-                    'connection'.format(face, buf_size))
-
-        self.config.logger.debug('ghost_info: {0}'.format(self._ghost_info))
-
-        corners_offset = total_x_size
-        for face, block_id, span, size in corners:
-            total_x_size += size
-
-        self.config.logger.debug('total conn buffer sizes: {0} (x), {1} '
-                '(ortho)'.format(total_x_size, total_ortho_size))
-
-        self._x_connected = total_x_size > 0
-        self._connected = (total_ortho_size > 0) or self._x_connected
-
-        self._ortho_ghost_recv_buffer = None
-        self._ortho_ghost_send_buffer = None
-
-        if total_ortho_size > 0:
-            self._ortho_ghost_recv_buffer = np.ones(total_ortho_size,
-                dtype=self.float) * -1
-            self._ortho_ghost_send_buffer = np.zeros(total_ortho_size,
-                dtype=self.float)
-
-        if total_x_size > 0:
-            self._x_ghost_recv_buffer = np.ones(total_x_size, dtype=self.float) * -1
-            self._x_ghost_send_buffer = np.zeros(total_x_size, dtype=self.float)
-            # Lookup tables for distribution of the ghost node data.
-            self._x_ghost_collect_idx = np.zeros(total_x_size, dtype=np.uint32)
-            self._x_ghost_distrib_idx = np.zeros(total_x_size, dtype=np.uint32)
-
-        # Maps face to recv view and send view (views of the relevant
-        # parts of the recv and send buffers for that face, respectively.
-        # Note that the buffers for the face can be larger than the sum
-        # of the buffers used to transfer data between blocks, i.e. there
-        # might be some unused space in the face buffers.
-        face2view = {}
-        idx = 0
-        for face, (_, buf_size, offset, _) in self._ghost_info.iteritems():
-            selector = face_span[face]
-
-            if face < 2:
-                recv_view = self._x_ghost_recv_buffer.view()
-                send_view = self._x_ghost_send_buffer.view()
-            else:
-                recv_view = self._ortho_ghost_recv_buffer.view()
-                send_view = self._ortho_ghost_send_buffer.view()
-
-            nodes = span_area(selector)
-            dists = buf_size / nodes
-
-            # A view representing a buffer for the whole face.
-            recv_view = recv_view[offset:offset + buf_size]
-            send_view = send_view[offset:offset + buf_size]
-
-            self.config.logger.debug('face {0}: {1} nodes with {2} '
-                    'dists'.format(face, nodes, dists))
-
-            recv_view = recv_view.reshape(dists, nodes)
-            send_view = send_view.reshape(dists, nodes)
-
-            # For 2D blocks, there is no need to reshape the view, which
-            # is already a 1D array.
-            # XXX: this is off by prop_dists
-            if self._block.dim == 3:
-                recv_view = recv_view.reshape(
-                        (selector[0].stop - selector[0].start,
-                         selector[1].stop - selector[1].start))
-                send_view = send_view.reshape(
-                        (selector[0].stop - selector[0].start,
-                         selector[1].stop - selector[1].start))
-
-            face2view[face] = (recv_view, send_view)
-
-            # Add global indices for connections along the X axis.
-            if face < 2:
-                self._x_ghost_collect_idx[idx:idx + buf_size] = \
-                        self._get_global_indices_array(grid, face, selector, self.lat_linear)
-                # The face here is reversed, as for every distribution that we
-                # send out, the opposite distribution has to be received from
-                # the other block.
-                self._x_ghost_distrib_idx[idx:idx + buf_size] = \
-                        self._get_global_indices_array(grid,
-                                self._block.opposite_face(face),
-                                selector,
-                                self.lat_linear_dist)
-                idx += buf_size
-
-        # Clear distrib entries for corner nodes.
-        if total_x_size > 0:
-            for gx, x_dir in zip(self.lat_linear_dist[0:2], (-1, 1)):
-                for gy, y_dir in zip(self.lat_linear_dist[2:4], (-1, 1)):
-                    direction = [x_dir, y_dir]
-                    corner_dists = sym.get_interblock_dists(self._sim.grids[0], direction)
-                    for dist_num in corner_dists:
-                        glb_idx = self._get_global_id(gx, gy, dist_num)
-                        self.config.logger.debug('clearing {0}: {1} x {2} x {3} (dir {4})'.format(
-                            glb_idx, gx, gy, dist_num, direction))
-                        self._x_ghost_distrib_idx[self._x_ghost_distrib_idx == glb_idx] = 0
-
-        # Maps block ID to list of tuples: (face, recv_view, send_view).
-        # The views correspond exactly to areas used for transferring data
-        # for the block identified by the key of the dict.
-        self._blockface2view = {}
-        for block_id, item_list in block_face_span.iteritems():
-            for face, span, size in item_list:
-                view = face2view[face]
-                global_span = face_span[face]
-                rel_span = self._relative_span(global_span, span)
-
-                # XXX rel_span[0] is going to be invalid for 3D
-                recv_view = view[0][:,rel_span[0]]
-                send_view = view[1][:,rel_span[0]]
-
-                assert view[0].base is recv_view.base.base
-                assert view[1].base is send_view.base.base
-
-                self.config.logger.debug('face {0}: block {1} with views '
-                        '{2} (orig {4}), {3} (orig {5}), rel_span: {6}'.format(
-                            face, block_id, recv_view.shape,
-                            send_view.shape, view[0].shape, view[1].shape,
-                            rel_span[0]))
-
-                self._blockface2view.setdefault(block_id, []).append(
-                        (face, recv_view, send_view))
-
-        # Create X distrib/collect entries for the corner nodes.
-        offset = corners_offset
-        for face, block_id, span, size in corners:
-            recv_view = self._x_ghost_recv_buffer[offset:offset + size]
-            send_view = self._x_ghost_send_buffer[offset:offset + size]
-
-            recv_view = recv_view.reshape(1, 1)
-            send_view = send_view.reshape(1, 1)
-
-            self._blockface2view.setdefault(block_id, []).append(
-                    (face, recv_view, send_view))
-
-            self.config.logger.debug('face {0}: block {1} (X-corner) @ offset '
-                    '{2}, size {3}, span {4}'.format(face, block_id, offset,
-                        size, span))
-
-            self._x_ghost_collect_idx[idx:idx + size] = \
-                    self._get_global_indices_array(grid, face, span, self.lat_linear)
-            self._x_ghost_distrib_idx[idx:idx + size] = \
-                    self._get_global_indices_array(grid, face, span,
-                            self.lat_linear_dist, opposite=True)
-
-            idx += size
-            offset += size
-
-        # Make sure there are no duplicates in the distribution index array.
-        # Special value 0 is ignored.
-        if total_x_size > 0:
-            xgdi = self._x_ghost_distrib_idx
-            assert np.all(np.unique(xgdi[xgdi != 0]) == np.sort(xgdi[xgdi != 0]))
+            self.config.logger.debug('adding buffer for conn: {0} -> {1} '
+                    '(face {2})'.format(self._block.id, block_id, face))
+            self._block_to_connbuf[block_id].append(cbuf)
 
     def _init_compute(self):
         self.config.logger.debug("Initializing compute unit.")
@@ -530,23 +390,6 @@ class BlockRunner(object):
             for component in field:
                 gpu_vector.append(self.backend.alloc_buf(like=component.base))
             self._gpu_field_map[id(field)] = gpu_vector
-
-        if self._x_connected:
-            self._gpu_x_ghost_recv_buffer = self.backend.alloc_buf(
-                    like=self._x_ghost_recv_buffer)
-            self._gpu_x_ghost_send_buffer = self.backend.alloc_buf(
-                    like=self._x_ghost_send_buffer)
-
-            self._gpu_x_ghost_collect_idx = self.backend.alloc_buf(
-                    like=self._x_ghost_collect_idx)
-            self._gpu_x_ghost_distrib_idx = self.backend.alloc_buf(
-                    like=self._x_ghost_distrib_idx)
-
-        if self._connected and self._ortho_ghost_recv_buffer is not None:
-            self._gpu_ortho_ghost_recv_buffer = self.backend.alloc_buf(
-                    like=self._ortho_ghost_recv_buffer)
-            self._gpu_ortho_ghost_send_buffer = self.backend.alloc_buf(
-                    like=self._ortho_ghost_send_buffer)
 
         for grid in self._sim.grids:
             size = self._get_dist_bytes(grid)
@@ -649,13 +492,8 @@ class BlockRunner(object):
                         float(self.config.block_size))))
             self.backend.run_kernel(kernel, grid_size)
 
-        if self._connected:
-            for kernel, grid in zip(
-                    self._collect_kernels[self._sim.iteration & 1],
-                    self._distrib_grid):
-                self.backend.run_kernel(kernel, grid)
-                self.config.logger.debug('collect kernel args: {0} / grid: {1}'.format(
-                        kernel.args, grid))
+        for kernel, grid in self._collect_kernels[self._sim.iteration & 1]:
+            self.backend.run_kernel(kernel, grid)
 
     def _step_boundary(self):
         """Runs one simulation step for the boundary blocks.
@@ -666,50 +504,43 @@ class BlockRunner(object):
         stream = self._boundary_stream[self._step]
 
     def send_data(self):
-        if self._x_connected:
-            self.backend.from_buf(self._gpu_x_ghost_send_buffer)
-
-        if self._ortho_ghost_recv_buffer is not None:
-            self.backend.from_buf(self._gpu_ortho_ghost_send_buffer)
-
         for b_id, connector in self._block._connectors.iteritems():
-            faces = self._blockface2view[b_id]
-            if len(faces) > 1:
-                connector.send(np.hstack([np.ravel(x[2]) for x in faces]))
+            conn_bufs = self._block_to_connbuf[b_id]
+            for x in conn_bufs:
+                self.backend.from_buf(x.coll_buf.gpu)
+
+            if len(conn_bufs) > 1:
+                connector.send(np.hstack(
+                    [np.ravel(x.coll_buf.host) for x in conn_bufs]))
             else:
-                connector.send(np.ravel(faces[0][2]))
+                connector.send(np.ravel(conn_bufs[0].coll_buf.host))
 
     def recv_data(self):
         for b_id, connector in self._block._connectors.iteritems():
-            faces = self._blockface2view[b_id]
-            if len(faces) > 1:
-                dest = np.hstack([np.ravel(x[1]) for x in faces])
+            conn_bufs = self._block_to_connbuf[b_id]
+            if len(conn_bufs) > 1:
+                dest = np.hstack([np.ravel(x.recv_buf) for x in conn_bufs])
                 if not connector.recv(dest, self._quit_event):
                     return
-                idx = 0
-                # If there are two connections between the blocks,
-                # reverse the order of faces in the buffer.
-                for views in reversed(faces):
-                    dst_view = np.ravel(views[1])
-                    assert not dst_view.flags.owndata
-                    dst_view[:] = dest[idx:idx + dst_view.shape[0]]
-                    idx += dst_view.shape[0]
+                i = 0
+                for cbuf in conn_bufs:
+                    l = cbuf.recv_buf.size
+                    cbuf.recv_buf[:] = dest[i:i+l].reshape(cbuf.recv_buf.shape)
+                    i += l
+                    cbuf.distribute(self.backend)
             else:
-                recv_buf = np.ravel(faces[0][1])
-                if not connector.recv(recv_buf, self._quit_event):
+                cbuf = conn_bufs[0]
+                dest = np.ravel(cbuf.recv_buf)
+                if not connector.recv(dest, self._quit_event):
                     return
-
                 # If ravel returned a copy, we need to write the data
                 # back to the proper buffer.
                 # TODO(michalj): Check if there is any way of avoiding this
                 # copy.
-                if recv_buf.flags.owndata:
-                    faces[0][1][:] = recv_buf.reshape(faces[0][1].shape)
+                if dest.flags.owndata:
+                    cbuf.recv_buf[:] = dest.reshape(cbuf.recv_buf.shape)
+                cbuf.distribute(self.backend)
 
-        if self._x_connected:
-            self.backend.to_buf(self._gpu_x_ghost_recv_buffer)
-        if self._ortho_ghost_recv_buffer is not None:
-            self.backend.to_buf(self._gpu_ortho_ghost_recv_buffer)
 
     def _fields_to_host(self):
         """Copies data for all fields from the GPU to the host."""
@@ -731,75 +562,111 @@ class BlockRunner(object):
         self._distrib_grid = []
 
         collect_block = 32
+        def _grid_dim1(x):
+            return int(math.ceil(x / float(collect_block)))
 
-        # Note that these do not need to be protected by num_nodes, as we already
-        # have the distrib_collect_x_size template variable for this.
-        if self._x_connected:
-            collect_primary.append(
-                    self.get_kernel('CollectXGhostData',
-                        [self._gpu_x_ghost_collect_idx,
-                         self.gpu_dist(0, 1),
-                         self._gpu_x_ghost_send_buffer],
-                        'PPP', (collect_block,)))
-            collect_secondary.append(
-                    self.get_kernel('CollectXGhostData',
-                        [self._gpu_x_ghost_collect_idx,
-                         self.gpu_dist(0, 0),
-                         self._gpu_x_ghost_send_buffer],
-                        'PPP', (collect_block,)))
-            distrib_primary.append(
-                    self.get_kernel('DistributeXGhostData',
-                        [self._gpu_x_ghost_distrib_idx,
-                         self.gpu_dist(0, 0),
-                         self._gpu_x_ghost_recv_buffer],
-                        'PPP', (collect_block,)))
-            distrib_secondary.append(
-                    self.get_kernel('DistributeXGhostData',
-                        [self._gpu_x_ghost_distrib_idx,
-                         self.gpu_dist(0, 1),
-                         self._gpu_x_ghost_recv_buffer],
-                        'PPP', (collect_block,)))
-            self._distrib_grid.append((int(math.ceil(
-                    len(self._x_ghost_recv_buffer) /
-                    float(collect_block))),))
+        for b_id, conn_bufs in self._block_to_connbuf.iteritems():
+            for cbuf in conn_bufs:
+                # Data collection.
+                if cbuf.coll_idx.host is not None:
+                    grid_size = (_grid_dim1(cbuf.coll_buf.host.size),)
+
+                    def _get_sparse_coll_kernel(i):
+                        return KernelGrid(
+                            self.get_kernel('CollectSparseData',
+                            [cbuf.coll_idx.gpu, self.gpu_dist(0, i),
+                             cbuf.coll_buf.gpu, cbuf.coll_buf.host.size],
+                            'PPPi', (collect_block,)),
+                            grid_size)
+
+                    collect_primary.append(_get_sparse_coll_kernel(1))
+                    collect_secondary.append(_get_sparse_coll_kernel(0))
+                else:
+                    min_max = ([x.start for x in cbuf.cpair.src.src_slice] +
+                            list(cbuf.coll_buf.host.shape[1:]))
+                    if self.dim == 2:
+                        signature = 'PiiiP'
+                        grid_size = (_grid_dim1(cbuf.coll_buf.host.size),)
+                    else:
+                        signature = 'PiiiiiP'
+                        grid_size = (_grid_dim1(cbuf.coll_buf.host.shape[-1]),
+                            cbuf.coll_buf.host.shape[-2] * len(cbuf.cpair.src.dists))
+
+                    def _get_cont_coll_kernel(i):
+                        return KernelGrid(
+                            self.get_kernel('CollectContinuousData',
+                            [self.gpu_dist(0, i),
+                             cbuf.face] + min_max + [cbuf.coll_buf.gpu],
+                             signature, (collect_block,)),
+                             grid_size)
+
+                    collect_primary.append(_get_cont_coll_kernel(1))
+                    collect_secondary.append(_get_cont_coll_kernel(0))
+
+                # Data distribution
+                # Partial nodes.
+                if cbuf.dist_partial_idx.host is not None:
+                    grid_size = (_grid_dim1(cbuf.dist_partial_buf.host.size),)
+
+                    def _get_sparse_dist_kernel(i):
+                        return KernelGrid(
+                                self.get_kernel('DistributeSparseData',
+                                    [cbuf.dist_partial_idx.gpu,
+                                     self.gpu_dist(0, i),
+                                     cbuf.dist_partial_buf.gpu,
+                                     cbuf.dist_partial_buf.host.size],
+                                    'PPPi', (collect_block,)),
+                                grid_size)
+
+                    distrib_primary.append(_get_sparse_dist_kernel(0))
+                    distrib_secondary.append(_get_sparse_dist_kernel(1))
+
+                # Full nodes (all transfer distributions).
+                if cbuf.dist_full_buf.host is not None:
+                    # Sparse indexing (connection along X-axis).
+                    if cbuf.dist_full_idx.host is not None:
+                        grid_size = (_grid_dim1(cbuf.dist_full_buf.host.size),)
+
+                        def _get_sparse_fdist_kernel(i):
+                            return KernelGrid(
+                                    self.get_kernel('DistributeSparseData',
+                                        [cbuf.dist_full_idx.gpu,
+                                         self.gpu_dist(0, i),
+                                         cbuf.dist_full_buf.gpu,
+                                         cbuf.dist_full_buf.host.size],
+                                    'PPPi', (collect_block,)),
+                                    grid_size)
+
+                        distrib_primary.append(_get_sparse_fdist_kernel(0))
+                        distrib_secondary.append(_get_sparse_fdist_kernel(1))
+                    # Continuous indexing.
+                    elif cbuf.cpair.dst.dst_slice:
+                        low = [x + self._block.envelope_size for x in cbuf.cpair.dst.dst_low]
+                        min_max = ([(x + y.start) for x, y in zip(low, cbuf.cpair.dst.dst_slice)] +
+                                list(cbuf.dist_full_buf.host.shape[1:]))
+
+                        if self.dim == 2:
+                            signature = 'PiiiP'
+                            grid_size = (_grid_dim1(cbuf.dist_full_buf.host.size),)
+                        else:
+                            signature = 'PiiiiiP'
+                            grid_size = (_grid_dim1(cbuf.dist_full_buf.host.shape[-1]),
+                                cbuf.dist_full_buf.host.shape[-2] * len(cbuf.cpair.dst.dists))
+
+                        def _get_cont_dist_kernel(i):
+                            return KernelGrid(
+                                    self.get_kernel('DistributeContinuousData',
+                                    [self.gpu_dist(0, i),
+                                     self._block.opposite_face(cbuf.face)] +
+                                    min_max + [cbuf.dist_full_buf.gpu],
+                                    signature, (collect_block,)),
+                                    grid_size)
+
+                        distrib_primary.append(_get_cont_dist_kernel(0))
+                        distrib_secondary.append(_get_cont_dist_kernel(1))
 
         self._collect_kernels = (collect_primary, collect_secondary)
         self._distrib_kernels = (distrib_primary, distrib_secondary)
-
-        # TODO(michalj): Can the buffer and offset be merged into a single
-        # field?
-        for face, (gx_start, num_nodes, buf_offset, max_x) in self._ghost_info.iteritems():
-            # X-faces are already processed above.
-            if face < 2:
-                continue
-
-            if self._block.dim == 2:
-                start_arg = [np.int32(gx_start + self._block.envelope_size)]
-                max_arg = [np.int32(num_nodes)]
-                signature = 'PiiiPi'
-            else:
-                start_arg = [np.int32(gx_start[0] + self._block.envelope_size),
-                             np.int32(gx_start[1] + self._block.envelope_size)]
-                max_arg = [np.int32(max_x), np.int32(num_nudes / max_x)]
-                signature = 'PiiiiiPi'
-
-            for i in range(0, 2):  # primary, secondary
-                self._collect_kernels[i].append(
-                        self.get_kernel('CollectOrthogonalGhostData',
-                            [self.gpu_dist(0, 1-i)] + start_arg +
-                                [np.int32(face)] + max_arg +
-                                [self._gpu_ortho_ghost_send_buffer, buf_offset],
-                            signature, (collect_block,)))
-                self._distrib_kernels[i].append(
-                        self.get_kernel('DistributeOrthogonalGhostData',
-                            [self.gpu_dist(0, i)] + start_arg +
-                                [np.int32(self._block.opposite_face(face))] +
-                                max_arg +
-                                [self._gpu_ortho_ghost_recv_buffer, buf_offset],
-                            signature, (collect_block,)))
-            self._distrib_grid.append((int(math.ceil(
-                    num_nodes /
-                    float(collect_block))),))
 
     def _debug_get_dist(self, output=True):
         """Copies the distributions from the GPU to a properly structured host array.
@@ -877,8 +744,7 @@ class BlockRunner(object):
                 self._output.dump_dists(dbuf, self._sim.iteration)
 
             self.step(output_req)
-            if self._connected:
-                self.send_data()
+            self.send_data()
 
             if output_req and self.config.output_required:
                 self._fields_to_host()
@@ -892,17 +758,12 @@ class BlockRunner(object):
                 self.config.logger.info("Simulation termination requested.")
                 break
 
-            if self._connected:
-                self.recv_data()
-                if self._quit_event.is_set():
-                    self.config.logger.info("Simulation termination requested.")
+            self.recv_data()
+            if self._quit_event.is_set():
+                self.config.logger.info("Simulation termination requested.")
 
-                for kernel, grid in zip(
-                        self._distrib_kernels[self._sim.iteration & 1],
-                        self._distrib_grid):
-                    self.config.logger.debug('distrib kernel args: {0} / grid {1}'.format(
-                            kernel.args, grid))
-                    self.backend.run_kernel(kernel, grid)
+            for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
+                self.backend.run_kernel(kernel, grid)
 
     def main_benchmark(self):
         t_comp = 0.0
@@ -920,21 +781,17 @@ class BlockRunner(object):
             self.step(output_req)
             t2 = time.time()
 
-            if self._connected:
-                self.send_data()
+            self.send_data()
 
             t3 = time.time()
             if output_req:
                 self._fields_to_host()
             t4 = time.time()
 
-            if self._connected:
-                self.recv_data()
+            self.recv_data()
 
-                for kernel, grid in zip(
-                        self._distrib_kernels[self._sim.iteration & 1],
-                        self._distrib_grid):
-                    self.backend.run_kernel(kernel, grid)
+            for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
+                self.backend.run_kernel(kernel, grid)
 
             t5 = time.time()
 

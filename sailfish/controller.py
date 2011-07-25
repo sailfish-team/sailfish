@@ -175,19 +175,6 @@ class LBMachineMaster(object):
                 self.blocks[nbid].add_connector(block.id,
                         LBBlockConnector(array2, array1, ev2, ev1, ev4, ev3))
 
-    def _init_block_envelope(self, sim):
-        """Sets the size of the ghost node envelope for all blocks."""
-        envelope_size = sim.nonlocality
-        for vec in sim.grid.basis:
-            for comp in vec:
-                envelope_size = max(sim.nonlocality, abs(comp))
-
-        # Get rid of any Sympy wrapper objects.
-        envelope_size = int(envelope_size)
-
-        for block in self.blocks:
-            block.set_actual_size(envelope_size)
-
     def _init_visualization_and_io(self):
         if self.config.output:
             output_cls = io.format_name_to_cls[self.config.output_format]
@@ -236,8 +223,6 @@ class LBMachineMaster(object):
         self.config.logger.info('Machine master starting.')
 
         sim = self.lb_class(self.config)
-        self._init_block_envelope(sim)
-
         block2gpu = self._assign_blocks_to_gpus()
 
         self._init_connectors()
@@ -454,6 +439,19 @@ class LBSimulationController(object):
         """Dimensionality of the simulation: 2 or 3."""
         return self._lb_class.geo.dim
 
+    def _init_block_envelope(self, sim, blocks):
+        """Sets the size of the ghost node envelope for all blocks."""
+        envelope_size = sim.nonlocality
+        for vec in sim.grid.basis:
+            for comp in vec:
+                envelope_size = max(sim.nonlocality, abs(comp))
+
+        # Get rid of any Sympy wrapper objects.
+        envelope_size = int(envelope_size)
+
+        for block in blocks:
+            block.set_actual_size(envelope_size)
+
     def run(self):
         self.conf.parse()
         self._lb_class.modify_config(self.conf)
@@ -464,6 +462,10 @@ class LBSimulationController(object):
                 "Make sure the block list is returned in geo_class.blocks()"
         assert len(blocks) > 0, \
                 "Make sure at least one block is returned in geo_class.blocks()"
+
+        sim = self._lb_class(self.conf)
+        self._init_block_envelope(sim, blocks)
+
         proc = LBGeometryProcessor(blocks, self.dim, self.geo)
         blocks = proc.transform(self.conf)
 

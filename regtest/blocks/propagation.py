@@ -215,7 +215,7 @@ class PeriodicPropagationTest(object): #unittest.TestCase):
         ae(b0[vi(-1, -1), 256, 256], np.float32(0.66))
 
 
-class TestCornerPropagation(object): #unittest.TestCase):
+class TestCornerPropagation(unittest.TestCase):
     def setUp(self):
         global periodic_x
         periodic_x = False
@@ -334,7 +334,7 @@ class ThreeBlocksSimulationTest(LBFluidSim, LBForcedSim):
         runner._debug_set_dist(dbuf, False)
 
 
-class TestThreeBlockPropagation(unittest.TestCase):
+class TestThreeBlockPropagation(object):  #unittest.TestCase):
     def test_propagation(self):
         global tmpdir
         ctrl = LBSimulationController(ThreeBlocksSimulationTest, ThreeBlocksGeometryTest)
