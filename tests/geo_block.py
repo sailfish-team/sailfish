@@ -364,6 +364,11 @@ class TestBlock2D(unittest.TestCase):
         self.assertEqual(cpair.src.dst_full_buf_slice, [slice(0, 7)])
         self.assertFalse(cpair.src.dst_partial_map)
 
+        self.assertEqual(cpair.dst.src_slice, [slice(0, 9)])
+        self.assertEqual(cpair.dst.dst_low, [1])
+        self.assertEqual(cpair.dst.dst_slice, [slice(3, 8)])
+        self.assertEqual(cpair.dst.dst_full_buf_slice, [slice(2, 7)])
+
         # full overlap (2nd block is larger)
         b4 = LBBlock2D(f(20, 8), f(5, 14), envelope_size=1, id_=4)
         self.assertTrue(base.connect(b4, grid=D2Q9))
@@ -378,7 +383,7 @@ class TestBlock2D(unittest.TestCase):
                 vi(*f(1,1)): np.array([[10], [11]])}
         self._verify_partial_map(cpair.src, expected_map)
 
-        # exact match at the bottom
+        # exact match at the bottom (2nd block is smaller)
         b5 = LBBlock2D(f(20, 10), f(5, 5), envelope_size=1, id_=5)
         self.assertTrue(base.connect(b5, grid=D2Q9))
         cpair = base.get_connection(face_hi, b5.id)
@@ -390,6 +395,28 @@ class TestBlock2D(unittest.TestCase):
                 vi(*f(1,-1)): np.array([[0]]),
                 vi(*f(1,0)): np.array([[0]])}
         self._verify_partial_map(cpair.src, expected_map)
+
+        # exact match at the bottom (2nd block is larger)
+        b6 = LBBlock2D(f(20, 10), f(5, 15), envelope_size=1, id_=6)
+        self.assertTrue(base.connect(b6, grid=D2Q9))
+        cpair = base.get_connection(face_hi, b6.id)
+        self.assertEqual(cpair.src.src_slice, [slice(1, 12)])
+        self.assertEqual(cpair.src.dst_low, [0])
+        self.assertEqual(cpair.src.dst_slice, [slice(1, 9)])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 9)])
+        expected_map = {
+                vi(*f(1,-1)): np.array([[0]]),
+                vi(*f(1,0)): np.array([[0], [9]]),
+                vi(*f(1,1)): np.array([[9], [10]]),
+            }
+        self._verify_partial_map(cpair.src, expected_map)
+
+        # note that the size of the src_slice is different, depending
+        # on the direction of the transfer
+        self.assertEqual(cpair.dst.src_slice, [slice(1, 11)])
+        self.assertEqual(cpair.dst.dst_low, [0])
+        self.assertEqual(cpair.dst.dst_slice, [slice(1,10)])
+        self.assertEqual(cpair.dst.dst_full_buf_slice, [slice(1,10)])
 
         # disconnected blocks
         bf1 = LBBlock2D(f(20, 21), f(5, 10), envelope_size=1)
