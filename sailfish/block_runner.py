@@ -30,7 +30,7 @@ class ConnectionBuffer(object):
             backend.to_buf(self.dist_partial_buf.gpu)
 
         if self.cpair.dst.dst_slice:
-            slc = [slice(0, self.recv_buf.shape[0])] + self.cpair.dst.dst_slice
+            slc = [slice(0, self.recv_buf.shape[0])] + self.cpair.dst.dst_full_buf_slice
             self.dist_full_buf.host[:] = self.recv_buf[slc]
             backend.to_buf(self.dist_full_buf.gpu)
 
@@ -287,10 +287,10 @@ class BlockRunner(object):
             gx = self.lat_linear_dist[self._block.opposite_face(face)]
         else:
             return None
-        low = [x + self._block.envelope_size for x in cpair.dst.dst_low]
+        es = self._block.envelope_size
         dst_slice = [
-                slice(x.start + shift, x.stop + shift) for x, shift in
-                zip(cpair.dst.dst_slice, low)]
+                slice(x.start + es, x.stop + es) for x in
+                cpair.dst.dst_slice]
         return self._idx_helper(gx, dst_slice, cpair.dst.dists)
 
     def _dst_face_loc_to_full_loc(self, face, face_loc):
@@ -523,7 +523,11 @@ class BlockRunner(object):
                 if not connector.recv(dest, self._quit_event):
                     return
                 i = 0
-                for cbuf in conn_bufs:
+                # In case there are 2 connections between the blocks, reverse the
+                # order of subbuffers in the recv buffer.  Note that this implicitly
+                # assumes the order of conn_bufs is the same for both blocks.
+                # TODO(michalj): Consider explicitly sorting conn_bufs.
+                for cbuf in reversed(conn_bufs):
                     l = cbuf.recv_buf.size
                     cbuf.recv_buf[:] = dest[i:i+l].reshape(cbuf.recv_buf.shape)
                     i += l
@@ -587,10 +591,12 @@ class BlockRunner(object):
                     if self.dim == 2:
                         signature = 'PiiiP'
                         grid_size = (_grid_dim1(cbuf.coll_buf.host.size),)
+                        min_max[-1] = min_max[-1] * len(cbuf.cpair.src.dists)
                     else:
                         signature = 'PiiiiiP'
                         grid_size = (_grid_dim1(cbuf.coll_buf.host.shape[-1]),
                             cbuf.coll_buf.host.shape[-2] * len(cbuf.cpair.src.dists))
+                        min_max[-2] = min_max[-2] * len(cbuf.cpair.src.dists)
 
                     def _get_cont_coll_kernel(i):
                         return KernelGrid(
@@ -648,10 +654,12 @@ class BlockRunner(object):
                         if self.dim == 2:
                             signature = 'PiiiP'
                             grid_size = (_grid_dim1(cbuf.dist_full_buf.host.size),)
+                            min_max[-1] = min_max[-1] * len(cbuf.cpair.dst.dists)
                         else:
                             signature = 'PiiiiiP'
                             grid_size = (_grid_dim1(cbuf.dist_full_buf.host.shape[-1]),
                                 cbuf.dist_full_buf.host.shape[-2] * len(cbuf.cpair.dst.dists))
+                            min_max[-2] = min_max[-2] * len(cbuf.cpair.dst.dists)
 
                         def _get_cont_dist_kernel(i):
                             return KernelGrid(

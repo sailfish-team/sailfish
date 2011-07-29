@@ -95,7 +95,7 @@ class SimulationTest(LBFluidSim, LBForcedSim):
         runner._debug_set_dist(dbuf)
         runner._debug_set_dist(dbuf, False)
 
-class PeriodicPropagationTest(object): #unittest.TestCase):
+class PeriodicPropagationTest(unittest.TestCase):
     def setUp(self):
         global periodic_x
         periodic_x = True
@@ -334,7 +334,7 @@ class ThreeBlocksSimulationTest(LBFluidSim, LBForcedSim):
         runner._debug_set_dist(dbuf, False)
 
 
-class TestThreeBlockPropagation(object):  #unittest.TestCase):
+class TestThreeBlockPropagation(unittest.TestCase):
     def test_propagation(self):
         global tmpdir
         ctrl = LBSimulationController(ThreeBlocksSimulationTest, ThreeBlocksGeometryTest)
@@ -352,7 +352,7 @@ class TestThreeBlockPropagation(object):  #unittest.TestCase):
         ae(b2[vi(1, 0), 64+128, 1], np.float32(0.23))
         ae(b0[vi(-1, 0), 64, 128], np.float32(0.31))
         ae(b2[vi(1, 1), 129, 1], np.float32(0.11))
-        ae(b2[vi(1, -1), 127, 1], np.float32(0.22))
+        ae(b2[vi(1, -1), 128, 1], np.float32(0.22))
 
 if __name__ == '__main__':
     tmpdir = tempfile.mkdtemp()
