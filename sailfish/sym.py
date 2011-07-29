@@ -12,7 +12,12 @@ import math
 import numpy
 import sympy
 from sympy import Matrix, Rational, Symbol, Poly, Eq
-from sympy.core import singleton
+try:
+    from sympy.core import singleton
+    NegativeOne = singleton.S.NegativeOne
+except ImportError:
+    from sympy.core import basic
+    NegativeOne = basic.S.NegativeOne
 from sympy.printing.ccode import CCodePrinter
 from sympy.printing.precedence import precedence
 import re
@@ -978,7 +983,7 @@ class KernelCodePrinter(CCodePrinter):
 
     def _print_Pow(self, expr):
         PREC = precedence(expr)
-        if expr.exp is singleton.S.NegativeOne:
+        if expr.exp is NegativeOne:
             return '1.0/%s' % (self.parenthesize(expr.base, PREC))
         # For the kernel code, it's better to calculate the power
         # here explicitly by multiplication.
