@@ -39,7 +39,7 @@ class TestInterblockPropagation(unittest.TestCase):
 
     def test_4blocks(self):
         global blocks, output
-        output = os.path.join(tmpdir, 'horiz_2block')
+        output = os.path.join(tmpdir, 'horiz_4block')
         blocks = 4
         ctrl = LBSimulationController(SimulationTest, LDCGeometry)
         ctrl.run()
@@ -66,6 +66,7 @@ class TestInterblockPropagation(unittest.TestCase):
 
     def test_3blocks(self):
         global blocks, output
+        output = os.path.join(tmpdir, 'horiz_3block')
         blocks = 3
         ctrl = LBSimulationController(SimulationTest, LDCGeometry)
         ctrl.run()
@@ -80,7 +81,7 @@ class TestInterblockPropagation(unittest.TestCase):
         vx     = np.hstack([vx_p1, testdata2['v'][0]])
 
         vy_p1  = np.vstack([testdata0['v'][1], testdata1['v'][1]])
-        vy     = np.hstack([vx_p1, testdata2['v'][1]])
+        vy     = np.hstack([vy_p1, testdata2['v'][1]])
 
         np.testing.assert_array_almost_equal(rho, self.rho)
         np.testing.assert_array_almost_equal(vx, self.vx)
