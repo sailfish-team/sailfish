@@ -51,9 +51,9 @@ test:
 	python tests/sym.py
 
 regtest:
+	python regtest/blocks/2d_propagation.py
 	python regtest/blocks/2d_ldc.py
 	python regtest/blocks/cylinder.py
-	python regtest/blocks/propagation.py
 
 presubmit: test regtest
 
