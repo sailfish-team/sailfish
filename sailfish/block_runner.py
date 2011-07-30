@@ -3,7 +3,7 @@ import math
 import operator
 import numpy as np
 from sailfish import codegen, util
-from sailfish.geo_block import span_area
+from sailfish.geo_block import span_shape
 
 # Used to hold a reference to a CUDA kernel and a grid on which it is
 # to be executed.
@@ -261,17 +261,15 @@ class BlockRunner(object):
                     (self._get_nodes() * dist_num))
 
     def _idx_helper(self, gx, buf_slice, dists):
-        idx = np.mgrid[buf_slice]
-        idx = np.kron(np.ones(len(dists), dtype=np.uint32), idx)
-        num_nodes = span_area(buf_slice)
-        dist_num = np.kron(
-                np.uint32(dists),
-                np.ones(num_nodes, dtype=np.uint32))
+        sel = [slice(0, len(dists))]
+        idx = np.mgrid[sel + buf_slice].astype(np.uint32)
+        for i, dist_num in enumerate(dists):
+            idx[0][i,:] = dist_num
         if self.dim == 2:
-            return self._get_global_idx((gx, idx), dist_num).astype(np.uint32)
+            return self._get_global_idx((gx, idx[1]), idx[0]).astype(np.uint32)
         else:
-            return self._get_global_idx((gx, idx[0], idx[1]),
-                    dist_num).astype(np.uint32)
+            return self._get_global_idx((gx, idx[1], idx[2]),
+                    idx[0]).astype(np.uint32)
 
     def _get_src_slice_indices(self, face, cpair):
         if face in (self._block._X_LOW, self._block._X_HIGH):
@@ -544,7 +542,6 @@ class BlockRunner(object):
                 if dest.flags.owndata:
                     cbuf.recv_buf[:] = dest.reshape(cbuf.recv_buf.shape)
                 cbuf.distribute(self.backend)
-
 
     def _fields_to_host(self):
         """Copies data for all fields from the GPU to the host."""

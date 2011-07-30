@@ -22,17 +22,11 @@ def span_area(span):
         area *= elem.stop - elem.start
     return area
 
-# XXX fix this for 3D
-def is_corner_span(span):
-    for coord in span:
-        if type(coord) is slice:
-            if coord.start == coord.stop:
-                if coord.start == 0:
-                    return True, -1
-                else:
-                    return True, 1
-    return False, None
-
+def span_shape(span):
+    ret = []
+    for elem in span:
+        ret.append(elem.stop - elem.start)
+    return ret
 
 ConnectionPair = namedtuple('ConnectionPair', 'src dst')
 
