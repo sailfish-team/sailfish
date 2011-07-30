@@ -96,7 +96,7 @@ class LBFluidSim(LBSim):
         ctx['model'] = self.config.model
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['simtype'] = 'lbm'
-        ctx['grid'] = self.grids[0]
+        ctx['grid'] = self.grid
         ctx['grids'] = self.grids
         ctx['bgk_equilibrium'] = self.equilibrium
         ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
