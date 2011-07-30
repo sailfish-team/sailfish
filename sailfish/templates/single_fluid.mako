@@ -409,10 +409,10 @@ ${kernel} void CollectContinuousData(
 // The data is collected from a rectangular area of the plane corresponding to 'face'.
 // The grid with which the kernel is to be called has the following dimensions:
 //
-//  x: # nodes along the X direction + any padding (real # nodes is identified by max_gx)
+//  x: # nodes along the X direction + any padding (real # nodes is identified by max_lx)
 //  y: # nodes along the Y/Z direction * # of dists to transfer + any padding
 //
-// The data will be placed into buffer + offset, in the following linear layout:
+// The data will be placed into buffer, in the following linear layout:
 //
 // (x0, y0, d0), (x1, y0, d0), .. (xN, y0, d0),
 // (x0, y1, d0), (x1, y1, d0), .. (xN, y1, d0),
@@ -455,7 +455,7 @@ ${kernel} void CollectContinuousData(
 				%endfor
 			}
 
-			idx = (other * max_gx + gx) * dist_num;
+			idx = (dist_size * max_lx * dist_num) + (other * max_lx) + gx;
 			buffer[idx] = tmp;
 			break;
 		}
@@ -503,6 +503,7 @@ ${kernel} void DistributeContinuousData(
 	}
 }
 %else:
+## 3D
 <%def name="_get_global_dist_idx(axis)">
 	## Y-axis
 	%if axis < 4:
@@ -523,7 +524,7 @@ ${kernel} void DistributeContinuousData(
 	int idx = get_global_id(1);
 	int gi;
 
-	if (gx >= max_gx || idx >= max_other) {
+	if (gx >= max_lx || idx >= max_other) {
 		return;
 	}
 
@@ -537,7 +538,7 @@ ${kernel} void DistributeContinuousData(
 			int dist_size = max_other / ${len(dists)};
 			int dist_num = idx / dist_size;
 			int other = idx % dist_size;
-			float tmp = buffer[(other * max_lx + gx) * dist_num];
+			float tmp = buffer[idx = (dist_size * max_lx * dist_num) + (other * max_lx) + gx];
 
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):

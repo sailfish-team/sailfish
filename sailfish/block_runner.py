@@ -588,15 +588,14 @@ class BlockRunner(object):
                 else:
                     min_max = ([x.start for x in cbuf.cpair.src.src_slice] +
                             list(cbuf.coll_buf.host.shape[1:]))
+                    min_max[-1] = min_max[-1] * len(cbuf.cpair.src.dists)
                     if self.dim == 2:
                         signature = 'PiiiP'
                         grid_size = (_grid_dim1(cbuf.coll_buf.host.size),)
-                        min_max[-1] = min_max[-1] * len(cbuf.cpair.src.dists)
                     else:
                         signature = 'PiiiiiP'
                         grid_size = (_grid_dim1(cbuf.coll_buf.host.shape[-1]),
                             cbuf.coll_buf.host.shape[-2] * len(cbuf.cpair.src.dists))
-                        min_max[-2] = min_max[-2] * len(cbuf.cpair.src.dists)
 
                     def _get_cont_coll_kernel(i):
                         return KernelGrid(
@@ -650,16 +649,15 @@ class BlockRunner(object):
                         low = [x + self._block.envelope_size for x in cbuf.cpair.dst.dst_low]
                         min_max = ([(x + y.start) for x, y in zip(low, cbuf.cpair.dst.dst_slice)] +
                                 list(cbuf.dist_full_buf.host.shape[1:]))
+                        min_max[-1] = min_max[-1] * len(cbuf.cpair.dst.dists)
 
                         if self.dim == 2:
                             signature = 'PiiiP'
                             grid_size = (_grid_dim1(cbuf.dist_full_buf.host.size),)
-                            min_max[-1] = min_max[-1] * len(cbuf.cpair.dst.dists)
                         else:
                             signature = 'PiiiiiP'
                             grid_size = (_grid_dim1(cbuf.dist_full_buf.host.shape[-1]),
                                 cbuf.dist_full_buf.host.shape[-2] * len(cbuf.cpair.dst.dists))
-                            min_max[-2] = min_max[-2] * len(cbuf.cpair.dst.dists)
 
                         def _get_cont_dist_kernel(i):
                             return KernelGrid(
