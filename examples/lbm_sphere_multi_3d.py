@@ -30,6 +30,11 @@ class SphereBlock(GeoBlock3D):
         y0 = self.gy / 2.0
         z0 = 2.0 * diam
 
+        wall_map = np.logical_or(
+                        np.logical_or(hy == 0, hy == self.gy-1),
+                        np.logical_or(hz == 0, hz == self.gz-1))
+        self.set_geo(wall_map, self.NODE_WALL)
+
         sphere_map = (np.square(hx - x0) +
                       np.square(hy - y0) +
                       np.square(hz - z0)) <= np.square(diam / 2.0)
