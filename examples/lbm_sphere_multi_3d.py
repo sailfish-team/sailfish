@@ -26,9 +26,9 @@ class SphereGeometry(LBGeometry3D):
 class SphereBlock(GeoBlock3D):
     def _define_nodes(self, hx, hy, hz):
         diam = self.gy / 3.0
-        x0 = self.gx / 2.0
+        z0 = self.gz / 2.0
         y0 = self.gy / 2.0
-        z0 = 2.0 * diam
+        x0 = 2.0 * diam
 
         wall_map = np.logical_or(
                         np.logical_or(hy == 0, hy == self.gy-1),
