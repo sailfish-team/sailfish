@@ -76,6 +76,7 @@ class LBConnection(object):
         # Create an array where the entry at [x,y] is the global coordinate pair
         # corresponding to the node [x,y] in the transfer buffer.
         src_coords = np.mgrid[src_slice_global]
+        # [2,x,y] -> [x,y,2]
         src_coords = np.rollaxis(src_coords, 0, len(src_coords.shape))
         min_loc = []
         max_loc = []
@@ -175,7 +176,7 @@ class LBConnection(object):
     @property
     def transfer_shape(self):
         """Logical shape of the transfer buffer."""
-        return [len(self.dists)] + map(lambda x: x.stop - x.start, self.src_slice)
+        return [len(self.dists)] + map(lambda x: x.stop - x.start, reversed(self.src_slice))
 
     @property
     def partial_nodes(self):
@@ -183,7 +184,7 @@ class LBConnection(object):
 
     @property
     def full_shape(self):
-        return [len(self.dists)] + map(lambda x: x.stop - x.start, self.dst_slice)
+        return [len(self.dists)] + map(lambda x: x.stop - x.start, reversed(self.dst_slice))
 
 class LBBlock(object):
     dim = None
