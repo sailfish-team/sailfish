@@ -41,6 +41,10 @@ class TwoBlocksZConnGeoTest(LBGeometry3D):
         blocks.append(LBBlock3D((0, 0, 64), (64, 66, 64)))
         return blocks
 
+class SingleBlockGeoTest(LBGeometry3D):
+    def blocks(self, n=None):
+        return [LBBlock3D((0,0,0), (64, 64, 64))]
+
 
 tmpdir = None
 periodic_x = False
@@ -185,6 +189,7 @@ class TwoBlockPropagationTest(object): #unittest.TestCase):
         b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
         self._verify(b0, b1, DepthTest)
 
+#############################################################################
 
 class PeriodicSimulationTest(LBFluidSim, LBForcedSim):
     geo = BlockTest
@@ -262,6 +267,75 @@ class PeriodicPropagationTest(unittest.TestCase):
         ae(b0[vi(1, 1, 0), 1, 33, 1], np.float32(0.34))
         ae(b0[vi(1,-1, 0), 1, 31, 1], np.float32(0.35))
         ae(b0[vi(1, 0, 1), 2, 32, 1], np.float32(0.36))
+
+#############################################################################
+
+class SingleBlockPeriodicSimulationTest(LBFluidSim, LBForcedSim):
+    geo = BlockTest
+
+    @classmethod
+    def modify_config(cls, config):
+        config.relaxation_enabled = False
+        config.periodic_x = True
+        config.periodic_y = True
+        config.periodic_z = True
+
+    @classmethod
+    def update_defaults(cls, defaults):
+        global tmpdir
+        defaults.update({
+            'lat_nx': 64,
+            'lat_ny': 64,
+            'lat_nz': 64,
+            'grid': 'D3Q19',
+            'max_iters': 2,
+            'every': 1,
+            'quiet': True,
+            'output': os.path.join(tmpdir, 'per_single_out'),
+            'debug_dump_dists': True,
+            'save_src': '/tmp/foo.cu'
+        })
+
+    def initial_conditions(self, runner):
+        dbuf = runner._debug_get_dist()
+        dbuf[:] = 0.0
+
+        dbuf[vi(-1, 0, 0), 32, 32, 1] = 0.11
+        dbuf[vi(-1, 1, 0), 32, 32, 1] = 0.12
+        dbuf[vi(-1, -1, 0), 32, 32, 1] = 0.13
+        dbuf[vi(-1, 0, 1), 32, 32, 1] = 0.14
+        dbuf[vi(-1, 0, -1), 32, 32, 1] = 0.15
+
+        # Corner
+        dbuf[vi(1, 0, 0), 1, 1, 64] = 0.21
+        dbuf[vi(1, 1, 0), 1, 1, 64] = 0.22
+        dbuf[vi(1, 0, 1), 1, 1, 64] = 0.23
+
+        # Edge
+        dbuf[vi(1, 0, 0), 1, 32, 64] = 0.33
+        dbuf[vi(1, 1, 0), 1, 32, 64] = 0.34
+        dbuf[vi(1, -1, 0), 1, 32, 64] = 0.35
+        dbuf[vi(1, 0, 1), 1, 32, 64] = 0.36
+
+        runner._debug_set_dist(dbuf)
+        runner._debug_set_dist(dbuf, False)
+
+class SingleBlockPeriodicTest(unittest.TestCase):
+    def test_x_face_propagation(self):
+        global tmpdir
+        ctrl = LBSimulationController(SingleBlockPeriodicSimulationTest,
+                SingleBlockGeoTest)
+        ctrl.run()
+
+        b0 = np.load(os.path.join(tmpdir, 'per_single_out_blk0_dist_dump1.npy'))
+        ae = np.testing.assert_equal
+
+        ae(b0[vi(-1, 0, 0), 32, 32, 64], np.float32(0.11))
+        ae(b0[vi(-1, 1, 0), 32, 33, 64], np.float32(0.12))
+        ae(b0[vi(-1, -1, 0), 32, 31, 64], np.float32(0.13))
+        ae(b0[vi(-1, 0, 1), 33, 32, 64], np.float32(0.14))
+        ae(b0[vi(-1, 0, -1), 31, 32, 64], np.float32(0.15))
+
 
 if __name__ == '__main__':
     tmpdir = tempfile.mkdtemp()
