@@ -316,7 +316,13 @@ class BlockRunner(object):
             for loc in locations:
                 dst_loc = [x + y for x, y in zip(dst_low, loc)]
                 dst_loc = self._dst_face_loc_to_full_loc(face, dst_loc)
-                sel.append([cpair.dst.dists.index(dist_num)] + list(loc))
+
+                # Reverse 'loc' here to go from natural order (x, y, z) to the
+                # in-face buffer order z, y, x
+                if face < 2:
+                    sel.append([cpair.dst.dists.index(dist_num)] + list(loc))
+                else:
+                    sel.append([cpair.dst.dists.index(dist_num)] + list(reversed(loc)))
                 idx[i] = self._get_global_idx(dst_loc, dist_num)
                 i += 1
         sel2 = []
