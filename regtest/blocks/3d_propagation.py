@@ -23,25 +23,22 @@ class BlockTest(GeoBlock3D):
 class TwoBlocksXConnGeoTest(LBGeometry3D):
     def blocks(self, n=None):
         blocks = []
-        q = 64
-        blocks.append(LBBlock3D((0, 0, 0), (q, q, q)))
-        blocks.append(LBBlock3D((q, 0, 0), (q, q, q)))
+        blocks.append(LBBlock3D((0, 0, 0), (64, 64, 66)))
+        blocks.append(LBBlock3D((64, 0, 0), (64, 64, 66)))
         return blocks
 
 class TwoBlocksYConnGeoTest(LBGeometry3D):
     def blocks(self, n=None):
         blocks = []
-        q = 64
-        blocks.append(LBBlock3D((0, 0, 0), (q, q, q)))
-        blocks.append(LBBlock3D((0, q, 0), (q, q, q)))
+        blocks.append(LBBlock3D((0, 0, 0), (64, 64, 66)))
+        blocks.append(LBBlock3D((0, 64, 0), (64, 64, 66)))
         return blocks
 
 class TwoBlocksZConnGeoTest(LBGeometry3D):
     def blocks(self, n=None):
         blocks = []
-        q = 64
-        blocks.append(LBBlock3D((0, 0, 0), (q, q, q)))
-        blocks.append(LBBlock3D((0, 0, q), (q, q, q)))
+        blocks.append(LBBlock3D((0, 0, 0), (64, 66, 64)))
+        blocks.append(LBBlock3D((0, 0, 64), (64, 66, 64)))
         return blocks
 
 
@@ -62,13 +59,16 @@ class SimulationTest(LBFluidSim, LBForcedSim):
     def update_defaults(cls, defaults):
         if cls.axis == 0:
             lat_nx = 128
-            lat_ny = lat_nz = 64
+            lat_ny = 64
+            lat_nz = 66
         elif cls.axis == 1:
             lat_ny = 128
-            lat_nx = lat_nz = 64
+            lat_nx = 64
+            lat_nz = 66
         elif cls.axis == 2:
             lat_nz = 128
-            lat_nx = lat_ny = 64
+            lat_nx = 64
+            lat_ny = 66
 
         global tmpdir
         defaults.update({

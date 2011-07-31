@@ -30,7 +30,7 @@ class ConnectionBuffer(object):
             backend.to_buf(self.dist_partial_buf.gpu)
 
         if self.cpair.dst.dst_slice:
-            slc = [slice(0, self.recv_buf.shape[0])] + self.cpair.dst.dst_full_buf_slice
+            slc = [slice(0, self.recv_buf.shape[0])] + list(reversed(self.cpair.dst.dst_full_buf_slice))
             self.dist_full_buf.host[:] = self.recv_buf[slc]
             backend.to_buf(self.dist_full_buf.gpu)
 
@@ -262,13 +262,13 @@ class BlockRunner(object):
 
     def _idx_helper(self, gx, buf_slice, dists):
         sel = [slice(0, len(dists))]
-        idx = np.mgrid[sel + buf_slice].astype(np.uint32)
+        idx = np.mgrid[sel + list(reversed(buf_slice))].astype(np.uint32)
         for i, dist_num in enumerate(dists):
             idx[0][i,:] = dist_num
         if self.dim == 2:
             return self._get_global_idx((gx, idx[1]), idx[0]).astype(np.uint32)
         else:
-            return self._get_global_idx((gx, idx[1], idx[2]),
+            return self._get_global_idx((gx, idx[2], idx[1]),
                     idx[0]).astype(np.uint32)
 
     def _get_src_slice_indices(self, face, cpair):
@@ -319,10 +319,7 @@ class BlockRunner(object):
 
                 # Reverse 'loc' here to go from natural order (x, y, z) to the
                 # in-face buffer order z, y, x
-                if face < 2:
-                    sel.append([cpair.dst.dists.index(dist_num)] + list(loc))
-                else:
-                    sel.append([cpair.dst.dists.index(dist_num)] + list(reversed(loc)))
+                sel.append([cpair.dst.dists.index(dist_num)] + list(reversed(loc)))
                 idx[i] = self._get_global_idx(dst_loc, dist_num)
                 i += 1
         sel2 = []
@@ -589,8 +586,9 @@ class BlockRunner(object):
                     collect_primary.append(_get_sparse_coll_kernel(1))
                     collect_secondary.append(_get_sparse_coll_kernel(0))
                 else:
+                    # [X, Z * dists] or [X, Y * dists]
                     min_max = ([x.start for x in cbuf.cpair.src.src_slice] +
-                            list(cbuf.coll_buf.host.shape[1:]))
+                            list(reversed(cbuf.coll_buf.host.shape[1:])))
                     min_max[-1] = min_max[-1] * len(cbuf.cpair.src.dists)
                     if self.dim == 2:
                         signature = 'PiiiP'
@@ -649,9 +647,10 @@ class BlockRunner(object):
                         distrib_secondary.append(_get_sparse_fdist_kernel(1))
                     # Continuous indexing.
                     elif cbuf.cpair.dst.dst_slice:
+                        # [X, Z * dists] or [X, Y * dists]
                         low = [x + self._block.envelope_size for x in cbuf.cpair.dst.dst_low]
                         min_max = ([(x + y.start) for x, y in zip(low, cbuf.cpair.dst.dst_slice)] +
-                                list(cbuf.dist_full_buf.host.shape[1:]))
+                                list(reversed(cbuf.dist_full_buf.host.shape[1:])))
                         min_max[-1] = min_max[-1] * len(cbuf.cpair.dst.dists)
 
                         if self.dim == 2:

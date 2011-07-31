@@ -20,30 +20,30 @@ class TestBlock3D(unittest.TestCase):
                     set([tuple(x) for x in conn.dst_partial_map[key]]))
 
     def test_block_connection_y(self):
-        base = LBBlock3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
+        base = LBBlock3D((10, 10, 10), (10, 10, 12), envelope_size=1, id_=0)
         face_hi = LBBlock3D._Y_HIGH
 
         # exact match
-        b1 = LBBlock3D((10, 20, 10), (10, 5, 10), envelope_size=1, id_=1)
+        b1 = LBBlock3D((10, 20, 10), (10, 5, 12), envelope_size=1, id_=1)
         self.assertTrue(base.connect(b1, grid=D3Q19))
         cpair = base.get_connection(face_hi, b1.id)
-        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(1, 11)])
+        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(1, 13)])
         self.assertEqual(cpair.src.dst_low, [0,0])
-        self.assertEqual(cpair.src.dst_slice, [slice(1, 9), slice(1, 9)])
-        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 9), slice(1, 9)])
+        self.assertEqual(cpair.src.dst_slice, [slice(1, 9), slice(1, 11)])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 9), slice(1, 11)])
 
-        # Order of axes in the connection buffer is: z, x
+        # Order of axes in the connection buffer is: x, z
         # Edges
-        l = [(z, 0) for z in range(1, 9)]
-        r = [(z, 9) for z in range(1, 9)]
-        t = [(9, x) for x in range(1, 9)]
-        b = [(0, x) for x in range(1, 9)]
+        l = [(x, 0) for x in range(1, 9)]
+        r = [(x, 11) for x in range(1, 9)]
+        t = [(9, z) for z in range(1, 11)]
+        b = [(0, z) for z in range(1, 11)]
 
         # Corners
         tl = [(9, 0)]
-        tr = [(9, 9)]
+        tr = [(9, 11)]
         bl = [(0, 0)]
-        br = [(0, 9)]
+        br = [(0, 11)]
 
         expected_map = {
                 vi3(0,1,0): l + r + t + b + tl + tr + br + bl,
@@ -55,30 +55,30 @@ class TestBlock3D(unittest.TestCase):
         self._verify_partial_map(cpair.src, expected_map)
 
     def test_block_connection_z(self):
-        base = LBBlock3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
+        base = LBBlock3D((10, 10, 10), (10, 12, 10), envelope_size=1, id_=0)
         face_hi = LBBlock3D._Z_HIGH
 
         # exact match
-        b1 = LBBlock3D((10, 10, 20), (10, 10, 5), envelope_size=1, id_=1)
+        b1 = LBBlock3D((10, 10, 20), (10, 12, 5), envelope_size=1, id_=1)
         self.assertTrue(base.connect(b1, grid=D3Q19))
         cpair = base.get_connection(face_hi, b1.id)
-        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(1, 11)])
+        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(1, 13)])
         self.assertEqual(cpair.src.dst_low, [0,0])
-        self.assertEqual(cpair.src.dst_slice, [slice(1, 9), slice(1, 9)])
-        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 9), slice(1, 9)])
+        self.assertEqual(cpair.src.dst_slice, [slice(1, 9), slice(1, 11)])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 9), slice(1, 11)])
 
-        # Order of axes in the connection buffer is: y, x
+        # Order of axes in the connection buffer is: x, y
         # Edges
-        l = [(y, 0) for y in range(1, 9)]
-        r = [(y, 9) for y in range(1, 9)]
-        t = [(9, x) for x in range(1, 9)]
-        b = [(0, x) for x in range(1, 9)]
+        l = [(x, 0) for x in range(1, 9)]
+        r = [(x, 11) for x in range(1, 9)]
+        t = [(9, y) for y in range(1, 11)]
+        b = [(0, y) for y in range(1, 11)]
 
         # Corners
         tl = [(9, 0)]
-        tr = [(9, 9)]
+        tr = [(9, 11)]
         bl = [(0, 0)]
-        br = [(0, 9)]
+        br = [(0, 11)]
 
         expected_map = {
                 vi3(0,0,1): l + r + t + b + tl + tr + br + bl,
@@ -90,30 +90,31 @@ class TestBlock3D(unittest.TestCase):
         self._verify_partial_map(cpair.src, expected_map)
 
     def test_block_connection_x(self):
-        base = LBBlock3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
+        base = LBBlock3D((10, 10, 10), (10, 12, 10), envelope_size=1, id_=0)
         face_hi = LBBlock3D._X_HIGH
 
         # exact match
-        b1 = LBBlock3D((20, 10, 10), (5, 10, 10), envelope_size=1, id_=1)
+        b1 = LBBlock3D((20, 10, 10), (5, 12, 10), envelope_size=1, id_=1)
         self.assertTrue(base.connect(b1, grid=D3Q19))
         cpair = base.get_connection(face_hi, b1.id)
         self.assertEqual(set(cpair.src.dists),
                          set([vi3(1,0,0), vi3(1,1,0), vi3(1,-1,0),
                               vi3(1,0,1), vi3(1,0,-1)]))
-        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(1, 11)])
+        self.assertEqual(cpair.src.src_slice, [slice(1, 13), slice(1, 11)])
         self.assertEqual(cpair.src.dst_low, [0,0])
-        self.assertEqual(cpair.src.dst_slice, [slice(1,9), slice(1, 9)])
-        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 9), slice(1, 9)])
+        self.assertEqual(cpair.src.dst_slice, [slice(1, 11), slice(1, 9)])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 11), slice(1, 9)])
 
+        # Order of axes in the connection buffer is y, z
         # Edges
-        l = [(y, 0) for y in range(1, 9)]
-        r = [(y, 9) for y in range(1, 9)]
-        t = [(9, z) for z in range(1, 9)]
+        l = [(y, 0) for y in range(1, 11)]
+        r = [(y, 9) for y in range(1, 11)]
+        t = [(11, z) for z in range(1, 9)]
         b = [(0, z) for z in range(1, 9)]
 
         # Corners
-        tl = [(9, 0)]
-        tr = [(9, 9)]
+        tl = [(11, 0)]
+        tr = [(11, 9)]
         bl = [(0, 0)]
         br = [(0, 9)]
 
@@ -125,6 +126,8 @@ class TestBlock3D(unittest.TestCase):
                 vi3(1,0,-1): l + t + b + tl + bl,
             }
         self._verify_partial_map(cpair.src, expected_map)
+
+        base = LBBlock3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
 
         # full overlap (2nd block is smaller)
         b2 = LBBlock3D((20, 12, 14), (5, 6, 4), envelope_size=1, id_=2)
