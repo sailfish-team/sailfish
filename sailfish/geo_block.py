@@ -146,6 +146,8 @@ class LBConnection(object):
     def __init__(self, dists, src_slice, dst_low, dst_slice, dst_full_buf_slice,
             dst_partial_map, src_id):
         """
+        In 3D, the order of all slices always follows the natural ordering: x, y, z
+
         dists: indices of distributions to be transferred
         src_slice: slice in the full buffer of the source block,
         dst_low: position of the buffer in the non-ghost coordinate system of

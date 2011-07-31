@@ -19,6 +19,76 @@ class TestBlock3D(unittest.TestCase):
                     set([tuple(x) for x in val]),
                     set([tuple(x) for x in conn.dst_partial_map[key]]))
 
+    def test_block_connection_y(self):
+        base = LBBlock3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
+        face_hi = LBBlock3D._Y_HIGH
+
+        # exact match
+        b1 = LBBlock3D((10, 20, 10), (10, 5, 10), envelope_size=1, id_=1)
+        self.assertTrue(base.connect(b1, grid=D3Q19))
+        cpair = base.get_connection(face_hi, b1.id)
+        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(1, 11)])
+        self.assertEqual(cpair.src.dst_low, [0,0])
+        self.assertEqual(cpair.src.dst_slice, [slice(1, 9), slice(1, 9)])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 9), slice(1, 9)])
+
+        # Order of axes in the connection buffer is: z, x
+        # Edges
+        l = [(z, 0) for z in range(1, 9)]
+        r = [(z, 9) for z in range(1, 9)]
+        t = [(9, x) for x in range(1, 9)]
+        b = [(0, x) for x in range(1, 9)]
+
+        # Corners
+        tl = [(9, 0)]
+        tr = [(9, 9)]
+        bl = [(0, 0)]
+        br = [(0, 9)]
+
+        expected_map = {
+                vi3(0,1,0): l + r + t + b + tl + tr + br + bl,
+                vi3(1,1,0): l + r + t + tl + tr,
+                vi3(-1,1,0): l + r + b + bl + br,
+                vi3(0,1,1): r + t + b + tr + br,
+                vi3(0,1,-1): l + t + b + tl + bl,
+            }
+        self._verify_partial_map(cpair.src, expected_map)
+
+    def test_block_connection_z(self):
+        base = LBBlock3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
+        face_hi = LBBlock3D._Z_HIGH
+
+        # exact match
+        b1 = LBBlock3D((10, 10, 20), (10, 10, 5), envelope_size=1, id_=1)
+        self.assertTrue(base.connect(b1, grid=D3Q19))
+        cpair = base.get_connection(face_hi, b1.id)
+        self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(1, 11)])
+        self.assertEqual(cpair.src.dst_low, [0,0])
+        self.assertEqual(cpair.src.dst_slice, [slice(1, 9), slice(1, 9)])
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 9), slice(1, 9)])
+
+        # Order of axes in the connection buffer is: y, x
+        # Edges
+        l = [(y, 0) for y in range(1, 9)]
+        r = [(y, 9) for y in range(1, 9)]
+        t = [(9, x) for x in range(1, 9)]
+        b = [(0, x) for x in range(1, 9)]
+
+        # Corners
+        tl = [(9, 0)]
+        tr = [(9, 9)]
+        bl = [(0, 0)]
+        br = [(0, 9)]
+
+        expected_map = {
+                vi3(0,0,1): l + r + t + b + tl + tr + br + bl,
+                vi3(1,0,1): l + r + t + tl + tr,
+                vi3(-1,0,1): l + r + b + bl + br,
+                vi3(0,1,1): r + t + b + tr + br,
+                vi3(0,-1,1): l + t + b + tl + bl,
+            }
+        self._verify_partial_map(cpair.src, expected_map)
+
     def test_block_connection_x(self):
         base = LBBlock3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
         face_hi = LBBlock3D._X_HIGH
