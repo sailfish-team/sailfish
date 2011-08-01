@@ -4,7 +4,7 @@ Sailfish branch.
 
 Many features are missing or broken in the multigpu branch.  Use it
 for development and exploration only, do NOT run any production
-simulations using this code unless you know excetly what you are doing.
+simulations using this code unless you know excatly what you are doing.
 
 Please note that the code has not been optimized for speed yet.
 
