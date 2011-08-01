@@ -53,8 +53,9 @@ test:
 regtest:
 	python regtest/blocks/2d_propagation.py
 	python regtest/blocks/2d_ldc.py
-	python regtest/blocks/cylinder.py
+	python regtest/blocks/2d_cylinder.py
 	python regtest/blocks/3d_propagation.py
+	python regtest/blocks/3d_ldc.py
 
 presubmit: test regtest
 
