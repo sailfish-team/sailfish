@@ -108,11 +108,14 @@
 	${const_var} float ${name} = ${val}f;
 %endfor
 
-${const_var} float geo_params[${num_params+1}] = {
-%for param in geo_params:
-	${param}f,
-%endfor
-0};		// geometry parameters
+%if geo_params:
+	// Additional geometry parameters (velocities, pressures, etc)
+	${const_var} float geo_params[${len(geo_params)}] = {
+	%for param in geo_params:
+		${param}f,
+	%endfor
+	};
+%endif
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="boundary.mako" import="*" name="boundary"/>
