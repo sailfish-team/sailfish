@@ -1,3 +1,8 @@
+This list might be out of date.  For up-to-date list of future Sailfish enhancements,
+please check:
+
+http://code.google.com/p/sailfish-cfd/issues/list?can=2&q=label%3Aenhancement
+
 * TASKS
 
 - Regularized boundary conditions for 2D and 3D.
@@ -6,10 +11,6 @@
   Add a new regtest to automatically run the Lid-Driven Cavity example,
   and generate plots comparing the results to data from the literature
   (see also regtest/ldc_golden).
-
-- Add unit tests for 2D geometry.
-  The unit tests currently only cover the 3D geometry.  Add similar
-  tests for 2D.
 
 - Implement the single-grid access pattern.
   Instead of alternating between two distinct grids, the LBM can be
@@ -25,10 +26,6 @@
 
 - Add a Taylor-Green testcase.
   See e.g. the D3Q13 PRE paper for more info about this test case.
-
-- Add multi-GPU support / domain decomposition.
-  Make it possible to automatically/manually divide the simulation
-  domain into subdomains which are simulated on separate GPUs.
 
 - Implement grid refinement.
   Make it possible to define regions of the simulation domain which are
