@@ -465,8 +465,7 @@ class BlockRunner(object):
                 grid_size = (
                         int(math.ceil(self._lat_size[1] /
                             float(self.config.block_size))),
-                        int(math.ceil(self._lat_size[0] /
-                            float(self.config.block_size))))
+                        self._lat_size[0])
 
             self.backend.run_kernel(kernel, grid_size)
 
@@ -480,8 +479,7 @@ class BlockRunner(object):
                 grid_size = (
                         int(math.ceil(self._lat_size[2] /
                             float(self.config.block_size))),
-                        int(math.ceil(self._lat_size[0] /
-                            float(self.config.block_size))))
+                        self._lat_size[0])
             self.backend.run_kernel(kernel, grid_size)
 
         if self._block.dim == 3 and self._block.periodic_z:
@@ -489,8 +487,7 @@ class BlockRunner(object):
             grid_size = (
                     int(math.ceil(self._lat_size[2] /
                         float(self.config.block_size))),
-                    int(math.ceil(self._lat_size[1] /
-                        float(self.config.block_size))))
+                    self._lat_size[1])
             self.backend.run_kernel(kernel, grid_size)
 
         for kernel, grid in self._collect_kernels[self._sim.iteration & 1]:

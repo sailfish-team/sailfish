@@ -219,13 +219,13 @@ ${kernel} void CollideAndPropagate(
 						direction[other_axes[axis][1]] = j
 						corner_dists = sym.get_interblock_dists(grid, direction)
 						conds = []
-						if i == -1:
+						if i == 1:
 							conds.append('idx1 > 1')
-						elif i == 1:
+						elif i == -1:
 							conds.append('idx1 < {0}'.format(max_dim))
-						if j == -1:
+						if j == 1:
 							conds.append('idx2 > 1')
-						elif j == 1:
+						elif j == -1:
 							conds.append('idx2 < {0}'.format(max_dim2))
 						cond = ' && '.join(conds)
 						cond_to_dists[cond] = corner_dists
