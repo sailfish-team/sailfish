@@ -514,7 +514,6 @@ class GeoEncoderConst(GeoEncoder):
         self._type_map = None
         self._param_map = None
         self._geo_params = []
-        self._num_params = 0
         # TODO: Generalize this.
         self._num_velocities = 0
         self.config = geo_block.block.runner.config
@@ -541,13 +540,12 @@ class GeoEncoderConst(GeoEncoder):
         max_len = 0
         for node_type, values in type_dict.iteritems():
             l = len(values)
-            self._num_params += l
             if node_type == GeoBlock.NODE_VELOCITY:
                 self._num_velocities = l
             max_len = max(max_len, l)
         self._bits_param = bit_len(max_len)
 
-        # TODO(michalj): Genealize this to other node types.
+        # TODO(michalj): Generalize this to other node types.
         for param_hash, val in type_dict[GeoBlock.NODE_VELOCITY]:
             self._geo_params.extend(val)
         for param_hash, val in type_dict[GeoBlock.NODE_PRESSURE]:
@@ -612,7 +610,6 @@ class GeoEncoderConst(GeoEncoder):
             'geo_obj_shift': 0,
             'geo_dir_other': 0,
             'geo_num_velocities': self._num_velocities,
-            'num_params': self._num_params,
             'geo_params': self._geo_params
         })
 

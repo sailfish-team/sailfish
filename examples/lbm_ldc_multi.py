@@ -27,7 +27,7 @@ class LDCGeometry(LBGeometry2D):
         if bps**2 != self.config.blocks:
             print ('Only configurations with '
                     'square-of-interger numbers of blocks are supported. '
-                    'Falling back to {} x {} blocks.'.format(bps, bps))
+                    'Falling back to {0} x {0} blocks.'.format(bps))
 
         yq = self.gy / bps
         ydiff = self.gy % bps
