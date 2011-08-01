@@ -1,3 +1,5 @@
+"""Intra- and inter-block geometry processing."""
+
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'GPL3'
@@ -21,12 +23,6 @@ def span_area(span):
             continue
         area *= elem.stop - elem.start
     return area
-
-def span_shape(span):
-    ret = []
-    for elem in span:
-        ret.append(elem.stop - elem.start)
-    return ret
 
 ConnectionPair = namedtuple('ConnectionPair', 'src dst')
 

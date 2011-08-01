@@ -6,12 +6,10 @@ __license__ = 'GPL3'
 
 import math
 import os
-import sys
 import time
 
 import numpy as np
 import pygame
-from scipy import signal
 
 from sailfish import lb_base, vis, geo_block
 

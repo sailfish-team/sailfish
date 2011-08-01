@@ -1,3 +1,9 @@
+"""Simulation controller."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'LGPL3'
+
 import ctypes
 import logging
 import operator
@@ -6,7 +12,6 @@ import sys
 import tempfile
 import multiprocessing as mp
 from multiprocessing import Process, Array, Event, Value
-import numpy as np
 
 from sailfish import codegen, config, io, block_runner, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D

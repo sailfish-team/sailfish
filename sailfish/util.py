@@ -1,3 +1,9 @@
+"""Miscellaneous utility functions."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'LGPL3'
+
 from sailfish import sym
 
 def get_grid_from_config(config):

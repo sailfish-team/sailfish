@@ -1,4 +1,4 @@
-"""Classes used to specify global LB simulation geometry and it partitions."""
+"""Classes to specify global LB simulation geometry and its partitions."""
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'

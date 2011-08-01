@@ -1,9 +1,14 @@
+"""Code for controlling a single block of a LB simulation."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'LGPL3'
+
 from collections import defaultdict, namedtuple
 import math
 import operator
 import numpy as np
 from sailfish import codegen, util
-from sailfish.geo_block import span_shape
 
 # Used to hold a reference to a CUDA kernel and a grid on which it is
 # to be executed.
