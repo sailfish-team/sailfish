@@ -1,5 +1,4 @@
-"""Classes and function for specifying and processing simulation
-configuration."""
+"""Classes for specifying and processing simulation configuration."""
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'

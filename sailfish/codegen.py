@@ -1,3 +1,9 @@
+"""Run-time CUDA/OpenCL code generation."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'LGPL3'
+
 import os
 import sys
 from mako.lookup import TemplateLookup

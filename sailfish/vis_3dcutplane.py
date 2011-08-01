@@ -1,3 +1,6 @@
+# TODO(michalj): Port this visualization backend.
+raise NotImplementedError("This visualization backend has not been ported yet.")
+
 class Fluid3DVisCutplane(Fluid2DVis):
     name = 'cutplane'
     dims = [3]

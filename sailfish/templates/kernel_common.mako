@@ -115,6 +115,8 @@
 		${param}f,
 	%endfor
 	};
+%else:
+	${const_var} float geo_params[1] = {0};
 %endif
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>

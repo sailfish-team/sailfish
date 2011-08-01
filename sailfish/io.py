@@ -1,3 +1,9 @@
+"""Input/Output for LB simulations."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'LGPL3'
+
 import math
 import numpy as np
 import operator
