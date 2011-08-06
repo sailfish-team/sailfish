@@ -7,11 +7,14 @@ __license__ = 'LGPL3'
 import ctypes
 import logging
 import operator
+import os
 import platform
 import sys
 import tempfile
 import multiprocessing as mp
 from multiprocessing import Process, Array, Event, Value
+
+import zmq
 
 from sailfish import codegen, config, io, block_runner, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
@@ -36,6 +39,7 @@ def _get_visualization_engines():
 
 def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
         quit_event):
+    config.logger.debug('BlockRunner starting with PID {0}'.format(os.getpid()))
     # Make sure each block has its own temporary directory.  This is
     # particularly important with Numpy 1.3.0, where there is a race
     # condition when saving npz files.
@@ -45,7 +49,8 @@ def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
     # context of the new process.
     backend = backend_class(config, gpu_id)
 
-    runner = block_runner.BlockRunner(sim, block, output, backend, quit_event)
+    runner = block_runner.BlockRunner(sim, block, output, backend, quit_event,
+            'tcp://127.0.0.1:{0}'.format(config.zmq_port))
     runner.run()
 
 
@@ -225,14 +230,19 @@ class LBMachineMaster(object):
         self._vis_process.join()
 
     def run(self):
-        self.config.logger.info('Machine master starting.')
+        self.config.logger.info('Machine master starting with PID {0}'.format(os.getpid()))
 
         sim = self.lb_class(self.config)
         block2gpu = self._assign_blocks_to_gpus()
 
         self._init_connectors()
         output_initializer = self._init_visualization_and_io()
-        backend_cls = _get_backends().next()
+        try:
+            backend_cls = _get_backends().next()
+        except StopIteration:
+            self.config.logger.error('Failed to initialize compute backend.'
+                    ' Make sure pycuda/pyopencl is installed.')
+            return
 
         # Create block runners for all blocks.
         for block in self.blocks:
@@ -371,7 +381,7 @@ class LBSimulationController(object):
     """Controls the execution of a LB simulation."""
 
     def __init__(self, lb_class, lb_geo=None):
-        self.conf = config.LBConfig()
+        self.config = config.LBConfig()
         self._lb_class = lb_class
 
         # Use a default global geometry is one has not been
@@ -384,7 +394,7 @@ class LBSimulationController(object):
 
         self._lb_geo = lb_geo
 
-        group = self.conf.add_group('Runtime mode settings')
+        group = self.config.add_group('Runtime mode settings')
         group.add_argument('--mode', help='runtime mode', type=str,
             choices=['batch', 'visualization', 'benchmark']),
         group.add_argument('--every',
@@ -413,31 +423,33 @@ class LBSimulationController(object):
                 'arrays to files'),
         group.add_argument('--log', type=str, default='',
                 help='name of the file to which data is to be logged')
+        group.add_argument('--zmq_port', type=int, default=1371,
+                help='0mq port to use for communication with block runners')
 
-        group = self.conf.add_group('Simulation-specific settings')
+        group = self.config.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)
 
-        group = self.conf.add_group('Geometry settings')
+        group = self.config.add_group('Geometry settings')
         lb_geo.add_options(group)
 
-        group = self.conf.add_group('Code generator options')
+        group = self.config.add_group('Code generator options')
         codegen.BlockCodeGenerator.add_options(group)
 
         # Backend options
         for backend in _get_backends():
-            group = self.conf.add_group(
+            group = self.config.add_group(
                     "'{0}' backend options".format(backend.name))
             backend.add_options(group)
 
         for engine in _get_visualization_engines():
-            group = self.conf.add_group(
+            group = self.config.add_group(
                     "'{0}' visualization engine".format(engine.name))
             engine.add_options(group)
 
         # Set default values defined by the simulation-specific class.
         defaults = {}
         lb_class.update_defaults(defaults)
-        self.conf.set_defaults(defaults)
+        self.config.set_defaults(defaults)
 
     @property
     def dim(self):
@@ -458,9 +470,13 @@ class LBSimulationController(object):
             block.set_actual_size(envelope_size)
 
     def run(self):
-        self.conf.parse()
-        self._lb_class.modify_config(self.conf)
-        self.geo = self._lb_geo(self.conf)
+        self.config.parse()
+        self._lb_class.modify_config(self.config)
+        self.geo = self._lb_geo(self.config)
+
+        ctx = zmq.Context()
+        summary_receiver = ctx.socket(zmq.PULL)
+        summary_receiver.bind('tcp://127.0.0.1:{0}'.format(self.config.zmq_port))
 
         blocks = self.geo.blocks()
         assert blocks is not None, \
@@ -468,15 +484,32 @@ class LBSimulationController(object):
         assert len(blocks) > 0, \
                 "Make sure at least one block is returned in geo_class.blocks()"
 
-        sim = self._lb_class(self.conf)
+        sim = self._lb_class(self.config)
         self._init_block_envelope(sim, blocks)
 
         proc = LBGeometryProcessor(blocks, self.dim, self.geo)
-        blocks = proc.transform(self.conf)
+        blocks = proc.transform(self.config)
 
         # TODO(michalj): do this over MPI
         p = Process(target=_start_machine_master,
                     name='Master/{0}'.format(platform.node()),
-                    args=(self.conf, blocks, self._lb_class))
+                    args=(self.config, blocks, self._lb_class))
         p.start()
         p.join()
+
+        if self.config.mode == 'benchmark':
+            timing_infos = []
+            mlups_total = 0.0
+            mlups_comp = 0.0
+            # Collect timing information from all blocks.
+            for i in range(len(blocks)):
+                ti = summary_receiver.recv_pyobj()
+                timing_infos.append(ti)
+                block = blocks[ti.block_id]
+                mlups_total += block.num_nodes / ti.total * 1e-6
+                mlups_comp += block.num_nodes / ti.comp * 1e-6
+
+            print ('Total MLUPS: eff:{0:.2f}  comp:{1:.2f}'.format(
+                    mlups_total, mlups_comp))
+
+            return timing_infos

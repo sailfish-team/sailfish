@@ -8,11 +8,14 @@ from collections import defaultdict, namedtuple
 import math
 import operator
 import numpy as np
+import zmq
 from sailfish import codegen, util
 
 # Used to hold a reference to a CUDA kernel and a grid on which it is
 # to be executed.
 KernelGrid = namedtuple('KernelGrid', 'kernel grid')
+TimingInfo = namedtuple('TimingInfo', 'comp data recv send total block_id')
+
 
 class ConnectionBuffer(object):
     def __init__(self, face, cpair, coll_buf, coll_idx, recv_buf,
@@ -40,6 +43,7 @@ class ConnectionBuffer(object):
             backend.to_buf(self.dist_full_buf.gpu)
 
 class GPUBuffer(object):
+    """Numpy array and a corresponding GPU buffer."""
     def __init__(self, host_buffer, backend):
         self.host = host_buffer
         if host_buffer is not None:
@@ -49,10 +53,14 @@ class GPUBuffer(object):
 
 
 class BlockRunner(object):
-    """Runs the simulation for a single LBBlock
+    """Runs the simulation for a single LBBlock.
     """
-    def __init__(self, simulation, block, output, backend, quit_event):
+    def __init__(self, simulation, block, output, backend, quit_event, summary_addr):
         # Create a 2-way connection between the LBBlock and this BlockRunner
+        self._ctx = zmq.Context()
+        self._summary_sender = self._ctx.socket(zmq.PUSH)
+        self._summary_sender.connect(summary_addr)
+
         self._block = block
         block.runner = self
 
@@ -826,3 +834,9 @@ class BlockRunner(object):
                         '  total:{4:e}'.format(
                             t_comp / j, t_data / j, t_recv / j, t_send / j,
                             t_total / j))
+
+        mi = self.config.max_iters
+        ti = TimingInfo(t_comp / mi, t_data / mi, t_recv / mi, t_send / mi,
+                t_total / mi, self._block.id)
+        self.config.logger.debug('Sending timing information to controller.')
+        self._summary_sender.send_pyobj(ti)
