@@ -5,6 +5,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'GPL3'
 
 from collections import defaultdict, namedtuple
+import operator
 import numpy as np
 from sailfish import sym
 
@@ -227,6 +228,10 @@ class LBBlock(object):
     @id.setter
     def id(self, x):
         self._id = x
+
+    @property
+    def num_nodes(self):
+        return reduce(operator.mul, self.size)
 
     @property
     def periodic_x(self):
