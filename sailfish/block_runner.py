@@ -58,7 +58,7 @@ class BlockRunner(object):
     def __init__(self, simulation, block, output, backend, quit_event, summary_addr):
         # Create a 2-way connection between the LBBlock and this BlockRunner
         self._ctx = zmq.Context()
-        self._summary_sender = self._ctx.socket(zmq.PUSH)
+        self._summary_sender = self._ctx.socket(zmq.REQ)
         self._summary_sender.connect(summary_addr)
 
         self._block = block
@@ -838,5 +838,6 @@ class BlockRunner(object):
         mi = self.config.max_iters
         ti = TimingInfo(t_comp / mi, t_data / mi, t_recv / mi, t_send / mi,
                 t_total / mi, self._block.id)
-        self.config.logger.debug('Sending timing information to controller.')
         self._summary_sender.send_pyobj(ti)
+        self.config.logger.debug('Sending timing information to controller.')
+        assert self._summary_sender.recv_pyobj() == 'ack'
