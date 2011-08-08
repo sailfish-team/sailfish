@@ -81,6 +81,10 @@ class CUDABackend(object):
         self._device = cuda.Device(gpu_id)
         self._ctx = self._device.make_context()
 
+    @property
+    def total_memory(self):
+        return self._device.total_memory()
+
     def alloc_buf(self, size=None, like=None, wrap_in_array=True):
         if like is not None:
             # When calculating the total array size, take into account

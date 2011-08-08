@@ -380,7 +380,7 @@ class LBGeometryProcessor(object):
 class LBSimulationController(object):
     """Controls the execution of a LB simulation."""
 
-    def __init__(self, lb_class, lb_geo=None):
+    def __init__(self, lb_class, lb_geo=None, default_config=None):
         self.config = config.LBConfig()
         self._lb_class = lb_class
 
@@ -441,15 +441,22 @@ class LBSimulationController(object):
                     "'{0}' backend options".format(backend.name))
             backend.add_options(group)
 
-        for engine in _get_visualization_engines():
-            group = self.config.add_group(
-                    "'{0}' visualization engine".format(engine.name))
-            engine.add_options(group)
+        # Do not try to import visualization engine modules if we already
+        # know that the simulation will be running in batch mode.
+        if (default_config is None or 'mode' not in default_config or
+            default_config['mode'] == 'visualization'):
+            for engine in _get_visualization_engines():
+                group = self.config.add_group(
+                        "'{0}' visualization engine".format(engine.name))
+                engine.add_options(group)
 
         # Set default values defined by the simulation-specific class.
         defaults = {}
         lb_class.update_defaults(defaults)
         self.config.set_defaults(defaults)
+
+        if default_config is not None:
+            self.config.set_defaults(default_config)
 
     @property
     def dim(self):
@@ -475,7 +482,7 @@ class LBSimulationController(object):
         self.geo = self._lb_geo(self.config)
 
         ctx = zmq.Context()
-        summary_receiver = ctx.socket(zmq.PULL)
+        summary_receiver = ctx.socket(zmq.REP)
         summary_receiver.bind('tcp://127.0.0.1:{0}'.format(self.config.zmq_port))
 
         blocks = self.geo.blocks()
@@ -495,7 +502,6 @@ class LBSimulationController(object):
                     name='Master/{0}'.format(platform.node()),
                     args=(self.config, blocks, self._lb_class))
         p.start()
-        p.join()
 
         if self.config.mode == 'benchmark':
             timing_infos = []
@@ -504,12 +510,17 @@ class LBSimulationController(object):
             # Collect timing information from all blocks.
             for i in range(len(blocks)):
                 ti = summary_receiver.recv_pyobj()
+                summary_receiver.send_pyobj('ack')
                 timing_infos.append(ti)
                 block = blocks[ti.block_id]
                 mlups_total += block.num_nodes / ti.total * 1e-6
                 mlups_comp += block.num_nodes / ti.comp * 1e-6
 
-            print ('Total MLUPS: eff:{0:.2f}  comp:{1:.2f}'.format(
-                    mlups_total, mlups_comp))
+            if not self.config.quiet:
+                print ('Total MLUPS: eff:{0:.2f}  comp:{1:.2f}'.format(
+                        mlups_total, mlups_comp))
 
-            return timing_infos
+            p.join()
+            return timing_infos, blocks
+
+        p.join()
