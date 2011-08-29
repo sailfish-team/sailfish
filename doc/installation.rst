@@ -87,6 +87,12 @@ these projects or a snapshot tarball (as illustrated above for PyCUDDA).
 Please also note that the NumPy version provided in Ubuntu releases older than Karmic is not
 recent enough for Sailfish.
 
+When running Sailfish simulations, you can use::
+
+  --cuda-nvcc-opts="--compiler-bindir=/usr/bin/gcc-4.4"
+
+to avoid compatibility problems with the CUDA compiler, which as of CUDA 4.0 only supports GCC 4.4 and older.
+
 
 Mac OS X installation instructions (Mac Ports)
 ----------------------------------------------
