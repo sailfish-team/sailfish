@@ -17,7 +17,7 @@ General requirements:
 
 Visualization (optional):
 
-* pygame (for 2D/3D)
+* pygame, scipy (for 2D/3D)
 * mayavi (for 3D)
 
 Data output (optional):
@@ -52,6 +52,15 @@ To install the required packages on a Gentoo system::
 
 You can also replace ``pycuda`` with ``pyopencl`` if you wish to use the OpenCL backend
 in Sailfish.
+
+CUDA 4.0 requires GCC 4.4 or older.  If you are using GCC 4.5+ as the main compiler on
+your system, you can still run Sailfish simulations without changing any global settings
+by adding::
+
+  --cuda-nvcc-opts="-ccbin /usr/x86_64-pc-linux-gnu/gcc-bin/4.4.6/"
+
+when calling the simulation (replace 4.4.6 with the actual version of the GCC installed
+on your system and use ``i686`` instead of ``x86_64`` if you are on a 32-bit machine).
 
 Ubuntu installation instructions
 --------------------------------
