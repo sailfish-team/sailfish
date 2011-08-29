@@ -65,34 +65,28 @@ on your system and use ``i686`` instead of ``x86_64`` if you are on a 32-bit mac
 Ubuntu installation instructions
 --------------------------------
 
+These instructions assume that you want to use the CUDA backend.  Before installing following them,
+please make sure the NVIDIA CUDA Toolkit is installed in ``/usr/local/cuda`` (default location).
+You can get the necessary files at http://nvidia.com/cuda.
+
 To install the required packages on an Ubuntu system::
 
-  apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-tables python-scipy python-mako python-decorator
-  apt-get install git-core python-setuptools libboost-dev
-  git clone git://github.com/sympy/sympy
-  git clone http://git.tiker.net/trees/pytools.git
+  apt-get install gcc-4.4 g++-4.4 python-pygame mayavi2 python-matplotlib python-numpy python-tables python-scipy python-sympy
+  apt-get install python-mako python-decorator python-pytools  build-essential python-dev python-setuptools libboost-python-dev libboost-thread-dev
+  apt-get install git-core
   git clone http://git.tiker.net/trees/pycuda.git
-  cd pytools
-  python setup.py build
-  python setup.py install
-  cd ../sympy
-  python setup.py build
-  python setup.py install
-  cd ../pycuda
-  /configure.py --boost-python-libname=boost_python-mt-py26 --boost-thread-libname=boost_thread-mt --cuda-root=/usr/local/cuda
-  python setup.py build
+  cd pycuda
+  ./configure.py --cuda-root=/usr/local/cuda --cudadrv-lib-dir=/usr/local/cuda/lib64 --boost-inc-dir=/usr/include --boost-lib-dir=/usr/lib --boost-python-libname=boost_python-mt --boost-thread-libname=boost_thread-mt
+  make -j4
   python setup.py install
 
-There are currently no (recent enough) packages for SymPy and PyCUDA/PyOpenCL available for
+There are currently no packages for PyCUDA/PyOpenCL available for
 Ubuntu, so these have to be installed manually from a checked-out upstream code repository of
-these projects or a snapshot tarball.
+these projects or a snapshot tarball (as illustrated above for PyCUDDA).
 
 Please also note that the NumPy version provided in Ubuntu releases older than Karmic is not
 recent enough for Sailfish.
 
-The example listed above assumes that you want to use the CUDA backend.  Before installing pycuda,
-please make sure the NVIDIA CUDA Toolkit is installed in ``/usr/local/cuda``.  You can get the
-necessary files at http://nvidia.com/cuda.
 
 Mac OS X installation instructions (Mac Ports)
 ----------------------------------------------
