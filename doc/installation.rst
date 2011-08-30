@@ -80,9 +80,11 @@ To install the required packages on an Ubuntu system::
   make -j4
   python setup.py install
 
+For 32-bit systems please change ``/usr/local/cuda/lib64`` to ``/usr/local/cuda/lib``.
+
 There are currently no packages for PyCUDA/PyOpenCL available for
 Ubuntu, so these have to be installed manually from a checked-out upstream code repository of
-these projects or a snapshot tarball (as illustrated above for PyCUDDA).
+these projects or a snapshot tarball (as illustrated above for PyCUDA).
 
 Please also note that the NumPy version provided in Ubuntu releases older than Karmic is not
 recent enough for Sailfish.
