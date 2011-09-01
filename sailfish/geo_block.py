@@ -664,11 +664,11 @@ class GeoBlock(object):
         # The type map allocated by the block runner already includes
         # ghost nodes, and is formatted in a way that makes it suitable
         # for copying to the compute device.
-        self._type_map = block.runner.make_scalar_field(np.uint32)
+        self._type_map = block.runner.make_scalar_field(np.uint32, register=False)
         self._type_vis_map = np.zeros(list(reversed(block.size)),
                 dtype=np.uint8)
         self._type_map_encoded = False
-        self._param_map = block.runner.make_scalar_field(np.uint32)
+        self._param_map = block.runner.make_scalar_field(np.uint32, register=False)
         self._params = {}
         self._encoder = None
 
