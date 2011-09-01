@@ -81,15 +81,21 @@ class CUDABackend(object):
         self._device = cuda.Device(gpu_id)
         self._ctx = self._device.make_context()
 
+        # To keep track of allocated memory.
+        self._total_memory_bytes = 0
+
     @property
     def total_memory(self):
         return self._device.total_memory()
 
-    def alloc_buf(self, size=None, like=None, wrap_in_array=True):
+    def alloc_buf(self, size=None, like=None, wrap_in_array=False):
         if like is not None:
             # When calculating the total array size, take into account
             # any striding.
-            buf = cuda.mem_alloc(like.shape[0] * like.strides[0])
+            # XXX: why does it even work?
+            buf_size = like.shape[0] * like.strides[0]
+            buf = cuda.mem_alloc(buf_size)
+            self._total_memory_bytes += buf_size
 
             if like.base is not None:
                 self.buffers[buf] = like.base
@@ -100,6 +106,7 @@ class CUDABackend(object):
             if wrap_in_array:
                 self.arrays[buf] = cudaarray.GPUArray(like.shape, like.dtype, gpudata=buf)
         else:
+            self._total_memory_bytes += size
             buf = cuda.mem_alloc(size)
 
         return buf

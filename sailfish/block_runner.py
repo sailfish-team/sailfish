@@ -152,14 +152,18 @@ class BlockRunner(object):
     def add_visualization_field(self, field_cb, name):
         self._output.register_field(field_cb, name, visualization=True)
 
-    def make_scalar_field(self, dtype=None, name=None):
+    def make_scalar_field(self, dtype=None, name=None, register=True):
         """Allocates a scalar NumPy array.
 
         The array includes padding adjusted for the compute device (hidden from
         the end user), as well as space for any ghost nodes.  The returned
         object is a view into the underlying array that hides all ghost nodes.
         Ghost nodes can still be accessed via the 'base' attribute of the
-        returned ndarray."""
+        returned ndarray.
+
+        :param register: if True, the field will be registered for output and
+            for automated creation of equivalent field on the compute device.
+        """
         if dtype is None:
             dtype = self.float
 
@@ -170,10 +174,11 @@ class BlockRunner(object):
                            dtype=dtype, strides=strides)
         fview = field[self._block._nonghost_slice]
 
-        if name is not None:
+        if name is not None and register:
             self._output.register_field(fview, name)
 
-        self._scalar_fields.append(fview)
+        if register:
+            self._scalar_fields.append(fview)
         return fview
 
     def make_vector_field(self, name=None, output=False):
@@ -182,7 +187,7 @@ class BlockRunner(object):
         view_components = []
 
         for x in range(0, self._block.dim):
-            field = self.make_scalar_field(self.float)
+            field = self.make_scalar_field(self.float, register=False)
             components.append(field)
 
         if name is not None:
@@ -212,9 +217,8 @@ class BlockRunner(object):
         # access from the compute unit.  Size of the X dimension is rounded up
         # to a multiple of block_size.  Order is [nz], ny, nx
         self._physical_size = list(reversed(self._block.actual_size))
-        self._physical_size[-1] = (int(math.ceil(float(self._physical_size[-1]) /
-                                                 self.config.block_size)) *
-                                       self.config.block_size)
+        bs = self.config.block_size
+        self._physical_size[-1] = int(math.ceil(float(self._physical_size[-1]) / bs)) * bs
 
         # CUDA block/grid size for standard kernel call.
         if self._block.dim == 2:
