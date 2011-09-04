@@ -55,11 +55,15 @@ class GPUBuffer(object):
 class BlockRunner(object):
     """Runs the simulation for a single LBBlock.
     """
-    def __init__(self, simulation, block, output, backend, quit_event, summary_addr):
+    def __init__(self, simulation, block, output, backend, quit_event,
+            summary_addr=None):
         # Create a 2-way connection between the LBBlock and this BlockRunner
         self._ctx = zmq.Context()
-        self._summary_sender = self._ctx.socket(zmq.REQ)
-        self._summary_sender.connect(summary_addr)
+        if summary_addr is not None:
+            self._summary_sender = self._ctx.socket(zmq.REQ)
+            self._summary_sender.connect(summary_addr)
+        else:
+            self._summary_sender = None
 
         self._block = block
         block.runner = self
@@ -82,6 +86,9 @@ class BlockRunner(object):
         self._gpu_grids_secondary = []
         self._vis_map_cache = None
         self._quit_event = quit_event
+
+        for b_id, connector in self._block._connectors.iteritems():
+            connector.init_runner(self._ctx)
 
     @property
     def config(self):
@@ -842,6 +849,7 @@ class BlockRunner(object):
         mi = self.config.max_iters
         ti = TimingInfo(t_comp / mi, t_data / mi, t_recv / mi, t_send / mi,
                 t_total / mi, self._block.id)
-        self._summary_sender.send_pyobj(ti)
-        self.config.logger.debug('Sending timing information to controller.')
-        assert self._summary_sender.recv_pyobj() == 'ack'
+        if self._summary_sender is not None:
+            self._summary_sender.send_pyobj(ti)
+            self.config.logger.debug('Sending timing information to controller.')
+            assert self._summary_sender.recv_pyobj() == 'ack'
