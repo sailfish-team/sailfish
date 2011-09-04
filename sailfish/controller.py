@@ -15,9 +15,9 @@ import multiprocessing as mp
 from multiprocessing import Process, Array, Event, Value
 
 import zmq
-
 from sailfish import codegen, config, io, block_runner, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
+from sailfish.connector import ZMQBlockConnector
 
 def _get_backends():
     for backend in ['cuda', 'opencl']:
@@ -52,38 +52,6 @@ def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
     runner = block_runner.BlockRunner(sim, block, output, backend, quit_event,
             'tcp://127.0.0.1:{0}'.format(config.zmq_port))
     runner.run()
-
-
-class LBBlockConnector(object):
-    """Handles data exchange between two blocks."""
-
-    def __init__(self, send_array, recv_array, send_ev, recv_ev, conf_ev,
-            remote_conf_ev):
-        self._send_array = send_array
-        self._recv_array = recv_array
-        self._send_ev = send_ev
-        self._recv_ev = recv_ev
-        self._conf_ev = conf_ev
-        self._remote_conf_ev = remote_conf_ev
-
-    def send(self, data):
-        self._remote_conf_ev.wait()
-        self._send_array[:] = data
-        self._remote_conf_ev.clear()
-        self._send_ev.set()
-
-    def recv(self, data, quit_ev):
-        # If the quit event is set, do not wait for the data transfer.
-        while self._recv_ev.wait(0.01) != True:
-            # Necessary for py26- compatiblity.
-            if self._recv_ev.is_set():
-                break
-            if quit_ev.is_set():
-                return False
-        data[:] = self._recv_array[:]
-        self._recv_ev.clear()
-        self._conf_ev.set()
-        return True
 
 
 class LBMachineMaster(object):
@@ -167,23 +135,15 @@ class LBMachineMaster(object):
                 else:
                     face_str = str(face)
 
-                array1 = Array(ctype, size1)
-                array2 = Array(ctype, size2)
-                ev1 = Event()
-                ev2 = Event()
-                ev3 = Event()
-                ev4 = Event()
-                ev3.set()
-                ev4.set()
 
                 self.config.logger.debug("Block connection: {0} <-> {1}: {2}/{3}"
                         "-element buffer (face {4}).".format(
                             block.id, nbid, size1, size2, face_str))
 
-                block.add_connector(nbid,
-                        LBBlockConnector(array1, array2, ev1, ev2, ev3, ev4))
-                self.blocks[nbid].add_connector(block.id,
-                        LBBlockConnector(array2, array1, ev2, ev1, ev4, ev3))
+                c1, c2 = ZMQBlockConnector.make_pair(ctype, (size1, size2),
+                                                    (block.id, nbid))
+                block.add_connector(nbid, c1)
+                self.blocks[nbid].add_connector(block.id, c2)
 
     def _init_visualization_and_io(self):
         if self.config.output:
