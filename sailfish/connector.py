@@ -75,13 +75,13 @@ class ZMQBlockConnector(object):
         self._receiver = receiver
 
     def send(self, data):
-        self.socket.send(data)
+        self.socket.send(data, copy=False)
 
     def recv(self, data, quit_ev):
         if quit_ev.is_set():
             return False
 
-        msg = self.socket.recv()
+        msg = self.socket.recv(copy=False)
         data[:] = np.frombuffer(buffer(msg), dtype=data.dtype)
         return True
 
