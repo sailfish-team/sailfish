@@ -4,7 +4,9 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'GPL3'
 
+import ConfigParser
 import argparse
+import os
 
 class LBConfig(argparse.Namespace):
     """Specifies the configuration of a LB simulation.
@@ -32,6 +34,13 @@ class LBConfig(argparse.Namespace):
         return self._parser.set_defaults(**defaults)
 
     def parse(self):
+        config = ConfigParser.ConfigParser()
+        config.read(['/etc/sailfishrc', os.path.expanduser('~/.sailfishrc'),
+                '.sailfishrc'])
+        try:
+            self._parser.set_defaults(**dict(config.items('main')))
+        except ConfigParser.NoSectionError:
+            pass
         self._parser.parse_args(namespace=self)
 
         # Additional internal config options, not settable via
