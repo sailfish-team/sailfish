@@ -206,12 +206,9 @@ class CUDABackend(object):
 
     def get_kernel(self, prog, name, block, args, args_format, shared=None, fields=[]):
         kern = prog.get_function(name)
-        kern.param_set_size(calcsize(args_format))
-        setattr(kern, 'args', (args, args_format))
-        setattr(kern, 'img_fields', [x for x in fields if x is not None])
-        kern.set_block_shape(*_expand_block(block))
-        if shared is not None:
-            kern.set_shared_size(shared)
+        kern.prepare(args_format, shared, texrefs=[x for x in fields if x is not None])
+        setattr(kern, 'args', args)
+        setattr(kern, 'block_shape', _expand_block(block))
 
         if self.options.cuda_kernel_stats and name not in self._kern_stats:
             self._kern_stats.add(name)
@@ -224,13 +221,8 @@ class CUDABackend(object):
         return kern
 
     def run_kernel(self, kernel, grid_size, stream=None):
-        kernel.param_setv(0, pack(kernel.args[1], *kernel.args[0]))
-        for img_field in kernel.img_fields:
-            # Copy device buffer to 3D CUDA array if neessary.
-            # if img_field in self._tex_to_memcpy:
-            #    self._tex_to_memcpy[img_field]()
-            kernel.param_set_texref(img_field)
-        kernel.launch_grid(*_expand_grid(grid_size))
+        kernel.prepared_async_call(_expand_grid(grid_size), kernel.block_shape,
+                stream, *kernel.args)
 
     def get_reduction_kernel(self, reduce_expr, map_expr, neutral, *args):
         """Generate and return reduction kernel; see PyCUDA documentation
