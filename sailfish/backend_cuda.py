@@ -257,7 +257,6 @@ class CUDABackend(object):
     def make_sync_event(self, stream):
         event = cuda.Event(cuda.event_flags.DISABLE_TIMING)
         event.record(stream)
-        stream.wait_for_event(event)
         return event
 
     def get_defines(self):
