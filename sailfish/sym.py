@@ -619,13 +619,7 @@ def bgk_external_force_pref(grid_num=0):
 
     # FIXME
     rho = getattr(S, 'g%sm0' % grid_num)
-
-    if grid_num == 0:
-        rho = 'rho'
-    else:
-        rho = 'phi'
-
-    return '%s * (3.0f - 3.0f/(2.0f * tau%s))' % (rho, grid_num)
+    return '(3.0f - 3.0f/(2.0f * tau%s))' % grid_num
 
 def bb_swap_pairs(grid):
     """Get a set of indices which have to be swapped for a full bounce-back."""
