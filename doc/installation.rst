@@ -7,7 +7,7 @@ installed on the host system.  These are as follows (minimal required versions a
 
 General requirements:
 
-* numpy-1.3.0
+* numpy-1.6.0
 * sympy-0.6.5
 * mako-0.2.5
 * a Python module for the computational backend (one or more of the following):
@@ -75,6 +75,8 @@ To install the required packages on an Ubuntu system::
   apt-get install python-mako python-decorator python-pytools  build-essential python-dev python-setuptools libboost-python-dev libboost-thread-dev
   apt-get install git-core
   git clone http://git.tiker.net/trees/pycuda.git
+  git submodule init
+  git submodule update
   cd pycuda
   ./configure.py --cuda-root=/usr/local/cuda --cudadrv-lib-dir=/usr/local/cuda/lib64 --boost-inc-dir=/usr/include --boost-lib-dir=/usr/lib --boost-python-libname=boost_python-mt --boost-thread-libname=boost_thread-mt
   make -j4
@@ -84,7 +86,9 @@ For 32-bit systems please change ``/usr/local/cuda/lib64`` to ``/usr/local/cuda/
 
 There are currently no packages for PyCUDA/PyOpenCL available for
 Ubuntu, so these have to be installed manually from a checked-out upstream code repository of
-these projects or a snapshot tarball (as illustrated above for PyCUDA).
+these projects or a snapshot tarball (as illustrated above for PyCUDA).  If this method does not
+work for you, please refer to http://wiki.tiker.net/PyCuda/Installation/Linux/Ubuntu for further
+instructions about installing PyCUDA on Ubuntu.
 
 Please also note that the NumPy version provided in Ubuntu releases older than Karmic is not
 recent enough for Sailfish.
