@@ -988,7 +988,7 @@ class LBMSim(object):
 
         self.forces.setdefault(grid, {}).setdefault(
                 accel, numpy.zeros(self.grid.dim, dtype=self.float))
-        a = self.forces[grid][accel] + self.float(force)
+        a = self.forces[grid][accel] + numpy.float64(force)
         self.forces[grid][accel] = a
 
     def use_force_for_eq(self, force, grid=0):
