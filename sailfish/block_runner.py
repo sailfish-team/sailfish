@@ -542,6 +542,7 @@ class BlockRunner(object):
             conn_bufs = self._block_to_connbuf[b_id]
             if len(conn_bufs) > 1:
                 dest = np.hstack([np.ravel(x.recv_buf) for x in conn_bufs])
+                # Returns false only if quit event is active.
                 if not connector.recv(dest, self._quit_event):
                     return
                 i = 0
@@ -557,6 +558,7 @@ class BlockRunner(object):
             else:
                 cbuf = conn_bufs[0]
                 dest = np.ravel(cbuf.recv_buf)
+                # Returns false only if quit event is active.
                 if not connector.recv(dest, self._quit_event):
                     return
                 # If ravel returned a copy, we need to write the data
