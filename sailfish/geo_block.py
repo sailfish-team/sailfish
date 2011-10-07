@@ -183,7 +183,7 @@ class LBConnection(object):
     def full_shape(self):
         return [len(self.dists)] + map(lambda x: x.stop - x.start, reversed(self.dst_slice))
 
-class LBBlock(object):
+class SubdomainSpec(object):
     dim = None
 
     # Face IDs.
@@ -432,7 +432,7 @@ class LBBlock(object):
 
         return False
 
-class LBBlock2D(LBBlock):
+class SubdomainSpec2D(SubdomainSpec):
     dim = 2
 
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
@@ -441,7 +441,7 @@ class LBBlock2D(LBBlock):
         self.ex = self.ox + self.nx
         self.ey = self.oy + self.ny
         self.end_location = [self.ex, self.ey]  # first node outside the block
-        LBBlock.__init__(self, location, size, envelope_size, *args, **kwargs)
+        SubdomainSpec.__init__(self, location, size, envelope_size, *args, **kwargs)
 
     @property
     def _nonghost_slice(self):
@@ -451,7 +451,7 @@ class LBBlock2D(LBBlock):
         return (slice(es, es + self.ny), slice(es, es + self.nx))
 
 
-class LBBlock3D(LBBlock):
+class SubdomainSpec3D(SubdomainSpec):
     dim = 3
 
     def __init__(self, location, size, envelope_size=None, *args, **kwargs):
@@ -462,7 +462,7 @@ class LBBlock3D(LBBlock):
         self.ez = self.oz + self.nz
         self.end_location = [self.ex, self.ey, self.ez]  # first node outside the block
         self._periodicity = [False, False, False]
-        LBBlock.__init__(self, location, size, envelope_size, *args, **kwargs)
+        SubdomainSpec.__init__(self, location, size, envelope_size, *args, **kwargs)
 
     @property
     def _nonghost_slice(self):
@@ -541,15 +541,15 @@ class GeoEncoderConst(GeoEncoder):
         max_len = 0
         for node_type, values in type_dict.iteritems():
             l = len(values)
-            if node_type == GeoBlock.NODE_VELOCITY:
+            if node_type == Subdomain.NODE_VELOCITY:
                 self._num_velocities = l
             max_len = max(max_len, l)
         self._bits_param = bit_len(max_len)
 
         # TODO(michalj): Generalize this to other node types.
-        for param_hash, val in type_dict[GeoBlock.NODE_VELOCITY]:
+        for param_hash, val in type_dict[Subdomain.NODE_VELOCITY]:
             self._geo_params.extend(val)
-        for param_hash, val in type_dict[GeoBlock.NODE_PRESSURE]:
+        for param_hash, val in type_dict[Subdomain.NODE_PRESSURE]:
             self._geo_params.append(val)
 
         self._type_dict = type_dict
@@ -572,16 +572,16 @@ class GeoEncoderConst(GeoEncoder):
             for j, shift in enumerate(vec):
                 shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
 
-            cnt[(shifted_map == GeoBlock.NODE_WALL)] += 1
+            cnt[(shifted_map == Subdomain.NODE_WALL)] += 1
             # FIXME: we're currently only processing the primary directions
             # here
             if vec.dot(vec) == 1:
-                idx = np.logical_and(self._type_map != GeoBlock.NODE_FLUID,
-                        shifted_map == GeoBlock.NODE_FLUID)
+                idx = np.logical_and(self._type_map != Subdomain.NODE_FLUID,
+                        shifted_map == Subdomain.NODE_FLUID)
                 orientation[idx] = self.geo_block.grid.vec_to_dir(list(vec))
 
             # Mark any nodes completely surrounded by walls as unused.
-            self._type_map[(cnt == self.geo_block.grid.Q)] = GeoBlock.NODE_UNUSED
+            self._type_map[(cnt == self.geo_block.grid.Q)] = Subdomain.NODE_UNUSED
 
         # Remap type IDs.
         max_type_code = max(self._type_id_map.keys())
@@ -597,14 +597,14 @@ class GeoEncoderConst(GeoEncoder):
 
     def update_context(self, ctx):
         ctx.update({
-            'geo_fluid': self._type_id(GeoBlock.NODE_FLUID),
-            'geo_wall': self._type_id(GeoBlock.NODE_WALL),
-            'geo_slip': self._type_id(GeoBlock.NODE_SLIP),
-            'geo_unused': self._type_id(GeoBlock.NODE_UNUSED),
-            'geo_velocity': self._type_id(GeoBlock.NODE_VELOCITY),
-            'geo_pressure': self._type_id(GeoBlock.NODE_PRESSURE),
-            'geo_boundary': self._type_id(GeoBlock.NODE_BOUNDARY),
-            'geo_ghost': self._type_id(GeoBlock.NODE_GHOST),
+            'geo_fluid': self._type_id(Subdomain.NODE_FLUID),
+            'geo_wall': self._type_id(Subdomain.NODE_WALL),
+            'geo_slip': self._type_id(Subdomain.NODE_SLIP),
+            'geo_unused': self._type_id(Subdomain.NODE_UNUSED),
+            'geo_velocity': self._type_id(Subdomain.NODE_VELOCITY),
+            'geo_pressure': self._type_id(Subdomain.NODE_PRESSURE),
+            'geo_boundary': self._type_id(Subdomain.NODE_BOUNDARY),
+            'geo_ghost': self._type_id(Subdomain.NODE_GHOST),
             'geo_misc_shift': self._bits_type,
             'geo_type_mask': (1 << self._bits_type) - 1,
             'geo_param_shift': self._bits_param,
@@ -633,8 +633,8 @@ class GeoEncoderMap(GeoEncoder):
     pass
 
 
-class GeoBlock(object):
-    """Abstract class for the geometry of a LBBlock."""
+class Subdomain(object):
+    """Abstract class for the geometry of a SubdomainSpec."""
 
     # TODO: Deprecate these in favor of BC classes.
     NODE_FLUID = 0
@@ -676,11 +676,15 @@ class GeoBlock(object):
     def config(self):
         return self.block.runner.config
 
-    def _define_nodes(self, *args):
-        raise NotImplementedError('_define_nodes() not defined in a child'
+    def boundary_conditions(self, *args):
+        raise NotImplementedError('boundary_conditions() not defined in a child'
                 'class.')
 
-    def set_geo(self, where, type_, params=None):
+    def initial_conditions(self, sim, *args):
+        raise NotImplementedError('initial_conditions() not defined in a child '
+                'class')
+
+    def set_node(self, where, type_, params=None):
         assert not self._type_map_encoded
 
         # TODO: if type_ is a class, we should just store its ID; if it's
@@ -693,7 +697,7 @@ class GeoBlock(object):
     def reset(self):
         self._type_map_encoded = False
         mgrid = self._get_mgrid()
-        self._define_nodes(*mgrid)
+        self.boundary_conditions(*mgrid)
 
         # Cache the unencoded type map for visualization.
         self._type_vis_map[:] = self._type_map[:]
@@ -708,7 +712,7 @@ class GeoBlock(object):
 
     def init_fields(self, sim):
         mgrid = self._get_mgrid()
-        self._init_fields(sim, *mgrid)
+        self.initial_conditions(sim, *mgrid)
 
     def update_context(self, ctx):
         assert self._encoder is not None
@@ -735,12 +739,12 @@ class GeoBlock(object):
         return self._type_vis_map
 
 
-class GeoBlock2D(GeoBlock):
+class Subdomain2D(Subdomain):
     dim = 2
 
     def __init__(self, grid_shape, block, *args, **kwargs):
         self.gy, self.gx = grid_shape
-        GeoBlock.__init__(self, grid_shape, block, *args, **kwargs)
+        Subdomain.__init__(self, grid_shape, block, *args, **kwargs)
 
     def _get_mgrid(self):
         return reversed(np.mgrid[self.block.oy:self.block.oy + self.block.ny,
@@ -769,12 +773,12 @@ class GeoBlock2D(GeoBlock):
         self._type_map.base[(cnt == self.grid.Q)] = self.NODE_UNUSED
 
 
-class GeoBlock3D(GeoBlock):
+class Subdomain3D(Subdomain):
     dim = 3
 
     def __init__(self, grid_shape, block, *args, **kwargs):
         self.gz, self.gy, self.gx = grid_shape
-        GeoBlock.__init__(self, grid_shape, block, *args, **kwargs)
+        Subdomain.__init__(self, grid_shape, block, *args, **kwargs)
 
     def _get_mgrid(self):
         return reversed(np.mgrid[self.block.oz:self.block.oz + self.block.nz,

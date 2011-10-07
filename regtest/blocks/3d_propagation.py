@@ -7,38 +7,38 @@ import unittest
 import numpy as np
 
 from sailfish.geo import LBGeometry3D
-from sailfish.geo_block import LBBlock3D, GeoBlock3D
+from sailfish.geo_block import SubdomainSpec3D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
 from sailfish.sym import D3Q19
 
 
-class BlockTest(GeoBlock3D):
-    def _define_nodes(self, hx, hy, hz):
+class BlockTest(Subdomain3D):
+    def boundary_conditions(self, hx, hy, hz):
         pass
 
-    def _init_fields(self, sim, hx, hy, hz):
+    def initial_conditions(self, sim, hx, hy, hz):
         pass
 
 class TwoBlocksXConnGeoTest(LBGeometry3D):
     def blocks(self, n=None):
         blocks = []
-        blocks.append(LBBlock3D((0, 0, 0), (64, 64, 66)))
-        blocks.append(LBBlock3D((64, 0, 0), (64, 64, 66)))
+        blocks.append(SubdomainSpec3D((0, 0, 0), (64, 64, 66)))
+        blocks.append(SubdomainSpec3D((64, 0, 0), (64, 64, 66)))
         return blocks
 
 class TwoBlocksYConnGeoTest(LBGeometry3D):
     def blocks(self, n=None):
         blocks = []
-        blocks.append(LBBlock3D((0, 0, 0), (64, 64, 66)))
-        blocks.append(LBBlock3D((0, 64, 0), (64, 64, 66)))
+        blocks.append(SubdomainSpec3D((0, 0, 0), (64, 64, 66)))
+        blocks.append(SubdomainSpec3D((0, 64, 0), (64, 64, 66)))
         return blocks
 
 class TwoBlocksZConnGeoTest(LBGeometry3D):
     def blocks(self, n=None):
         blocks = []
-        blocks.append(LBBlock3D((0, 0, 0), (64, 66, 64)))
-        blocks.append(LBBlock3D((0, 0, 64), (64, 66, 64)))
+        blocks.append(SubdomainSpec3D((0, 0, 0), (64, 66, 64)))
+        blocks.append(SubdomainSpec3D((0, 0, 64), (64, 66, 64)))
         return blocks
 
 
@@ -48,7 +48,7 @@ vi = lambda x, y, z: D3Q19.vec_idx([x, y, z])
 
 
 class SimulationTest(LBFluidSim, LBForcedSim):
-    geo = BlockTest
+    subdomain = BlockTest
 
     @classmethod
     def modify_config(cls, config):
@@ -268,7 +268,7 @@ class PeriodicPropagationTest(unittest.TestCase):
 
 class SingleBlockGeoTest(LBGeometry3D):
     def blocks(self, n=None):
-        return [LBBlock3D((0,0,0), (64, 62, 66))]
+        return [SubdomainSpec3D((0,0,0), (64, 62, 66))]
 
 class SingleBlockPeriodicSimulationTest(LBFluidSim, LBForcedSim):
     geo = BlockTest

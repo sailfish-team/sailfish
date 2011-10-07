@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import LBBlock2D, GeoBlock2D
+from sailfish.geo_block import SubdomainSpec2D, Subdomain2D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
 from sailfish.sym import D2Q9
@@ -23,7 +23,7 @@ class GeometryTest(LBGeometry2D):
         q = 128
         for i in range(0, 2):
             for j in range(0, 2):
-                blocks.append(LBBlock2D((i * q, j * q), (q, q)))
+                blocks.append(SubdomainSpec2D((i * q, j * q), (q, q)))
 
         return blocks
 
@@ -31,24 +31,24 @@ class DoubleBlockGeometryTest(LBGeometry2D):
     def blocks(self, n=None):
         blocks = []
         q = 128
-        blocks.append(LBBlock2D((0, 0), (q, 2*q)))
-        blocks.append(LBBlock2D((q, 0), (q, 2*q)))
+        blocks.append(SubdomainSpec2D((0, 0), (q, 2*q)))
+        blocks.append(SubdomainSpec2D((q, 0), (q, 2*q)))
         return blocks
 
 class ThreeBlocksGeometryTest(LBGeometry2D):
     def blocks(self, n=None):
         blocks = []
         q = 128
-        blocks.append(LBBlock2D((0, 0), (q, q)))
-        blocks.append(LBBlock2D((0, q), (q, q)))
-        blocks.append(LBBlock2D((q, 0), (q, 2*q)))
+        blocks.append(SubdomainSpec2D((0, 0), (q, q)))
+        blocks.append(SubdomainSpec2D((0, q), (q, q)))
+        blocks.append(SubdomainSpec2D((q, 0), (q, 2*q)))
         return blocks
 
-class BlockTest(GeoBlock2D):
-    def _define_nodes(self, hx, hy):
+class BlockTest(Subdomain2D):
+    def boundary_conditions(self, hx, hy):
         pass
 
-    def _init_fields(self, sim, hx, hy):
+    def initial_conditions(self, sim, hx, hy):
         pass
 
 tmpdir = None
@@ -56,7 +56,7 @@ periodic_x = False
 vi = lambda x, y: D2Q9.vec_idx([x, y])
 
 class SimulationTest(LBFluidSim, LBForcedSim):
-    geo = BlockTest
+    subdomain = BlockTest
 
     @classmethod
     def modify_config(cls, config):

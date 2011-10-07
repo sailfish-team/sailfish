@@ -2,7 +2,7 @@
 
 import numpy as np
 from sailfish.geo import LBGeometry3D
-from sailfish.geo_block import LBBlock3D, GeoBlock3D
+from sailfish.geo_block import SubdomainSpec3D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
 
@@ -19,12 +19,12 @@ class SphereGeometry(LBGeometry3D):
                 size += diff
 
             blocks.append(
-                    LBBlock3D((i * q, 0, 0), (size, self.gy, self.gz)))
+                    SubdomainSpec3D((i * q, 0, 0), (size, self.gy, self.gz)))
 
         return blocks
 
-class SphereBlock(GeoBlock3D):
-    def _define_nodes(self, hx, hy, hz):
+class SphereBlock(Subdomain3D):
+    def boundary_conditions(self, hx, hy, hz):
         diam = self.gy / 3.0
         z0 = self.gz / 2.0
         y0 = self.gy / 2.0
@@ -33,14 +33,14 @@ class SphereBlock(GeoBlock3D):
         wall_map = np.logical_or(
                         np.logical_or(hy == 0, hy == self.gy-1),
                         np.logical_or(hz == 0, hz == self.gz-1))
-        self.set_geo(wall_map, self.NODE_WALL)
+        self.set_node(wall_map, self.NODE_WALL)
 
         sphere_map = (np.square(hx - x0) +
                       np.square(hy - y0) +
                       np.square(hz - z0)) <= np.square(diam / 2.0)
-        self.set_geo(sphere_map, self.NODE_WALL)
+        self.set_node(sphere_map, self.NODE_WALL)
 
-    def _init_fields(self, sim, hx, hy, hz):
+    def initial_conditions(self, sim, hx, hy, hz):
         sim.rho[:] = 1.0
         sim.vy[:] = 0.0
         sim.vx[:] = 0.0

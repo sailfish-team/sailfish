@@ -53,11 +53,11 @@ class GPUBuffer(object):
 
 
 class BlockRunner(object):
-    """Runs the simulation for a single LBBlock.
+    """Runs the simulation for a single SubdomainSpec.
     """
     def __init__(self, simulation, block, output, backend, quit_event,
             summary_addr=None):
-        # Create a 2-way connection between the LBBlock and this BlockRunner
+        # Create a 2-way connection between the SubdomainSpec and this BlockRunner
         self._ctx = zmq.Context()
         if summary_addr is not None:
             self._summary_sender = self._ctx.socket(zmq.REQ)
@@ -101,7 +101,7 @@ class BlockRunner(object):
     def update_context(self, ctx):
         """Called by the codegen module."""
         self._block.update_context(ctx)
-        self._geo_block.update_context(ctx)
+        self._subdomain.update_context(ctx)
         ctx.update(self.backend.get_defines())
 
         # Size of the lattice.
@@ -205,15 +205,15 @@ class BlockRunner(object):
 
     def visualization_map(self):
         if self._vis_map_cache is None:
-            self._vis_map_cache = self._geo_block.visualization_map()
+            self._vis_map_cache = self._subdomain.visualization_map()
         return self._vis_map_cache
 
     def _init_geometry(self):
         self.config.logger.debug("Initializing geometry.")
         self._init_shape()
-        self._geo_block = self._sim.geo(self._global_size, self._block,
-                                        self._sim.grid)
-        self._geo_block.reset()
+        self._subdomain = self._sim.subdomain(self._global_size, self._block,
+                self._sim.grid)
+        self._subdomain.reset()
 
     def _init_shape(self):
         # Logical size of the lattice (including ghost nodes).
@@ -422,7 +422,7 @@ class BlockRunner(object):
             self._gpu_grids_secondary.append(self.backend.alloc_buf(size=size))
 
         self._gpu_geo_map = self.backend.alloc_buf(
-                like=self._geo_block.encoded_map())
+                like=self._subdomain.encoded_map())
 
     def gpu_field(self, field):
         """Returns the GPU copy of a field."""
@@ -739,7 +739,7 @@ class BlockRunner(object):
         self._init_compute()
         self.config.logger.debug("Initializing macroscopic fields.")
         self._sim.init_fields(self)
-        self._geo_block.init_fields(self._sim)
+        self._subdomain.init_fields(self._sim)
         self._init_gpu_data()
         self.config.logger.debug("Applying initial conditions.")
         self._sim.initial_conditions(self)
