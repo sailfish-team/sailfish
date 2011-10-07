@@ -6,7 +6,7 @@ from sailfish.config import LBConfig
 from sailfish.lb_base import LBSim
 from sailfish.backend_dummy import DummyBackend
 from sailfish.block_runner import BlockRunner
-from sailfish.geo_block import LBBlock2D, LBBlock3D
+from sailfish.geo_block import SubdomainSpec2D, SubdomainSpec3D
 
 class TestBasicFunctionality(unittest.TestCase):
     location = 0, 0
@@ -30,12 +30,12 @@ class TestBasicFunctionality(unittest.TestCase):
                 backend=self.backend, quit_event=None)
 
     def test_block_connection(self):
-        block = LBBlock2D(self.location, self.size)
+        block = SubdomainSpec2D(self.location, self.size)
         runner = self.get_block_runner(block)
         self.assertEqual(block.runner, runner)
 
     def test_strides_and_size_2d(self):
-        block = LBBlock2D(self.location, self.size)
+        block = SubdomainSpec2D(self.location, self.size)
         block.set_actual_size(0)
         runner = self.get_block_runner(block)
         runner._init_shape()
@@ -50,7 +50,7 @@ class TestBasicFunctionality(unittest.TestCase):
         self.assertEqual(nodes, reduce(operator.mul, real_size))
 
     def test_strides_and_size_3d(self):
-        block = LBBlock3D(self.location_3d, self.size_3d)
+        block = SubdomainSpec3D(self.location_3d, self.size_3d)
         block.set_actual_size(0)
         runner = self.get_block_runner(block)
         runner._init_shape()

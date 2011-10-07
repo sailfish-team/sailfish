@@ -61,6 +61,7 @@ Contents
    tutorial
    models
    performance
+   internals
    testcases
    regtest
    api

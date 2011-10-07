@@ -5,7 +5,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'GPL3'
 
 
-from sailfish.geo_block import LBBlock2D, LBBlock3D
+from sailfish.geo_block import SubdomainSpec2D, SubdomainSpec3D
 
 
 class LBGeometry(object):
@@ -35,7 +35,7 @@ class LBGeometry2D(LBGeometry):
     def blocks(self):
         """Returns a 1-element list containing a single 2D block
         covering the whole domain."""
-        return [LBBlock2D((0, 0), (self.config.lat_nx,
+        return [SubdomainSpec2D((0, 0), (self.config.lat_nx,
                                    self.config.lat_ny))]
 
 class LBGeometry3D(LBGeometry):
@@ -57,7 +57,7 @@ class LBGeometry3D(LBGeometry):
     def blocks(self):
         """Returns a 1-element list containing a single 3D block
         covering the whole domain."""
-        return [LBBlock3D((0, 0, 0),
+        return [SubdomainSpec3D((0, 0, 0),
                           (self.config.lat_nx, self.config_lat_ny,
                            self.config.lat_nz))]
 

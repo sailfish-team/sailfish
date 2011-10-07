@@ -2,7 +2,7 @@
 
 import numpy as np
 from sailfish.geo import LBGeometry3D
-from sailfish.geo_block import LBBlock3D, GeoBlock3D
+from sailfish.geo_block import SubdomainSpec3D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
 
@@ -37,26 +37,26 @@ class LDCGeometry(LBGeometry3D):
                     zsize = zq
                     if k == bps:
                         zsize += zd
-                    blocks.append(LBBlock3D((i * xq, j * yq, k * zq),
+                    blocks.append(SubdomainSpec3D((i * xq, j * yq, k * zq),
                                 (xsize, ysize, zsize)))
         return blocks
 
 
-class LDCBlock(GeoBlock3D):
+class LDCBlock(Subdomain3D):
     """3D Lid-driven geometry."""
 
     max_v = 0.05
 
-    def _define_nodes(self, hx, hy, hz):
+    def boundary_conditions(self, hx, hy, hz):
         wall_map = np.logical_or(hz == 0, np.logical_or(
                 np.logical_or(hx == self.gx-1, hx == 0),
                 np.logical_or(hy == self.gy-1, hy == 0)))
 
-        self.set_geo(wall_map, self.NODE_WALL)
-        self.set_geo(hz == self.gz-1, self.NODE_VELOCITY,
+        self.set_node(wall_map, self.NODE_WALL)
+        self.set_node(hz == self.gz-1, self.NODE_VELOCITY,
                 (self.max_v, 0.0, 0.0))
 
-    def _init_fields(self, sim, hx, hy, hz):
+    def initial_conditions(self, sim, hx, hy, hz):
         sim.rho[:] = 1.0
         sim.vx[hz == self.gz-1] = self.max_v
 

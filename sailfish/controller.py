@@ -235,7 +235,7 @@ class GeometryError(Exception):
     pass
 
 class LBGeometryProcessor(object):
-    """Transforms a set of LBBlocks into a another set covering the same
+    """Transforms a set of SubdomainSpecs into a another set covering the same
     physical domain, but optimized for execution on the available hardware.
     Initializes logical connections between the blocks based on their
     location."""
@@ -421,7 +421,7 @@ class LBSimulationController(object):
     @property
     def dim(self):
         """Dimensionality of the simulation: 2 or 3."""
-        return self._lb_class.geo.dim
+        return self._lb_class.subdomain.dim
 
     def _init_block_envelope(self, sim, blocks):
         """Sets the size of the ghost node envelope for all blocks."""

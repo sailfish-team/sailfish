@@ -226,7 +226,7 @@ class Fluid2DVis(vis.FluidVis):
 
         geo_map = np.rot90(geo_map, 3)
 
-        tg_buffer[geo_map == geo_block.GeoBlock.NODE_WALL] = self._color_wall
+        tg_buffer[geo_map == geo_block.Subdomain.NODE_WALL] = self._color_wall
 
     def _draw_field(self, srf, width, height, block):
         a = pygame.surfarray.pixels3d(srf)
