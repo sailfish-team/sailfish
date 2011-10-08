@@ -67,7 +67,7 @@ class LDCBlock(Subdomain2D):
 
 
 class LDCSim(LBFluidSim, LBForcedSim):
-    geo = LDCBlock
+    subdomain = LDCBlock
 
     @classmethod
     def update_defaults(cls, defaults):

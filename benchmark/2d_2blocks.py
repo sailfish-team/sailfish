@@ -4,23 +4,23 @@ import numpy as np
 from examples.lbm_ldc_multi import LDCSim
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import LBBlock2D
+from sailfish.geo_block import SubdomainSpec2D
 
 import util
 
 class BenchmarkXConnGeometry(LBGeometry2D):
     def blocks(self, n=None):
         w = self.gx / 2
-        blocks = [LBBlock2D((0, 0), (w, self.gy)),
-                LBBlock2D((w, 0), (w, self.gy))]
+        blocks = [SubdomainSpec2D((0, 0), (w, self.gy)),
+                  SubdomainSpec2D((w, 0), (w, self.gy))]
         return blocks
 
 
 class BenchmarkYConnGeometry(LBGeometry2D):
     def blocks(self, n=None):
         h = self.gy / 2
-        blocks = [LBBlock2D((0, 0), (self.gx, h)),
-                LBBlock2D((0, h), (self.gx, h))]
+        blocks = [SubdomainSpec2D((0, 0), (self.gx, h)),
+                  SubdomainSpec2D((0, h), (self.gx, h))]
         return blocks
 
 

@@ -55,7 +55,7 @@ class CylinderBlock(Subdomain2D):
 
 
 class CylinderSimulation(LBFluidSim, LBForcedSim):
-    geo = CylinderBlock
+    subdomain = CylinderBlock
 
     @classmethod
     def update_defaults(cls, defaults):
