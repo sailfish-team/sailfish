@@ -5,32 +5,31 @@ import numpy as np
 from examples.lbm_ldc_multi_3d import LDCSim
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry3D
-from sailfish.geo_block import LBBlock3D
+from sailfish.geo_block import SubdomainSpec3D
 
 import util
 
 class BenchmarkXConnGeometry(LBGeometry3D):
     def blocks(self, n=None):
         w = self.gx / 2
-        blocks = [LBBlock3D((0, 0, 0), (w, self.gy, self.gz)),
-                LBBlock3D((w, 0, 0), (w, self.gy, self.gz))]
-        print w, self.gy, self.gz
+        blocks = [SubdomainSpec3D((0, 0, 0), (w, self.gy, self.gz)),
+                  SubdomainSpec3D((w, 0, 0), (w, self.gy, self.gz))]
         return blocks
 
 
 class BenchmarkYConnGeometry(LBGeometry3D):
     def blocks(self, n=None):
         h = self.gy / 2
-        blocks = [LBBlock3D((0, 0, 0), (self.gx, h, self.gz)),
-                LBBlock3D((0, h, 0), (self.gx, h, self.gz))]
+        blocks = [SubdomainSpec3D((0, 0, 0), (self.gx, h, self.gz)),
+                  SubdomainSpec3D((0, h, 0), (self.gx, h, self.gz))]
         return blocks
 
 
 class BenchmarkZConnGeometry(LBGeometry3D):
     def blocks(self, n=None):
         d = self.gz / 2
-        blocks = [LBBlock3D((0, 0, 0), (self.gx, self.gy, d)),
-                LBBlock3D((0, 0, d), (self.gx, self.gy, d))]
+        blocks = [SubdomainSpec3D((0, 0, 0), (self.gx, self.gy, d)),
+                  SubdomainSpec3D((0, 0, d), (self.gx, self.gy, d))]
         return blocks
 
 def run_benchmark():

@@ -48,7 +48,7 @@ class SphereBlock(Subdomain3D):
 
 
 class SphereSimulation(LBFluidSim, LBForcedSim):
-    geo = SphereBlock
+    subdomain = SphereBlock
 
     @classmethod
     def update_defaults(cls, defaults):
