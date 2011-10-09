@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import shutil
 import tempfile
 import unittest
 
@@ -8,7 +9,9 @@ import numpy as np
 
 from examples.lbm_ldc_multi import LDCGeometry, LDCSim
 from sailfish.controller import LBSimulationController
+from regtest.blocks import util
 
+block_size = 64
 tmpdir = tempfile.mkdtemp()
 blocks = 1
 output = ''
@@ -16,8 +19,9 @@ output = ''
 class SimulationTest(LDCSim):
     @classmethod
     def update_defaults(cls, defaults):
-        global blocks, output
+        global block_size, blocks, output
         LDCSim.update_defaults(defaults)
+        defaults['block_size'] = block_size
         defaults['blocks'] = blocks
         defaults['max_iters'] = 100
         defaults['quiet'] = True
@@ -89,4 +93,7 @@ class TestInterblockPropagation(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    args = util.parse_cmd_line()
+    block_size = args.block_size
     unittest.main()
+    shutil.rmtree(tmpdir)

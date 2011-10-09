@@ -385,6 +385,9 @@ class LBSimulationController(object):
                 help='name of the file to which data is to be logged')
         group.add_argument('--zmq_port', type=int, default=1371,
                 help='0mq port to use for communication with block runners')
+        group.add_argument('--bulk_boundary_split', type=bool, default=True,
+                help='if True, bulk and boundary nodes will be handled '
+                'separately (increases parallelism)')
 
         group = self.config.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)

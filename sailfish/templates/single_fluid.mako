@@ -127,13 +127,26 @@ ${kernel} void CollideAndPropagate(
 	${global_ptr} float *dist_out,
 	${global_ptr} float *orho,
 	${kernel_args_1st_moment('ov')}
-	int save_macro
+	int options
 %if simtype == 'shan-chen':
 	,${global_ptr} float *gg0m0
 %endif
 	)
 {
-	${local_indices()}
+	%if boundary_size > 0:
+		int gx, gy, lx, gi;
+		%if dim == 3:
+			int gz;
+		%endif
+
+		if (options & OPTION_BULK) {
+			${local_indices_bulk()}
+		} else {
+			${local_indices_boundary()}
+		}
+	%else:
+		${local_indices()}
+	%endif
 
 	// Shared variables for in-block propagation
 	%for i in sym.get_prop_dists(grid, 1):
@@ -174,7 +187,7 @@ ${kernel} void CollideAndPropagate(
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out);
 
 	// only save the macroscopic quantities if requested to do so
-	if (save_macro == 1) {
+	if (options & OPTION_SAVE_MACRO_FIELDS) {
 		orho[gi] = g0m0;
 		ovx[gi] = v[0];
 		ovy[gi] = v[1];

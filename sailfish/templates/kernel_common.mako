@@ -30,6 +30,8 @@
 	%endif
 </%def>
 
+## Defines local indices for kernels that do not distinguish between
+## bulk and boundary regions.
 <%def name="local_indices()">
 	int lx = get_local_id(0);	// ID inside the current block
 	%if dim == 2:
@@ -51,6 +53,129 @@
 	%endif
 
 	int gi = ${get_global_idx()};
+
+	// Nothing to do if we're outside of the simulation domain.
+	if (gx > ${lat_nx-1}) {
+		return;
+	}
+</%def>
+
+## Defines local indices for bulk kernels.
+## This is the same as local_indices(), but with proper offsets to skip
+## the boundary.
+<%def name="local_indices_bulk()">
+	lx = get_local_id(0);	// ID inside the current block
+	%if dim == 2:
+		gx = ${block_size} + get_global_id(0);
+		gy = ${boundary_size} + get_group_id(1);
+	%else:
+		gx = ${block_size} + get_global_id(0) % ${arr_nx - 2 * block_size};
+		gy = ${boundary_size} + get_global_id(0) / ${arr_nx - 2 * block_size};
+		gz = ${boundary_size} + get_global_id(1);
+	%endif
+
+	gi = ${get_global_idx()};
+
+	// Nothing to do if we're outside of the simulation domain.
+	if (gx > ${lat_nx-1}) {
+		return;
+	}
+</%def>
+
+## Defines local indices for boundary kernels.
+<%def name="local_indices_boundary()">
+	lx = get_local_id(0);	// ID inside the current block
+	int gid = get_group_id(0) + get_group_id(1) * get_global_size(0) / get_local_size(0);
+	%if dim == 2:
+		<%
+			xblocks = arr_nx / block_size
+			yblocks = arr_ny - 2 * boundary_size
+			bottom_idx = boundary_size * xblocks
+			left_idx = 2 * bottom_idx
+			right_idx = left_idx + yblocks
+			right2_idx = right_idx + yblocks
+			max_idx = right2_idx + yblocks
+		%>
+		if (gid < ${bottom_idx}) {
+			gx = (gid % ${xblocks}) * ${block_size} + lx;
+			gy = gid / ${xblocks};
+		} else if (gid < ${left_idx}) {
+			gid -= ${bottom_idx};
+			gx = (gid % ${xblocks}) * ${block_size} + lx;
+			gy = ${lat_ny-1} - gid / ${xblocks};
+		} else if (gid < ${right_idx}) {
+			gx = lx;
+			gy = gid + ${boundary_size - left_idx};
+		} else if (gid < ${right2_idx}) {
+			gx = ${arr_nx - block_size} + lx;
+			gy = gid + ${boundary_size - right_idx};
+		} else if (gid < ${max_idx}) {
+			gx = ${arr_nx - 2*block_size} + lx;
+			gy = gid + ${boundary_size - right2_idx};
+		} else {
+			return;
+		}
+	%else:
+		<%
+			xblocks = arr_nx / block_size
+			yblocks = arr_ny - 2 * boundary_size
+			ortho_blocks = yblocks * (arr_nz - 2 * boundary_size)
+
+			bottom_idx = boundary_size * xblocks * (yblocks + arr_nz)
+			left_idx = 2 * bottom_idx
+			right_idx = left_idx + ortho_blocks
+			right2_idx = right_idx + ortho_blocks
+			max_idx = right2_idx + ortho_blocks
+		%>
+		{
+		int h;
+		if (gid < ${bottom_idx}) {
+			gx = (gid % ${xblocks}) * ${block_size} + lx;
+			gid = gid / ${xblocks};
+			h = gid / ${boundary_size};
+			gid = gid % ${boundary_size};
+			if (gid < ${arr_nz}) {
+				gy = h;
+				gz = gid;
+			} else {
+				gy = gid - ${arr_nz};
+				gz = h;
+			}
+		} else if (gid < ${left_idx}) {
+			gid -= ${bottom_idx};
+			gx = (gid % ${xblocks}) * ${block_size} + lx;
+			gid = gid / ${xblocks};
+			h = gid / ${boundary_size};
+			gid = gid % ${boundary_size};
+			if (gid < ${arr_nz}) {
+				gy = ${lat_ny-1} - h;
+				gz = ${lat_nz-2} - gid;
+			} else {
+				gy = ${lat_ny-1} - (gid - ${arr_nz});
+				gz = ${lat_nz-2} - h;
+			}
+		} else if (gid < ${right_idx}) {
+			gid -= ${left_idx};
+			gx = lx;
+			gy = ${boundary_size} + gid % ${yblocks};
+			gz = ${boundary_size} + gid / ${yblocks};
+		} else if (gid < ${right2_idx}) {
+			gid -= ${right_idx};
+			gx = ${arr_nx - block_size} + lx;
+			gy = ${boundary_size} + gid % ${yblocks};
+			gz = ${boundary_size} + gid / ${yblocks};
+		} else if (gid < ${max_idx}) {
+			gid -= ${right2_idx};
+			gx = ${arr_nx - 2*block_size} + lx;
+			gy = ${boundary_size} + gid % ${yblocks};
+			gz = ${boundary_size} + gid / ${yblocks};
+		} else {
+			return;
+		}
+		}
+	%endif
+
+	gi = ${get_global_idx()};
 
 	// Nothing to do if we're outside of the simulation domain.
 	if (gx > ${lat_nx-1}) {
@@ -101,6 +226,8 @@
 #define BLOCK_SIZE ${block_size}
 #define DIST_SIZE ${dist_size}
 #define GEO_FLUID ${geo_fluid}
+#define OPTION_SAVE_MACRO_FIELDS 1
+#define OPTION_BULK 2
 
 #define DT 1.0f
 

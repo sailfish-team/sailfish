@@ -97,7 +97,7 @@ class CUDABackend(object):
             buf = cuda.mem_alloc(buf_size)
             self._total_memory_bytes += buf_size
 
-            if like.base is not None:
+            if like.base is not None and type(like.base) is not cuda.PagelockedHostAllocation:
                 self.buffers[buf] = like.base
             else:
                 self.buffers[buf] = like
@@ -111,13 +111,10 @@ class CUDABackend(object):
 
         return buf
 
-    def alloc_async_buf(self, size, dtype):
+    def alloc_async_host_buf(self, shape, dtype):
         """Allocates a buffer that can be used for asynchronous data
         transfers."""
-        buf = cuda.pagelocked_zeros(size, dtype=dtype)
-        cl_buf = cuda.mem_alloc(buf.nbytes)
-        self.buffers[cl_buf] = buf
-        return buf
+        return cuda.pagelocked_zeros(shape, dtype=dtype)
 
     def nonlocal_field(self, prog, cl_buf, num, shape, strides):
         if len(shape) == 3:
@@ -254,8 +251,11 @@ class CUDABackend(object):
     def make_stream(self):
         return cuda.Stream()
 
-    def make_sync_event(self, stream):
-        event = cuda.Event(cuda.event_flags.DISABLE_TIMING)
+    def make_event(self, stream, timing=False):
+        flags = 0
+        if not timing:
+            flags |= cuda.event_flags.DISABLE_TIMING
+        event = cuda.Event(flags)
         event.record(stream)
         return event
 

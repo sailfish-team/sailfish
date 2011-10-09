@@ -34,8 +34,8 @@ def run_benchmark():
             'gpus': [0,1],
         }
 
-    mem_size = 2**32 - 2**28  # assume 2G - 128M memory size
-    node_cost = (2 * 9 + 4) * 4  # node cost in bytes
+    mem_size = 2**32 - 2**28        # assume 4G - 256M memory size
+    node_cost = (2 * 9 + 4) * 4     # node cost in bytes
     fmt = ['%d', '%d', '%d', '%.6e', '%.6e', '%.6e', '%.6e']
 
     summary = []

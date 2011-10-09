@@ -1,5 +1,5 @@
 
-.PHONY: clean regtest2d_single regtest2d_double regtest3d_single regtest3d_double regtest presubmit
+.PHONY: clean regtest2d_single regtest2d_double regtest3d_single regtest3d_double regtest regtest_small_block presubmit
 
 regtest2d_single:
 	python -u regtest/poiseuille.py --dim=2
@@ -57,11 +57,17 @@ regtest:
 	python regtest/blocks/3d_propagation.py
 	python regtest/blocks/3d_ldc.py
 
-presubmit: test regtest
+# Necessary to trigger bulk/boundary split code.
+regtest_small_block:
+	python regtest/blocks/2d_propagation.py --block_size=16
+	python regtest/blocks/2d_ldc.py --block_size=16
+	python regtest/blocks/2d_cylinder.py --block_size=16
+	python regtest/blocks/3d_propagation.py --block_size=16
+	python regtest/blocks/3d_ldc.py --block_size=16
+
+presubmit: test regtest regtest_small_block
 
 clean:
 	rm -f sailfish/*.pyc
 	rm -f perftest/*.pdf
 	rm -rf regtest/results
-
-
