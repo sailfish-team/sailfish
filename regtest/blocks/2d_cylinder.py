@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import shutil
 import tempfile
 import unittest
 
@@ -8,8 +9,10 @@ import numpy as np
 
 from examples.lbm_cylinder_multi import CylinderSimulation, CylinderGeometry
 from sailfish.controller import LBSimulationController
+from regtest.blocks import util
 
 tmpdir = tempfile.mkdtemp()
+block_size = 64
 blocks = 2
 vertical = False
 output = ''
@@ -17,8 +20,9 @@ output = ''
 class SimulationTest(CylinderSimulation):
     @classmethod
     def update_defaults(cls, defaults):
-        global blocks, vertical, output
+        global block_size, blocks, vertical, output
         CylinderSimulation.update_defaults(defaults)
+        defaults['block_size'] = block_size
         defaults['blocks'] = blocks
         defaults['vertical'] = vertical
         defaults['max_iters'] = 100
@@ -124,4 +128,7 @@ class TestInterblockPropagation(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    args = util.parse_cmd_line()
+    block_size = args.block_size
     unittest.main()
+    shutil.rmtree(tmpdir)

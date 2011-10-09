@@ -8,6 +8,7 @@ from collections import defaultdict, namedtuple
 import math
 import operator
 import numpy as np
+import time
 import zmq
 from sailfish import codegen, util
 
@@ -32,15 +33,16 @@ class ConnectionBuffer(object):
         self.dist_full_buf = dist_full_buf
         self.dist_full_idx = dist_full_idx
 
-    def distribute(self, backend):
+    def distribute(self, backend, stream):
         if self.dist_partial_sel is not None:
             self.dist_partial_buf.host[:] = self.recv_buf[self.dist_partial_sel]
-            backend.to_buf(self.dist_partial_buf.gpu)
+            backend.to_buf_async(self.dist_partial_buf.gpu, stream)
 
         if self.cpair.dst.dst_slice:
             slc = [slice(0, self.recv_buf.shape[0])] + list(reversed(self.cpair.dst.dst_full_buf_slice))
             self.dist_full_buf.host[:] = self.recv_buf[slc]
-            backend.to_buf(self.dist_full_buf.gpu)
+            backend.to_buf_async(self.dist_full_buf.gpu, stream)
+
 
 class GPUBuffer(object):
     """Numpy array and a corresponding GPU buffer."""
@@ -124,6 +126,7 @@ class BlockRunner(object):
             periodic_z = 0
             bnd_limits.append(1)
 
+        ctx['boundary_size'] = self._boundary_size
         ctx['lat_linear'] = self.lat_linear
         ctx['lat_linear_dist'] = self.lat_linear_dist
 
@@ -159,7 +162,7 @@ class BlockRunner(object):
     def add_visualization_field(self, field_cb, name):
         self._output.register_field(field_cb, name, visualization=True)
 
-    def make_scalar_field(self, dtype=None, name=None, register=True):
+    def make_scalar_field(self, dtype=None, name=None, register=True, async=False):
         """Allocates a scalar NumPy array.
 
         The array includes padding adjusted for the compute device (hidden from
@@ -177,9 +180,16 @@ class BlockRunner(object):
         size = self._get_nodes()
         strides = self._get_strides(dtype)
 
-        field = np.ndarray(self._physical_size, buffer=np.zeros(size, dtype=dtype),
+        if async:
+            buf = self.backend.alloc_async_host_buf(size, dtype=dtype)
+        else:
+            buf = np.zeros(size, dtype=dtype)
+
+        field = np.ndarray(self._physical_size, buffer=buf,
                            dtype=dtype, strides=strides)
+        assert field.base is buf
         fview = field[self._block._nonghost_slice]
+        assert fview.base is field
 
         if name is not None and register:
             self._output.register_field(fview, name)
@@ -188,13 +198,13 @@ class BlockRunner(object):
             self._scalar_fields.append(fview)
         return fview
 
-    def make_vector_field(self, name=None, output=False):
+    def make_vector_field(self, name=None, output=False, async=False):
         """Allocates several scalar arrays representing a vector field."""
         components = []
         view_components = []
 
         for x in range(0, self._block.dim):
-            field = self.make_scalar_field(self.float, register=False)
+            field = self.make_scalar_field(self.float, register=False, async=async)
             components.append(field)
 
         if name is not None:
@@ -228,14 +238,69 @@ class BlockRunner(object):
         self._physical_size[-1] = int(math.ceil(float(self._physical_size[-1]) / bs)) * bs
 
         # CUDA block/grid size for standard kernel call.
-        if self._block.dim == 2:
-            self._kernel_grid_size = list(reversed(self._physical_size))
-        else:
-            self._kernel_grid_size = [self._physical_size[2] *
-                    self._physical_size[1],  self._physical_size[0]]
-        self._kernel_grid_size[0] /= self.config.block_size
+        self._kernel_block_size = (bs, 1)
+        self._boundary_size = self._block.envelope_size + 1
+        bns = self._boundary_size
+        assert bns < bs
 
-        self._kernel_block_size = (self.config.block_size, 1)
+        # Number of blocks to be handled by the boundary kernel.  This is also
+        # the grid size for boundary kernels.
+        if self._block.dim == 2:
+            arr_ny, arr_nx = self._physical_size
+            lat_nx, lat_ny = self._lat_size
+
+            # Sometimes, due to misalignment, two blocks might be necessary to
+            # cover the right boundary.
+            padding = arr_nx - lat_nx
+            if bs - padding < bns:
+                aux_main = 3    # 1 block on the left, 2 blocks on the right
+            else:
+                aux_main = 2    # 1 block on the left, 1 block on the right
+
+            self._boundary_blocks = (
+                    (bns * arr_nx / bs) * 2 +       # top & bottom
+                    (arr_ny - 2 * bns) * aux_main)  # left & right (w/o top & bottom rows)
+            self._kernel_grid_bulk = [arr_nx - aux_main * bs, arr_ny - 2 * bns]
+            self._kernel_grid_full = [arr_nx / bs, arr_ny]
+        else:
+            arr_nz, arr_ny, arr_nx = self._physical_size
+            lat_nx, lat_ny, lat_nz = self._lat_size
+
+            # Sometimes, due to misalignment, two blocks might be necessary to
+            # cover the right boundary.
+            padding = arr_nx - lat_nx
+
+            if bs - padding < bns:
+                aux_main = 3    # 1 block on the left, 2 blocks on the right
+            else:
+                aux_main = 2    # 1 block on the left, 1 block on the right
+
+            self._boundary_blocks = (
+                    (bns * arr_nx / bs) * (arr_nz + (arr_ny - 2 * bns)) * 2 +   # top, bottom, front, back
+                    (arr_ny - 2 * bns) * (arr_nz - 2 * bns) * aux_main)         # left and right faces
+            self._kernel_grid_bulk = [(arr_nx - 2 * bs) * (arr_ny - 2 * bns),
+                    arr_nz - 2 * bns]
+            self._kernel_grid_full = [arr_nx * arr_ny / bs, arr_nz]
+
+        if self._boundary_blocks >= 65536:
+            # Use an artificial 2D grid to work around device limits.
+            self._boundary_blocks = (4096, int(math.ceil(self._boundary_blocks / 4096.0)))
+        else:
+            self._boundary_blocks = (self._boundary_blocks, 1)
+
+        self._kernel_grid_bulk[0] /= bs
+
+        # Special cases: boundary kernels can cover the whole domain or this is
+        # the only block participating in the simulation.
+        if (0 in self._kernel_grid_bulk or self._kernel_grid_bulk[0] < 0 or
+                self._kernel_grid_bulk[1] < 0 or len(self._block._connectors) == 0 or
+                not self.config.bulk_boundary_split):
+            self.config.logger.debug("Disabling bulk/boundary split.")
+            # Disable the boundary kernels and ensure that the bulk kernel will
+            # cover the whole domain.
+            self._boundary_blocks = None
+            self._boundary_size = 0
+            self._kernel_grid_bulk = self._kernel_grid_full
 
         # Global grid size as seen by the simulation class.
         if self._block.dim == 2:
@@ -331,7 +396,8 @@ class BlockRunner(object):
     def _get_partial_dst_indices(self, face, cpair):
         if cpair.dst.partial_nodes == 0:
             return None, None, None
-        buf = np.zeros(cpair.dst.partial_nodes, dtype=self.float)
+        buf = self.backend.alloc_async_host_buf(cpair.dst.partial_nodes,
+                dtype=self.float)
         idx = np.zeros(cpair.dst.partial_nodes, dtype=np.uint32)
         dst_low = [x + self._block.envelope_size for x in cpair.dst.dst_low]
         sel = []
@@ -359,6 +425,7 @@ class BlockRunner(object):
     def _init_buffers(self):
         # TODO(michalj): Fix this for multi-grid models.
         grid = util.get_grid_from_config(self.config)
+        alloc = self.backend.alloc_async_host_buf
 
         # Maps block ID to a list of 1 or 2 ConnectionBuffer
         # objects.  The list will contain 2 elements  only when
@@ -369,15 +436,15 @@ class BlockRunner(object):
 
             # Buffers for collecting and sending information.
             # TODO(michalj): Optimize this by providing proper padding.
-            coll_buf = np.zeros(cpair.src.transfer_shape, dtype=self.float)
+            coll_buf = alloc(cpair.src.transfer_shape, dtype=self.float)
             coll_idx = self._get_src_slice_indices(face, cpair)
 
             # Buffers for receiving and distributing information.
-            recv_buf = np.zeros(cpair.dst.transfer_shape, dtype=self.float)
+            recv_buf = alloc(cpair.dst.transfer_shape, dtype=self.float)
             # Any partial dists are serialized into a single continuous buffer.
             dist_partial_buf, dist_partial_idx, dist_partial_sel = \
                     self._get_partial_dst_indices(face, cpair)
-            dist_full_buf = np.zeros(cpair.dst.full_shape, dtype=self.float)
+            dist_full_buf = alloc(cpair.dst.full_shape, dtype=self.float)
             dist_full_idx = self._get_dst_slice_indices(face, cpair)
 
             cbuf = ConnectionBuffer(face, cpair,
@@ -399,9 +466,8 @@ class BlockRunner(object):
         code = self._get_compute_code()
         self.module = self.backend.build(code)
 
-
-        self._boundary_streams = (self.backend.make_stream(),
-                                  self.backend.make_stream())
+        # Streams
+        self._boundary_stream = self.backend.make_stream()
         self._bulk_stream = self.backend.make_stream()
 
     def _init_gpu_data(self):
@@ -448,12 +514,20 @@ class BlockRunner(object):
 
     def exec_kernel(self, name, args, args_format):
         kernel = self.get_kernel(name, args, args_format)
-        self.backend.run_kernel(kernel, self._kernel_grid_size)
+        self.backend.run_kernel(kernel, self._kernel_grid_full)
 
     def step(self, output_req):
-        # call _step_boundary here
+        self._step_boundary(output_req)
         self._step_bulk(output_req)
         self._sim.iteration += 1
+
+    def _get_bulk_kernel(self, output_req):
+        if output_req:
+            kernel = self._kernels_bulk_full[self._sim.iteration & 1]
+        else:
+            kernel = self._kernels_bulk_none[self._sim.iteration & 1]
+
+        return kernel, self._kernel_grid_bulk
 
     def _step_bulk(self, output_req):
         """Runs one simulation step in the bulk domain.
@@ -461,23 +535,19 @@ class BlockRunner(object):
         Bulk domain is defined to be all nodes that belong to CUDA
         blocks that do not depend on input from any ghost nodes.
         """
-        if output_req:
-            kernel = self._kernels_full[self._sim.iteration & 1]
-        else:
-            kernel = self._kernels_none[self._sim.iteration & 1]
+        self._timing_calc_start = self.backend.make_event(self._bulk_stream, timing=True)
 
-        # TODO(michalj): Do we need the sync here?
-        self.backend.sync()
-
-        self.backend.run_kernel(kernel, self._kernel_grid_size)
+        # The bulk kernel only needs to be run if the simulation has a bulk/boundary split.
+        # If this split is not present, the whole domain is simulated in _step_boundary and
+        # _step_bulk only needs to handle PBC (below).
+        if self._boundary_blocks is not None:
+            kernel, grid = self._get_bulk_kernel(output_req)
+            self.backend.run_kernel(kernel, grid, self._bulk_stream)
 
         if self._sim.iteration & 1:
             base = 0
         else:
             base = 3
-
-        # TODO(michalj): Do we need the sync here?
-        self.backend.sync()
 
         if self._block.periodic_x:
             kernel = self._pbc_kernels[base]
@@ -491,7 +561,7 @@ class BlockRunner(object):
                             float(self.config.block_size))),
                         self._lat_size[0])
 
-            self.backend.run_kernel(kernel, grid_size)
+            self.backend.run_kernel(kernel, grid_size, self._bulk_stream)
 
         if self._block.periodic_y:
             kernel = self._pbc_kernels[base + 1]
@@ -504,7 +574,7 @@ class BlockRunner(object):
                         int(math.ceil(self._lat_size[2] /
                             float(self.config.block_size))),
                         self._lat_size[0])
-            self.backend.run_kernel(kernel, grid_size)
+            self.backend.run_kernel(kernel, grid_size, self._bulk_stream)
 
         if self._block.dim == 3 and self._block.periodic_z:
             kernel = self._pbc_kernels[base + 2]
@@ -512,29 +582,58 @@ class BlockRunner(object):
                     int(math.ceil(self._lat_size[2] /
                         float(self.config.block_size))),
                     self._lat_size[1])
-            self.backend.run_kernel(kernel, grid_size)
+            self.backend.run_kernel(kernel, grid_size, self._bulk_stream)
 
-        for kernel, grid in self._collect_kernels[self._sim.iteration & 1]:
-            self.backend.run_kernel(kernel, grid)
+        self._timing_calc_end = self.backend.make_event(self._bulk_stream, timing=True)
 
-    def _step_boundary(self):
+    def _step_boundary(self, output_req):
         """Runs one simulation step for the boundary blocks.
 
         Boundary blocks are CUDA blocks that depend on input from
         ghost nodes."""
 
-        stream = self._boundary_stream[self._step]
+        if self._boundary_blocks is not None:
+            if output_req:
+                kernel = self._kernels_bnd_full[self._sim.iteration & 1]
+            else:
+                kernel = self._kernels_bnd_none[self._sim.iteration & 1]
+            grid = self._boundary_blocks
+        else:
+            kernel, grid = self._get_bulk_kernel(output_req)
+
+        blk_str = self._bulk_stream
+        make_event = self.backend.make_event
+
+        self._timing_bnd_start = make_event(blk_str, timing=True)
+        self.backend.run_kernel(kernel, grid, blk_str)
+        self._timing_bnd_stop = make_event(blk_str, timing=True)
+
+        # Enqueue a wait so that the data collection will not start until the kernel
+        # handling boundary calculations is completed (that kernel runs in the bulk
+        # stream so that it is automatically synchronized with bulk calculations.
+        # This is done to ensure that boundary calculations are completed before bulk
+        # ones, so that the bulk time calculation can maximally overlap with data
+        # transfer.
+        self._boundary_stream.wait_for_event(self._timing_bnd_stop)
+        for kernel, grid in self._collect_kernels[self._sim.iteration & 1]:
+            self.backend.run_kernel(kernel, grid, self._boundary_stream)
+
+        self._timing_coll_done = self.backend.make_event(self._boundary_stream, timing=True)
 
     def send_data(self):
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
             for x in conn_bufs:
-                self.backend.from_buf(x.coll_buf.gpu)
+                self.backend.from_buf_async(x.coll_buf.gpu, self._boundary_stream)
 
+        self._boundary_stream.synchronize()
+        for b_id, connector in self._block._connectors.iteritems():
+            conn_bufs = self._block_to_connbuf[b_id]
             if len(conn_bufs) > 1:
                 connector.send(np.hstack(
                     [np.ravel(x.coll_buf.host) for x in conn_bufs]))
             else:
+                # TODO(michalj): Use non-blocking sends here?
                 connector.send(np.ravel(conn_bufs[0].coll_buf.host))
 
     def recv_data(self):
@@ -554,7 +653,7 @@ class BlockRunner(object):
                     l = cbuf.recv_buf.size
                     cbuf.recv_buf[:] = dest[i:i+l].reshape(cbuf.recv_buf.shape)
                     i += l
-                    cbuf.distribute(self.backend)
+                    cbuf.distribute(self.backend, self._boundary_stream)
             else:
                 cbuf = conn_bufs[0]
                 dest = np.ravel(cbuf.recv_buf)
@@ -567,16 +666,16 @@ class BlockRunner(object):
                 # copy.
                 if dest.flags.owndata:
                     cbuf.recv_buf[:] = dest.reshape(cbuf.recv_buf.shape)
-                cbuf.distribute(self.backend)
+                cbuf.distribute(self.backend, self._boundary_stream)
 
     def _fields_to_host(self):
         """Copies data for all fields from the GPU to the host."""
         for field in self._scalar_fields:
-            self.backend.from_buf(self._gpu_field_map[id(field)])
+            self.backend.from_buf_async(self._gpu_field_map[id(field)], self._bulk_stream)
 
         for field in self._vector_fields:
             for component in self._gpu_field_map[id(field)]:
-                self.backend.from_buf(component)
+                self.backend.from_buf_async(component, self._bulk_stream)
 
     def _init_interblock_kernels(self):
         # TODO(michalj): Extend this for multi-grid models.
@@ -745,8 +844,10 @@ class BlockRunner(object):
         self._sim.initial_conditions(self)
 
         self._init_interblock_kernels()
-        self._kernels_full = self._sim.get_compute_kernels(self, True)
-        self._kernels_none = self._sim.get_compute_kernels(self, False)
+        self._kernels_bulk_full = self._sim.get_compute_kernels(self, True, True)
+        self._kernels_bulk_none = self._sim.get_compute_kernels(self, False, True)
+        self._kernels_bnd_full = self._sim.get_compute_kernels(self, True, False)
+        self._kernels_bnd_none = self._sim.get_compute_kernels(self, False, False)
         self._pbc_kernels = self._sim.get_pbc_kernels(self)
 
         if self.config.output:
@@ -779,7 +880,6 @@ class BlockRunner(object):
 
             if output_req and self.config.output_required:
                 self._fields_to_host()
-                self._output.save(self._sim.iteration)
 
             if (self.config.max_iters > 0 and self._sim.iteration >=
                     self.config.max_iters):
@@ -794,16 +894,26 @@ class BlockRunner(object):
                 self.config.logger.info("Simulation termination requested.")
 
             for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
-                self.backend.run_kernel(kernel, grid)
+                self.backend.run_kernel(kernel, grid, self._boundary_stream)
+
+            self._boundary_stream.synchronize()
+            self._bulk_stream.synchronize()
+            if output_req and self.config.output_required:
+                self._output.save(self._sim.iteration)
+
+        self._boundary_stream.synchronize()
+        self._bulk_stream.synchronize()
+        if output_req and self.config.output_required:
+            self._output.save(self._sim.iteration)
 
     def main_benchmark(self):
-        t_comp = 0.0
+        t_bulk = 0.0
+        t_bnd  = 0.0
+        t_coll = 0.0
         t_total = 0.0
         t_send = 0.0
         t_recv = 0.0
         t_data = 0.0
-
-        import time
 
         for i in xrange(self.config.max_iters):
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
@@ -822,12 +932,20 @@ class BlockRunner(object):
             self.recv_data()
 
             for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
-                self.backend.run_kernel(kernel, grid)
+                self.backend.run_kernel(kernel, grid, self._boundary_stream)
 
             t5 = time.time()
 
-            t_comp += t2 - t1
-            t_total += t5 - t1
+            self._bulk_stream.synchronize()
+            self._boundary_stream.synchronize()
+
+            t6 = time.time()
+
+            t_bulk += self._timing_calc_end.time_since(self._timing_calc_start) / 1e3
+            t_bnd  += self._timing_bnd_stop.time_since(self._timing_bnd_start) / 1e3
+            t_coll += self._timing_coll_done.time_since(self._timing_bnd_stop) / 1e3
+
+            t_total += t6 - t1
             t_recv += t5 - t4
             t_send += t3 - t2
             t_data += t4 - t3
@@ -836,20 +954,20 @@ class BlockRunner(object):
                 mlups_base = self._sim.iteration * reduce(operator.mul,
                              self._lat_size)
                 mlups_total = mlups_base / t_total * 1e-6
-                mlups_comp = mlups_base / t_comp * 1e-6
+                mlups_comp = mlups_base / (t_bulk + t_bnd) * 1e-6
                 self.config.logger.info(
                         'MLUPS eff:{0:.2f}  comp:{1:.2f}  overhead:{2:.3f}'.format(
-                            mlups_total, mlups_comp, t_total / t_comp - 1.0))
+                            mlups_total, mlups_comp, t_total / (t_bulk + t_bnd) - 1.0))
 
                 j = self._sim.iteration
                 self.config.logger.debug(
-                        'time comp:{0:e}  data:{1:e}  recv:{2:e}  send:{3:e}'
-                        '  total:{4:e}'.format(
-                            t_comp / j, t_data / j, t_recv / j, t_send / j,
+                        'time bulk:{0:e}  bnd:{1:e}  coll:{2:e}  data:{3:e}  recv:{4:e}  send:{5:e}'
+                        '  total:{6:e}'.format(
+                            t_bulk / j, t_bnd / j, t_coll / j, t_data / j, t_recv / j, t_send / j,
                             t_total / j))
 
         mi = self.config.max_iters
-        ti = TimingInfo(t_comp / mi, t_data / mi, t_recv / mi, t_send / mi,
+        ti = TimingInfo((t_bulk + t_bnd) / mi, t_data / mi, t_recv / mi, t_send / mi,
                 t_total / mi, self._block.id)
         if self._summary_sender is not None:
             self._summary_sender.send_pyobj(ti)

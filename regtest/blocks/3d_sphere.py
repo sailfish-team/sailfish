@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import shutil
 import tempfile
 import unittest
 
@@ -8,15 +9,18 @@ import numpy as np
 
 from examples.lbm_sphere_multi_3d import SphereSimulation, SphereGeometry
 from sailfish.controller import LBSimulationController
+from regtest.blocks import util
 
+block_size = 64
 blocks = 2
 output = ''
 
 class SimulationTest(SphereSimulation):
     @classmethod
     def update_defaults(cls, defaults):
-        global blocks, output
+        global block_size, blocks, output
         SphereSimulation.update_defaults(defaults)
+        defaults['block_size'] = block_size
         defaults['blocks'] = blocks
         defaults['max_iters'] = 100
         defaults['quiet'] = True
@@ -58,5 +62,7 @@ class TestInterblockPropagation(unittest.TestCase):
 
 if __name__ == '__main__':
     tmpdir = tempfile.mkdtemp()
-    print tmpdir
+    args = util.parse_cmd_line()
+    block_size = args.block_size
     unittest.main()
+    shutil.rmtree(tmpdir)

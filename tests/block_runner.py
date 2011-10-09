@@ -8,6 +8,10 @@ from sailfish.backend_dummy import DummyBackend
 from sailfish.block_runner import BlockRunner
 from sailfish.geo_block import SubdomainSpec2D, SubdomainSpec3D
 
+class DummyLogger(object):
+    def debug(*args):
+        pass
+
 class TestBasicFunctionality(unittest.TestCase):
     location = 0, 0
     size = 10, 3
@@ -22,6 +26,7 @@ class TestBasicFunctionality(unittest.TestCase):
         config.block_size = 8
         # Does not affect behaviour of any of the functions tested here.
         config.lat_nz, config.lat_nx, config.lat_ny = self.size_3d
+        config.logger = DummyLogger()
         self.sim = LBSim(config)
         self.backend = DummyBackend()
 

@@ -118,7 +118,7 @@ class LBFluidSim(LBSim):
         runner.exec_kernel('SetInitialConditions', args1, 'P'*len(args1))
         runner.exec_kernel('SetInitialConditions', args2, 'P'*len(args2))
 
-    def get_compute_kernels(self, runner, full_output):
+    def get_compute_kernels(self, runner, full_output, bulk):
         """
         Args:
           full_output: if True, returns kernels that prepare fields for
@@ -133,12 +133,14 @@ class LBFluidSim(LBSim):
         args1 = [gpu_map, gpu_dist1a, gpu_dist1b, gpu_rho] + gpu_v
         args2 = [gpu_map, gpu_dist1b, gpu_dist1a, gpu_rho] + gpu_v
 
+        options = 0
         if full_output:
-            args1.append(np.uint32(1))
-            args2.append(np.uint32(1))
-        else:
-            args1.append(np.uint32(0))
-            args2.append(np.uint32(0))
+            options |= 1
+        if bulk:
+            options |= 2
+
+        args1.append(np.uint32(options))
+        args2.append(np.uint32(options))
 
         kernels = []
         kernels.append(runner.get_kernel(
@@ -162,8 +164,8 @@ class LBFluidSim(LBSim):
         return kernels
 
     def init_fields(self, runner):
-        self.rho = runner.make_scalar_field(name='rho')
-        self.v = runner.make_vector_field(name='v')
+        self.rho = runner.make_scalar_field(name='rho', async=True)
+        self.v = runner.make_vector_field(name='v', async=True)
 
         if self.grid.dim == 2:
             self.vx, self.vy = self.v

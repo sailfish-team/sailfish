@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import shutil
 import tempfile
 import unittest
 
@@ -11,6 +12,7 @@ from sailfish.geo_block import SubdomainSpec3D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
 from sailfish.sym import D3Q19
+from regtest.blocks import util
 
 
 class BlockTest(Subdomain3D):
@@ -42,6 +44,7 @@ class TwoBlocksZConnGeoTest(LBGeometry3D):
         return blocks
 
 
+block_size = 64
 tmpdir = None
 periodic_x = False
 vi = lambda x, y, z: D3Q19.vec_idx([x, y, z])
@@ -69,8 +72,9 @@ class SimulationTest(LBFluidSim, LBForcedSim):
             lat_nx = 64
             lat_ny = 66
 
-        global tmpdir
+        global block_size, tmpdir
         defaults.update({
+            'block_size': block_size,
             'lat_nx': lat_nx,
             'lat_ny': lat_ny,
             'lat_nz': lat_nz,
@@ -197,8 +201,9 @@ class PeriodicSimulationTest(LBFluidSim, LBForcedSim):
 
     @classmethod
     def update_defaults(cls, defaults):
-        global tmpdir
+        global block_size, tmpdir
         defaults.update({
+            'block_size': block_size,
             'lat_nx': 128,
             'lat_ny': 64,
             'lat_nz': 66,
@@ -282,8 +287,9 @@ class SingleBlockPeriodicSimulationTest(LBFluidSim, LBForcedSim):
 
     @classmethod
     def update_defaults(cls, defaults):
-        global tmpdir
+        global block_size, tmpdir
         defaults.update({
+            'block_size': block_size,
             'lat_nx': 64,
             'lat_ny': 62,
             'lat_nz': 66,
@@ -361,4 +367,7 @@ class SingleBlockPeriodicTest(unittest.TestCase):
 
 if __name__ == '__main__':
     tmpdir = tempfile.mkdtemp()
+    args = util.parse_cmd_line()
+    block_size = args.block_size
     unittest.main()
+    shutil.rmtree(tmpdir)

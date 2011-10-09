@@ -173,7 +173,7 @@ class LBConnection(object):
     @property
     def transfer_shape(self):
         """Logical shape of the transfer buffer."""
-        return [len(self.dists)] + map(lambda x: x.stop - x.start, reversed(self.src_slice))
+        return [len(self.dists)] + map(lambda x: int(x.stop - x.start), reversed(self.src_slice))
 
     @property
     def partial_nodes(self):
@@ -181,7 +181,7 @@ class LBConnection(object):
 
     @property
     def full_shape(self):
-        return [len(self.dists)] + map(lambda x: x.stop - x.start, reversed(self.dst_slice))
+        return [len(self.dists)] + map(lambda x: int(x.stop - x.start), reversed(self.dst_slice))
 
 class SubdomainSpec(object):
     dim = None

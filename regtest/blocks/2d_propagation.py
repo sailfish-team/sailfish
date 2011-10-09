@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import shutil
 import tempfile
 import unittest
 
@@ -11,6 +12,7 @@ from sailfish.geo_block import SubdomainSpec2D, Subdomain2D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
 from sailfish.sym import D2Q9
+from regtest.blocks import util
 
 #
 #  b1  b3
@@ -51,6 +53,7 @@ class BlockTest(Subdomain2D):
     def initial_conditions(self, sim, hx, hy):
         pass
 
+block_size = 64
 tmpdir = None
 periodic_x = False
 vi = lambda x, y: D2Q9.vec_idx([x, y])
@@ -66,8 +69,9 @@ class SimulationTest(LBFluidSim, LBForcedSim):
 
     @classmethod
     def update_defaults(cls, defaults):
-        global tmpdir
+        global block_size, tmpdir
         defaults.update({
+            'block_size': block_size,
             'lat_nx': 256,
             'lat_ny': 256,
             'max_iters': 2,
@@ -302,8 +306,9 @@ class ThreeBlocksSimulationTest(LBFluidSim, LBForcedSim):
 
     @classmethod
     def update_defaults(cls, defaults):
-        global tmpdir
+        global block_size, tmpdir
         defaults.update({
+            'block_size': block_size,
             'lat_nx': 256,
             'lat_ny': 256,
             'max_iters': 2,
@@ -356,4 +361,7 @@ class TestThreeBlockPropagation(unittest.TestCase):
 
 if __name__ == '__main__':
     tmpdir = tempfile.mkdtemp()
+    args = util.parse_cmd_line()
+    block_size = args.block_size
     unittest.main()
+    shutil.rmtree(tmpdir)
