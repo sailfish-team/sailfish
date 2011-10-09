@@ -188,7 +188,7 @@ class TwoBlockPropagationTest(object): #unittest.TestCase):
 #############################################################################
 
 class PeriodicSimulationTest(LBFluidSim, LBForcedSim):
-    geo = BlockTest
+    subdomain = BlockTest
 
     @classmethod
     def modify_config(cls, config):
@@ -271,7 +271,7 @@ class SingleBlockGeoTest(LBGeometry3D):
         return [SubdomainSpec3D((0,0,0), (64, 62, 66))]
 
 class SingleBlockPeriodicSimulationTest(LBFluidSim, LBForcedSim):
-    geo = BlockTest
+    subdomain = BlockTest
 
     @classmethod
     def modify_config(cls, config):
