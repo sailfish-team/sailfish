@@ -294,7 +294,7 @@ class TestCornerPropagation(unittest.TestCase):
 
 
 class ThreeBlocksSimulationTest(LBFluidSim, LBForcedSim):
-    geo = BlockTest
+    subdomain = BlockTest
 
     @classmethod
     def modify_config(cls, config):
