@@ -15,7 +15,7 @@ from sailfish import codegen, util
 # Used to hold a reference to a CUDA kernel and a grid on which it is
 # to be executed.
 KernelGrid = namedtuple('KernelGrid', 'kernel grid')
-TimingInfo = namedtuple('TimingInfo', 'comp data recv send total block_id')
+TimingInfo = namedtuple('TimingInfo', 'comp data recv send wait total block_id')
 
 
 class ConnectionBuffer(object):
@@ -914,6 +914,7 @@ class BlockRunner(object):
         t_send = 0.0
         t_recv = 0.0
         t_data = 0.0
+        t_wait = 0.0
 
         for i in xrange(self.config.max_iters):
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
@@ -949,6 +950,7 @@ class BlockRunner(object):
             t_recv += t5 - t4
             t_send += t3 - t2
             t_data += t4 - t3
+            t_wait += t6 - t5
 
             if output_req:
                 mlups_base = self._sim.iteration * reduce(operator.mul,
@@ -961,14 +963,14 @@ class BlockRunner(object):
 
                 j = self._sim.iteration
                 self.config.logger.debug(
-                        'time bulk:{0:e}  bnd:{1:e}  coll:{2:e}  data:{3:e}  recv:{4:e}  send:{5:e}'
-                        '  total:{6:e}'.format(
+                        'time bulk:{0:e}  bnd:{1:e}  coll:{2:e}  data:{3:e}  recv:{4:e}'
+                        '  send:{5:e}  wait:{6:e}  total:{7:e}'.format(
                             t_bulk / j, t_bnd / j, t_coll / j, t_data / j, t_recv / j, t_send / j,
-                            t_total / j))
+                            t_wait / j, t_total / j))
 
         mi = self.config.max_iters
         ti = TimingInfo((t_bulk + t_bnd) / mi, t_data / mi, t_recv / mi, t_send / mi,
-                t_total / mi, self._block.id)
+                t_wait / mi, t_total / mi, self._block.id)
         if self._summary_sender is not None:
             self._summary_sender.send_pyobj(ti)
             self.config.logger.debug('Sending timing information to controller.')
