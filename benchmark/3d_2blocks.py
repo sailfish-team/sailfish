@@ -32,7 +32,7 @@ class BenchmarkZConnGeometry(LBGeometry3D):
                   SubdomainSpec3D((0, 0, d), (self.gx, self.gy, d))]
         return blocks
 
-def run_benchmark():
+def run_benchmark(boundary_split=True, suffix=''):
     settings = {
             'mode': 'benchmark',
             'max_iters': 300,
@@ -41,6 +41,7 @@ def run_benchmark():
             'quiet': True,
             'grid': 'D3Q19',
             'gpus': [0,1],
+            'bulk_boundary_split': boundary_split,
         }
 
     fmt = ['%d', '%d', '%d', '%d', '%.6e', '%.6e', '%.6e', '%.6e']
@@ -52,14 +53,17 @@ def run_benchmark():
             ctrl = LBSimulationController(LDCSim, geo_cls, settings)
             timing_infos, blocks = ctrl.run()
             summary.append(util.summarize(timing_infos, blocks))
+            timings.append(timing_infos)
 
     summary = []
+    timings = []
     sizes = [(1276, 128, 124), (1148, 128, 138), (1020, 128, 155), (892, 128, 177),
             (762, 256, 104), (636, 256, 124), (508, 256, 156), (380, 256, 207),
             (252, 256, 314), (124, 512, 320)]
     test_sizes(sizes, BenchmarkXConnGeometry)
-    np.savetxt('3d_2blocks_x.dat', summary, fmt)
-
+    np.savetxt('3d_2blocks_x{0}.dat', summary, fmt)
+    util.save_timing('3d_2blocks_x{0}.timing'.format(suffix), timings)
 
 if __name__ == '__main__':
     run_benchmark()
+    run_benchmark(False, 'nosplit')
