@@ -388,6 +388,8 @@ class LBSimulationController(object):
         group.add_argument('--bulk_boundary_split', type=bool, default=True,
                 help='if True, bulk and boundary nodes will be handled '
                 'separately (increases parallelism)')
+        group.add_argument('--cluster_spec', type=str, default='',
+                help='path of a Python module with the cluster specification')
 
         group = self.config.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)
