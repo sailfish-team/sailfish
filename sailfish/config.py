@@ -50,3 +50,15 @@ class LBConfig(argparse.Namespace):
     @property
     def output_required(self):
         return self.output or self.mode == 'visualization'
+
+
+class MachineSpec(object):
+    """Declares information about a machine."""
+
+    def __init__(self, host, gpus=None):
+        """
+        :param host: host name (can be an execnet gateway spec)
+        :param gpus: list of GPU IDs on which to run
+        """
+        self.host = host
+        self.gpus = gpus
