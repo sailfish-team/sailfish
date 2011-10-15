@@ -61,7 +61,7 @@ def run_benchmark(boundary_split=True, suffix=''):
             (762, 256, 104), (636, 256, 124), (508, 256, 156), (380, 256, 207),
             (252, 256, 314), (124, 512, 320)]
     test_sizes(sizes, BenchmarkXConnGeometry)
-    np.savetxt('3d_2blocks_x{0}.dat', summary, fmt)
+    np.savetxt('3d_2blocks_x{0}.dat'.format(suffix), summary, fmt)
     util.save_timing('3d_2blocks_x{0}.timing'.format(suffix), timings)
 
 if __name__ == '__main__':
