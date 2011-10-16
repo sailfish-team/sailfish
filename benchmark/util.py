@@ -15,10 +15,10 @@ def summarize(timing_infos, blocks):
 
 def save_timing(fname, timings):
     f = open(fname, 'w')
-    print >>f, '# comp data recv send wait total'
+    print >>f, '# comp bulk bnd coll data recv send wait total'
     for entry in timings:
         for t in entry:
-            print >>f, '{0:e} {1:e} {2:e} {3:e} {4:e} {5:e}'.format(
-                    t.comp, t.data, t.recv, t.send, t.wait, t.total)
+            print >>f, '{0:e} {1:e} {2:e} {3:e} {4:e} {5:e} {6:e} {7:e} {8:e}'.format(
+                    t.comp, t.bulk, t.bnd, t.coll, t.data, t.recv, t.send, t.wait, t.total)
         print >>f, "###"
     f.close()

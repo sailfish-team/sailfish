@@ -15,7 +15,7 @@ from sailfish import codegen, util
 # Used to hold a reference to a CUDA kernel and a grid on which it is
 # to be executed.
 KernelGrid = namedtuple('KernelGrid', 'kernel grid')
-TimingInfo = namedtuple('TimingInfo', 'comp data recv send wait total block_id')
+TimingInfo = namedtuple('TimingInfo', 'comp bulk bnd coll data recv send wait total block_id')
 
 
 class ConnectionBuffer(object):
@@ -969,7 +969,8 @@ class BlockRunner(object):
                             t_wait / j, t_total / j))
 
         mi = self.config.max_iters
-        ti = TimingInfo((t_bulk + t_bnd) / mi, t_data / mi, t_recv / mi, t_send / mi,
+        ti = TimingInfo((t_bulk + t_bnd) / mi, t_bulk / mi, t_bnd / mi,
+                t_coll / mi, t_data / mi, t_recv / mi, t_send / mi,
                 t_wait / mi, t_total / mi, self._block.id)
         if self._summary_sender is not None:
             self._summary_sender.send_pyobj(ti)
