@@ -58,7 +58,7 @@ class BlockRunner(object):
     """Runs the simulation for a single SubdomainSpec.
     """
     def __init__(self, simulation, block, output, backend, quit_event,
-            summary_addr=None):
+            summary_addr=None, master_addr=None):
         # Create a 2-way connection between the SubdomainSpec and this BlockRunner
         self._ctx = zmq.Context()
         if summary_addr is not None:
@@ -89,7 +89,29 @@ class BlockRunner(object):
         self._vis_map_cache = None
         self._quit_event = quit_event
 
+        self._master_sock = self._ctx.socket(zmq.PAIR)
+        self._master_sock.connect(master_addr)
+
+        # For remote connections, we start the listening side of the
+        # connection first so that random ports can be selected and
+        # communicated to the master.
+        unready = []
+        ports = {}
         for b_id, connector in self._block._connectors.iteritems():
+            if connector.is_ready():
+                connector.init_runner(self._ctx)
+                ports[(self._block.id, b_id)] = connector.port
+            else:
+                unready.append(b_id)
+
+        self._master_sock.send_pyobj(ports)
+        if unready:
+            remote_ports = self._master_sock.recv_pyobj()
+            assert len(remote_ports.keys()) == len(unready)
+
+        for b_id in unready:
+            connector = self._block._connectors[b_id]
+            connector.port = remote_ports[(b_id, self._block.id)]
             connector.init_runner(self._ctx)
 
     @property
