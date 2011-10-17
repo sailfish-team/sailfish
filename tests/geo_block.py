@@ -21,7 +21,7 @@ class TestBlock3D(unittest.TestCase):
 
     def test_block_connection_y(self):
         base = SubdomainSpec3D((10, 10, 10), (10, 10, 12), envelope_size=1, id_=0)
-        face_hi = SubdomainSpec3D._Y_HIGH
+        face_hi = SubdomainSpec3D.Y_HIGH
 
         # exact match
         b1 = SubdomainSpec3D((10, 20, 10), (10, 5, 12), envelope_size=1, id_=1)
@@ -56,7 +56,7 @@ class TestBlock3D(unittest.TestCase):
 
     def test_block_connection_z(self):
         base = SubdomainSpec3D((10, 10, 10), (10, 12, 10), envelope_size=1, id_=0)
-        face_hi = SubdomainSpec3D._Z_HIGH
+        face_hi = SubdomainSpec3D.Z_HIGH
 
         # exact match
         b1 = SubdomainSpec3D((10, 10, 20), (10, 12, 5), envelope_size=1, id_=1)
@@ -91,7 +91,7 @@ class TestBlock3D(unittest.TestCase):
 
     def test_block_connection_x(self):
         base = SubdomainSpec3D((10, 10, 10), (10, 12, 10), envelope_size=1, id_=0)
-        face_hi = SubdomainSpec3D._X_HIGH
+        face_hi = SubdomainSpec3D.X_HIGH
 
         # exact match
         b1 = SubdomainSpec3D((20, 10, 10), (5, 12, 10), envelope_size=1, id_=1)
@@ -191,7 +191,7 @@ class TestBlock3D(unittest.TestCase):
         to the X axis."""
         base = SubdomainSpec3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
 
-        if face == SubdomainSpec3D._X_LOW:
+        if face == SubdomainSpec3D.X_LOW:
             x_low = 5
             x_dir = -1
         else:
@@ -255,16 +255,16 @@ class TestBlock3D(unittest.TestCase):
         self._verify_partial_map(cpair.src, expected_map)
 
     def test_block_connection_edge_x_low(self):
-        self._x_edge_helper(SubdomainSpec3D._X_LOW)
+        self._x_edge_helper(SubdomainSpec3D.X_LOW)
 
     def test_block_connection_edge_x_high(self):
-        self._x_edge_helper(SubdomainSpec3D._X_HIGH)
+        self._x_edge_helper(SubdomainSpec3D.X_HIGH)
 
     def test_block_connection_edge_non_x(self):
         base = SubdomainSpec3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
         b1 = SubdomainSpec3D((10, 5, 5), (10, 5, 5), envelope_size=1, id_=1)
         self.assertTrue(base.connect(b1, grid=D3Q19))
-        cpair = base.get_connection(SubdomainSpec3D._Y_LOW, b1.id)
+        cpair = base.get_connection(SubdomainSpec3D.Y_LOW, b1.id)
         self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(0, 1)])
         self.assertEqual(cpair.src.dst_low, [0, 4])
         self.assertEqual(cpair.src.dst_slice, [])
@@ -276,7 +276,7 @@ class TestBlock3D(unittest.TestCase):
 
         b2 = SubdomainSpec3D((10, 20, 5), (10, 5, 5), envelope_size=1, id_=2)
         self.assertTrue(base.connect(b2, grid=D3Q19))
-        cpair = base.get_connection(SubdomainSpec3D._Y_HIGH, b2.id)
+        cpair = base.get_connection(SubdomainSpec3D.Y_HIGH, b2.id)
         self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(0, 1)])
         self.assertEqual(cpair.src.dst_low, [0, 4])
         self.assertEqual(cpair.src.dst_slice, [])
@@ -288,7 +288,7 @@ class TestBlock3D(unittest.TestCase):
 
         b3 = SubdomainSpec3D((10, 5, 20), (10, 5, 5), envelope_size=1, id_=3)
         self.assertTrue(base.connect(b3, grid=D3Q19))
-        cpair = base.get_connection(SubdomainSpec3D._Y_LOW, b3.id)
+        cpair = base.get_connection(SubdomainSpec3D.Y_LOW, b3.id)
         self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(11, 12)])
         self.assertEqual(cpair.src.dst_low, [0, 0])
         self.assertEqual(cpair.src.dst_slice, [])
@@ -300,7 +300,7 @@ class TestBlock3D(unittest.TestCase):
 
         b4 = SubdomainSpec3D((10, 20, 20), (10, 5, 5), envelope_size=1, id_=4)
         self.assertTrue(base.connect(b4, grid=D3Q19))
-        cpair = base.get_connection(SubdomainSpec3D._Y_HIGH, b4.id)
+        cpair = base.get_connection(SubdomainSpec3D.Y_HIGH, b4.id)
         self.assertEqual(cpair.src.src_slice, [slice(1, 11), slice(11, 12)])
         self.assertEqual(cpair.src.dst_low, [0, 0])
         self.assertEqual(cpair.src.dst_slice, [])
@@ -313,7 +313,7 @@ class TestBlock3D(unittest.TestCase):
     def _corner_helper(self, face):
         base = SubdomainSpec3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
 
-        if face == SubdomainSpec3D._X_LOW:
+        if face == SubdomainSpec3D.X_LOW:
             x_low = 5
             x_dir = -1
         else:
@@ -369,10 +369,10 @@ class TestBlock3D(unittest.TestCase):
         self._verify_partial_map(cpair.src, expected_map)
 
     def test_corner_x_low(self):
-        self._corner_helper(SubdomainSpec3D._X_LOW)
+        self._corner_helper(SubdomainSpec3D.X_LOW)
 
     def test_corner_x_high(self):
-        self._corner_helper(SubdomainSpec3D._X_HIGH)
+        self._corner_helper(SubdomainSpec3D.X_HIGH)
 
 
 class TestBlock2D(unittest.TestCase):
@@ -512,7 +512,7 @@ class TestBlock2D(unittest.TestCase):
         # corner match (low)
         b6 = SubdomainSpec2D((20, 5), (5, 5), envelope_size=1, id_=6)
         self.assertTrue(base.connect(b6, grid=D2Q9))
-        cpair = base.get_connection(SubdomainSpec2D._X_HIGH, b6.id)
+        cpair = base.get_connection(SubdomainSpec2D.X_HIGH, b6.id)
         self.assertEqual(cpair.src.src_slice, [slice(0, 1)])
         self.assertEqual(cpair.src.dst_low, [4])
         self.assertEqual(cpair.src.dst_slice, [])
@@ -532,7 +532,7 @@ class TestBlock2D(unittest.TestCase):
         # corner match (high)
         b7 = SubdomainSpec2D((20, 20), (5, 5), envelope_size=1, id_=7)
         self.assertTrue(base.connect(b7, grid=D2Q9))
-        cpair = base.get_connection(SubdomainSpec2D._X_HIGH, b7.id)
+        cpair = base.get_connection(SubdomainSpec2D.X_HIGH, b7.id)
         self.assertEqual(cpair.src.src_slice, [slice(11, 12)])
         self.assertEqual(cpair.src.dst_low, [0])
         self.assertEqual(cpair.src.dst_slice, [])
@@ -565,7 +565,7 @@ class TestBlock2D(unittest.TestCase):
         b2 = SubdomainSpec2D((32, 0), (32, 32), envelope_size=1, id_=2)
         self.assertTrue(b1.connect(b2, geo, axis=0, grid=D2Q9))
 
-        cpair = b1.get_connection(SubdomainSpec2D._X_LOW, b2.id)
+        cpair = b1.get_connection(SubdomainSpec2D.X_LOW, b2.id)
         self.assertEqual(set(cpair.src.dists),
                          set([vi(-1,0), vi(-1,1), vi(-1,-1)]))
         _verify_slices(cpair)
@@ -575,7 +575,7 @@ class TestBlock2D(unittest.TestCase):
                 vi(-1, 1): np.array([[31]])}
         self._verify_partial_map(cpair.src, expected_map)
 
-        cpair = b2.get_connection(SubdomainSpec2D._X_HIGH, b1.id)
+        cpair = b2.get_connection(SubdomainSpec2D.X_HIGH, b1.id)
         _verify_slices(cpair)
         expected_map = {
                 vi(1,-1): np.array([[0]]),
@@ -585,7 +585,7 @@ class TestBlock2D(unittest.TestCase):
 
         b3 = SubdomainSpec2D((0, 32), (32, 32), envelope_size=1, id_=3)
         self.assertTrue(b3.connect(b1, geo, axis=1, grid=D2Q9))
-        cpair = b1.get_connection(SubdomainSpec2D._Y_LOW, b3.id)
+        cpair = b1.get_connection(SubdomainSpec2D.Y_LOW, b3.id)
         _verify_slices(cpair)
         expected_map = {
                 vi(-1,-1): np.array([[0]]),
@@ -593,7 +593,7 @@ class TestBlock2D(unittest.TestCase):
                 vi(1, -1): np.array([[31]])}
         self._verify_partial_map(cpair.src, expected_map)
 
-        cpair = b3.get_connection(SubdomainSpec2D._Y_HIGH, b1.id)
+        cpair = b3.get_connection(SubdomainSpec2D.Y_HIGH, b1.id)
         _verify_slices(cpair)
         expected_map = {
                 vi(-1,1): np.array([[0]]),
