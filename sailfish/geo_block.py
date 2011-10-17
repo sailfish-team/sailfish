@@ -187,12 +187,12 @@ class SubdomainSpec(object):
     dim = None
 
     # Face IDs.
-    _X_LOW = 0
-    _X_HIGH = 1
-    _Y_LOW = 2
-    _Y_HIGH = 3
-    _Z_LOW = 4
-    _Z_HIGH = 5
+    X_LOW = 0
+    X_HIGH = 1
+    Y_LOW = 2
+    Y_HIGH = 3
+    Z_LOW = 4
+    Z_HIGH = 5
 
     def __init__(self, location, size, envelope_size=None, id_=None, *args, **kwargs):
         self.location = location
@@ -289,6 +289,9 @@ class SubdomainSpec(object):
                 ids.append((face, pair.dst.block_id))
         return ids
 
+    def has_face_conn(self, face):
+        return face in self._connections.keys()
+
     def set_actual_size(self, envelope_size):
         # TODO: It might be possible to optimize this a little by avoiding
         # having buffers on the sides which are not connected to other blocks.
@@ -301,7 +304,7 @@ class SubdomainSpec(object):
 
     @classmethod
     def face_to_dir(cls, face):
-        if face in (cls._X_LOW, cls._Y_LOW, cls._Z_LOW):
+        if face in (cls.X_LOW, cls.Y_LOW, cls.Z_LOW):
             return -1
         else:
             return 1
@@ -309,11 +312,11 @@ class SubdomainSpec(object):
     @classmethod
     def face_to_axis(cls, face):
         """Returns the axis number corresponding to a face constant."""
-        if face == cls._X_HIGH or face == cls._X_LOW:
+        if face == cls.X_HIGH or face == cls.X_LOW:
             return 0
-        elif face == cls._Y_HIGH or face == cls._Y_LOW:
+        elif face == cls.Y_HIGH or face == cls.Y_LOW:
             return 1
-        elif face == cls._Z_HIGH or face == cls._Z_LOW:
+        elif face == cls.Z_HIGH or face == cls.Z_LOW:
             return 2
 
     def face_to_normal(self, face):
@@ -326,9 +329,9 @@ class SubdomainSpec(object):
 
     def opposite_face(self, face):
         opp_map = {
-            self._X_HIGH: self._X_LOW,
-            self._Y_HIGH: self._Y_LOW,
-            self._Z_HIGH: self._Z_LOW
+            self.X_HIGH: self.X_LOW,
+            self.Y_HIGH: self.Y_LOW,
+            self.Z_HIGH: self.Z_LOW
         }
         opp_map.update(dict((v, k) for k, v in opp_map.iteritems()))
         return opp_map[face]
@@ -337,19 +340,19 @@ class SubdomainSpec(object):
     def axis_dir_to_face(cls, axis, dir_):
         if axis == 0:
             if dir_ == -1:
-                return cls._X_LOW
+                return cls.X_LOW
             elif dir_ == 1:
-                return cls._X_HIGH
+                return cls.X_HIGH
         elif axis == 1:
             if dir_ == -1:
-                return cls._Y_LOW
+                return cls.Y_LOW
             elif dir_ == 1:
-                return cls._Y_HIGH
+                return cls.Y_HIGH
         elif axis == 2:
             if dir_ == -1:
-                return cls._Z_LOW
+                return cls.Z_LOW
             elif dir_ == -1:
-                return cls._Z_HIGH
+                return cls.Z_HIGH
 
     def connect(self, block, geo=None, axis=None, grid=None):
         """Creates a connection between this block and another block.
@@ -366,36 +369,36 @@ class SubdomainSpec(object):
         assert block.id != self.id
 
         def connect_x():
-            c1 = LBConnection.make(self, block, self._X_HIGH, grid)
-            c2 = LBConnection.make(block, self, self._X_LOW, grid)
+            c1 = LBConnection.make(self, block, self.X_HIGH, grid)
+            c2 = LBConnection.make(block, self, self.X_LOW, grid)
 
             if c1 is None:
                 return False
 
-            self._add_connection(self._X_HIGH, ConnectionPair(c1, c2))
-            block._add_connection(self._X_LOW, ConnectionPair(c2, c1))
+            self._add_connection(self.X_HIGH, ConnectionPair(c1, c2))
+            block._add_connection(self.X_LOW, ConnectionPair(c2, c1))
             return True
 
         def connect_y():
-            c1 = LBConnection.make(self, block, self._Y_HIGH, grid)
-            c2 = LBConnection.make(block, self, self._Y_LOW, grid)
+            c1 = LBConnection.make(self, block, self.Y_HIGH, grid)
+            c2 = LBConnection.make(block, self, self.Y_LOW, grid)
 
             if c1 is None:
                 return False
 
-            self._add_connection(self._Y_HIGH, ConnectionPair(c1, c2))
-            block._add_connection(self._Y_LOW, ConnectionPair(c2, c1))
+            self._add_connection(self.Y_HIGH, ConnectionPair(c1, c2))
+            block._add_connection(self.Y_LOW, ConnectionPair(c2, c1))
             return True
 
         def connect_z():
-            c1 = LBConnection.make(self, block, self._Z_HIGH, grid)
-            c2 = LBConnection.make(block, self, self._Z_LOW, grid)
+            c1 = LBConnection.make(self, block, self.Z_HIGH, grid)
+            c2 = LBConnection.make(block, self, self.Z_LOW, grid)
 
             if c1 is None:
                 return False
 
-            self._add_connection(self._Z_HIGH, ConnectionPair(c1, c2))
-            block._add_connection(self._Z_LOW, ConnectionPair(c2, c1))
+            self._add_connection(self.Z_HIGH, ConnectionPair(c1, c2))
+            block._add_connection(self.Z_LOW, ConnectionPair(c2, c1))
             return True
 
         if geo is not None:

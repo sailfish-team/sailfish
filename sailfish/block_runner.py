@@ -249,18 +249,31 @@ class BlockRunner(object):
             arr_ny, arr_nx = self._physical_size
             lat_nx, lat_ny = self._lat_size
 
+            ew_conns = 0        # east-west
+            block = self._block
+
             # Sometimes, due to misalignment, two blocks might be necessary to
             # cover the right boundary.
             padding = arr_nx - lat_nx
-            if bs - padding < bns:
-                aux_main = 3    # 1 block on the left, 2 blocks on the right
-            else:
-                aux_main = 2    # 1 block on the left, 1 block on the right
+            if block.has_face_conn(block.X_HIGH):
+                if bs - padding < bns:
+                    ew_conns = 1    # 1 block on the left, 1 block on the right
+                else:
+                    ew_conns = 2    # 1 block on the left, 2 blocks on the right
+
+            if block.has_face_conn(block.X_LOW):
+                ew_conns += 1
+
+            ns_conns = 0        # north-south
+            if block.has_face_conn(block.Y_LOW):
+                ns_conns += 1
+            if block.has_face_conn(block.Y_HIGH):
+                ns_conns += 1
 
             self._boundary_blocks = (
-                    (bns * arr_nx / bs) * 2 +       # top & bottom
-                    (arr_ny - 2 * bns) * aux_main)  # left & right (w/o top & bottom rows)
-            self._kernel_grid_bulk = [arr_nx - aux_main * bs, arr_ny - 2 * bns]
+                    (bns * arr_nx / bs) * ns_conns +       # top & bottom
+                    (arr_ny - ns_conns * bns) * ew_conns)  # left & right (w/o top & bottom rows)
+            self._kernel_grid_bulk = [arr_nx - ew_conns * bs, arr_ny - ns_conns * bns]
             self._kernel_grid_full = [arr_nx / bs, arr_ny]
         else:
             arr_nz, arr_ny, arr_nx = self._physical_size
@@ -310,7 +323,7 @@ class BlockRunner(object):
                     self.config.lat_nx)
 
         # Used so that face values map to the limiting coordinate
-        # along a specific axis, e.g. lat_linear[_X_LOW] = 0
+        # along a specific axis, e.g. lat_linear[X_LOW] = 0
         # TODO(michalj): Should this use _block.envelope_size instead of -1?
         self.lat_linear = [0, self._lat_size[-1]-1, 0, self._lat_size[-2]-1]
         self.lat_linear_dist = [self._lat_size[-1]-2, 1,  self._lat_size[-2]-2, 1]
@@ -361,7 +374,7 @@ class BlockRunner(object):
                     idx[0]).astype(np.uint32)
 
     def _get_src_slice_indices(self, face, cpair):
-        if face in (self._block._X_LOW, self._block._X_HIGH):
+        if face in (self._block.X_LOW, self._block.X_HIGH):
             gx = self.lat_linear[face]
         else:
             return None
@@ -370,7 +383,7 @@ class BlockRunner(object):
     def _get_dst_slice_indices(self, face, cpair):
         if not cpair.dst.dst_slice:
             return None
-        if face in (self._block._X_LOW, self._block._X_HIGH):
+        if face in (self._block.X_LOW, self._block.X_HIGH):
             gx = self.lat_linear_dist[self._block.opposite_face(face)]
         else:
             return None

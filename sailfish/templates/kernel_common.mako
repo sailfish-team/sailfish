@@ -66,8 +66,20 @@
 <%def name="local_indices_bulk()">
 	lx = get_local_id(0);	// ID inside the current block
 	%if dim == 2:
-		gx = ${block_size} + get_global_id(0);
-		gy = ${boundary_size} + get_group_id(1);
+		<%
+			if block.has_face_conn(block.X_LOW):
+				xoff = block_size
+			else:
+				xoff = 0
+
+			if block.has_face_conn(block.Y_LOW):
+				yoff = boundary_size
+			else:
+				yoff = 0
+		%>
+
+		gx = ${xoff} + get_global_id(0);
+		gy = ${yoff} + get_group_id(1);
 	%else:
 		gx = ${block_size} + get_global_id(0) % ${arr_nx - 2 * block_size};
 		gy = ${boundary_size} + get_global_id(0) / ${arr_nx - 2 * block_size};
@@ -88,31 +100,58 @@
 	int gid = get_group_id(0) + get_group_id(1) * get_global_size(0) / get_local_size(0);
 	%if dim == 2:
 		<%
+			has_ylow = int(block.has_face_conn(block.Y_LOW))
+			has_yhigh = int(block.has_face_conn(block.Y_HIGH))
+			has_xlow = int(block.has_face_conn(block.X_LOW))
+			has_xhigh = int(block.has_face_conn(block.X_HIGH))
+
+			ns_conns = has_ylow + has_yhigh
 			xblocks = arr_nx / block_size
-			yblocks = arr_ny - 2 * boundary_size
-			bottom_idx = boundary_size * xblocks
-			left_idx = 2 * bottom_idx
-			right_idx = left_idx + yblocks
-			right2_idx = right_idx + yblocks
-			max_idx = right2_idx + yblocks
+			yblocks = arr_ny - ns_conns * boundary_size
+
+			padding = arr_nx - lat_nx
+			if block.has_face_conn(block.X_HIGH) and block_size - padding >= boundary_size:
+				aux_ew = 1	# 2 blocks on the right due to misalignment
+			else:
+				aux_ew = 0	# 1 block on the right
+
+			bottom_idx = has_ylow * boundary_size * xblocks
+			left_idx = bottom_idx + has_yhigh * boundary_size * xblocks
+			right_idx = left_idx + has_xlow * yblocks
+			right2_idx = right_idx + has_xhigh * yblocks
+			max_idx = right2_idx + aux_ew * yblocks
 		%>
-		if (gid < ${bottom_idx}) {
-			gx = (gid % ${xblocks}) * ${block_size} + lx;
-			gy = gid / ${xblocks};
-		} else if (gid < ${left_idx}) {
-			gid -= ${bottom_idx};
-			gx = (gid % ${xblocks}) * ${block_size} + lx;
-			gy = ${lat_ny-1} - gid / ${xblocks};
-		} else if (gid < ${right_idx}) {
-			gx = lx;
-			gy = gid + ${boundary_size - left_idx};
-		} else if (gid < ${right2_idx}) {
-			gx = ${arr_nx - block_size} + lx;
-			gy = gid + ${boundary_size - right_idx};
-		} else if (gid < ${max_idx}) {
-			gx = ${arr_nx - 2*block_size} + lx;
-			gy = gid + ${boundary_size - right2_idx};
-		} else {
+		// x: ${xblocks}, y: ${yblocks}
+		if (0) {;}
+		%if block.has_face_conn(block.Y_LOW):
+			else if (gid < ${bottom_idx}) {
+				gx = (gid % ${xblocks}) * ${block_size} + lx;
+				gy = gid / ${xblocks};
+			}
+		%endif
+		%if block.has_face_conn(block.Y_HIGH):
+			else if (gid < ${left_idx}) {
+				gid -= ${bottom_idx};
+				gx = (gid % ${xblocks}) * ${block_size} + lx;
+				gy = ${lat_ny-1} - gid / ${xblocks};
+			}
+		%endif
+		%if block.has_face_conn(block.X_LOW):
+			else if (gid < ${right_idx}) {
+				gx = lx;
+				gy = gid + ${has_ylow * boundary_size - left_idx};
+			}
+		%endif
+		%if block.has_face_conn(block.X_HIGH):
+			else if (gid < ${right2_idx}) {
+				gx = ${arr_nx - block_size} + lx;
+				gy = gid + ${has_ylow * boundary_size - right_idx};
+			} else if (gid < ${max_idx}) {
+				gx = ${arr_nx - 2*block_size} + lx;
+				gy = gid + ${has_ylow * boundary_size - right2_idx};
+			}
+		%endif
+		else {
 			return;
 		}
 	%else:
