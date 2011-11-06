@@ -304,6 +304,9 @@ class LBMSim(object):
     def hostsync_dist(self):
         """Copy the current distributions from the compute unit to the host.
 
+        Note: This function only works if the simulation has distributions
+        explicitly initialized on the host (i.e. ic_fields = False).
+
         The distributions are then available in :attr:`dist`.
         """
         for dist in self.curr_dists():
