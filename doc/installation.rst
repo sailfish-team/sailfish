@@ -66,8 +66,8 @@ Ubuntu installation instructions
 --------------------------------
 
 These instructions assume that you want to use the CUDA backend.  Before installing following them,
-please make sure the NVIDIA CUDA Toolkit is installed in ``/usr/local/cuda`` (default location).
-You can get the necessary files at http://nvidia.com/cuda.
+please make sure the NVIDIA CUDA Toolkit is installed in ``/usr/local/cuda`` (default location) and
+that ``nvcc`` is in your ``$PATH``.  You can get the necessary files at http://nvidia.com/cuda.
 
 To install the required packages on an Ubuntu system::
 
@@ -75,9 +75,9 @@ To install the required packages on an Ubuntu system::
   apt-get install python-mako python-decorator python-pytools  build-essential python-dev python-setuptools libboost-python-dev libboost-thread-dev
   apt-get install git-core
   git clone http://git.tiker.net/trees/pycuda.git
+  cd pycuda
   git submodule init
   git submodule update
-  cd pycuda
   ./configure.py --cuda-root=/usr/local/cuda --cudadrv-lib-dir=/usr/local/cuda/lib64 --boost-inc-dir=/usr/include --boost-lib-dir=/usr/lib --boost-python-libname=boost_python-mt --boost-thread-libname=boost_thread-mt
   make -j4
   python setup.py install
