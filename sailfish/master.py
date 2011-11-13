@@ -27,7 +27,7 @@ def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
     # particularly important with Numpy 1.3.0, where there is a race
     # condition when saving npz files.
     tempfile.tempdir = tempfile.mkdtemp()
-    # We instantiate the backend class here (instead in the machine
+    # We instantiate the backend class here (instead of in the machine
     # master), so that the backend object is created within the
     # context of the new process.
     backend = backend_class(config, gpu_id)
@@ -58,7 +58,7 @@ class LBMachineMaster(object):
         :param subdomain_addr_map: dict mapping subdomain IDs to IP/DNS addresses
         :param channel: execnet Channel object for communication with the
                 controller
-        :param iface: network interface on which to listed for connections from
+        :param iface: network interface on which to listen for connections from
                 other blocks
         """
 

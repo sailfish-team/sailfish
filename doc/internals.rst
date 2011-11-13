@@ -66,6 +66,25 @@ This section explains what happens in the first few seconds after you
 start executing your simulation script and before the simulation is
 actually running.
 
+Distributed execution
+---------------------
+
+A distributed simulation is started by the controller mapping subdomains to
+available nodes (as specified in a cluster definition file).  This is followed
+by establishing an SSH connection to all nodes to which at least one block has been
+assigned.  Once the connection is established, the ``execnet`` module is used to 
+(optionally) sync files from the controller host to the node, and to execute the
+:func:`_start_cluster_machine_master` function to start a :class:`LBMachineMaster`
+on each node.  The masters and the controller are then linked by an execnet channel.
+
+Each master starts a :class:`LBBlockRunner` for each of its subdomains.  The runners
+are executed as subprocesses, and they communicate with the master using zeromq
+IPC connections.  For each connected subdomain pair, one of the subdomains starts a listening
+zeromq TCP socket with a random port.  This port is then communicated to the master,
+which forwards it to the controller.  Once all runners have started, the controller
+builds a global port map, which is then sent through the masters to all runners, which
+use it to establish two-way connections between all connected subdomain pairs.
+
 Inside a simulation
 -------------------
 
