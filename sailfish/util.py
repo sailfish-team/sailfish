@@ -4,9 +4,12 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+from collections import namedtuple
 import sys
 
 from sailfish import sym
+
+TimingInfo = namedtuple('TimingInfo', 'comp bulk bnd coll data recv send wait total block_id')
 
 def get_grid_from_config(config):
     for x in sym.KNOWN_GRIDS:
