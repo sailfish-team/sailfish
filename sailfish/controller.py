@@ -309,18 +309,14 @@ class LBSimulationController(object):
                 rsync.add_target(gw, dest)
             rsync.send()
 
-        node_subdomains = self._split_subdomains_between_nodes(cluster.nodes,
+        self._node_subdomains = self._split_subdomains_between_nodes(cluster.nodes,
                 subdomains)
 
         subdomain_id_to_addr = {}
-        for node_id, subdomains in enumerate(node_subdomains):
+        for node_id, subdomains in enumerate(self._node_subdomains):
             for subdomain in subdomains:
                 subdomain_id_to_addr[subdomain.id] = cluster.nodes[node_id].addr
 
-        # TODO:
-        # specify a zmq port to the controller in the config
-        # wait for all nodes to report their location (host, port)
-        # each node waits to receive map for other nodes
         self._cluster_channels = []
         import sys
         for i, (node, gw) in enumerate(zip(cluster.nodes, self._cluster_gateways)):
@@ -333,7 +329,7 @@ class LBSimulationController(object):
 
             self._cluster_channels.append(
                     gw.remote_exec(_start_cluster_machine_master,
-                    args=pickle.dumps((node_config, node_subdomains[i])),
+                    args=pickle.dumps((node_config, self._node_subdomains[i])),
                     main_script=sys.argv[0],
                     lb_class_name=self._lb_class.__name__,
                     subdomain_addr_map=subdomain_id_to_addr,
@@ -370,11 +366,13 @@ class LBSimulationController(object):
 
         if self.config.cluster_spec:
             if self.config.mode == 'benchmark':
-                for ch in self._cluster_channels:
-                    timing_infos.append(util.TimingInfo(*ch.receive()))
+                for ch, subdomains in zip(self._cluster_channels, self._node_subdomains):
+                    for sub in subdomains:
+                        timing_infos.append(util.TimingInfo(*ch.receive()))
 
             for ch in self._cluster_channels:
-                assert ch.receive() == 'FIN'
+                data = ch.receive()
+                assert data == 'FIN'
             for gw in self._cluster_gateways:
                 gw.exit()
         else:
