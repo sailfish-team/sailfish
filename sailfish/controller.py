@@ -30,10 +30,13 @@ def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
     This function is executed by the execnet module.  In order for it to work,
     it cannot depend on any global symbols."""
     import cPickle as pickle
+    import os
     import platform
+    import sys
     import traceback
 
     try:
+        sys.path.append(os.path.dirname(main_script))
         import imp
         main = imp.load_source('main', main_script)
         for name in dir(main):
@@ -342,7 +345,11 @@ class LBSimulationController(object):
         ports = {}
         for channel in self._cluster_channels:
             data = channel.receive()
-            ports.update(data)
+            # If a string is received, print it to help with debugging.
+            if type(data) is str:
+                print data
+            else:
+                ports.update(data)
 
         for channel in self._cluster_channels:
             channel.send(ports)
