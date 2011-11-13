@@ -6,6 +6,7 @@ __license__ = 'LGPL3'
 
 import cPickle as pickle
 import copy
+import math
 import imp
 import platform
 from multiprocessing import Process
@@ -54,6 +55,33 @@ def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
         channel.send(traceback.format_exc())
 
     channel.send('FIN')
+
+
+# TODO: This is currently a very dumb procedure.  Ideally, we would
+# obtain a speed estimate from each node, calculate the amount of work
+# per subdomain, and distribute the work taking all this into account.
+def split_subdomains_between_nodes(nodes, subdomains):
+    """Assigns subdomains to cluster nodes.
+
+    Returns a list of 'nodes' lists of subdomains."""
+
+    total_gpus = sum([len(node.gpus) for node in nodes])
+    n = len(subdomains)
+    idx = 0
+
+    assignments = []
+    for i, node in enumerate(nodes):
+        units = int(math.ceil(float(n) * len(node.gpus) / total_gpus))
+        assignments.append(subdomains[idx:idx+units])
+        idx += units
+
+        if idx >= n:
+            break
+
+    # Add any remaining subdomains to the last node.
+    assignments[-1].extend(subdomains[idx:])
+
+    return assignments
 
 
 class GeometryError(Exception):
@@ -269,35 +297,14 @@ class LBSimulationController(object):
         for block in blocks:
             block.set_actual_size(envelope_size)
 
-    # TODO: This is currently a very dumb procedure.  Ideally, we would
-    # obtain a speed estimate from each node, calculate the amount of work
-    # per subdomain, and distribute the work taking all this into account.
-    def _split_subdomains_between_nodes(self, nodes, subdomains):
-        """Assigns subdomains to cluster nodes.
-
-        Returns a list of 'nodes' lists of subdomains."""
-
-        total_gpus = sum([len(node.gpus) for node in nodes])
-        n = len(subdomains)
-        idx = 0
-
-        assignments = []
-        for i, node in enumerate(nodes):
-            units = int(n * len(node.gpus) / total_gpus)
-            assignments.append(subdomains[idx:idx+units])
-            idx += units
-
-        # Add any remaining subdomains to the last node.
-        assignments[-1].extend(subdomains[idx:])
-
-        return assignments
-
     def _start_cluster_simulation(self, subdomains):
         """Starts a simulation on a cluster of nodes."""
         cluster = imp.load_source('cluster', self.config.cluster_spec)
 
         self._cluster_gateways = []
-        for node in cluster.nodes:
+        self._node_subdomains = split_subdomains_between_nodes(cluster.nodes, subdomains)
+
+        for _, node in zip(self._node_subdomains, cluster.nodes):
             self._cluster_gateways.append(execnet.makegateway(node.host))
 
         # Copy files to remote nodes if necessary.
@@ -308,9 +315,6 @@ class LBSimulationController(object):
             for gw in self._cluster_gateways:
                 rsync.add_target(gw, dest)
             rsync.send()
-
-        self._node_subdomains = self._split_subdomains_between_nodes(cluster.nodes,
-                subdomains)
 
         subdomain_id_to_addr = {}
         for node_id, subdomains in enumerate(self._node_subdomains):

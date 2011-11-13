@@ -211,6 +211,8 @@ class LBMachineMaster(object):
         sim = self.lb_class(self.config)
         block2gpu = self._assign_blocks_to_gpus()
 
+        self.config.logger.info('Block -> GPU map: {0}'.format(block2gpu))
+
         self._init_connectors()
         output_initializer = self._init_visualization_and_io()
         try:
