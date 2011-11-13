@@ -59,6 +59,13 @@ class BlockRunner(object):
     def __init__(self, simulation, block, output, backend, quit_event,
             summary_addr=None, master_addr=None, summary_channel=None):
         """
+        :param simulation: instance of a simulation class, descendant from LBSim
+        :param block: SubdomainSpec that this runner is to handle
+        :param backend: instance of a Sailfish backend class to handle
+                GPU interaction
+        :param quit_event: multiprocessing Event object; if set, the master is
+                requesting early termination of the simulation
+        :param master_addr: if not None, zmq address of the machine master
         :param summary_addr: if not None, zmq address string to which summary
                 information will be sent.
         :param summary_channel: if not None, execnet channel object to which

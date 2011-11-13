@@ -52,7 +52,14 @@ class LBMachineMaster(object):
             channel=None, iface=None):
         """
         Args:
-        :param subdomain_addr_map: dict mapping subdomain IDs to IP addresses
+        :param config: LBConfig object
+        :param blocks: list of SubdomainSpec objects assigned to this machine
+        :param lb_class: simulation class descendant from LBSim
+        :param subdomain_addr_map: dict mapping subdomain IDs to IP/DNS addresses
+        :param channel: execnet Channel object for communication with the
+                controller
+        :param iface: network interface on which to listed for connections from
+                other blocks
         """
 
         self.blocks = blocks
