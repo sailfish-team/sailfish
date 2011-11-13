@@ -195,7 +195,7 @@ class LBSimulationController(object):
     """Controls the execution of a LB simulation."""
 
     def __init__(self, lb_class, lb_geo=None, default_config=None):
-        self.config = config.LBConfigParser()
+        self._config_parser = config.LBConfigParser()
         self._lb_class = lb_class
 
         # Use a default global geometry is one has not been
@@ -208,7 +208,7 @@ class LBSimulationController(object):
 
         self._lb_geo = lb_geo
 
-        group = self.config.add_group('Runtime mode settings')
+        group = self._config_parser.add_group('Runtime mode settings')
         group.add_argument('--mode', help='runtime mode', type=str,
             choices=['batch', 'visualization', 'benchmark']),
         group.add_argument('--every',
@@ -247,18 +247,18 @@ class LBSimulationController(object):
                 'contents of "local_path" to "dest_path" on all cluster '
                 'machines before starting the simulation')
 
-        group = self.config.add_group('Simulation-specific settings')
+        group = self._config_parser.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)
 
-        group = self.config.add_group('Geometry settings')
+        group = self._config_parser.add_group('Geometry settings')
         lb_geo.add_options(group)
 
-        group = self.config.add_group('Code generator options')
+        group = self._config_parser.add_group('Code generator options')
         codegen.BlockCodeGenerator.add_options(group)
 
         # Backend options
         for backend in util.get_backends():
-            group = self.config.add_group(
+            group = self._config_parser.add_group(
                     "'{0}' backend options".format(backend.name))
             backend.add_options(group)
 
@@ -267,17 +267,17 @@ class LBSimulationController(object):
         if (default_config is None or 'mode' not in default_config or
             default_config['mode'] == 'visualization'):
             for engine in util.get_visualization_engines():
-                group = self.config.add_group(
+                group = self._config_parser.add_group(
                         "'{0}' visualization engine".format(engine.name))
                 engine.add_options(group)
 
         # Set default values defined by the simulation-specific class.
         defaults = {}
         lb_class.update_defaults(defaults)
-        self.config.set_defaults(defaults)
+        self._config_parser.set_defaults(defaults)
 
         if default_config is not None:
-            self.config.set_defaults(default_config)
+            self._config_parser.set_defaults(default_config)
 
     @property
     def dim(self):
@@ -409,7 +409,7 @@ class LBSimulationController(object):
     def run(self):
         """Runs a simulation."""
 
-        self.config = self.config.parse()
+        self.config = self._config_parser.parse()
         self._lb_class.modify_config(self.config)
         self.geo = self._lb_geo(self.config)
 

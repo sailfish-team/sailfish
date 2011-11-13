@@ -61,9 +61,15 @@ class MachineSpec(object):
 
     def __init__(self, host, addr, gpus=[0], iface='eth0', **kwargs):
         """
-        :param host: host name (can be an execnet gateway spec)
+        :param host: host name (can be a full execnet gateway spec)
+        :param addr: host address (IP or domain name); this will be used to
+                establish block-block connections
         :param gpus: list of GPU IDs on which to run
-        :parma addr: host address (IP or domain name)
+        :param iface: network interface on which to listen for remote
+                connections
+
+        Additional keyword parameters will be stored in the machine's
+        LBConfig instance when a simulation is run.
         """
         self.host = host
         self.addr = addr
