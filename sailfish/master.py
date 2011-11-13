@@ -108,9 +108,6 @@ class LBMachineMaster(object):
         else:
             return ctypes.c_float
 
-    def _is_local_block(self, block_id):
-        return block_id in self.blocks
-
     def _init_connectors(self):
         """Creates block connectors for all blocks connections."""
         # A set to keep track which connections are already created.
@@ -118,6 +115,9 @@ class LBMachineMaster(object):
 
         # TOOD(michalj): Fix this for multi-grid models.
         grid = util.get_grid_from_config(self.config)
+
+        # IDs of the blocks that are local to this master.
+        local_block_ids = set([b.id for b in self.blocks])
 
         for i, block in enumerate(self.blocks):
             connecting_blocks = block.connecting_blocks()
@@ -145,7 +145,7 @@ class LBMachineMaster(object):
                         "-element buffer (face {4}).".format(
                             block.id, nbid, size1, size2, face_str))
 
-                if self._is_local_block(nbid):
+                if nbid in local_block_ids:
                     c1, c2 = ZMQBlockConnector.make_ipc_pair(ctype, (size1, size2),
                                                              (block.id, nbid))
                     block.add_connector(nbid, c1)
