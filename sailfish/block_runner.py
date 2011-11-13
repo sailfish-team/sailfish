@@ -15,7 +15,6 @@ from sailfish import codegen, util
 # Used to hold a reference to a CUDA kernel and a grid on which it is
 # to be executed.
 KernelGrid = namedtuple('KernelGrid', 'kernel grid')
-TimingInfo = namedtuple('TimingInfo', 'comp bulk bnd coll data recv send wait total block_id')
 
 
 class ConnectionBuffer(object):
@@ -58,14 +57,23 @@ class BlockRunner(object):
     """Runs the simulation for a single SubdomainSpec.
     """
     def __init__(self, simulation, block, output, backend, quit_event,
-            summary_addr=None, master_addr=None):
-        # Create a 2-way connection between the SubdomainSpec and this BlockRunner
+            summary_addr=None, master_addr=None, summary_channel=None):
+        """
+        :param summary_addr: if not None, zmq address string to which summary
+                information will be sent.
+        :param summary_channel: if not None, execnet channel object to which
+                summary information will be sent.
+        """
+
+        self._summary_sender = None
+        self._summary_channel = summary_channel
+
         self._ctx = zmq.Context()
         if summary_addr is not None:
+            assert summary_channel is None, ("Use either zmq or execnet "
+                    "to send back summary information, but not both.")
             self._summary_sender = self._ctx.socket(zmq.REQ)
             self._summary_sender.connect(summary_addr)
-        else:
-            self._summary_sender = None
 
         self._block = block
         block.runner = self
@@ -865,6 +873,17 @@ class BlockRunner(object):
         gy = rest / arr_nx
         return dist_num, gy, gx
 
+    def _send_summary_info(self, timing_info):
+        if self._summary_sender is not None:
+            self._summary_sender.send_pyobj(timing_info)
+            self.config.logger.debug('Sending timing information to controller.')
+            assert self._summary_sender.recv_pyobj() == 'ack'
+        elif self._summary_channel is not None:
+            # Send as tuple to avoid incompatibilities between namedtuple
+            # implementations (__dict__ is sometimes missing).
+            self._summary_channel.send(tuple(timing_info))
+            self.config.logger.debug('Sending timing information to controller.')
+
     def run(self):
         self.config.logger.info("Initializing block.")
 
@@ -1004,10 +1023,7 @@ class BlockRunner(object):
                             t_wait / j, t_total / j))
 
         mi = self.config.max_iters
-        ti = TimingInfo((t_bulk + t_bnd) / mi, t_bulk / mi, t_bnd / mi,
+        ti = util.TimingInfo((t_bulk + t_bnd) / mi, t_bulk / mi, t_bnd / mi,
                 t_coll / mi, t_data / mi, t_recv / mi, t_send / mi,
                 t_wait / mi, t_total / mi, self._block.id)
-        if self._summary_sender is not None:
-            self._summary_sender.send_pyobj(ti)
-            self.config.logger.debug('Sending timing information to controller.')
-            assert self._summary_sender.recv_pyobj() == 'ack'
+        self._send_summary_info(ti)

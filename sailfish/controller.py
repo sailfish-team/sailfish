@@ -15,14 +15,19 @@ import zmq
 from sailfish import codegen, config, io, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
 
-
 def _start_machine_master(config, blocks, lb_class):
+    """Starts a machine master process locally."""
     from sailfish.master import LBMachineMaster
     master = LBMachineMaster(config, blocks, lb_class)
     master.run()
 
+
 def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
         subdomain_addr_map, iface):
+    """Starts a machine master process on a remote host.
+
+    This function is executed by the execnet module.  In order for it to work,
+    it cannot depend on any global symbols."""
     import cPickle as pickle
     import platform
     import traceback
@@ -44,9 +49,12 @@ def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
                 iface=iface)
         master.run()
     except Exception:
+        # Send any exceptions by to the controller to aid
+        # debugging.
         channel.send(traceback.format_exc())
 
     channel.send('FIN')
+
 
 class GeometryError(Exception):
     pass
@@ -201,8 +209,6 @@ class LBSimulationController(object):
                 'arrays to files'),
         group.add_argument('--log', type=str, default='',
                 help='name of the file to which data is to be logged')
-        group.add_argument('--zmq_port', type=int, default=1371,
-                help='0mq port to use for communication with block runners')
         group.add_argument('--bulk_boundary_split', type=bool, default=True,
                 help='if True, bulk and boundary nodes will be handled '
                 'separately (increases parallelism)')
@@ -359,14 +365,44 @@ class LBSimulationController(object):
         else:
             self._start_local_simulation(subdomains)
 
-    def _finish_simulation(self):
+    def _finish_simulation(self, blocks, summary_receiver):
+        timing_infos = []
+
         if self.config.cluster_spec:
+            if self.config.mode == 'benchmark':
+                for ch in self._cluster_channels:
+                    timing_infos.append(util.TimingInfo(*ch.receive()))
+
             for ch in self._cluster_channels:
-                print ch.receive()
+                assert ch.receive() == 'FIN'
             for gw in self._cluster_gateways:
                 gw.exit()
         else:
+            if self.config.mode == 'benchmark':
+                # Collect timing information from all blocks.
+                for i in range(len(blocks)):
+                    ti = summary_receiver.recv_pyobj()
+                    summary_receiver.send_pyobj('ack')
+                    timing_infos.append(ti)
+
             self._simulation_process.join()
+
+        if self.config.mode == 'benchmark':
+            mlups_total = 0.0
+            mlups_comp = 0.0
+
+            for ti in timing_infos:
+                block = blocks[ti.block_id]
+                mlups_total += block.num_nodes / ti.total * 1e-6
+                mlups_comp += block.num_nodes / ti.comp * 1e-6
+
+            if not self.config.quiet:
+                print ('Total MLUPS: eff:{0:.2f}  comp:{1:.2f}'.format(
+                        mlups_total, mlups_comp))
+            return timing_infos, blocks
+
+        return None, None
+
 
     def run(self):
         """Runs a simulation."""
@@ -377,7 +413,8 @@ class LBSimulationController(object):
 
         ctx = zmq.Context()
         summary_receiver = ctx.socket(zmq.REP)
-        summary_receiver.bind('tcp://127.0.0.1:{0}'.format(self.config.zmq_port))
+        port = summary_receiver.bind_to_random_port('tcp://127.0.0.1')
+        self.config._zmq_port = port
 
         blocks = self.geo.blocks()
         assert blocks is not None, \
@@ -392,25 +429,4 @@ class LBSimulationController(object):
         blocks = proc.transform(self.config)
 
         self._start_simulation(blocks)
-
-        if self.config.mode == 'benchmark':
-            timing_infos = []
-            mlups_total = 0.0
-            mlups_comp = 0.0
-            # Collect timing information from all blocks.
-            for i in range(len(blocks)):
-                ti = summary_receiver.recv_pyobj()
-                summary_receiver.send_pyobj('ack')
-                timing_infos.append(ti)
-                block = blocks[ti.block_id]
-                mlups_total += block.num_nodes / ti.total * 1e-6
-                mlups_comp += block.num_nodes / ti.comp * 1e-6
-
-            if not self.config.quiet:
-                print ('Total MLUPS: eff:{0:.2f}  comp:{1:.2f}'.format(
-                        mlups_total, mlups_comp))
-
-            self._finish_simulation()
-            return timing_infos, blocks
-
-        self._finish_simulation()
+        return self._finish_simulation(blocks, summary_receiver)

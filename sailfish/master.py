@@ -21,7 +21,7 @@ from sailfish import block_runner, util, io
 from sailfish.connector import ZMQBlockConnector, ZMQRemoteBlockConnector
 
 def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
-        quit_event, master_addr):
+        quit_event, master_addr, ctrl_channel):
     config.logger.debug('BlockRunner starting with PID {0}'.format(os.getpid()))
     # Make sure each block has its own temporary directory.  This is
     # particularly important with Numpy 1.3.0, where there is a race
@@ -32,9 +32,15 @@ def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
     # context of the new process.
     backend = backend_class(config, gpu_id)
 
-    # FIXME: fix the address here.
+    summary_addr = None
+    if ctrl_channel is None:
+        # If there is no controller channel, all processes are running on a
+        # single host and we can communicate with the controller using the
+        # loopback interface.
+        summary_addr = 'tcp://127.0.0.1:{0}'.format(config._zmq_port)
+
     runner = block_runner.BlockRunner(sim, block, output, backend, quit_event,
-            'tcp://127.0.0.1:{0}'.format(config.zmq_port), master_addr)
+            summary_addr, master_addr, summary_channel=ctrl_channel)
     runner.run()
 
 
@@ -199,6 +205,8 @@ class LBMachineMaster(object):
 
     def run(self):
         self.config.logger.info('Machine master starting with PID {0}'.format(os.getpid()))
+        self.config.logger.info('Handling blocks: {0}'.format([b.id for b in
+            self.blocks]))
 
         sim = self.lb_class(self.config)
         block2gpu = self._assign_blocks_to_gpus()
@@ -227,7 +235,8 @@ class LBMachineMaster(object):
                         name='Block/{0}'.format(block.id),
                         args=(block, self.config, sim,
                               backend_cls, block2gpu[block.id],
-                              output, self._quit_event, master_addr))
+                              output, self._quit_event, master_addr,
+                              self._channel))
             self.runners.append(p)
             self._block_id_to_runner[block.id] = p
 
