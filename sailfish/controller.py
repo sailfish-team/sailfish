@@ -8,6 +8,7 @@ import cPickle as pickle
 import copy
 import math
 import imp
+import os
 import platform
 from multiprocessing import Process
 
@@ -302,7 +303,11 @@ class LBSimulationController(object):
 
     def _start_cluster_simulation(self, subdomains):
         """Starts a simulation on a cluster of nodes."""
-        cluster = imp.load_source('cluster', self.config.cluster_spec)
+        try:
+            cluster = imp.load_source('cluster', self.config.cluster_spec)
+        except IOError, e:
+            cluster = imp.load_source('cluster',
+                    os.path.expanduser('~/.sailfish/{0}'.format(self.config.cluster_spec)))
 
         self._cluster_gateways = []
         self._node_subdomains = split_subdomains_between_nodes(cluster.nodes, subdomains)
