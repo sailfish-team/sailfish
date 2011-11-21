@@ -122,7 +122,6 @@ class BlockRunner(object):
         self._master_sock.send_pyobj(ports)
         if unready:
             remote_ports = self._master_sock.recv_pyobj()
-            assert len(remote_ports.keys()) == len(unready)
 
         for b_id in unready:
             connector = self._block._connectors[b_id]

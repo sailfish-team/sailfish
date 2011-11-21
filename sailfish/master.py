@@ -125,6 +125,7 @@ class LBMachineMaster(object):
 
         # IDs of the blocks that are local to this master.
         local_block_ids = set([b.id for b in self.blocks])
+        local_block_map = dict([(b.id, b) for b in self.blocks])
 
         for i, block in enumerate(self.blocks):
             connecting_blocks = block.connecting_blocks()
@@ -156,7 +157,7 @@ class LBMachineMaster(object):
                     c1, c2 = ZMQBlockConnector.make_ipc_pair(ctype, (size1, size2),
                                                              (block.id, nbid))
                     block.add_connector(nbid, c1)
-                    self.blocks[nbid].add_connector(block.id, c2)
+                    local_block_map[nbid].add_connector(block.id, c2)
                 else:
                     receiver = block.id > nbid
                     if receiver:
