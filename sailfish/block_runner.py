@@ -7,6 +7,7 @@ __license__ = 'LGPL3'
 from collections import defaultdict, namedtuple
 import math
 import operator
+import os
 import numpy as np
 import time
 import zmq
@@ -74,6 +75,7 @@ class BlockRunner(object):
 
         self._summary_sender = None
         self._summary_channel = summary_channel
+        self._ppid = os.getppid()
 
         self._ctx = zmq.Context()
         if summary_addr is not None:
@@ -533,6 +535,7 @@ class BlockRunner(object):
 
         for grid in self._sim.grids:
             size = self._get_dist_bytes(grid)
+            self.config.logger.debug("Using {0} bytes for buffer".format(size))
             self._gpu_grids_primary.append(self.backend.alloc_buf(size=size))
             self._gpu_grids_secondary.append(self.backend.alloc_buf(size=size))
 
@@ -949,6 +952,10 @@ class BlockRunner(object):
                 self.config.logger.info("Simulation termination requested.")
                 break
 
+            if self._ppid != os.getppid():
+                self.config.logger.info("Master process is dead -- terminating simulation.")
+                break
+
             self.recv_data()
             if self._quit_event.is_set():
                 self.config.logger.info("Simulation termination requested.")
@@ -1027,6 +1034,10 @@ class BlockRunner(object):
                         '  send:{5:e}  wait:{6:e}  total:{7:e}'.format(
                             t_bulk / j, t_bnd / j, t_coll / j, t_data / j, t_recv / j, t_send / j,
                             t_wait / j, t_total / j))
+
+        # Early termination requested or master process is dead.
+        if self._quit_event.is_set() or self._ppid != os.getppid():
+            return
 
         mi = self.config.max_iters
         ti = util.TimingInfo((t_bulk + t_bnd) / mi, t_bulk / mi, t_bnd / mi,
