@@ -55,15 +55,6 @@
 
 
 <%def name="nonlocal_fld(fld_id)">
-	%if fld_id in image_fields:
-		%if dim == 3:
-			get_img_field(img_f${fld_id}, nx + ny*${arr_nx}, nz)
-##			tex3D(img_f${fld_id}, nx, ny, nz)
-		%else:
-			get_img_field(img_f${fld_id}, nx, ny)
-		%endif
-	%else:
-		f${fld_id}[idx]
-	%endif
+	f${fld_id}[idx]
 </%def>
 
