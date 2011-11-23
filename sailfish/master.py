@@ -6,6 +6,7 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+import atexit
 import ctypes
 import logging
 import operator
@@ -74,27 +75,32 @@ class LBMachineMaster(object):
         self._quit_event = Event()
         self._channel = channel
 
+        atexit.register(lambda event: event.set(), event=self._quit_event)
+
         if iface is not None:
             self._iface = iface
         else:
             self._iface = '*'
         self.config.logger = logging.getLogger('saifish')
         formatter = logging.Formatter("[%(relativeCreated)6d %(levelname)5s %(processName)s] %(message)s")
-        handler = logging.StreamHandler()
-        handler.setFormatter(formatter)
-        self.config.logger.addHandler(handler)
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+        if config.verbose:
+            stream_handler.setLevel(logging.DEBUG)
+        elif config.quiet:
+            stream_handler.setLevel(logging.WARNING)
+        else:
+            stream_handler.setLevel(logging.INFO)
+
+        self.config.logger.addHandler(stream_handler)
 
         if self.config.log:
             handler = logging.FileHandler(self.config.log)
             handler.setFormatter(formatter)
+            handler.setLevel(config.loglevel)
             self.config.logger.addHandler(handler)
 
-        if config.verbose:
-            self.config.logger.setLevel(logging.DEBUG)
-        elif config.quiet:
-            self.config.logger.setLevel(logging.WARNING)
-        else:
-            self.config.logger.setLevel(logging.INFO)
+        self.config.logger.setLevel(logging.DEBUG)
 
     def _assign_blocks_to_gpus(self):
         block2gpu = {}

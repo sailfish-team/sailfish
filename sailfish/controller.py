@@ -8,6 +8,7 @@ import cPickle as pickle
 import copy
 import math
 import imp
+import logging
 import os
 import platform
 from multiprocessing import Process
@@ -16,6 +17,7 @@ import execnet
 import zmq
 from sailfish import codegen, config, io, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
+
 
 def _start_machine_master(config, blocks, lb_class):
     """Starts a machine master process locally."""
@@ -241,6 +243,8 @@ class LBSimulationController(object):
                 'arrays to files'),
         group.add_argument('--log', type=str, default='',
                 help='name of the file to which data is to be logged')
+        group.add_argument('--loglevel', type=int, default=logging.INFO,
+                help='minimum log level for the file logger')
         group.add_argument('--bulk_boundary_split', type=bool, default=True,
                 help='if True, bulk and boundary nodes will be handled '
                 'separately (increases parallelism)')
