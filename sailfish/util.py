@@ -14,6 +14,11 @@ from sailfish import sym
 
 TimingInfo = namedtuple('TimingInfo', 'comp bulk bnd coll data recv send wait total block_id')
 
+
+class GridError(Exception):
+    pass
+
+
 def get_grid_from_config(config):
     for x in sym.KNOWN_GRIDS:
         if x.__name__ == config.grid:

@@ -144,18 +144,7 @@ ${device_func} inline float sc_ppot(${global_ptr} float *fx, int fi1, int idx, i
 %endif
 )
 {
-	if (0) { ; }
-
-	%for fld_id in image_fields:
-		else if (fi1 == ${fld_id}) {
-			return ${sc_ppot(fld_id)};
-		}
-	%endfor
-	else {
-		return ${sc_ppot('x')};
-	}
-
-	return 0.0f;
+	return ${sc_ppot('x')};
 }
 
 

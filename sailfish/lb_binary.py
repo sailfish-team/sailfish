@@ -4,59 +4,84 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'GPL3'
 
-import numpy
+import numpy as np
+from sailfish import sym, util
+from sailfish.lb_base import LBSim
 
-from sailfish import lbm, lb_single, sym
 
-class BinaryFluidBase(lb_single.FluidLBMSim):
+class LBBinaryFluidBase(LBSim):
+    """Simulates a binary fluid."""
+
     kernel_file = 'binary_fluid.mako'
 
-    def __init__(self, geo_class, options=[], args=None, defaults=None):
-        super(BinaryFluidBase, self).__init__(geo_class, options, args, defaults)
+    def __init__(self, config):
+        super(LBBinaryFluidBase, self).__init__(config)
+        grid = util.get_grid_from_config(config)
+
+        if grid is None:
+            raise util.GridError('Invalid grid selected: {0}'.format(config.grid))
+
+        self.grids = [grid, grid]
         self._prepare_symbols()
-        self.add_nonlocal_field(0)
-        self.add_nonlocal_field(1)
 
-    def curr_dists(self):
-        if self.iter_ & 1:
-            return [self.gpu_dist1b, self.gpu_dist2b]
+    @property
+    def grid(self):
+        """Grid with the highest connectivity (Q)."""
+        return self.grids[0]
+
+    @classmethod
+    def add_options(cls, group, dim):
+        LBSim.add_options(group, dim)
+        group.add_option('--tau_phi', type=float, default=1.0,
+                help='relaxation time for the phase field')
+
+        grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == dim]
+        group.add_argument('--grid', help='LB grid', type=str,
+                choices=grids, default=grids[0])
+
+    def init_fields(self, runner):
+        self.phi = runner.make_scalar_field(name='phi', async=True)
+        self.rho = runner.make_scalar_field(name='rho', async=True)
+        self.v = runner.make_vector_field(name='v', async=True)
+
+        if self.grid.dim == 2:
+            self.vx, self.vy = self.v
+            runner.add_visualization_field(
+                    lambda: np.square(self.vx) + np.square(self.vy),
+                    name='v^2')
         else:
-            return [self.gpu_dist1a, self.gpu_dist2a]
+            self.vx, self.vy, self.vz = self.v
+            runner.add_visualization_field(
+                    lambda: np.square(self.vx) + np.square(self.vy) +
+                    np.square(self.vz), name='v^2')
 
-    def _prepare_symbols(self):
-        self.S.alias('phi', self.S.g1m0)
+    # FIXME
+    def get_pbc_kernels(self, runner):
+        gpu_dist1a = runner.gpu_dist(0, 0)
+        gpu_dist1b = runner.gpu_dist(0, 1)
+        gpu_dist2a = runner.gpu_dist(1, 0)
+        gpu_dist2b = runner.gpu_dist(1, 1)
 
-    def _init_fields(self, need_dist):
-        lbm.LBMSim._init_fields(self, need_dist)
-        self.phi = self.make_field('phi', True)
+        kernels = []
+        for i in range(0, 3):
+            kernels.append(runner.get_kernel(
+                'ApplyPeriodicBoundaryConditions', [gpu_dist1a, np.uint32(i)], 'Pi'))
+        for i in range(0, 3):
+            kernels.append(runner.get_kernel(
+                'ApplyPeriodicBoundaryConditions', [gpu_dist1b, np.uint32(i)], 'Pi'))
 
-        if need_dist:
-            self.dist2 = self.make_dist(self.grid)
+        return kernels
 
-    def _init_compute_fields(self):
-        super(BinaryFluidBase, self)._init_compute_fields()
-        self.gpu_phi = self.backend.alloc_buf(like=self.phi)
-        self.gpu_mom0.append(self.gpu_phi)
-
-        if not self._ic_fields:
-            self.gpu_dist2a = self.backend.alloc_buf(like=self.dist2)
-            self.gpu_dist2b = self.backend.alloc_buf(like=self.dist2)
-        else:
-            self.gpu_dist2a = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid), wrap_in_array=False)
-            self.gpu_dist2b = self.backend.alloc_buf(size=self.get_dist_bytes(self.grid), wrap_in_array=False)
-
-        self.img_rho = self.bind_nonlocal_field(self.gpu_rho, 0)
-        self.img_phi = self.bind_nonlocal_field(self.gpu_phi, 1)
-
-    def _init_compute_kernels(self):
+    # FIXME
+    def get_compute_kernels(self, runner, full_output, bulk):
         cnp_args1n = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_dist2a,
-                      self.gpu_dist2b, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [numpy.uint32(0)]
+                      self.gpu_dist2b, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [np.uint32(0)]
         cnp_args1s = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_dist2a,
-                      self.gpu_dist2b, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [numpy.uint32(1)]
+                      self.gpu_dist2b, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [np.uint32(1)]
         cnp_args2n = [self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_dist2b,
-                      self.gpu_dist2a, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [numpy.uint32(0)]
+                      self.gpu_dist2a, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [np.uint32(0)]
         cnp_args2s = [self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_dist2b,
-                      self.gpu_dist2a, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [numpy.uint32(1)]
+                      self.gpu_dist2a, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [np.uint32(1)]
 
         macro_args1 = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist2a, self.gpu_rho, self.gpu_phi]
         macro_args2 = [self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist2b, self.gpu_rho, self.gpu_phi]
@@ -99,29 +124,28 @@ class BinaryFluidBase(lb_single.FluidLBMSim):
         else:
             self.kern_grid_size = (self.arr_nx/self.options.block_size * self.arr_ny, self.arr_nz)
 
-    def _init_compute_ic(self):
-        if not self._ic_fields:
-            # Nothing to do, the initial distributions have already been
-            # set and copied to the GPU in _init_compute_fields.
-            return
+    def initial_conditions(self, runner):
+        gpu_rho = runner.gpu_field(self.rho)
+        gpu_phi = runner.gpu_field(self.phi)
+        gpu_v = runner.gpu_field(self.v)
 
-        args1 = [self.gpu_dist1a, self.gpu_dist2a] + self.gpu_velocity + [self.gpu_rho, self.gpu_phi]
-        args2 = [self.gpu_dist1b, self.gpu_dist2b] + self.gpu_velocity + [self.gpu_rho, self.gpu_phi]
+        gpu_dist1a = runner.gpu_dist(0, 0)
+        gpu_dist1b = runner.gpu_dist(0, 1)
+        gpu_dist2a = runner.gpu_dist(1, 0)
+        gpu_dist2b = runner.gpu_dist(1, 1)
 
-        kern1 = self.backend.get_kernel(self.mod, 'SetInitialConditions',
-                    args=args1,
-                    args_format='P'*len(args1),
-                    block=self._kernel_block_size())
+        args1 = [gpu_dist1a, gpu_dist2a] + gpu_v + [gpu_rho, gpu_phi]
+        args2 = [gpu_dist1b, gpu_dist2b] + gpu_v + [gpu_rho, gpu_phi]
 
-        kern2 = self.backend.get_kernel(self.mod, 'SetInitialConditions',
-                    args=args2,
-                    args_format='P'*len(args2),
-                    block=self._kernel_block_size())
+        runner.exec_kernel('SetInitialConditions', args1, 'P'*len(args1))
+        runner.exec_kernel('SetInitialConditions', args2, 'P'*len(args2))
 
-        self.backend.run_kernel(kern1, self.kern_grid_size)
-        self.backend.run_kernel(kern2, self.kern_grid_size)
-        self.backend.sync()
+    def update_context(self, ctx):
+        super(LBBinaryFluidBase, self)._update_ctx(ctx)
+        ctx['grids'] = self.grids
+        ctx['tau_phi'] = self.config.tau_phi
 
+    # FIXME
     def _lbm_step(self, get_data, **kwargs):
         kerns = self.kern_map[self.iter_ & 1]
 
@@ -138,53 +162,49 @@ class BinaryFluidBase(lb_single.FluidLBMSim):
         else:
             self.backend.run_kernel(kerns[1], self.kern_grid_size)
 
-class BinaryFluidFreeEnergy(BinaryFluidBase):
+    def _prepare_symbols(self):
+        self.S.alias('phi', self.S.g1m0)
+
+
+class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
+
+    def __init__(self, config):
+        super(LBBinaryFluidFreeEnergy, self).__init__(config)
+        self.equilibrium, self.equilibrium_vars = sym.free_energy_binary_liquid_equilibrium(self)
+
     @property
     def constants(self):
         return [('Gamma', self.options.Gamma), ('A', self.options.A), ('kappa', self.options.kappa),
                 ('tau_a', self.options.tau_a), ('tau_b', self.options.tau_b)]
 
-    def __init__(self, geo_class, options=[], args=None, defaults=None):
-        super(BinaryFluidFreeEnergy, self).__init__(geo_class, options, args, defaults)
-        self.equilibrium, self.equilibrium_vars = sym.free_energy_binary_liquid_equilibrium(self)
+    @classmethod
+    def add_options(cls, group, dim):
+        LBBinaryFluidBase.add_options(group, dim)
 
-    def _add_options(self, parser, lb_group):
-        super(BinaryFluidFreeEnergy, self)._add_options(parser, lb_group)
+        group.add_option('--bc_wall_grad_phase', type=float, default=0.0,
+                help='gradient of the phase field at the wall; '
+                    'this determines the wetting properties')
+        group.add_option('--bc_wall_grad_order', type=int, default=2,
+                choices=[1, 2],
+                help='order of the gradient stencil used for the '
+                    'wetting boundary condition at the walls; valid values are 1 and 2')
+        group.add_option('--Gamma', type=float, default=0.5, help='Gamma parameter')
+        group.add_option('--kappa', type=float, default=0.5, help='kappa parameter')
+        group.add_option('--A', type=float, default=0.5, help='A parameter')
+        group.add_option('--tau_a', type=float, default=1.0,
+                help='relaxation time for the A component')
+        group.add_option('--tau_b', type=float, default=1.0,
+                help='relaxation time for the B component')
 
-        lb_group.add_option('--bc_wall_grad_phase', dest='bc_wall_grad_phase',
-            type='float', default=0.0, help='gradient of the phase field at '
-            'the wall; this determines the wetting properties')
-        lb_group.add_option('--bc_wall_grad_order', dest='bc_wall_grad_order', type='int',
-            default=2, help='order of the gradient stencil used for the '
-            'wetting boundary condition at the walls; valid values are 1 and 2')
-        lb_group.add_option('--Gamma', dest='Gamma',
-            help='Gamma parameter', action='store', type='float',
-            default=0.5)
-        lb_group.add_option('--kappa', dest='kappa',
-            help='kappa parameter', action='store', type='float',
-            default=0.5)
-        lb_group.add_option('--A', dest='A',
-            help='A parameter', action='store', type='float',
-            default=0.5)
-        lb_group.add_option('--tau_phi', dest='tau_phi', help='relaxation time for the phi field',
-                            action='store', type='float', default=1.0)
-        lb_group.add_option('--tau_a', dest='tau_a', help='relaxation time for the A component',
-                            action='store', type='float', default=1.0)
-        lb_group.add_option('--tau_b', dest='tau_b', help='relaxation time for the B component',
-                            action='store', type='float', default=1.0)
-        return None
-
-    def _update_ctx(self, ctx):
-        super(BinaryFluidFreeEnergy, self)._update_ctx(ctx)
-        ctx['grids'] = [self.grid, self.grid]
-        ctx['tau_phi'] = self.options.tau_phi
+    def update_context(self, ctx):
+        super(LBBinaryFluidFreeEnergy, self).update_context(ctx)
         ctx['simtype'] = 'free-energy'
-        ctx['bc_wall_grad_phase'] = self.options.bc_wall_grad_phase
-        ctx['bc_wall_grad_order'] = self.options.bc_wall_grad_order
+        ctx['bc_wall_grad_phase'] = self.config.bc_wall_grad_phase
+        ctx['bc_wall_grad_order'] = self.config.bc_wall_grad_order
 
     def _prepare_symbols(self):
-        """Additional symbols and coefficients for the free-energy binary liquid model."""
-        super(BinaryFluidFreeEnergy, self)._prepare_symbols()
+        """Creates additional symbols and coefficients for the free-energy binary liquid model."""
+        super(LBBinaryFluidFreeEnergy, self)._prepare_symbols()
         from sympy import Symbol, Rational
 
         self.S.Gamma = Symbol('Gamma')
@@ -267,41 +287,34 @@ class BinaryFluidFreeEnergy(BinaryFluidBase):
                     self.S.wxx.append(-Rational(1, 24))
                     self.S.wyy.append(-Rational(1, 24))
 
+    # FIXME
+    #def _init_fields(self, need_dist):
+    #    super(BinaryFluidFreeEnergy, self)._init_fields(need_dist)
+    #    self.vis.add_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
 
-    def _init_fields(self, need_dist):
-        super(BinaryFluidFreeEnergy, self)._init_fields(need_dist)
-        self.vis.add_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
 
+class LBShanChenBinary(LBBinaryFluidBase):
 
-class ShanChenBinary(BinaryFluidBase):
-    @property
-    def constants(self):
-        return [('SCG', self.options.G)]
-
-    def __init__(self, geo_class, options=[], args=None, defaults=None):
-        super(ShanChenBinary, self).__init__(geo_class, options, args, defaults)
+    def __init__(self, config):
+        super(LBShanChenBinary, self).__init__(config)
         self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
         eq2, _ = sym.bgk_equilibrium(self.grid, self.S.phi, self.S.phi)
         self.equilibrium.append(eq2[0])
         self.add_force_coupling(0, 1, 'SCG')
 
-    def _init_fields(self, need_dist):
-        super(ShanChenBinary, self)._init_fields(need_dist)
-        self.vis.add_field((lambda: self.rho, lambda: self.phi), 'density')
+    @property
+    def constants(self):
+        return [('SCG', self.config.G)]
 
-    def _add_options(self, parser, lb_group):
-        super(ShanChenBinary, self)._add_options(parser, lb_group)
+    @classmethod
+    def add_options(cls, group, dim):
+        LBBinaryFluidBase.add_options(group, dim)
 
-        lb_group.add_option('--G', dest='G',
-            help='Shan-Chen interaction strength', action='store', type='float',
-            default=1.0)
-        lb_group.add_option('--tau_phi', dest='tau_phi', help='relaxation time for the phi field',
-                            action='store', type='float', default=1.0)
-        return None
+        group.add_argument('--visc', type=float, default=1.0, help='numerical viscosity')
+        group.add_option('--G', type=float, default=1.0,
+                help='Shan-Chen interaction strenght constant')
 
-    def _update_ctx(self, ctx):
-        super(ShanChenBinary, self)._update_ctx(ctx)
-        ctx['grids'] = [self.grid, self.grid]
-        ctx['tau_phi'] = self.options.tau_phi
+    def update_context(self, ctx):
+        super(LBShanChenBinary, self).update_context(ctx)
         ctx['simtype'] = 'shan-chen'
         ctx['sc_pseudopotential'] = 'sc_ppot_lin'

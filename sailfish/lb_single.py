@@ -9,8 +9,6 @@ import numpy as np
 from sailfish import sym, util
 from sailfish.lb_base import LBSim
 
-class GridError(Exception):
-    pass
 
 class LBForcedSim(LBSim):
     """Adds support for body forces."""
@@ -48,7 +46,7 @@ class LBForcedSim(LBSim):
 
 
 class LBFluidSim(LBSim):
-    """Simulates a single phase fluid."""
+    """Simulates a single fluid."""
 
     kernel_file = "single_fluid.mako"
 
@@ -79,7 +77,7 @@ class LBFluidSim(LBSim):
         grid = util.get_grid_from_config(config)
 
         if grid is None:
-            raise GridError('Invalid grid selected: {0}'.format(config.grid))
+            raise util.GridError('Invalid grid selected: {0}'.format(config.grid))
 
         self.grids = [grid]
         self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(grid)
@@ -104,7 +102,6 @@ class LBFluidSim(LBSim):
         ctx['relaxation_enabled'] = self.config.relaxation_enabled
         ctx['force_couplings'] = {}
         ctx['force_for_eq'] = {}
-        ctx['image_fields'] = set()
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
