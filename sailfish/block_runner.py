@@ -115,7 +115,8 @@ class BlockRunner(object):
         for b_id, connector in self._block._connectors.iteritems():
             if connector.is_ready():
                 connector.init_runner(self._ctx)
-                ports[(self._block.id, b_id)] = connector.port
+                if connector.port is not None:
+                    ports[(self._block.id, b_id)] = connector.port
             else:
                 unready.append(b_id)
 
