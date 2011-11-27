@@ -22,7 +22,7 @@ from sailfish import block_runner, util, io
 from sailfish.connector import ZMQBlockConnector, ZMQRemoteBlockConnector
 
 def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
-        quit_event, master_addr, ctrl_channel):
+        quit_event, master_addr, timing_info_to_master):
     config.logger.debug('BlockRunner starting with PID {0}'.format(os.getpid()))
     # Make sure each block has its own temporary directory.  This is
     # particularly important with Numpy 1.3.0, where there is a race
@@ -33,15 +33,16 @@ def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
     # context of the new process.
     backend = backend_class(config, gpu_id)
 
-    summary_addr = None
-    if ctrl_channel is None:
+    if not timing_info_to_master:
         # If there is no controller channel, all processes are running on a
         # single host and we can communicate with the controller using the
         # loopback interface.
         summary_addr = 'tcp://127.0.0.1:{0}'.format(config._zmq_port)
+    else:
+        summary_addr = master_addr
 
     runner = block_runner.BlockRunner(sim, block, output, backend, quit_event,
-            summary_addr, master_addr, summary_channel=ctrl_channel)
+            summary_addr, master_addr)
     runner.run()
 
 
@@ -252,7 +253,7 @@ class LBMachineMaster(object):
                         args=(block, self.config, sim,
                               backend_cls, block2gpu[block.id],
                               output, self._quit_event, master_addr,
-                              self._channel))
+                              self._channel is not None))
             self.runners.append(p)
             self._block_id_to_runner[block.id] = p
 
@@ -267,16 +268,22 @@ class LBMachineMaster(object):
 
         # Only process rmeote port information if we have a channel open
         # back to the controller.
-        if self._channel:
+        if self._channel is not None:
             self._channel.send(ports)
             ports = self._channel.receive()
-
-            for socket in sockets:
-                socket.send_pyobj(ports)
         else:
             # If there is no channel, we're the single master running in this
             # simulation and no port information should be necessary.
             assert not ports
+
+        for socket in sockets:
+            socket.send_pyobj(ports)
+
+        if self._channel is not None and self.config.mode == 'benchmark':
+            for socket in sockets:
+                timing_info = socket.recv_pyobj()
+                self._channel.send(tuple(timing_info))
+                socket.send('ack')
 
         # Wait for all block runners to finish.
         for runner in self.runners:

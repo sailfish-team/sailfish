@@ -69,20 +69,12 @@ class BlockRunner(object):
         :param master_addr: if not None, zmq address of the machine master
         :param summary_addr: if not None, zmq address string to which summary
                 information will be sent.
-        :param summary_channel: if not None, execnet channel object to which
-                summary information will be sent.
         """
 
         self._summary_sender = None
-        self._summary_channel = summary_channel
         self._ppid = os.getppid()
 
         self._ctx = zmq.Context()
-        if summary_addr is not None:
-            assert summary_channel is None, ("Use either zmq or execnet "
-                    "to send back summary information, but not both.")
-            self._summary_sender = self._ctx.socket(zmq.REQ)
-            self._summary_sender.connect(summary_addr)
 
         self._block = block
         block.runner = self
@@ -108,6 +100,12 @@ class BlockRunner(object):
 
         self._master_sock = self._ctx.socket(zmq.PAIR)
         self._master_sock.connect(master_addr)
+        if summary_addr is not None:
+            if summary_addr != master_addr:
+                self._summary_sender = self._ctx.socket(zmq.REQ)
+                self._summary_sender.connect(summary_addr)
+            else:
+                self._summary_sender = self._master_sock
 
         # For remote connections, we start the listening side of the
         # connection first so that random ports can be selected and
@@ -122,8 +120,7 @@ class BlockRunner(object):
                 unready.append(b_id)
 
         self._master_sock.send_pyobj(ports)
-        if unready:
-            remote_ports = self._master_sock.recv_pyobj()
+        remote_ports = self._master_sock.recv_pyobj()
 
         for b_id in unready:
             connector = self._block._connectors[b_id]
@@ -886,12 +883,7 @@ class BlockRunner(object):
         if self._summary_sender is not None:
             self._summary_sender.send_pyobj(timing_info)
             self.config.logger.debug('Sending timing information to controller.')
-            assert self._summary_sender.recv_pyobj() == 'ack'
-        elif self._summary_channel is not None:
-            # Send as tuple to avoid incompatibilities between namedtuple
-            # implementations (__dict__ is sometimes missing).
-            self._summary_channel.send(tuple(timing_info))
-            self.config.logger.debug('Sending timing information to controller.')
+            assert self._summary_sender.recv() == 'ack'
 
     def run(self):
         self.config.logger.info("Initializing block.")

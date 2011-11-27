@@ -400,7 +400,7 @@ class LBSimulationController(object):
                 # Collect timing information from all blocks.
                 for i in range(len(blocks)):
                     ti = summary_receiver.recv_pyobj()
-                    summary_receiver.send_pyobj('ack')
+                    summary_receiver.send('ack')
                     timing_infos.append(ti)
 
             self._simulation_process.join()
