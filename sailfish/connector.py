@@ -73,6 +73,16 @@ class ZMQBlockConnector(object):
         """
         self._addr = addr
         self._receiver = receiver
+        self.port = None
+
+    def init_runner(self, ctx):
+        """Called from the block runner of the sender block."""
+        import zmq
+        self.socket = ctx.socket(zmq.PAIR)
+        if self._receiver:
+            self.socket.connect(self._addr)
+        else:
+            self.socket.bind(self._addr)
 
     def send(self, data):
         self.socket.send(data, copy=False)
@@ -85,17 +95,25 @@ class ZMQBlockConnector(object):
         data[:] = np.frombuffer(buffer(msg), dtype=data.dtype)
         return True
 
-    def init_runner(self, ctx):
-        """Called from the block runner of the sender block."""
-        import zmq
-        self.socket = ctx.socket(zmq.PAIR)
-        if self._receiver:
-            self.socket.connect(self._addr)
-        else:
-            self.socket.bind(self._addr)
+    def is_ready(self):
+        return True
 
     @classmethod
-    def make_pair(self, ctype, sizes, ids):
+    def make_ipc_pair(self, ctype, sizes, ids):
         addr = 'ipc://%s/sailfish-master-%d_%d-%d' % (tempfile.gettempdir(),
                 os.getpid(), ids[0], ids[1])
         return (ZMQBlockConnector(addr, False), ZMQBlockConnector(addr, True))
+
+class ZMQRemoteBlockConnector(ZMQBlockConnector):
+    """Handles directed data exchange between two blocks on two different hosts."""
+
+    def is_ready(self):
+        return self.port != None or not self._receiver
+
+    def init_runner(self, ctx):
+        import zmq
+        self.socket = ctx.socket(zmq.PAIR)
+        if self._receiver:
+            self.socket.connect("{0}:{1}".format(self._addr, self.port))
+        else:
+            self.port = self.socket.bind_to_random_port(self._addr)

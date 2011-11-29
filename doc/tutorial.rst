@@ -4,5 +4,6 @@ Tutorial
 .. toctree::
 
    running_simulations
-   simulations
+   simulation_setup
    results
+   distributed_simulations

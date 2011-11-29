@@ -21,7 +21,6 @@ class TestBasicFunctionality(unittest.TestCase):
 
     def setUp(self):
         config = LBConfig()
-        config.parse()
         config.precision = 'single'
         config.block_size = 8
         # Does not affect behaviour of any of the functions tested here.

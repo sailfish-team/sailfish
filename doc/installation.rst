@@ -10,6 +10,8 @@ General requirements:
 * numpy-1.3.0
 * sympy-0.6.5
 * mako-0.2.5
+* execnet-1.0.9
+* Python zeromq-2.1.10
 * a Python module for the computational backend (one or more of the following):
 
   * pycuda-0.92 (with the NVIDIA drivers and NVIDIA CUDA Toolkit)
@@ -28,6 +30,8 @@ Data output (optional):
 Tests:
 
 * matplotlib
+
+Versions older than those listed above might also work, but have not been tested.
 
 Downloading Sailfish
 --------------------
