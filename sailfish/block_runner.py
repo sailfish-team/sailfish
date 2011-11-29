@@ -7,6 +7,7 @@ __license__ = 'LGPL3'
 from collections import defaultdict, namedtuple
 import math
 import operator
+import os
 import numpy as np
 import time
 import zmq
@@ -15,7 +16,6 @@ from sailfish import codegen, util
 # Used to hold a reference to a CUDA kernel and a grid on which it is
 # to be executed.
 KernelGrid = namedtuple('KernelGrid', 'kernel grid')
-TimingInfo = namedtuple('TimingInfo', 'comp bulk bnd coll data recv send wait total block_id')
 
 
 class ConnectionBuffer(object):
@@ -58,14 +58,23 @@ class BlockRunner(object):
     """Runs the simulation for a single SubdomainSpec.
     """
     def __init__(self, simulation, block, output, backend, quit_event,
-            summary_addr=None):
-        # Create a 2-way connection between the SubdomainSpec and this BlockRunner
+            summary_addr=None, master_addr=None, summary_channel=None):
+        """
+        :param simulation: instance of a simulation class, descendant from LBSim
+        :param block: SubdomainSpec that this runner is to handle
+        :param backend: instance of a Sailfish backend class to handle
+                GPU interaction
+        :param quit_event: multiprocessing Event object; if set, the master is
+                requesting early termination of the simulation
+        :param master_addr: if not None, zmq address of the machine master
+        :param summary_addr: if not None, zmq address string to which summary
+                information will be sent.
+        """
+
+        self._summary_sender = None
+        self._ppid = os.getppid()
+
         self._ctx = zmq.Context()
-        if summary_addr is not None:
-            self._summary_sender = self._ctx.socket(zmq.REQ)
-            self._summary_sender.connect(summary_addr)
-        else:
-            self._summary_sender = None
 
         self._block = block
         block.runner = self
@@ -89,7 +98,39 @@ class BlockRunner(object):
         self._vis_map_cache = None
         self._quit_event = quit_event
 
+        # This only happens in unit tests.
+        if master_addr is not None:
+            self._init_network(master_addr, summary_addr)
+
+    def _init_network(self, master_addr, summary_addr):
+        self._master_sock = self._ctx.socket(zmq.PAIR)
+        self._master_sock.connect(master_addr)
+        if summary_addr is not None:
+            if summary_addr != master_addr:
+                self._summary_sender = self._ctx.socket(zmq.REQ)
+                self._summary_sender.connect(summary_addr)
+            else:
+                self._summary_sender = self._master_sock
+
+        # For remote connections, we start the listening side of the
+        # connection first so that random ports can be selected and
+        # communicated to the master.
+        unready = []
+        ports = {}
         for b_id, connector in self._block._connectors.iteritems():
+            if connector.is_ready():
+                connector.init_runner(self._ctx)
+                if connector.port is not None:
+                    ports[(self._block.id, b_id)] = connector.port
+            else:
+                unready.append(b_id)
+
+        self._master_sock.send_pyobj(ports)
+        remote_ports = self._master_sock.recv_pyobj()
+
+        for b_id in unready:
+            connector = self._block._connectors[b_id]
+            connector.port = remote_ports[(b_id, self._block.id)]
             connector.init_runner(self._ctx)
 
     @property
@@ -497,6 +538,7 @@ class BlockRunner(object):
 
         for grid in self._sim.grids:
             size = self._get_dist_bytes(grid)
+            self.config.logger.debug("Using {0} bytes for buffer".format(size))
             self._gpu_grids_primary.append(self.backend.alloc_buf(size=size))
             self._gpu_grids_secondary.append(self.backend.alloc_buf(size=size))
 
@@ -843,6 +885,12 @@ class BlockRunner(object):
         gy = rest / arr_nx
         return dist_num, gy, gx
 
+    def _send_summary_info(self, timing_info):
+        if self._summary_sender is not None:
+            self._summary_sender.send_pyobj(timing_info)
+            self.config.logger.debug('Sending timing information to controller.')
+            assert self._summary_sender.recv() == 'ack'
+
     def run(self):
         self.config.logger.info("Initializing block.")
 
@@ -900,6 +948,10 @@ class BlockRunner(object):
 
             if self._quit_event.is_set():
                 self.config.logger.info("Simulation termination requested.")
+                break
+
+            if self._ppid != os.getppid():
+                self.config.logger.info("Master process is dead -- terminating simulation.")
                 break
 
             self.recv_data()
@@ -981,11 +1033,12 @@ class BlockRunner(object):
                             t_bulk / j, t_bnd / j, t_coll / j, t_data / j, t_recv / j, t_send / j,
                             t_wait / j, t_total / j))
 
+        # Early termination requested or master process is dead.
+        if self._quit_event.is_set() or self._ppid != os.getppid():
+            return
+
         mi = self.config.max_iters
-        ti = TimingInfo((t_bulk + t_bnd) / mi, t_bulk / mi, t_bnd / mi,
+        ti = util.TimingInfo((t_bulk + t_bnd) / mi, t_bulk / mi, t_bnd / mi,
                 t_coll / mi, t_data / mi, t_recv / mi, t_send / mi,
                 t_wait / mi, t_total / mi, self._block.id)
-        if self._summary_sender is not None:
-            self._summary_sender.send_pyobj(ti)
-            self.config.logger.debug('Sending timing information to controller.')
-            assert self._summary_sender.recv_pyobj() == 'ack'
+        self._send_summary_info(ti)

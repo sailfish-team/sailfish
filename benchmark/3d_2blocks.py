@@ -35,16 +35,19 @@ class BenchmarkZConnGeometry(LBGeometry3D):
 def run_benchmark(boundary_split=True, suffix=''):
     settings = {
             'mode': 'benchmark',
-            'max_iters': 300,
-            'every': 100,
+            'max_iters': 1000,
+            'every': 500,
             'blocks': 2,
             'quiet': True,
             'grid': 'D3Q19',
-            'gpus': [0,1],
+            'gpus': [0, 1],
             'bulk_boundary_split': boundary_split,
         }
 
     fmt = ['%d', '%d', '%d', '%d', '%.6e', '%.6e', '%.6e', '%.6e']
+
+    mem_size = 2**32 - 2**29        # assume 4G - 256M of memory
+    node_cost = (2 * 19 + 4) * 4    # node cost in bytes
 
     def test_sizes(sizes, geo_cls):
         for w, h, d in sizes:
@@ -57,12 +60,54 @@ def run_benchmark(boundary_split=True, suffix=''):
 
     summary = []
     timings = []
-    sizes = [(1276, 128, 124), (1148, 128, 138), (1020, 128, 155), (892, 128, 177),
-            (762, 256, 104), (636, 256, 124), (508, 256, 156), (380, 256, 207),
-            (252, 256, 314), (124, 512, 320)]
+
+    # 'h' x 'd' is the connection surface
+    #####################################
+    w = np.uint32(range(2, 18, 2)) * 64 - 4
+    h = np.uint32([128] * len(w))
+    d = mem_size / node_cost / w / h
+    sizes = [(x, y, z) for x, y, z in zip(w, h, d)]
+
     test_sizes(sizes, BenchmarkXConnGeometry)
-    np.savetxt('3d_2blocks_x{0}.dat'.format(suffix), summary, fmt)
-    util.save_timing('3d_2blocks_x{0}.timing'.format(suffix), timings)
+    np.savetxt('3d_2blocks_x_v1{0}.dat'.format(suffix), summary, fmt)
+    util.save_timing('3d_2blocks_x_v1{0}.timing'.format(suffix), timings)
+
+    # Same as above, but the 'z' dimension is varied.  Should give the same
+    # results as when the 'y' dimension is varied.
+    d = np.uint32([128] * len(w))
+    h = mem_size / node_cost / w / d
+    sizes = [(x, y, z) for x, y, z in zip(w, h, d)]
+    summary = []
+    timings = []
+
+    test_sizes(sizes, BenchmarkXConnGeometry)
+    np.savetxt('3d_2blocks_x_v2{0}.dat'.format(suffix), summary, fmt)
+    util.save_timing('3d_2blocks_x_v2{0}.timing'.format(suffix), timings)
+
+    # 'w' x 'd' is the connection surface
+    #####################################
+    d = np.uint32([128] * len(w))
+    h = mem_size / node_cost / w / d
+    sizes = [(x, y, z) for x, y, z in zip(w, h, d)]
+    summary = []
+    timings = []
+
+    test_sizes(sizes, BenchmarkYConnGeometry)
+    np.savetxt('3d_2blocks_y{0}.dat'.format(suffix), summary, fmt)
+    util.save_timing('3d_2blocks_y{0}.timing'.format(suffix), timings)
+
+    # 'w' x 'h' is the connection surface
+    #####################################
+    h = np.uint32([128] * len(w))
+    d = mem_size / node_cost / w / h
+    sizes = [(x, y, z) for x, y, z in zip(w, h, d)]
+    summary = []
+    timings = []
+
+    test_sizes(sizes, BenchmarkZConnGeometry)
+    np.savetxt('3d_2blocks_z{0}.dat'.format(suffix), summary, fmt)
+    util.save_timing('3d_2blocks_z{0}.timing'.format(suffix), timings)
+
 
 if __name__ == '__main__':
     run_benchmark()
