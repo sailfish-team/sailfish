@@ -98,6 +98,11 @@ class BlockRunner(object):
         self._vis_map_cache = None
         self._quit_event = quit_event
 
+        # This only happens in unit tests.
+        if master_addr is not None:
+            self._init_network(master_addr, summary_addr)
+
+    def _init_network(self, master_addr, summary_addr):
         self._master_sock = self._ctx.socket(zmq.PAIR)
         self._master_sock.connect(master_addr)
         if summary_addr is not None:
