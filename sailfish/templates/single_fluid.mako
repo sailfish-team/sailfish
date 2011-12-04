@@ -551,7 +551,8 @@ ${kernel} void DistributeContinuousData(
 			int dist_size = max_other / ${len(dists)};
 			int dist_num = idx / dist_size;
 			int other = idx % dist_size;
-			float tmp = buffer[idx = (dist_size * max_lx * dist_num) + (other * max_lx) + gx];
+			idx = (dist_size * max_lx * dist_num) + (other * max_lx) + gx;
+			float tmp = buffer[idx];
 
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
