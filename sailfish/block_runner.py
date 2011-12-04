@@ -330,8 +330,9 @@ class BlockRunner(object):
                 aux_main = 2    # 1 block on the left, 1 block on the right
 
             self._boundary_blocks = (
-                    (bns * arr_nx / bs) * (arr_nz + (arr_ny - 2 * bns)) * 2 +   # top, bottom, front, back
-                    (arr_ny - 2 * bns) * (arr_nz - 2 * bns) * aux_main)         # left and right faces
+                    arr_nx * arr_nz * bns / bs * 2 +                # N/S faces
+                    arr_nx * (arr_ny - 2 * bns) * bns / bs * 2 +    # T/B faces
+                    (arr_ny - 2 * bns) * (arr_nz - 2 * bns) * aux_main) # E/W faces
             self._kernel_grid_bulk = [(arr_nx - 2 * bs) * (arr_ny - 2 * bns),
                     arr_nz - 2 * bns]
             self._kernel_grid_full = [arr_nx * arr_ny / bs, arr_nz]
