@@ -158,51 +158,51 @@
 		<%
 			xblocks = arr_nx / block_size
 			yblocks = arr_ny - 2 * boundary_size
-			ortho_blocks = yblocks * (arr_nz - 2 * boundary_size)
+			zblocks = arr_nz - 2 * boundary_size
+			ortho_blocks = yblocks * zblocks
 
-			bottom_idx = boundary_size * xblocks * (yblocks + arr_nz)
-			left_idx = 2 * bottom_idx
+			bottom_idx = boundary_size * xblocks * arr_nz * 2
+			left_idx = bottom_idx + xblocks * yblocks * boundary_size * 2
 			right_idx = left_idx + ortho_blocks
 			right2_idx = right_idx + ortho_blocks
 			max_idx = right2_idx + ortho_blocks
 		%>
-		{
-		int h;
+		// N/S faces, Y-connection.  Face area is arr_nx * arr_nz.
 		if (gid < ${bottom_idx}) {
 			gx = (gid % ${xblocks}) * ${block_size} + lx;
 			gid = gid / ${xblocks};
-			h = gid / ${boundary_size};
-			gid = gid % ${boundary_size};
-			if (gid < ${arr_nz}) {
-				gy = h;
-				gz = gid;
+			gz = gid % ${arr_nz};
+			gid = gid / ${arr_nz};
+			if (gid < ${boundary_size}) {
+				gy = gid;
 			} else {
-				gy = gid - ${arr_nz};
-				gz = h;
+				gy = ${arr_ny - boundary_size} + gid - ${boundary_size};
 			}
+		// B/T faces, Z-connection.  Face area is arr_nx * (arr_ny-2)
 		} else if (gid < ${left_idx}) {
 			gid -= ${bottom_idx};
 			gx = (gid % ${xblocks}) * ${block_size} + lx;
 			gid = gid / ${xblocks};
-			h = gid / ${boundary_size};
-			gid = gid % ${boundary_size};
-			if (gid < ${arr_nz}) {
-				gy = ${lat_ny-1} - h;
-				gz = ${lat_nz-2} - gid;
-			} else {
-				gy = ${lat_ny-1} - (gid - ${arr_nz});
-				gz = ${lat_nz-2} - h;
+			// The area within the boundary is handled in the first case
+			// above (N/S faces.
+			gy = ${boundary_size} + gid / ${2 * boundary_size};
+			gz = gid % ${2 * boundary_size};
+			if (gz >= ${boundary_size}) {
+				gz = ${arr_nz - boundary_size} + gz - ${boundary_size};
 			}
+		// E face
 		} else if (gid < ${right_idx}) {
 			gid -= ${left_idx};
 			gx = lx;
 			gy = ${boundary_size} + gid % ${yblocks};
 			gz = ${boundary_size} + gid / ${yblocks};
+		// W face (part 1)
 		} else if (gid < ${right2_idx}) {
 			gid -= ${right_idx};
 			gx = ${arr_nx - block_size} + lx;
 			gy = ${boundary_size} + gid % ${yblocks};
 			gz = ${boundary_size} + gid / ${yblocks};
+		// W face (part 2)
 		} else if (gid < ${max_idx}) {
 			gid -= ${right2_idx};
 			gx = ${arr_nx - 2*block_size} + lx;
@@ -210,7 +210,6 @@
 			gz = ${boundary_size} + gid / ${yblocks};
 		} else {
 			return;
-		}
 		}
 	%endif
 

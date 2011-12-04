@@ -138,7 +138,7 @@ class SimulationTest(LBFluidSim, LBForcedSim):
         runner._debug_set_dist(dbuf, False)
 
 
-class TwoBlockPropagationTest(object): #unittest.TestCase):
+class TwoBlockPropagationTest(unittest.TestCase):
     def _verify(self, b0, b1, cls):
         p1 = cls.p1
         p2 = cls.p2
