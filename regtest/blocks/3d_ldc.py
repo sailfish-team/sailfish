@@ -23,7 +23,7 @@ class SimulationTest(LDCSim):
         LDCSim.update_defaults(defaults)
         defaults['block_size'] = block_size
         defaults['blocks'] = blocks
-        defaults['max_iters'] = 100
+        defaults['max_iters'] = 200
         defaults['quiet'] = True
         defaults['output'] = output
 
@@ -36,7 +36,7 @@ class TestInterblockPropagation(unittest.TestCase):
         blocks = 1
         ctrl = LBSimulationController(SimulationTest, LDCGeometry)
         ctrl.run()
-        cls.ref = np.load('%s_blk0_100.npz' % output)
+        cls.ref = np.load('%s_blk0_200.npz' % output)
         cls.rho = cls.ref['rho']
         cls.vx  = cls.ref['v'][0]
         cls.vy  = cls.ref['v'][1]
@@ -48,14 +48,14 @@ class TestInterblockPropagation(unittest.TestCase):
         blocks = 8
         ctrl = LBSimulationController(SimulationTest, LDCGeometry)
         ctrl.run()
-        testdata0 = np.load('%s_blk0_100.npz' % output)
-        testdata1 = np.load('%s_blk1_100.npz' % output)
-        testdata2 = np.load('%s_blk2_100.npz' % output)
-        testdata3 = np.load('%s_blk3_100.npz' % output)
-        testdata4 = np.load('%s_blk4_100.npz' % output)
-        testdata5 = np.load('%s_blk5_100.npz' % output)
-        testdata6 = np.load('%s_blk6_100.npz' % output)
-        testdata7 = np.load('%s_blk7_100.npz' % output)
+        testdata0 = np.load('%s_blk0_200.npz' % output)
+        testdata1 = np.load('%s_blk1_200.npz' % output)
+        testdata2 = np.load('%s_blk2_200.npz' % output)
+        testdata3 = np.load('%s_blk3_200.npz' % output)
+        testdata4 = np.load('%s_blk4_200.npz' % output)
+        testdata5 = np.load('%s_blk5_200.npz' % output)
+        testdata6 = np.load('%s_blk6_200.npz' % output)
+        testdata7 = np.load('%s_blk7_200.npz' % output)
 
         rho_p1 = np.vstack([testdata0['rho'], testdata1['rho']])
         rho_p2 = np.vstack([testdata2['rho'], testdata3['rho']])
