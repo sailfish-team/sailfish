@@ -278,6 +278,9 @@ class BlockRunner(object):
         bs = self.config.block_size
         self._physical_size[-1] = int(math.ceil(float(self._physical_size[-1]) / bs)) * bs
 
+        self.config.logger.debug('Effective lattice size is: {0}'.format(
+            list(reversed(self._physical_size))))
+
         # CUDA block/grid size for standard kernel call.
         self._kernel_block_size = (bs, 1)
         self._boundary_size = self._block.envelope_size + 1
