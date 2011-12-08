@@ -10,16 +10,39 @@ from sailfish.lb_single import LBFluidSim, LBForcedSim
 class SphereGeometry(LBGeometry3D):
     def blocks(self, n=None):
         blocks = []
-        q = self.gx / self.config.blocks
-        diff = self.gx % self.config.blocks
+
+        if self.config.conn == 'x':
+            dim = self.gx
+        elif self.config.conn == 'y':
+            dim = self.gy
+        else:
+            dim = self.gz
+
+        q = dim / self.config.blocks
+        diff = dim % self.config.blocks
+
+        def _loc(i):
+            if self.config.conn == 'x':
+                return (i * q, 0, 0)
+            elif self.config.conn == 'y':
+                return (0, i * q, 0)
+            else:
+                return (0, 0, i * q)
+
+        def _size(size):
+            if self.config.conn == 'x':
+                return (size, self.gy, self.gz)
+            elif self.config.conn == 'y':
+                return (self.gx, size, self.gz)
+            else:
+                return (self.gx, self.gy, size)
 
         for i in range(0, self.config.blocks):
             size = q
             if i == self.config.blocks - 1:
                 size += diff
 
-            blocks.append(
-                    SubdomainSpec3D((i * q, 0, 0), (size, self.gy, self.gz)))
+            blocks.append(SubdomainSpec3D(_loc(i), _size(size)))
 
         return blocks
 
@@ -69,6 +92,7 @@ class SphereSimulation(LBFluidSim, LBForcedSim):
         LBForcedSim.add_options(group, dim)
 
         group.add_argument('--blocks', type=int, default=1, help='number of blocks to use')
+        group.add_argument('--conn', type=str, choices=['x', 'y', 'z'], default='x')
 
     def __init__(self, config):
         super(SphereSimulation, self).__init__(config)
