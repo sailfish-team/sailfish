@@ -1,17 +1,5 @@
 <%page args="bgk_args_decl"/>
 
-<%def name="nonlocal_fields_decl()">
-	%if backend == 'cuda':
-		%for i in image_fields:
-			%if precision == 'single':
-				texture<float, 2> img_f${i};
-			%else:
-				texture<int2, 2> img_f${i};
-			%endif
-		%endfor
-	%endif
-</%def>
-
 <%def name="kernel_args_1st_moment(name)">
 	${global_ptr} float *${name}x,
 	${global_ptr} float *${name}y,

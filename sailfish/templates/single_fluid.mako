@@ -28,7 +28,6 @@ extern int printf (__const char *__restrict __format, ...);
 ${const_var} float visc = ${visc}f;		// viscosity
 
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
-${kernel_common.nonlocal_fields_decl()}
 ${kernel_common.body(bgk_args_decl)}
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
