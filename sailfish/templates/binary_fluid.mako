@@ -28,7 +28,6 @@ ${const_var} float visc = ${visc}f;		// viscosity
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
-${kernel_common.nonlocal_fields_decl()}
 %if simtype == 'shan-chen':
 	${kernel_common.body(bgk_args_decl_sc)}
 %elif simtype == 'free-energy':

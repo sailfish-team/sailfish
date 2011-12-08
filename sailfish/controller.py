@@ -303,6 +303,8 @@ class LBSimulationController(object):
         lb_class.update_defaults(defaults)
         self._config_parser.set_defaults(defaults)
 
+        # TODO(michalj): Verify that options in defaults correspond to options
+        # defined as command line arguments.
         if default_config is not None:
             self._config_parser.set_defaults(default_config)
 

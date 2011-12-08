@@ -38,7 +38,9 @@ class LBSim(object):
     def update_context(self, ctx):
         """Updates the context dicitionary containing variables used for
         code generation."""
-        pass
+        ctx['grid'] = self.grid
+        ctx['grids'] = self.grids
+        ctx['loc_names'] = ['gx', 'gy', 'gz']
 
     def __init__(self, config):
         self.config = config
@@ -46,7 +48,6 @@ class LBSim(object):
         self.iteration = 0
 
     # TODO(michalj): Restore support for force couplings.
-    # TODO(michalj): Restore support for fields accessed via textures.
     # TODO(michalj): Restore support for iter hooks.
     # TODO(michalj): Restore support for defining visualization fields.
     # TODO(michalj): Restore support for tracer particles.

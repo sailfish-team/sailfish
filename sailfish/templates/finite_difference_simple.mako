@@ -6,17 +6,7 @@ ${device_func} inline float get_field(${global_ptr} float *fx, int fi, int idx, 
 %endif
 )
 {
-	if (0) { ; }
-	%for fld_id in image_fields:
-		else if (fi == ${fld_id}) {
-			return ${nonlocal_fld(fld_id)};
-		}
-	%endfor
-	else {
-		return ${nonlocal_fld('x')};
-	}
-
-	return 0.0f;
+	return ${nonlocal_fld('x')};
 }
 
 ${device_func} inline void laplacian_and_grad(${global_ptr} float *field, int fi, int i, float *laplacian, float *grad, int x, int y

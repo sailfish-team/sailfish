@@ -32,7 +32,7 @@ class LBBinaryFluidBase(LBSim):
     @classmethod
     def add_options(cls, group, dim):
         LBSim.add_options(group, dim)
-        group.add_option('--tau_phi', type=float, default=1.0,
+        group.add_argument('--tau_phi', type=float, default=1.0,
                 help='relaxation time for the phase field')
 
         grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == dim]
@@ -141,9 +141,10 @@ class LBBinaryFluidBase(LBSim):
         runner.exec_kernel('SetInitialConditions', args2, 'P'*len(args2))
 
     def update_context(self, ctx):
-        super(LBBinaryFluidBase, self)._update_ctx(ctx)
-        ctx['grids'] = self.grids
+        super(LBBinaryFluidBase, self).update_context(ctx)
         ctx['tau_phi'] = self.config.tau_phi
+        ctx['bgk_equilibrium'] = self.equilibrium
+        ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
 
     # FIXME
     def _lbm_step(self, get_data, **kwargs):
@@ -181,19 +182,19 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
     def add_options(cls, group, dim):
         LBBinaryFluidBase.add_options(group, dim)
 
-        group.add_option('--bc_wall_grad_phase', type=float, default=0.0,
+        group.add_argument('--bc_wall_grad_phase', type=float, default=0.0,
                 help='gradient of the phase field at the wall; '
                     'this determines the wetting properties')
-        group.add_option('--bc_wall_grad_order', type=int, default=2,
+        group.add_argument('--bc_wall_grad_order', type=int, default=2,
                 choices=[1, 2],
                 help='order of the gradient stencil used for the '
                     'wetting boundary condition at the walls; valid values are 1 and 2')
-        group.add_option('--Gamma', type=float, default=0.5, help='Gamma parameter')
-        group.add_option('--kappa', type=float, default=0.5, help='kappa parameter')
-        group.add_option('--A', type=float, default=0.5, help='A parameter')
-        group.add_option('--tau_a', type=float, default=1.0,
+        group.add_argument('--Gamma', type=float, default=0.5, help='Gamma parameter')
+        group.add_argument('--kappa', type=float, default=0.5, help='kappa parameter')
+        group.add_argument('--A', type=float, default=0.5, help='A parameter')
+        group.add_argument('--tau_a', type=float, default=1.0,
                 help='relaxation time for the A component')
-        group.add_option('--tau_b', type=float, default=1.0,
+        group.add_argument('--tau_b', type=float, default=1.0,
                 help='relaxation time for the B component')
 
     def update_context(self, ctx):
@@ -311,10 +312,12 @@ class LBShanChenBinary(LBBinaryFluidBase):
         LBBinaryFluidBase.add_options(group, dim)
 
         group.add_argument('--visc', type=float, default=1.0, help='numerical viscosity')
-        group.add_option('--G', type=float, default=1.0,
+        group.add_argument('--G', type=float, default=1.0,
                 help='Shan-Chen interaction strenght constant')
 
     def update_context(self, ctx):
         super(LBShanChenBinary, self).update_context(ctx)
         ctx['simtype'] = 'shan-chen'
         ctx['sc_pseudopotential'] = 'sc_ppot_lin'
+        ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0
+        ctx['visc'] = self.config.visc

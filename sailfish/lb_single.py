@@ -16,6 +16,7 @@ class LBForcedSim(LBSim):
     def __init__(self, config):
         super(LBForcedSim, self).__init__(config)
         self._forces = {}
+        self._force_couplings = {}
 
     # TODO(michalj): Add support for dynamical forces via sympy expressions
     # and for global force fields via numpy arrays.
@@ -43,7 +44,11 @@ class LBForcedSim(LBSim):
     def update_context(self, ctx):
         super(LBForcedSim, self).update_context(ctx)
         ctx['forces'] = self._forces
+        ctx['force_couplings'] = self._force_couplings
+        ctx['force_for_eq'] = {}
 
+    def add_force_coupling(self, grid_a, grid_b, const_name):
+        self._force_couplings[(grid_a, grid_b)] = const_name
 
 class LBFluidSim(LBSim):
     """Simulates a single fluid."""
@@ -92,16 +97,10 @@ class LBFluidSim(LBSim):
         ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0
         ctx['visc'] = self.config.visc
         ctx['model'] = self.config.model
-        ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['simtype'] = 'lbm'
-        ctx['grid'] = self.grid
-        ctx['grids'] = self.grids
         ctx['bgk_equilibrium'] = self.equilibrium
         ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
-
         ctx['relaxation_enabled'] = self.config.relaxation_enabled
-        ctx['force_couplings'] = {}
-        ctx['force_for_eq'] = {}
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
