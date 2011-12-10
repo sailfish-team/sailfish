@@ -186,9 +186,6 @@ class BlockRunner(object):
         ctx['sim'] = self._sim
         ctx['block'] = self._block
 
-        # FIXME Additional constants.
-        ctx['constants'] = []
-
         arr_nx = self._physical_size[-1]
         arr_ny = self._physical_size[-2]
 

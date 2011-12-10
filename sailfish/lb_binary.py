@@ -173,10 +173,14 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
         super(LBBinaryFluidFreeEnergy, self).__init__(config)
         self.equilibrium, self.equilibrium_vars = sym.free_energy_binary_liquid_equilibrium(self)
 
-    @property
     def constants(self):
-        return [('Gamma', self.options.Gamma), ('A', self.options.A), ('kappa', self.options.kappa),
-                ('tau_a', self.options.tau_a), ('tau_b', self.options.tau_b)]
+        ret = super(LBBinaryFluidFreeEnergy, self).constants()
+        ret['Gamma'] = self.options.Gamma
+        ret['A'] = self.options.A
+        ret['kappa'] = self.options.kappa
+        ret['tau_a'] = self.options.tau_a
+        ret['tau_b'] = self.options.tau_b
+        return ret
 
     @classmethod
     def add_options(cls, group, dim):
@@ -303,9 +307,10 @@ class LBShanChenBinary(LBBinaryFluidBase):
         self.equilibrium.append(eq2[0])
         self.add_force_coupling(0, 1, 'SCG')
 
-    @property
     def constants(self):
-        return [('SCG', self.config.G)]
+        ret = super(LBShanChenBinary, self).constants()
+        ret['SCG'] = self.config.G
+        return ret
 
     @classmethod
     def add_options(cls, group, dim):
