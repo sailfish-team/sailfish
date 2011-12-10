@@ -257,7 +257,7 @@
 
 #define DT 1.0f
 
-%for name, val in constants:
+%for name, val in constants.iteritems():
 	${const_var} float ${name} = ${val}f;
 %endfor
 

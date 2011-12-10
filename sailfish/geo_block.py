@@ -512,6 +512,7 @@ class Subdomain(object):
         self._param_map = block.runner.make_scalar_field(np.uint32, register=False)
         self._params = {}
         self._encoder = None
+        self._seen_types = set()
 
     @property
     def config(self):
@@ -525,15 +526,23 @@ class Subdomain(object):
         raise NotImplementedError('initial_conditions() not defined in a child '
                 'class')
 
-    def set_node(self, where, type_, params=None):
+    # TOOD(michalj): Add support for BC classes here..
+    def set_node(self, where, node_type, params=None):
+        """Set a boundary condition at selected node(s).
+
+        :param where: index expression selecting nodes to set
+        :param node_type: constant identifying node type
+        :param params: optional parameters for the node (e.g. velocity)
+        """
         assert not self._type_map_encoded
 
         # TODO: if type_ is a class, we should just store its ID; if it's
         # an object, the ID should be dynamically assigned
-        self._type_map[where] = type_
-        key = (type_, params)
+        self._type_map[where] = node_type
+        key = (node_type, params)
         self._param_map[where] = hash(key)
         self._params[hash(key)] = key
+        self._seen_types.add(node_type)
 
     def reset(self):
         self._type_map_encoded = False
@@ -561,9 +570,19 @@ class Subdomain(object):
         self._encoder.update_context(ctx)
 
         # FIXME(michalj)
+        if Subdomain.NODE_VELOCITY in self._seen_types:
+            bc_velocity = 'equilibrium'
+        else:
+            bc_velocity = None
+
+        if Subdomain.NODE_WALL in self._seen_types:
+            bc_wall = 'fullbb'
+        else:
+            bc_wall = None
+
         ctx.update({
-                'bc_wall': 'fullbb',
-                'bc_velocity': 'equilibrium',
+                'bc_wall': bc_wall,
+                'bc_velocity': bc_velocity,
                 'bc_wall_': BCWall,
                 'bc_velocity_': BCWall,
                 'bc_pressure_': BCWall,

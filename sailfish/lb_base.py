@@ -28,6 +28,11 @@ class LBSim(object):
     def update_defaults(cls, defaults):
         pass
 
+    def constants(self):
+        """Returns a dict mapping names to values and defining global constants
+        for the simulation."""
+        return {}
+
     @property
     def grid(self):
         """Returns a grid object representing the connectivity of the lattice
@@ -41,6 +46,7 @@ class LBSim(object):
         ctx['grid'] = self.grid
         ctx['grids'] = self.grids
         ctx['loc_names'] = ['gx', 'gy', 'gz']
+        ctx['constants'] = self.constants()
 
     def __init__(self, config):
         self.config = config

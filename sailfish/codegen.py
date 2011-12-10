@@ -124,7 +124,6 @@ class BlockCodeGenerator(object):
 #        ctx['sim'] = self
 #        ctx['bgk_equilibrium'] = self.equilibrium
 #        ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
-#        ctx['constants'] = self.constants
 #        ctx['grids'] = [self.grid]
 #
 #        ctx['forces'] = self.forces
