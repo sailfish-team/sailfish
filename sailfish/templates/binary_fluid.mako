@@ -367,4 +367,4 @@ ${kernel} void CollideAndPropagate(
 	${propagate('dist2_out', 'd1')}
 }
 
-
+<%include file="util_kernels.mako"/>

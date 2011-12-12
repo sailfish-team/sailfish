@@ -72,57 +72,41 @@ class LBBinaryFluidBase(LBSim):
 
         return kernels
 
-    # FIXME
     def get_compute_kernels(self, runner, full_output, bulk):
-        cnp_args1n = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_dist2a,
-                      self.gpu_dist2b, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [np.uint32(0)]
-        cnp_args1s = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist1b, self.gpu_dist2a,
-                      self.gpu_dist2b, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [np.uint32(1)]
-        cnp_args2n = [self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_dist2b,
-                      self.gpu_dist2a, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [np.uint32(0)]
-        cnp_args2s = [self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist1a, self.gpu_dist2b,
-                      self.gpu_dist2a, self.gpu_rho, self.gpu_phi] + self.gpu_velocity + [np.uint32(1)]
+        gpu_rho = runner.gpu_field(self.rho)
+        gpu_phi = runner.gpu_field(self.phi)
+        gpu_v = runner.gpu_field(self.v)
+        gpu_map = runner.gpu_geo_map()
 
-        macro_args1 = [self.geo.gpu_map, self.gpu_dist1a, self.gpu_dist2a, self.gpu_rho, self.gpu_phi]
-        macro_args2 = [self.geo.gpu_map, self.gpu_dist1b, self.gpu_dist2b, self.gpu_rho, self.gpu_phi]
+        gpu_dist1a = runner.gpu_dist(0, 0)
+        gpu_dist1b = runner.gpu_dist(0, 1)
+        gpu_dist2a = runner.gpu_dist(1, 0)
+        gpu_dist2b = runner.gpu_dist(1, 1)
 
-        k_block_size = self._kernel_block_size()
-        cnp_name = 'CollideAndPropagate'
-        macro_name = 'PrepareMacroFields'
-        fields = [self.img_rho, self.img_phi]
+        args1 = [gpu_map, gpu_dist1a, gpu_dist1b, gpu_dist2a, gpu_dist2b,
+                gpu_rho, gpu_phi] + gpu_v
+        args2 = [gpu_map, gpu_dist1b, gpu_dist1a, gpu_dist2b, gpu_dist2a,
+                gpu_rho, gpu_phi] + gpu_v
 
-        kern_cnp1n = self.backend.get_kernel(self.mod, cnp_name,
-                         args=cnp_args1n, args_format='P'*(len(cnp_args1n)-1)+'i',
-                         block=k_block_size, fields=fields)
-        kern_cnp1s = self.backend.get_kernel(self.mod, cnp_name,
-                         args=cnp_args1s, args_format='P'*(len(cnp_args1n)-1)+'i',
-                         block=k_block_size, fields=fields)
-        kern_cnp2n = self.backend.get_kernel(self.mod, cnp_name,
-                         args=cnp_args2n, args_format='P'*(len(cnp_args1n)-1)+'i',
-                         block=k_block_size, fields=fields)
-        kern_cnp2s = self.backend.get_kernel(self.mod, cnp_name,
-                         args=cnp_args2s, args_format='P'*(len(cnp_args1n)-1)+'i',
-                         block=k_block_size, fields=fields)
-        kern_mac1 = self.backend.get_kernel(self.mod, macro_name,
-                         args=macro_args1, args_format='P'*len(macro_args1),
-                         block=k_block_size)
-        kern_mac2 = self.backend.get_kernel(self.mod, macro_name,
-                         args=macro_args2, args_format='P'*len(macro_args2),
-                         block=k_block_size)
+        options = 0
+        if full_output:
+            options |= 1
+        if bulk:
+            options |= 2
 
-        # For occupancy analysis in performance tests.
-        self._lb_kernel = kern_cnp1n
+        args1.append(np.uint32(options))
+        args2.append(np.uint32(options))
 
-        # Map: iteration parity -> kernel arguments to use.
-        self.kern_map = {
-            0: (kern_mac1, kern_cnp1n, kern_cnp1s),
-            1: (kern_mac2, kern_cnp2n, kern_cnp2s),
-        }
+        # FIXME
+        macro_args1 = [gpu_map, gpu_dist1a, gpu_dist2a, gpu_rho, gpu_phi]
+        macro_args2 = [gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi]
 
-        if self.grid.dim == 2:
-            self.kern_grid_size = (self.arr_nx/self.options.block_size, self.arr_ny)
-        else:
-            self.kern_grid_size = (self.arr_nx/self.options.block_size * self.arr_ny, self.arr_nz)
+        kernels = []
+        kernels.append(runner.get_kernel(
+                'CollideAndPropagate', args1, 'P'*(len(args1)-1)+'i'))
+        kernels.append(runner.get_kernel(
+                'CollideAndPropagate', args2, 'P'*(len(args2)-1)+'i'))
+        return kernels
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
