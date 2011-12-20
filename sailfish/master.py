@@ -174,7 +174,7 @@ class LBMachineMaster(object):
                     c1 = ZMQRemoteBlockConnector(addr, receiver=block.id > nbid)
                     block.add_connector(nbid, c1)
 
-    def _init_visualization_and_io(self):
+    def _init_visualization_and_io(self, sim):
         if self.config.output:
             output_cls = io.format_name_to_cls[self.config.output_format]
         else:
@@ -182,6 +182,9 @@ class LBMachineMaster(object):
 
         if self.config.mode != 'visualization':
             return lambda block: output_cls(self.config, block.id)
+
+        basic_fields = sim.fields()
+        # XXX compute total storage requirements
 
         for block in self.blocks:
             size = reduce(operator.mul, block.size)
@@ -195,6 +198,7 @@ class LBMachineMaster(object):
         vis_config.iteration = -1
         vis_config.field_name = ''
         vis_config.all_blocks = False
+        vis_fields = sim.visualization_fields(sim.dim)
 
         # Start the visualizatione engine.
         vis_class = util.get_visualization_engines().next()
@@ -229,7 +233,7 @@ class LBMachineMaster(object):
         self.config.logger.info('Block -> GPU map: {0}'.format(block2gpu))
 
         self._init_connectors()
-        output_initializer = self._init_visualization_and_io()
+        output_initializer = self._init_visualization_and_io(sim)
         try:
             backend_cls = util.get_backends().next()
         except StopIteration:

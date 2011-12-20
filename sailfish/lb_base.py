@@ -48,6 +48,18 @@ class LBSim(object):
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['constants'] = self.constants()
 
+    def init_fields(self, runner):
+        suffixes = ['x', 'y', 'z']
+        for field in self.fields():
+            if type(field) is ScalarField:
+                f = runner.make_scalar_field(name=field.name, async=True)
+                setattr(self, field.name, f)
+            elif type(field) is VectorField:
+                f = runner.make_vector_field(name=field.name, async=True)
+                setattr(self, field.name, f)
+                for i in range(0, self.grid.dim):
+                    setattr(self, field.name + suffixes[i], f[i])
+
     def __init__(self, config):
         self.config = config
         self.S = sym.S()
@@ -58,3 +70,14 @@ class LBSim(object):
     # TODO(michalj): Restore support for defining visualization fields.
     # TODO(michalj): Restore support for tracer particles.
     # TODO(michalj): Restore support for free-surface LB.
+
+class Field(object):
+    def __init__(self, name, expr=None):
+        self.name = name
+        self.expr = expr
+
+class ScalarField(Field):
+    pass
+
+class VectorField(Field):
+    pass

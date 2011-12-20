@@ -6,8 +6,7 @@ __license__ = 'GPL3'
 
 import numpy as np
 from sailfish import sym, util
-from sailfish.lb_base import LBSim
-
+from sailfish.lb_base import LBSim, ScalarField, VectorField
 
 class LBBinaryFluidBase(LBSim):
     """Simulates a binary fluid."""
@@ -39,21 +38,19 @@ class LBBinaryFluidBase(LBSim):
         group.add_argument('--grid', help='LB grid', type=str,
                 choices=grids, default=grids[0])
 
-    def init_fields(self, runner):
-        self.phi = runner.make_scalar_field(name='phi', async=True)
-        self.rho = runner.make_scalar_field(name='rho', async=True)
-        self.v = runner.make_vector_field(name='v', async=True)
+    @classmethod
+    def fields(cls):
+        return [ScalarField('rho'), ScalarField('phi'), VectorField('v')]
 
-        if self.grid.dim == 2:
-            self.vx, self.vy = self.v
-            runner.add_visualization_field(
-                    lambda: np.square(self.vx) + np.square(self.vy),
-                    name='v^2')
+    @classmethod
+    def visualization_fields(cls, dim):
+        if dim == 2:
+            return [ScalarField('v^2',
+                    expr=lambda f: np.square(f['vx']) + np.square(f['vy']))]
         else:
-            self.vx, self.vy, self.vz = self.v
-            runner.add_visualization_field(
-                    lambda: np.square(self.vx) + np.square(self.vy) +
-                    np.square(self.vz), name='v^2')
+            return [ScalarField('v^2',
+                    expr=lambda f: np.square(f['vx']) + np.square(f['vy']) +
+                        np.square(f['vz']))]
 
     # FIXME
     def get_pbc_kernels(self, runner):
