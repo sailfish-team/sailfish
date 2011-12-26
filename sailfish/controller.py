@@ -11,6 +11,12 @@ import imp
 import logging
 import os
 import platform
+import re
+import shutil
+import socket
+import subprocess
+import stat
+import tempfile
 from multiprocessing import Process
 
 import execnet
@@ -213,6 +219,7 @@ class LBSimulationController(object):
                 lb_geo = LBGeometry3D
 
         self._lb_geo = lb_geo
+        self._tmpdir = tempfile.mkdtemp()
 
         group = self._config_parser.add_group('Runtime mode settings')
         group.add_argument('--mode', help='runtime mode', type=str,
@@ -253,7 +260,14 @@ class LBSimulationController(object):
         group.add_argument('--cluster_sync', type=str, default='',
                 help='local_path:dest_path; if specified, will send the '
                 'contents of "local_path" to "dest_path" on all cluster '
-                'machines before starting the simulation')
+                'machines before starting the simulation.')
+        group.add_argument('--cluster_pbs', type=bool, default=True,
+                help='If True, standard PBS variables will be used to run '
+                'the job in a cluster.')
+        group.add_argument('--cluster_pbs_initscript', type=str,
+                default='sailfish-init.sh', help='Script to execute on remote '
+                'nodes in order to set the environment prior to starting '
+                'a machine master.')
 
         group = self._config_parser.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)
@@ -287,6 +301,9 @@ class LBSimulationController(object):
         if default_config is not None:
             self._config_parser.set_defaults(default_config)
 
+    def __del__(self):
+        shutil.rmtree(self._tmpdir)
+
     @property
     def dim(self):
         """Dimensionality of the simulation: 2 or 3."""
@@ -305,13 +322,15 @@ class LBSimulationController(object):
         for block in blocks:
             block.set_actual_size(envelope_size)
 
-    def _start_cluster_simulation(self, subdomains):
+    def _start_cluster_simulation(self, subdomains, cluster=None):
         """Starts a simulation on a cluster of nodes."""
-        try:
-            cluster = imp.load_source('cluster', self.config.cluster_spec)
-        except IOError, e:
-            cluster = imp.load_source('cluster',
-                    os.path.expanduser('~/.sailfish/{0}'.format(self.config.cluster_spec)))
+
+        if cluster is None:
+            try:
+                cluster = imp.load_source('cluster', self.config.cluster_spec)
+            except IOError, e:
+                cluster = imp.load_source('cluster',
+                        os.path.expanduser('~/.sailfish/{0}'.format(self.config.cluster_spec)))
 
         self._cluster_gateways = []
         self._node_subdomains = split_subdomains_between_nodes(cluster.nodes, subdomains)
@@ -370,13 +389,58 @@ class LBSimulationController(object):
                     args=(self.config, subdomains, self._lb_class))
         self._simulation_process.start()
 
+    def _start_pbs_handlers(self):
+        cluster = util.gpufile_to_clusterspec(os.environ['PBS_GPUFILE'])
+        self._pbs_handlers = []
+
+        def _start_socketserver(addr, port):
+            return subprocess.Popen(['pbsdsh', '-o', '-h',
+                addr, 'sh', '-c',
+                ". %s ; python sailfish/socketserver.py :%s" %
+                (self.config.cluster_pbs_initscript, port)])
+
+        for node in cluster.nodes:
+            port = node.get_port()
+            self._pbs_handlers.append(_start_socketserver(node.addr, port))
+
+        starting_nodes = list(enumerate(cluster.nodes))
+        while starting_nodes:
+            still_starting = list()
+
+            for i, node in starting_nodes:
+                if self._pbs_handlers[i].returncode is not None:
+                    port = node.get_port() + 1
+                    node.set_port(port)
+                    self._pbs_handlers[i] = _start_socketserver(node.addr, port)
+                    still_staring.append((i, node))
+                else:
+                    try:
+                        s = socket.create_connection((node.addr, port), timeout=5)
+                        s.close()
+                    except (socket.timeout, socket.error):
+                        still_starting.append((i, node))
+
+            starting_nodes = still_starting
+
+        return cluster
+
+    def _is_pbs_cluster(self):
+        return self.config.cluster_pbs and 'PBS_GPUFILE' in os.environ
+
     def _start_simulation(self, subdomains):
         """Starts a simulation.
 
         :param subdomains: list of SubdomainSpec objects
         """
 
-        if self.config.cluster_spec:
+        # A PBS implementation with GPU-aware scheduling is required.
+        if self._is_pbs_cluster():
+            assert self.config.cluster_spec == '', ('Cluster specifications '
+                    'are not supported when running under PBS.')
+
+            cluster = self._start_pbs_handlers()
+            self._start_cluster_simulation(subdomains, cluster)
+        elif self.config.cluster_spec:
             self._start_cluster_simulation(subdomains)
         else:
             self._start_local_simulation(subdomains)
@@ -384,7 +448,7 @@ class LBSimulationController(object):
     def _finish_simulation(self, blocks, summary_receiver):
         timing_infos = []
 
-        if self.config.cluster_spec:
+        if self.config.cluster_spec or self._is_pbs_cluster():
             if self.config.mode == 'benchmark':
                 for ch, subdomains in zip(self._cluster_channels, self._node_subdomains):
                     for sub in subdomains:
@@ -395,6 +459,10 @@ class LBSimulationController(object):
                 assert data == 'FIN'
             for gw in self._cluster_gateways:
                 gw.exit()
+
+            if self._is_pbs_cluster():
+                for handler in self._pbs_handlers:
+                    handler.terminate()
         else:
             if self.config.mode == 'benchmark':
                 # Collect timing information from all blocks.
