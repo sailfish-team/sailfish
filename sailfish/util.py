@@ -68,9 +68,12 @@ def gpufile_to_clusterspec(gpufile):
 
     cluster = []
     for node, gpus in nodes.iteritems():
-        cluster.append(config.MachineSpec('socket=%s:%s' % (
-            socket.gethostbyname(host), port),
-            host, gpus=list(gpus)))
+        try:
+            ipaddr = socket.gethostbyname(node)
+        except socket.error:
+            ipaddr = node
+        cluster.append(config.MachineSpec('socket=%s:%s' % (ipaddr, port),
+            node, gpus=list(gpus)))
 
     class Cluster(object):
         def __init__(self, nodes):

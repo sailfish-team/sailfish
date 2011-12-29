@@ -90,3 +90,12 @@ class MachineSpec(object):
         curr_port = self.get_port()
         self.host = self.host.replace(curr_port, port)
 
+    def __repr__(self):
+        return 'MachineSpec({0}, {1}, {2}, {3})'.format(
+                self.host, self.addr, self.gpus, self.iface)
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
