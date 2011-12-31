@@ -104,8 +104,20 @@ class ZMQBlockConnector(object):
                 os.getpid(), ids[0], ids[1])
         return (ZMQBlockConnector(addr, False), ZMQBlockConnector(addr, True))
 
+
 class ZMQRemoteBlockConnector(ZMQBlockConnector):
     """Handles directed data exchange between two blocks on two different hosts."""
+
+    def __init__(self, addr, receiver=False):
+        """
+        :param addr: if receiver == False, addr is tcp://<interface> or
+            tcp://*, otherwise it is tcp://<remote_node_ip_or_name>
+        :param receiver: if True, use connect on the socket, otherwise bind
+            it to a random port.
+        """
+        # Import to check if the module is available and fail early if not.
+        import netifaces
+        ZMQBlockConnector.__init__(self, addr, receiver)
 
     def is_ready(self):
         return self.port != None or not self._receiver
@@ -117,3 +129,18 @@ class ZMQRemoteBlockConnector(ZMQBlockConnector):
             self.socket.connect("{0}:{1}".format(self._addr, self.port))
         else:
             self.port = self.socket.bind_to_random_port(self._addr)
+
+    def get_addr(self):
+        iface = self._addr.replace('tcp://', '')
+        # Local import so that other connectors can work without this module.
+        import netifaces
+        if iface in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(iface)
+            return addrs[netifaces.AF_INET][0]['addr']
+        else:
+            return None
+
+    def set_addr(self, addr):
+        if addr is not None:
+            self._addr = 'tcp://{0}'.format(addr)
+

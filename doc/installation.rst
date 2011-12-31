@@ -12,6 +12,7 @@ General requirements:
 * mako-0.2.5
 * execnet-1.0.9
 * Python zeromq-2.1.10
+* netifaces-0.6 (for distributed simulations only)
 * a Python module for the computational backend (one or more of the following):
 
   * pycuda-0.92 (with the NVIDIA drivers and NVIDIA CUDA Toolkit)
