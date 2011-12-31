@@ -268,6 +268,9 @@ class LBSimulationController(object):
                 default='sailfish-init.sh', help='Script to execute on remote '
                 'nodes in order to set the environment prior to starting '
                 'a machine master.')
+        group.add_argument('--cluster_pbs_interface', type=str,
+                default='', help='Network interface to use on PBS nodes for '
+                'internode communication.')
 
         group = self._config_parser.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)
@@ -390,7 +393,8 @@ class LBSimulationController(object):
         self._simulation_process.start()
 
     def _start_pbs_handlers(self):
-        cluster = util.gpufile_to_clusterspec(os.environ['PBS_GPUFILE'])
+        cluster = util.gpufile_to_clusterspec(os.environ['PBS_GPUFILE'],
+                self.config.cluster_pbs_interface)
         self._pbs_handlers = []
 
         def _start_socketserver(addr, port):

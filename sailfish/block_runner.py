@@ -121,7 +121,8 @@ class BlockRunner(object):
             if connector.is_ready():
                 connector.init_runner(self._ctx)
                 if connector.port is not None:
-                    ports[(self._block.id, b_id)] = connector.port
+                    ports[(self._block.id, b_id)] = (connector.get_addr(),
+                            connector.port)
             else:
                 unready.append(b_id)
 
@@ -130,7 +131,9 @@ class BlockRunner(object):
 
         for b_id in unready:
             connector = self._block._connectors[b_id]
-            connector.port = remote_ports[(b_id, self._block.id)]
+            addr, port = remote_ports[(b_id, self._block.id)]
+            connector.port = port
+            connector.set_addr(addr)
             connector.init_runner(self._ctx)
 
     @property
