@@ -13,6 +13,10 @@ class LBSim(object):
 
     kernel_file = "__TEMPLATE_NOT_SET__"
 
+    #: Set this to a class implementing the BlockRunner interface in order
+    #  to use subdomain runner other than default.
+    subdomain_runner = None
+
     #: How many layers of nearest neighbors nodes are required by the model.
     nonlocality = 0
 
@@ -72,9 +76,14 @@ class LBSim(object):
     # TODO(michalj): Restore support for free-surface LB.
 
 class Field(object):
-    def __init__(self, name, expr=None):
+    def __init__(self, name, expr=None, need_nn=False):
+        """
+        :param need_nn: if True, the model needs access to this field
+            on the neighboring nodes.
+        """
         self.name = name
         self.expr = expr
+        self.need_nn = need_nn
 
 class ScalarField(Field):
     pass

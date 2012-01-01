@@ -41,8 +41,12 @@ def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
     else:
         summary_addr = master_addr
 
-    runner = block_runner.BlockRunner(sim, block, output, backend, quit_event,
-            summary_addr, master_addr)
+    runner_cls = block_runner.BlockRunner
+    if sim.subdomain_runner is not None:
+        runner_cls = sim.subdomain_runner
+
+    runner = runner_cls(sim, block, output, backend, quit_event, summary_addr,
+            master_addr)
     runner.run()
 
 
