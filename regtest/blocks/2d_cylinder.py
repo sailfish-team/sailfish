@@ -28,6 +28,7 @@ class SimulationTest(CylinderSimulation):
         defaults['max_iters'] = 100
         defaults['quiet'] = True
         defaults['output'] = output
+        defaults['cuda_cache'] = False
 
 # NOTE: This test class is not thread safe.
 class TestInterblockPropagation(unittest.TestCase):
@@ -127,8 +128,11 @@ class TestInterblockPropagation(unittest.TestCase):
         np.testing.assert_array_almost_equal(vy, self.vvy)
 
 
+def tearDownModule():
+    shutil.rmtree(tmpdir)
+
+
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
     unittest.main()
-    shutil.rmtree(tmpdir)
