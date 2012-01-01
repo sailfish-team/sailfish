@@ -1,26 +1,18 @@
-"""Classes for binary fluid lattice Boltzmann simulations.
-
-For non-local models like those used for binary fluids, the simulation
-proceeds as follows:
-- relexation and streaming
-- inter-node single dist sync (like in local models)
-- macroscopic variable calculation
-- inter-noe non-local fields sync
-- simulation step
-"""
+"""Classes for binary fluid lattice Boltzmann simulations."""
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 import numpy as np
-from sailfish import sym, util
+from sailfish import block_runner, sym, util
 from sailfish.lb_base import LBSim, ScalarField, VectorField
 
 
 class LBBinaryFluidBase(LBSim):
     """Base class for binary fluid simulations."""
 
+    subdomain_runner = block_runnner.NNBlockRunner
     kernel_file = 'binary_fluid.mako'
 
     def __init__(self, config):
@@ -47,10 +39,6 @@ class LBBinaryFluidBase(LBSim):
         grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == dim]
         group.add_argument('--grid', help='LB grid', type=str,
                 choices=grids, default=grids[0])
-
-    @classmethod
-    def fields(cls):
-        return [ScalarField('rho'), ScalarField('phi'), VectorField('v')]
 
     @classmethod
     def visualization_fields(cls, dim):
@@ -104,21 +92,21 @@ class LBBinaryFluidBase(LBSim):
         args1.append(np.uint32(options))
         args2.append(np.uint32(options))
 
-        # FIXME
         macro_args1 = [gpu_map, gpu_dist1a, gpu_dist2a, gpu_rho, gpu_phi]
         macro_args2 = [gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi]
 
-        kernels.append(runner.get_kernel(
-            'PrepareMacroFields', macro_args1, 'P' * len(macro_args1))
-        kernels.append(runner.get_kernel(
-            'PrepareMacroFields', macro_args2, 'P' * len(macro_args2))
+        macro_kernels = [
+            runner.get_kernel('PrepareMacroFields', macro_args1,
+                'P' * len(macro_args1)),
+            runner.get_kernel('PrepareMacroFields', macro_args2,
+                'P' * len(macro_args2))]
 
-        kernels = []
-        kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args1, 'P'*(len(args1)-1)+'i'))
-        kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args2, 'P'*(len(args2)-1)+'i'))
-        return kernels
+        sim_kernels = [
+            runner.get_kernel('CollideAndPropagate', args1,
+                'P'*(len(args1)-1)+'i')),
+            runner.get_kernel('CollideAndPropagate', args2,
+                'P'*(len(args2)-1)+'i'))]
+        return zip(macro_kernels, sim_kernels)
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
@@ -178,6 +166,10 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
         ret['tau_a'] = self.options.tau_a
         ret['tau_b'] = self.options.tau_b
         return ret
+
+    @classmethod
+    def fields(cls):
+        return [ScalarField('rho'), ScalarField('phi', need_nn=True), VectorField('v')]
 
     @classmethod
     def add_options(cls, group, dim):
@@ -309,6 +301,12 @@ class LBBinaryFluidShanChen(LBBinaryFluidBase):
         ret = super(LBBinaryFluidShanChen, self).constants()
         ret['SCG'] = self.config.G
         return ret
+
+    @classmethod
+    def fields(cls):
+        return [ScalarField('rho', need_nn=True),
+                ScalarField('phi', need_nn=True),
+                VectorField('v')]
 
     @classmethod
     def add_options(cls, group, dim):

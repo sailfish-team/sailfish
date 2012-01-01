@@ -595,6 +595,10 @@ class BlockRunner(object):
         self._step_boundary(output_req)
         self._step_bulk(output_req)
         self._sim.iteration += 1
+        self.send_data()
+        self.recv_data()
+        for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
+            self.backend.run_kernel(kernel, grid, self._data_stream)
 
     def _get_bulk_kernel(self, output_req):
         if output_req:
@@ -947,6 +951,15 @@ class BlockRunner(object):
             "Simulation completed after {0} iterations.".format(
                 self._sim.iteration))
 
+    def need_quit(self):
+        if self._quit_event.is_set():
+            self.config.logger.info("Simulation termination requested.")
+            return True
+
+        if self._ppid != os.getppid():
+            self.config.logger.info("Master process is dead -- terminating simulation.")
+            return False
+
     def main(self):
         while True:
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
@@ -956,7 +969,6 @@ class BlockRunner(object):
                 self._output.dump_dists(dbuf, self._sim.iteration)
 
             self.step(output_req)
-            self.send_data()
 
             if output_req and self.config.output_required:
                 self._fields_to_host()
@@ -965,21 +977,6 @@ class BlockRunner(object):
                     self.config.max_iters):
                 break
 
-            if self._quit_event.is_set():
-                self.config.logger.info("Simulation termination requested.")
-                break
-
-            if self._ppid != os.getppid():
-                self.config.logger.info("Master process is dead -- terminating simulation.")
-                break
-
-            self.recv_data()
-            if self._quit_event.is_set():
-                self.config.logger.info("Simulation termination requested.")
-
-            for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
-                self.backend.run_kernel(kernel, grid, self._data_stream)
-
             self._data_stream.synchronize()
             self._calc_stream.synchronize()
             if output_req and self.config.output_required:
@@ -987,7 +984,6 @@ class BlockRunner(object):
 
         # Receive any data from remote nodes prior to termination.  This ensures
         # we don't run into problems with zmq.
-        self.recv_data()
         self._data_stream.synchronize()
         self._calc_stream.synchronize()
         if output_req and self.config.output_required:
@@ -1003,6 +999,7 @@ class BlockRunner(object):
         t_data = 0.0
         t_wait = 0.0
 
+        # XXX fix this.
         for i in xrange(self.config.max_iters):
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
 
@@ -1064,3 +1061,123 @@ class BlockRunner(object):
                 t_coll / mi, t_data / mi, t_recv / mi, t_send / mi,
                 t_wait / mi, t_total / mi, self._block.id)
         self._send_summary_info(ti)
+
+
+class NNBlockRunner(BlockRunner):
+    """Runs a fluid simulation for a single subdomain.
+
+    This is a specialization of the BlockRunner class for models which
+    require access to macroscopic fields from the nearest neighbor nodes.
+    It changes the steps executed on the GPU as follows:
+
+    calc stream                    data stream
+    -------------------------------------------------------
+    boundary macro fields    --->  collect macro data
+    bulk macro fields              ...
+    boundary sim. step       <---  distribute macro data
+                             --->  collect distrib. data
+    bulk sim. step                 ...
+                                   distribute distrib. data
+                       <- sync ->
+
+    TODO(michalj): Try the alternative scheme:
+
+    calc stream                    data stream
+    -------------------------------------------------------
+    boundary macro fields    --->  collect macro data
+    bulk macro fields              ...
+    bulk sim. step
+    boundary sim. step       <---  distribute macro data
+                             --->  collect distrib. data
+                                   ...
+                                   distribute distrib. data
+                       <- sync ->
+
+
+    An arrow above symbolizes a dependency between the two streams.
+    """
+
+    def step(self, output_req):
+        """Runs one simulation step."""
+
+        if output_req:
+            bnd = self._kernels_bnd_full
+            bulk = self._kernels_bulk_full
+        else:
+            bnd = self._kernels_bnd_none
+            bulk = self._kernels_bulk_none
+
+        it = self._sim_iteration
+        bnd_kernel_macro, bnd_kernel_sim = bnd[it & 1]
+        bulk_kernel_macro, bulk_kernel_sim = bulk[it & 1]
+
+        # Local aliases.
+        has_boundary_split = self._boundary_blocks is not None
+        str_calc = self._calc_stream
+        str_data = self._data_stream
+        make_event = self.backend.make_event
+        run = self.backend.run_kernel
+        grid_bulk = self._kernel_grid_bulk
+        grid_bnd = self._boundary_blocks
+
+        # Macroscopic variables.
+        # self._timing_bnd_start = make_event(str_calc, timing=True)
+        if has_boundary_split:
+            run(bnd_kernel_macro, grid_bnd, str_calc)
+        else:
+            run(bulk_kernel_macro, grid_bulk, str_calc)
+        self._timing_bnd_stop = make_event(str_calc, timing=True)
+
+        str_data.wait_for_event(self._timing_bnd_stop)
+
+        # FIXME: different collect kernels for the phi field
+        for kernel, grid in self._collect_kernels[it & 1]:
+            run(kernel, grid, str_data)
+
+        #self._timing_coll_done = make_event(str_data, timing=True)
+        #self._timing_calc_start = make_event(str_calc, timing=True)
+
+        if has_boundary_split:
+            run(bulk_kernel_macro, grid_bulk, str_calc)
+
+        # self._timing_calc_end = make_event(str_calc, timing=True)
+
+        self._send_macro()
+        if self.need_quit():
+            return False
+
+        self._recv_macro()
+
+        # FIXME: different distrib kernel for the phi field, normally
+        # at this point we assume we need it + 1
+        for kernel, grid in self._distrib_kernels[it & 1]:
+            run(kernel, grid, str_data)
+
+        # Actual simulation step.
+        if has_boundary_split:
+            run(bnd_kernel_sim, grid_bnd, str_calc)
+        else:
+            run(bulk_kernel_sim, grid_bulk, stc_calc)
+
+        ev = make_event(str_calc)
+        str_data.wait_for_event(ev)
+
+        for kernel, grid in self._collect_kernels[it & 1]:
+            run(kernel, grid, str_data)
+
+        if has_boundary_split:
+            run(bulk_kernel_sim, grid_bulk, str_calc)
+
+        self._apply_pbc()
+        self._send_dists()
+        if self.need_quit():
+            return False
+
+        self._recv_dists()
+        for kernel, grid in self._distrib_kernels[it & 1]:
+            run(kernel, grid, str_data)
+
+        self._sim.iteration += 1
+
+        return True
+

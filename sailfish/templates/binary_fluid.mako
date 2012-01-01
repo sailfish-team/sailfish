@@ -117,6 +117,7 @@ ${kernel} void SetInitialConditions(
 	${init_dist_with_eq()}
 }
 
+## XXX: only do that for fields that are marked as need_nn
 ${kernel} void PrepareMacroFields(
 	${global_ptr} int *map,
 	${global_ptr} float *dist1_in,
@@ -311,6 +312,7 @@ ${kernel} void CollideAndPropagate(
 
 	%if simtype == 'free-energy':
 		getMacro(&d0, ncode, type, orientation, &g0m0, v);
+		// TODO(michalj): Is this really needed?
 		get0thMoment(&d1, type, orientation, &g1m0);
 	%elif simtype == 'shan-chen':
 		${sc_macro_fields()}

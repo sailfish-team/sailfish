@@ -199,6 +199,12 @@ ${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, 
 	%endfor
 }
 
+// i: global node index
+// f1, f2: fields
+// fi1, fi2: field numbers
+// cc: coupling constant
+// a1, a2: Shan-Chen accelerations
+// x, y, [z]: position of the node
 ${device_func} inline void shan_chen_accel(int i, ${global_ptr} float *f1, ${global_ptr} float *f2,
 int fi1, int fi2, float cc, float *a1, float *a2, int x, int y
 %if dim == 3:
