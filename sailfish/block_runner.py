@@ -985,6 +985,9 @@ class BlockRunner(object):
             if output_req and self.config.output_required:
                 self._output.save(self._sim.iteration)
 
+        # Receive any data from remote nodes prior to termination.  This ensures
+        # we don't run into problems with zmq.
+        self.recv_data()
         self._data_stream.synchronize()
         self._calc_stream.synchronize()
         if output_req and self.config.output_required:
