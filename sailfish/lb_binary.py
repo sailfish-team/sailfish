@@ -1,15 +1,25 @@
-"""Classes for binary fluid lattice Boltzmann simulations."""
+"""Classes for binary fluid lattice Boltzmann simulations.
+
+For non-local models like those used for binary fluids, the simulation
+proceeds as follows:
+- relexation and streaming
+- inter-node single dist sync (like in local models)
+- macroscopic variable calculation
+- inter-noe non-local fields sync
+- simulation step
+"""
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
-__license__ = 'GPL3'
+__license__ = 'LGPL3'
 
 import numpy as np
 from sailfish import sym, util
 from sailfish.lb_base import LBSim, ScalarField, VectorField
 
+
 class LBBinaryFluidBase(LBSim):
-    """Simulates a binary fluid."""
+    """Base class for binary fluid simulations."""
 
     kernel_file = 'binary_fluid.mako'
 
@@ -98,6 +108,11 @@ class LBBinaryFluidBase(LBSim):
         macro_args1 = [gpu_map, gpu_dist1a, gpu_dist2a, gpu_rho, gpu_phi]
         macro_args2 = [gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi]
 
+        kernels.append(runner.get_kernel(
+            'PrepareMacroFields', macro_args1, 'P' * len(macro_args1))
+        kernels.append(runner.get_kernel(
+            'PrepareMacroFields', macro_args2, 'P' * len(macro_args2))
+
         kernels = []
         kernels.append(runner.get_kernel(
                 'CollideAndPropagate', args1, 'P'*(len(args1)-1)+'i'))
@@ -149,6 +164,7 @@ class LBBinaryFluidBase(LBSim):
 
 
 class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
+    """Binary fluid mixture using the free-energy model."""
 
     def __init__(self, config):
         super(LBBinaryFluidFreeEnergy, self).__init__(config)
@@ -279,17 +295,18 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
     #    self.vis.add_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
 
 
-class LBShanChenBinary(LBBinaryFluidBase):
+class LBBinaryFluidShanChen(LBBinaryFluidBase):
+    """Binary fluid mixture using the Shan-Chen model."""
 
     def __init__(self, config):
-        super(LBShanChenBinary, self).__init__(config)
+        super(LBBinaryFluidShanChen, self).__init__(config)
         self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
         eq2, _ = sym.bgk_equilibrium(self.grid, self.S.phi, self.S.phi)
         self.equilibrium.append(eq2[0])
         self.add_force_coupling(0, 1, 'SCG')
 
     def constants(self):
-        ret = super(LBShanChenBinary, self).constants()
+        ret = super(LBBinaryFluidShanChen, self).constants()
         ret['SCG'] = self.config.G
         return ret
 
@@ -302,7 +319,7 @@ class LBShanChenBinary(LBBinaryFluidBase):
                 help='Shan-Chen interaction strenght constant')
 
     def update_context(self, ctx):
-        super(LBShanChenBinary, self).update_context(ctx)
+        super(LBBinaryFluidShanChen, self).update_context(ctx)
         ctx['simtype'] = 'shan-chen'
         ctx['sc_pseudopotential'] = 'sc_ppot_lin'
         ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0

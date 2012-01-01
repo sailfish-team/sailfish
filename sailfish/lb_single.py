@@ -50,6 +50,7 @@ class LBForcedSim(LBSim):
     def add_force_coupling(self, grid_a, grid_b, const_name):
         self._force_couplings[(grid_a, grid_b)] = const_name
 
+
 class LBFluidSim(LBSim):
     """Simulates a single fluid."""
 
