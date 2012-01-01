@@ -133,6 +133,7 @@ class LBMachineMaster(object):
         # IDs of the blocks that are local to this master.
         local_block_ids = set([b.id for b in self.blocks])
         local_block_map = dict([(b.id, b) for b in self.blocks])
+        ipc_files = []
 
         for i, block in enumerate(self.blocks):
             connecting_blocks = block.connecting_blocks()
@@ -164,6 +165,7 @@ class LBMachineMaster(object):
                     c1, c2 = ZMQBlockConnector.make_ipc_pair(ctype, (size1, size2),
                                                              (block.id, nbid))
                     block.add_connector(nbid, c1)
+                    ipc_files.append(c1.ipc_file)
                     local_block_map[nbid].add_connector(block.id, c2)
                 else:
                     receiver = block.id > nbid
@@ -173,6 +175,8 @@ class LBMachineMaster(object):
                         addr = "tcp://{0}".format(self._iface)
                     c1 = ZMQRemoteBlockConnector(addr, receiver=block.id > nbid)
                     block.add_connector(nbid, c1)
+
+        return ipc_files
 
     def _init_visualization_and_io(self, sim):
         if self.config.output:
@@ -232,7 +236,7 @@ class LBMachineMaster(object):
 
         self.config.logger.info('Block -> GPU map: {0}'.format(block2gpu))
 
-        self._init_connectors()
+        ipc_files = self._init_connectors()
         output_initializer = self._init_visualization_and_io(sim)
         try:
             backend_cls = util.get_backends().next()
@@ -249,6 +253,7 @@ class LBMachineMaster(object):
             output = output_initializer(block)
             master_addr = 'ipc://{0}/sailfish-master-{1}_{2}'.format(
                     tempfile.gettempdir(), os.getpid(), block.id)
+            ipc_files.append(master_addr.replace('ipc://', ''))
             sock = ctx.socket(zmq.PAIR)
             sock.bind(master_addr)
             sockets.append(sock)
@@ -295,3 +300,5 @@ class LBMachineMaster(object):
 
         self._finish_visualization()
 
+        for ipcfile in ipc_files:
+            os.unlink(ipcfile)

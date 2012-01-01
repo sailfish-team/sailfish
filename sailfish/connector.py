@@ -75,6 +75,11 @@ class ZMQBlockConnector(object):
         self._receiver = receiver
         self.port = None
 
+        if addr.startswith('ipc://'):
+            self.ipc_file = addr.replace('ipc://', '')
+        else:
+            self.ipc_file = None
+
     def init_runner(self, ctx):
         """Called from the block runner of the sender block."""
         import zmq
