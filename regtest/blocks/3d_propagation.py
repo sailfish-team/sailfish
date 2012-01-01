@@ -84,6 +84,7 @@ class SimulationTest(LBFluidSim, LBForcedSim):
             'quiet': True,
             'output': os.path.join(tmpdir, 'test_out'),
             'debug_dump_dists': True,
+            'cuda_cache': False,
         })
 
     # Permutation functions.
@@ -213,6 +214,7 @@ class PeriodicSimulationTest(LBFluidSim, LBForcedSim):
             'quiet': True,
             'output': os.path.join(tmpdir, 'per_horiz_out'),
             'debug_dump_dists': True,
+            'cuda_cache': False,
         })
 
     def initial_conditions(self, runner):
@@ -299,6 +301,7 @@ class SingleBlockPeriodicSimulationTest(LBFluidSim, LBForcedSim):
             'quiet': True,
             'output': os.path.join(tmpdir, 'per_single_out'),
             'debug_dump_dists': True,
+            'cuda_cache': False,
         })
 
     def initial_conditions(self, runner):
@@ -365,9 +368,15 @@ class SingleBlockPeriodicTest(unittest.TestCase):
         ae(b0[vi(-1, 0, 0), 32, 1, 64], np.float32(0.31))
         ae(b0[vi(-1, -1, 0), 32, 1, 64], np.float32(0.32))
 
-if __name__ == '__main__':
+def setUpModule():
+    global tmpdir
     tmpdir = tempfile.mkdtemp()
+
+def tearDownModule():
+    shutil.rmtree(tmpdir)
+
+
+if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
     unittest.main()
-    shutil.rmtree(tmpdir)

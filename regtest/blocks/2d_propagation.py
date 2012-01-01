@@ -79,6 +79,7 @@ class SimulationTest(LBFluidSim, LBForcedSim):
             'quiet': True,
             'output': os.path.join(tmpdir, 'test_out'),
             'debug_dump_dists': True,
+            'cuda_cache': False,
         })
 
     def initial_conditions(self, runner):
@@ -316,6 +317,7 @@ class ThreeBlocksSimulationTest(LBFluidSim, LBForcedSim):
             'quiet': True,
             'output': os.path.join(tmpdir, 'test_out'),
             'debug_dump_dists': True,
+            'cuda_cache': False,
         })
 
     def initial_conditions(self, runner):
@@ -359,9 +361,17 @@ class TestThreeBlockPropagation(unittest.TestCase):
         ae(b2[vi(1, 1), 129, 1], np.float32(0.11))
         ae(b2[vi(1, -1), 128, 1], np.float32(0.22))
 
-if __name__ == '__main__':
+
+def setUpModule():
+    global tmpdir
     tmpdir = tempfile.mkdtemp()
+
+
+def tearDownModule():
+    shutil.rmtree(tmpdir)
+
+
+if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
     unittest.main()
-    shutil.rmtree(tmpdir)

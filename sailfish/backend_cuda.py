@@ -66,6 +66,8 @@ class CUDABackend(object):
         group.add_argument('--cuda-fermi-highprec', dest='cuda_fermi_highprec',
                 help='use high precision division on Compute Capability 2.0+ '
                      ' devices', action='store_true', default=False)
+        group.add_argument('--cuda_cache', type=bool, default=True,
+                help='if True, use the pycuda compiler cache.')
         group.add_argument('--block_size', type=int, default=64,
                 help='size of the block of threads on the compute device')
         return 1
@@ -202,8 +204,14 @@ class CUDABackend(object):
             options.append('--prec-div=false')
             options.append('--prec-sqrt=false')
 
+        if self.options.cuda_cache:
+            cache = None
+        else:
+            cache = False
+
         return pycuda.compiler.SourceModule(source, options=options,
-                nvcc=self.options.cuda_nvcc, keep=self.options.cuda_keep_temp) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
+                nvcc=self.options.cuda_nvcc, keep=self.options.cuda_keep_temp,
+                cache_dir=cache) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
 
     def get_kernel(self, prog, name, block, args, args_format, shared=None, fields=[]):
         kern = prog.get_function(name)
