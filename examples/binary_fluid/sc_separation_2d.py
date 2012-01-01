@@ -5,7 +5,7 @@ import numpy as np
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import Subdomain2D
 from sailfish.controller import LBSimulationController
-from sailfish.lb_binary import LBShanChenBinary
+from sailfish.lb_binary import LBBinaryFluidShanChen
 from sailfish.lb_single import LBForcedSim
 
 class SeparationDomain(Subdomain2D):
@@ -16,7 +16,7 @@ class SeparationDomain(Subdomain2D):
     def boundary_conditions(self, hx, hy):
         pass
 
-class SeparationSCSim(LBShanChenBinary, LBForcedSim):
+class SeparationSCSim(LBBinaryFluidShanChen, LBForcedSim):
     subdomain = SeparationDomain
 
     @classmethod

@@ -55,7 +55,23 @@ class GPUBuffer(object):
 
 
 class BlockRunner(object):
-    """Runs the simulation for a single SubdomainSpec.
+    """Runs the simulation for a single Subdomain.
+
+    The simulation proceeds into two streams, which is used for overlapping
+    calculations with data transfers.  The subdomain is divided into two
+    regions -- boundary and bulk.  The nodes in the bulk region are those
+    that do not send information to any nodes in other subdomains.  The
+    boundary region includes all the remaining nodes, including the ghost
+    node envelope used for data storage only.
+
+    calc stream                    data stream
+    -----------------------------------------------
+    boundary sim. step    --->     collect data
+    bulk sim. step                 ...
+                                   distribute data
+                       <- sync ->
+
+    An arrow above symbolizes a dependency between the two streams.
     """
     def __init__(self, simulation, block, output, backend, quit_event,
             summary_addr=None, master_addr=None, summary_channel=None):
@@ -283,7 +299,7 @@ class BlockRunner(object):
 
         # CUDA block/grid size for standard kernel call.
         self._kernel_block_size = (bs, 1)
-        self._boundary_size = self._block.envelope_size + 1
+        self._boundary_size = self._block.envelope_size * 2
         bns = self._boundary_size
         assert bns < bs
 
@@ -525,8 +541,8 @@ class BlockRunner(object):
         self.module = self.backend.build(code)
 
         # Streams
-        self._boundary_stream = self.backend.make_stream()
-        self._bulk_stream = self.backend.make_stream()
+        self._data_stream = self.backend.make_stream()
+        self._calc_stream = self.backend.make_stream()
 
     def _init_gpu_data(self):
         self.config.logger.debug("Initializing compute unit data.")
@@ -588,21 +604,7 @@ class BlockRunner(object):
 
         return kernel, self._kernel_grid_bulk
 
-    def _step_bulk(self, output_req):
-        """Runs one simulation step in the bulk domain.
-
-        Bulk domain is defined to be all nodes that belong to CUDA
-        blocks that do not depend on input from any ghost nodes.
-        """
-        self._timing_calc_start = self.backend.make_event(self._bulk_stream, timing=True)
-
-        # The bulk kernel only needs to be run if the simulation has a bulk/boundary split.
-        # If this split is not present, the whole domain is simulated in _step_boundary and
-        # _step_bulk only needs to handle PBC (below).
-        if self._boundary_blocks is not None:
-            kernel, grid = self._get_bulk_kernel(output_req)
-            self.backend.run_kernel(kernel, grid, self._bulk_stream)
-
+    def _apply_pbc(self):
         if self._sim.iteration & 1:
             base = 0
         else:
@@ -620,7 +622,7 @@ class BlockRunner(object):
                             float(self.config.block_size))),
                         self._lat_size[0])
 
-            self.backend.run_kernel(kernel, grid_size, self._bulk_stream)
+            self.backend.run_kernel(kernel, grid_size, self._calc_stream)
 
         if self._block.periodic_y:
             kernel = self._pbc_kernels[base + 1]
@@ -633,7 +635,7 @@ class BlockRunner(object):
                         int(math.ceil(self._lat_size[2] /
                             float(self.config.block_size))),
                         self._lat_size[0])
-            self.backend.run_kernel(kernel, grid_size, self._bulk_stream)
+            self.backend.run_kernel(kernel, grid_size, self._calc_stream)
 
         if self._block.dim == 3 and self._block.periodic_z:
             kernel = self._pbc_kernels[base + 2]
@@ -641,9 +643,25 @@ class BlockRunner(object):
                     int(math.ceil(self._lat_size[2] /
                         float(self.config.block_size))),
                     self._lat_size[1])
-            self.backend.run_kernel(kernel, grid_size, self._bulk_stream)
+            self.backend.run_kernel(kernel, grid_size, self._calc_stream)
 
-        self._timing_calc_end = self.backend.make_event(self._bulk_stream, timing=True)
+    def _step_bulk(self, output_req):
+        """Runs one simulation step in the bulk domain.
+
+        Bulk domain is defined to be all nodes that belong to CUDA
+        blocks that do not depend on input from any ghost nodes.
+        """
+        self._timing_calc_start = self.backend.make_event(self._calc_stream, timing=True)
+
+        # The bulk kernel only needs to be run if the simulation has a bulk/boundary split.
+        # If this split is not present, the whole domain is simulated in _step_boundary and
+        # _step_bulk only needs to handle PBC (below).
+        if self._boundary_blocks is not None:
+            kernel, grid = self._get_bulk_kernel(output_req)
+            self.backend.run_kernel(kernel, grid, self._calc_stream)
+
+        self._apply_pbc()
+        self._timing_calc_end = self.backend.make_event(self._calc_stream, timing=True)
 
     def _step_boundary(self, output_req):
         """Runs one simulation step for the boundary blocks.
@@ -660,7 +678,7 @@ class BlockRunner(object):
         else:
             kernel, grid = self._get_bulk_kernel(output_req)
 
-        blk_str = self._bulk_stream
+        blk_str = self._calc_stream
         make_event = self.backend.make_event
 
         self._timing_bnd_start = make_event(blk_str, timing=True)
@@ -669,23 +687,20 @@ class BlockRunner(object):
 
         # Enqueue a wait so that the data collection will not start until the kernel
         # handling boundary calculations is completed (that kernel runs in the bulk
-        # stream so that it is automatically synchronized with bulk calculations.
-        # This is done to ensure that boundary calculations are completed before bulk
-        # ones, so that the bulk time calculation can maximally overlap with data
-        # transfer.
-        self._boundary_stream.wait_for_event(self._timing_bnd_stop)
+        # stream so that it is automatically synchronized with bulk calculations).
+        self._data_stream.wait_for_event(self._timing_bnd_stop)
         for kernel, grid in self._collect_kernels[self._sim.iteration & 1]:
-            self.backend.run_kernel(kernel, grid, self._boundary_stream)
+            self.backend.run_kernel(kernel, grid, self._data_stream)
 
-        self._timing_coll_done = self.backend.make_event(self._boundary_stream, timing=True)
+        self._timing_coll_done = self.backend.make_event(self._data_stream, timing=True)
 
     def send_data(self):
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
             for x in conn_bufs:
-                self.backend.from_buf_async(x.coll_buf.gpu, self._boundary_stream)
+                self.backend.from_buf_async(x.coll_buf.gpu, self._data_stream)
 
-        self._boundary_stream.synchronize()
+        self._data_stream.synchronize()
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
             if len(conn_bufs) > 1:
@@ -712,7 +727,7 @@ class BlockRunner(object):
                     l = cbuf.recv_buf.size
                     cbuf.recv_buf[:] = dest[i:i+l].reshape(cbuf.recv_buf.shape)
                     i += l
-                    cbuf.distribute(self.backend, self._boundary_stream)
+                    cbuf.distribute(self.backend, self._data_stream)
             else:
                 cbuf = conn_bufs[0]
                 dest = np.ravel(cbuf.recv_buf)
@@ -725,16 +740,16 @@ class BlockRunner(object):
                 # copy.
                 if dest.flags.owndata:
                     cbuf.recv_buf[:] = dest.reshape(cbuf.recv_buf.shape)
-                cbuf.distribute(self.backend, self._boundary_stream)
+                cbuf.distribute(self.backend, self._data_stream)
 
     def _fields_to_host(self):
         """Copies data for all fields from the GPU to the host."""
         for field in self._scalar_fields:
-            self.backend.from_buf_async(self._gpu_field_map[id(field)], self._bulk_stream)
+            self.backend.from_buf_async(self._gpu_field_map[id(field)], self._calc_stream)
 
         for field in self._vector_fields:
             for component in self._gpu_field_map[id(field)]:
-                self.backend.from_buf_async(component, self._bulk_stream)
+                self.backend.from_buf_async(component, self._calc_stream)
 
     def _init_interblock_kernels(self):
         # TODO(michalj): Extend this for multi-grid models.
@@ -963,15 +978,15 @@ class BlockRunner(object):
                 self.config.logger.info("Simulation termination requested.")
 
             for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
-                self.backend.run_kernel(kernel, grid, self._boundary_stream)
+                self.backend.run_kernel(kernel, grid, self._data_stream)
 
-            self._boundary_stream.synchronize()
-            self._bulk_stream.synchronize()
+            self._data_stream.synchronize()
+            self._calc_stream.synchronize()
             if output_req and self.config.output_required:
                 self._output.save(self._sim.iteration)
 
-        self._boundary_stream.synchronize()
-        self._bulk_stream.synchronize()
+        self._data_stream.synchronize()
+        self._calc_stream.synchronize()
         if output_req and self.config.output_required:
             self._output.save(self._sim.iteration)
 
@@ -1002,12 +1017,12 @@ class BlockRunner(object):
             self.recv_data()
 
             for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
-                self.backend.run_kernel(kernel, grid, self._boundary_stream)
+                self.backend.run_kernel(kernel, grid, self._data_stream)
 
             t5 = time.time()
 
-            self._bulk_stream.synchronize()
-            self._boundary_stream.synchronize()
+            self._calc_stream.synchronize()
+            self._data_stream.synchronize()
 
             t6 = time.time()
 
