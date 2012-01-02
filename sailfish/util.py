@@ -88,3 +88,9 @@ def gpufile_to_clusterspec(gpufile, iface=''):
 
     return Cluster(cluster)
 
+def reverse_pairs(iterable):
+    it = iter(iterable)
+    for x in it:
+        y = it.next()
+        yield y
+        yield x

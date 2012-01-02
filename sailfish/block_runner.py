@@ -779,12 +779,11 @@ class BlockRunner(object):
                 if not connector.recv(dest, self._quit_event):
                     return
                 i = 0
-                # XXX: fix this sort multi-grid models.
                 # In case there are 2 connections between the blocks, reverse the
                 # order of subbuffers in the recv buffer.  Note that this implicitly
                 # assumes the order of conn_bufs is the same for both blocks.
                 # TODO(michalj): Consider explicitly sorting conn_bufs.
-                for cbuf in reversed(conn_bufs):
+                for cbuf in util.reverse_pairs(conn_bufs):
                     l = cbuf.recv_buf.size
                     cbuf.recv_buf[:] = dest[i:i+l].reshape(cbuf.recv_buf.shape)
                     i += l
