@@ -21,7 +21,29 @@ KernelGrid = namedtuple('KernelGrid', 'kernel grid')
 class ConnectionBuffer(object):
     def __init__(self, face, cpair, coll_buf, coll_idx, recv_buf,
             dist_partial_buf, dist_partial_idx, dist_partial_sel,
-            dist_full_buf, dist_full_idx):
+            dist_full_buf, dist_full_idx, grid_id=0):
+        """
+        :param face: face ID
+        :param cpair: ConnectionPair, a tuple of two LBConnection objects
+        :param coll_buf: GPUBuffer for information collected on the source
+            node to be sent to the destination node
+        :param coll_idx: GPUBuffer with an array of indices indicating sparse
+            nodes from which data is to be collected; this is only used for
+            connections via the X_LOW and X_HIGH faces
+        :param recv_buf: page-locked numpy buffer with information
+            received from the remote node
+        :param dist_partial_buf: GPUBuffer, for partial distributions
+        :param dist_partial_idx: GPUBuffer, for indices of the partial distributions
+        :param dist_partial_sel: selector in recv_buf to get the partial
+            distributions
+        :param dist_full_buf: GPUBuffer for information to be distributed; this
+            is used for nodes where a complete set of distributions is available
+            (e.g. not corner or edge nodes)
+        :param dist_full_idx: GPUBuffer with an array of indices indicating
+            the position of nodes to which data is to be distributed; this is
+            only used for connections via the X_LOW and X_HIGH faces
+        :param grid_id: grid ID
+        """
         self.face = face
         self.cpair = cpair
         self.coll_buf = coll_buf
@@ -32,14 +54,17 @@ class ConnectionBuffer(object):
         self.dist_partial_sel = dist_partial_sel
         self.dist_full_buf = dist_full_buf
         self.dist_full_idx = dist_full_idx
+        self.grid_id = grid_id
 
     def distribute(self, backend, stream):
+        # Serialize partial distributions into a contiguous buffer.
         if self.dist_partial_sel is not None:
             self.dist_partial_buf.host[:] = self.recv_buf[self.dist_partial_sel]
             backend.to_buf_async(self.dist_partial_buf.gpu, stream)
 
         if self.cpair.dst.dst_slice:
-            slc = [slice(0, self.recv_buf.shape[0])] + list(reversed(self.cpair.dst.dst_full_buf_slice))
+            slc = [slice(0, self.recv_buf.shape[0])] + list(
+                    reversed(self.cpair.dst.dst_full_buf_slice))
             self.dist_full_buf.host[:] = self.recv_buf[slc]
             backend.to_buf_async(self.dist_full_buf.gpu, stream)
 
@@ -190,12 +215,11 @@ class BlockRunner(object):
         ctx['lat_linear'] = self.lat_linear
         ctx['lat_linear_dist'] = self.lat_linear_dist
 
+        # FIXME(michalj)
         ctx['periodic_x'] = 0 #int(self._block.periodic_x)
         ctx['periodic_y'] = 0 #int(self._block.periodic_y)
         ctx['periodic_z'] = 0 #periodic_z
         ctx['periodicity'] = [0, 0, 0]
-
-#[int(self._block.periodic_x), int(self._block.periodic_y), periodic_z]
 
         ctx['bnd_limits'] = bnd_limits
         ctx['dist_size'] = self._get_nodes()
@@ -412,6 +436,11 @@ class BlockRunner(object):
         return self._bcg.get_code(self)
 
     def _get_global_idx(self, location, dist_num):
+        """Returns a global index (in the distributions array).
+
+        :param location: position of the node in the natural order
+        :param dist_num: distribution number
+        """
         if self.dim == 2:
             gx, gy = location
             arr_nx = self._physical_size[1]
@@ -435,6 +464,12 @@ class BlockRunner(object):
                     idx[0]).astype(np.uint32)
 
     def _get_src_slice_indices(self, face, cpair):
+        """Returns a numpy array of indices of sparse nodes from which
+        data is to be collected.
+
+        :param face: face ID for the connection
+        :param cpair: ConnectionPair describing the connection
+        """
         if face in (self._block.X_LOW, self._block.X_HIGH):
             gx = self.lat_linear[face]
         else:
@@ -442,6 +477,12 @@ class BlockRunner(object):
         return self._idx_helper(gx, cpair.src.src_slice, cpair.src.dists)
 
     def _get_dst_slice_indices(self, face, cpair):
+        """Returns a numpy array of indices of sparse nodes to which
+        data is to be distributed.
+
+        :param face: face ID for the connection
+        :param cpair: ConnectionPair describing the connection
+        """
         if not cpair.dst.dst_slice:
             return None
         if face in (self._block.X_LOW, self._block.X_HIGH):
@@ -468,6 +509,19 @@ class BlockRunner(object):
             return face_loc + [missing_loc]
 
     def _get_partial_dst_indices(self, face, cpair):
+        """Returns objects used to store data for nodes for which a partial
+        set of distributions is available.
+
+        This has the form of a triple:
+        - a page-locked numpy buffer for the distributions
+        - a numpy array of indices of nodes to which partial data is to be
+          distributed
+        - a selector to be applied to the receive buffer to get the partial
+          distributions.
+
+        :param face: face ID for the connection
+        :param cpair: ConnectionPair describing the connection
+        """
         if cpair.dst.partial_nodes == 0:
             return None, None, None
         buf = self.backend.alloc_async_host_buf(cpair.dst.partial_nodes,
@@ -497,43 +551,45 @@ class BlockRunner(object):
         return buf, idx, sel2
 
     def _init_buffers(self):
-        # TODO(michalj): Fix this for multi-grid models.
-        grid = util.get_grid_from_config(self.config)
+        """Creates buffers for inter-block communication."""
         alloc = self.backend.alloc_async_host_buf
 
-        # Maps block ID to a list of 1 or 2 ConnectionBuffer
-        # objects.  The list will contain 2 elements  only when
-        # global periodic boundary conditions are enabled).
+        # Maps block ID to a list of ConnectionBuffer objects.  For every
+        # grid, the list will contain 1 or 2 elements, 2 elements being
+        # used only when global periodic boundary conditions are enabled.
         self._block_to_connbuf = defaultdict(list)
         for face, block_id in self._block.connecting_blocks():
             cpair = self._block.get_connection(face, block_id)
 
-            # Buffers for collecting and sending information.
-            # TODO(michalj): Optimize this by providing proper padding.
-            coll_buf = alloc(cpair.src.transfer_shape, dtype=self.float)
             coll_idx = self._get_src_slice_indices(face, cpair)
+            coll_idx = GPUBuffer(coll_idx, self.backend)
 
-            # Buffers for receiving and distributing information.
-            recv_buf = alloc(cpair.dst.transfer_shape, dtype=self.float)
-            # Any partial dists are serialized into a single continuous buffer.
-            dist_partial_buf, dist_partial_idx, dist_partial_sel = \
-                    self._get_partial_dst_indices(face, cpair)
-            dist_full_buf = alloc(cpair.dst.full_shape, dtype=self.float)
             dist_full_idx = self._get_dst_slice_indices(face, cpair)
+            dist_full_idx = GPUBuffer(dist_full_idx, self.backend)
 
-            cbuf = ConnectionBuffer(face, cpair,
-                    GPUBuffer(coll_buf, self.backend),
-                    GPUBuffer(coll_idx, self.backend),
-                    recv_buf,
-                    GPUBuffer(dist_partial_buf, self.backend),
-                    GPUBuffer(dist_partial_idx, self.backend),
-                    dist_partial_sel,
-                    GPUBuffer(dist_full_buf, self.backend),
-                    GPUBuffer(dist_full_idx, self.backend))
+            for i, grid in enumerate(self._sim.grids):
+                # TODO(michalj): Optimize this by providing proper padding.
+                coll_buf = alloc(cpair.src.transfer_shape, dtype=self.float)
+                recv_buf = alloc(cpair.dst.transfer_shape, dtype=self.float)
+                dist_full_buf = alloc(cpair.dst.full_shape, dtype=self.float)
 
-            self.config.logger.debug('adding buffer for conn: {0} -> {1} '
-                    '(face {2})'.format(self._block.id, block_id, face))
-            self._block_to_connbuf[block_id].append(cbuf)
+                # Any partial dists are serialized into a single continuous buffer.
+                dist_partial_buf, dist_partial_idx, dist_partial_sel = \
+                        self._get_partial_dst_indices(face, cpair)
+
+                cbuf = ConnectionBuffer(face, cpair,
+                        GPUBuffer(coll_buf, self.backend),
+                        coll_idx,
+                        recv_buf,
+                        GPUBuffer(dist_partial_buf, self.backend),
+                        GPUBuffer(dist_partial_idx, self.backend),
+                        dist_partial_sel,
+                        GPUBuffer(dist_full_buf, self.backend),
+                        dist_full_idx, i)
+
+                self.config.logger.debug('adding buffer for conn: {0} -> {1} '
+                        '(face {2})'.format(self._block.id, block_id, face))
+                self._block_to_connbuf[block_id].append(cbuf)
 
     def _init_compute(self):
         self.config.logger.debug("Initializing compute unit.")
@@ -595,8 +651,8 @@ class BlockRunner(object):
         self._step_boundary(output_req)
         self._step_bulk(output_req)
         self._sim.iteration += 1
-        self.send_data()
-        self.recv_data()
+        self._send_dists()
+        self._recv_dists()
         for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
             self.backend.run_kernel(kernel, grid, self._data_stream)
 
@@ -698,7 +754,7 @@ class BlockRunner(object):
 
         self._timing_coll_done = self.backend.make_event(self._data_stream, timing=True)
 
-    def send_data(self):
+    def _send_dists(self):
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
             for x in conn_bufs:
@@ -714,7 +770,7 @@ class BlockRunner(object):
                 # TODO(michalj): Use non-blocking sends here?
                 connector.send(np.ravel(conn_bufs[0].coll_buf.host))
 
-    def recv_data(self):
+    def _recv_dists(self):
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
             if len(conn_bufs) > 1:
@@ -723,6 +779,7 @@ class BlockRunner(object):
                 if not connector.recv(dest, self._quit_event):
                     return
                 i = 0
+                # XXX: fix this sort multi-grid models.
                 # In case there are 2 connections between the blocks, reverse the
                 # order of subbuffers in the recv buffer.  Note that this implicitly
                 # assumes the order of conn_bufs is the same for both blocks.
@@ -755,8 +812,134 @@ class BlockRunner(object):
             for component in self._gpu_field_map[id(field)]:
                 self.backend.from_buf_async(component, self._calc_stream)
 
+    def _init_collect_kernels(self, cbuf, grid_dim1, block_size):
+        """Returns collection kernels for a connection.
+
+        :param cbuf: ConnectionBuffer
+        :param grid_dim1: callable returning the size of the CUDA grid
+            given the total size
+        :param block_size: CUDA block size for the kernels
+
+        Returns: primary, secondary.
+        """
+        # Data collection.
+        if cbuf.coll_idx.host is not None:
+            grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
+
+            def _get_sparse_coll_kernel(i):
+                return KernelGrid(
+                    self.get_kernel('CollectSparseData',
+                    [cbuf.coll_idx.gpu, self.gpu_dist(cbuf.grid_id, i),
+                     cbuf.coll_buf.gpu, cbuf.coll_buf.host.size],
+                    'PPPi', (block_size,)),
+                    grid_size)
+
+            return _get_sparse_coll_kernel(1), _get_sparse_coll_kernel(0)
+        else:
+            # [X, Z * dists] or [X, Y * dists]
+            min_max = ([x.start for x in cbuf.cpair.src.src_slice] +
+                    list(reversed(cbuf.coll_buf.host.shape[1:])))
+            min_max[-1] = min_max[-1] * len(cbuf.cpair.src.dists)
+            if self.dim == 2:
+                signature = 'PiiiP'
+                grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
+            else:
+                signature = 'PiiiiiP'
+                grid_size = (grid_dim1(cbuf.coll_buf.host.shape[-1]),
+                    cbuf.coll_buf.host.shape[-2] * len(cbuf.cpair.src.dists))
+
+            def _get_cont_coll_kernel(i):
+                return KernelGrid(
+                    self.get_kernel('CollectContinuousData',
+                    [self.gpu_dist(cbuf.grid_id, i),
+                     cbuf.face] + min_max + [cbuf.coll_buf.gpu],
+                     signature, (block_size,)),
+                     grid_size)
+
+            return _get_cont_coll_kernel(1), _get_cont_coll_kernel(0)
+
+    def _init_distrib_kernels(self, cbuf, grid_dim1, block_size):
+        """Returns distribution kernels for a connection.
+
+        :param cbuf: ConnectionBuffer
+        :param grid_dim1: callable returning the size of the CUDA grid
+            given the total size
+        :param block_size: CUDA block size for the kernels
+
+        Returns: lists of: primary, secondary.
+        """
+        primary = []
+        secondary = []
+
+        # Data distribution
+        # Partial nodes.
+        if cbuf.dist_partial_idx.host is not None:
+            grid_size = (grid_dim1(cbuf.dist_partial_buf.host.size),)
+
+            def _get_sparse_dist_kernel(i):
+                return KernelGrid(
+                        self.get_kernel('DistributeSparseData',
+                            [cbuf.dist_partial_idx.gpu,
+                             self.gpu_dist(cbuf.grid_id, i),
+                             cbuf.dist_partial_buf.gpu,
+                             cbuf.dist_partial_buf.host.size],
+                            'PPPi', (block_size,)),
+                        grid_size)
+
+            primary.append(_get_sparse_dist_kernel(0))
+            secondary.append(_get_sparse_dist_kernel(1))
+
+        # Full nodes (all transfer distributions).
+        if cbuf.dist_full_buf.host is not None:
+            # Sparse indexing (connection along X-axis).
+            if cbuf.dist_full_idx.host is not None:
+                grid_size = (grid_dim1(cbuf.dist_full_buf.host.size),)
+
+                def _get_sparse_fdist_kernel(i):
+                    return KernelGrid(
+                            self.get_kernel('DistributeSparseData',
+                                [cbuf.dist_full_idx.gpu,
+                                 self.gpu_dist(cbuf.grid_id, i),
+                                 cbuf.dist_full_buf.gpu,
+                                 cbuf.dist_full_buf.host.size],
+                            'PPPi', (block_size,)),
+                            grid_size)
+
+                primary.append(_get_sparse_fdist_kernel(0))
+                secondary.append(_get_sparse_fdist_kernel(1))
+            # Continuous indexing.
+            elif cbuf.cpair.dst.dst_slice:
+                # [X, Z * dists] or [X, Y * dists]
+                low = [x + self._block.envelope_size for x in cbuf.cpair.dst.dst_low]
+                min_max = ([(x + y.start) for x, y in zip(low, cbuf.cpair.dst.dst_slice)] +
+                        list(reversed(cbuf.dist_full_buf.host.shape[1:])))
+                min_max[-1] = min_max[-1] * len(cbuf.cpair.dst.dists)
+
+                if self.dim == 2:
+                    signature = 'PiiiP'
+                    grid_size = (grid_dim1(cbuf.dist_full_buf.host.size),)
+                else:
+                    signature = 'PiiiiiP'
+                    grid_size = (grid_dim1(cbuf.dist_full_buf.host.shape[-1]),
+                        cbuf.dist_full_buf.host.shape[-2] * len(cbuf.cpair.dst.dists))
+
+                def _get_cont_dist_kernel(i):
+                    return KernelGrid(
+                            self.get_kernel('DistributeContinuousData',
+                            [self.gpu_dist(cbuf.grid_id, i),
+                             self._block.opposite_face(cbuf.face)] +
+                            min_max + [cbuf.dist_full_buf.gpu],
+                            signature, (block_size,)),
+                            grid_size)
+
+                primary.append(_get_cont_dist_kernel(0))
+                secondary.append(_get_cont_dist_kernel(1))
+
+        return primary, secondary
+
     def _init_interblock_kernels(self):
-        # TODO(michalj): Extend this for multi-grid models.
+        """Returns kernels for collection and distribution of distribution
+        data."""
 
         collect_primary = []
         collect_secondary = []
@@ -771,107 +954,15 @@ class BlockRunner(object):
 
         for b_id, conn_bufs in self._block_to_connbuf.iteritems():
             for cbuf in conn_bufs:
-                # Data collection.
-                if cbuf.coll_idx.host is not None:
-                    grid_size = (_grid_dim1(cbuf.coll_buf.host.size),)
+                primary, secondary = self._init_collect_kernels(cbuf,
+                        _grid_dim1, collect_block)
+                collect_primary.append(primary)
+                collect_secondary.append(secondary)
 
-                    def _get_sparse_coll_kernel(i):
-                        return KernelGrid(
-                            self.get_kernel('CollectSparseData',
-                            [cbuf.coll_idx.gpu, self.gpu_dist(0, i),
-                             cbuf.coll_buf.gpu, cbuf.coll_buf.host.size],
-                            'PPPi', (collect_block,)),
-                            grid_size)
-
-                    collect_primary.append(_get_sparse_coll_kernel(1))
-                    collect_secondary.append(_get_sparse_coll_kernel(0))
-                else:
-                    # [X, Z * dists] or [X, Y * dists]
-                    min_max = ([x.start for x in cbuf.cpair.src.src_slice] +
-                            list(reversed(cbuf.coll_buf.host.shape[1:])))
-                    min_max[-1] = min_max[-1] * len(cbuf.cpair.src.dists)
-                    if self.dim == 2:
-                        signature = 'PiiiP'
-                        grid_size = (_grid_dim1(cbuf.coll_buf.host.size),)
-                    else:
-                        signature = 'PiiiiiP'
-                        grid_size = (_grid_dim1(cbuf.coll_buf.host.shape[-1]),
-                            cbuf.coll_buf.host.shape[-2] * len(cbuf.cpair.src.dists))
-
-                    def _get_cont_coll_kernel(i):
-                        return KernelGrid(
-                            self.get_kernel('CollectContinuousData',
-                            [self.gpu_dist(0, i),
-                             cbuf.face] + min_max + [cbuf.coll_buf.gpu],
-                             signature, (collect_block,)),
-                             grid_size)
-
-                    collect_primary.append(_get_cont_coll_kernel(1))
-                    collect_secondary.append(_get_cont_coll_kernel(0))
-
-                # Data distribution
-                # Partial nodes.
-                if cbuf.dist_partial_idx.host is not None:
-                    grid_size = (_grid_dim1(cbuf.dist_partial_buf.host.size),)
-
-                    def _get_sparse_dist_kernel(i):
-                        return KernelGrid(
-                                self.get_kernel('DistributeSparseData',
-                                    [cbuf.dist_partial_idx.gpu,
-                                     self.gpu_dist(0, i),
-                                     cbuf.dist_partial_buf.gpu,
-                                     cbuf.dist_partial_buf.host.size],
-                                    'PPPi', (collect_block,)),
-                                grid_size)
-
-                    distrib_primary.append(_get_sparse_dist_kernel(0))
-                    distrib_secondary.append(_get_sparse_dist_kernel(1))
-
-                # Full nodes (all transfer distributions).
-                if cbuf.dist_full_buf.host is not None:
-                    # Sparse indexing (connection along X-axis).
-                    if cbuf.dist_full_idx.host is not None:
-                        grid_size = (_grid_dim1(cbuf.dist_full_buf.host.size),)
-
-                        def _get_sparse_fdist_kernel(i):
-                            return KernelGrid(
-                                    self.get_kernel('DistributeSparseData',
-                                        [cbuf.dist_full_idx.gpu,
-                                         self.gpu_dist(0, i),
-                                         cbuf.dist_full_buf.gpu,
-                                         cbuf.dist_full_buf.host.size],
-                                    'PPPi', (collect_block,)),
-                                    grid_size)
-
-                        distrib_primary.append(_get_sparse_fdist_kernel(0))
-                        distrib_secondary.append(_get_sparse_fdist_kernel(1))
-                    # Continuous indexing.
-                    elif cbuf.cpair.dst.dst_slice:
-                        # [X, Z * dists] or [X, Y * dists]
-                        low = [x + self._block.envelope_size for x in cbuf.cpair.dst.dst_low]
-                        min_max = ([(x + y.start) for x, y in zip(low, cbuf.cpair.dst.dst_slice)] +
-                                list(reversed(cbuf.dist_full_buf.host.shape[1:])))
-                        min_max[-1] = min_max[-1] * len(cbuf.cpair.dst.dists)
-
-                        if self.dim == 2:
-                            signature = 'PiiiP'
-                            grid_size = (_grid_dim1(cbuf.dist_full_buf.host.size),)
-                        else:
-                            signature = 'PiiiiiP'
-                            grid_size = (_grid_dim1(cbuf.dist_full_buf.host.shape[-1]),
-                                cbuf.dist_full_buf.host.shape[-2] * len(cbuf.cpair.dst.dists))
-
-                        def _get_cont_dist_kernel(i):
-                            return KernelGrid(
-                                    self.get_kernel('DistributeContinuousData',
-                                    [self.gpu_dist(0, i),
-                                     self._block.opposite_face(cbuf.face)] +
-                                    min_max + [cbuf.dist_full_buf.gpu],
-                                    signature, (collect_block,)),
-                                    grid_size)
-
-                        distrib_primary.append(_get_cont_dist_kernel(0))
-                        distrib_secondary.append(_get_cont_dist_kernel(1))
+                primary, secondary = self._init_distrib_kernels(cbuf,
+                        _grid_dim1, collect_block)
+                distrib_primary.extend(primary)
+                distrib_secondary.extend(secondary)
 
         self._collect_kernels = (collect_primary, collect_secondary)
         self._distrib_kernels = (distrib_primary, distrib_secondary)
