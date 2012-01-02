@@ -27,9 +27,6 @@ output = ''
 
 name = 'ldc3d'
 
-
-
-
     
 
 class LTestLDCSim(LDCSim):
@@ -45,8 +42,6 @@ class LTestLDCSim(LDCSim):
     @classmethod
     def update_defaults(cls, defaults):
     LDCBlock.max_v=0.05
-	output=tmpdir+"/wynik"
-	print output
 	defaults.update({
             'max_iters': MAX_ITERS,
 	    'lat_nx':LAT_NX ,
@@ -54,11 +49,10 @@ class LTestLDCSim(LDCSim):
             'output': tmpdir+"/wynik"})
 	
         LDCSim.update_defaults(defaults)
-	print "tu"
 	
     @classmethod
     def modify_config(cls, config):
-        config.visc = (config.lat_nx)*LDCBlock.max_v/config.re
+        config.visc = (config.lat_nx-2)*LDCBlock.max_v/config.re
 	config.every=config.max_iters-1
 
     @classmethod
@@ -66,9 +60,7 @@ class LTestLDCSim(LDCSim):
         LDCSim.add_options(group, dim)
         group.add_argument('--re', dest="re", help='Reynolds number', type=int, default=400)
 
-    
-	
-	
+
 class LTestSimulationController(LBSimulationController): 
     res_vx =""
     res_vz =""
