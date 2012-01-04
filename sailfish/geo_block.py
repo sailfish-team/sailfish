@@ -22,111 +22,186 @@ def span_area(span):
 ConnectionPair = namedtuple('ConnectionPair', 'src dst')
 
 
-# TODO(michalj): Add support for data about complementary distributions and
-# additional macroscopic variables (necessary for multifluid models).
+def _get_src_slice(b1, b2, slice_axes):
+    """Returns two slice lists identifying nodes in b1 from which
+    information is sent to b2.
+
+    The first list contains slices in b1's dist buffer.  The second list
+    contains slices in the global coordinate system.
+
+    The returned slices correspond to the axes specified in slice_axes.
+
+    :param b1: source SubdomainSpec
+    :parma b2: target SubdomainSpec
+    :param slice_axes: list of axis numbers identifying axes spanning
+        the area of nodes sending information to the target node
+    """
+    src_slice = []
+    src_slice_global = []
+
+    for axis in slice_axes:
+        # Effective span along the current axis, including ghost nodes.
+        b1_min = b1.location[axis] - b1.envelope_size
+        b1_max = b1.end_location[axis] - 1 + b1.envelope_size
+
+        # Effective span along the current axis, real nodes only.
+        b2_min = b2.location[axis]
+        b2_max = b2.end_location[axis] - 1
+
+        # Span in global simulation coordinates.
+        global_span_min = max(b1_min, b2_min)
+        global_span_max = min(b1_max, b2_max)
+
+        # No overlap, bail out.
+        if global_span_min > b1_max or global_span_max < b1_min:
+            return None, None
+
+        src_slice.append(slice(global_span_min - b1_min,
+            global_span_max - b1_min + 1))
+        src_slice_global.append(slice(global_span_min,
+            global_span_max + 1))
+
+    return src_slice, src_slice_global
+
+
+def _get_dst_full_slice(b1, b2, src_slice_global, full_map, slice_axes):
+    """Identifies nodes that transmit full information.
+
+    Returns a tuple of:
+    - offset vector in the plane ortogonal to the connection axis in local
+      coordinate system of the destination subdomain (real nodes only)
+    - slice selecting part of the buffer (real nodes only) with nodes
+      containing information about all distributions
+    - same as the previous one, but the slice is for the transfer buffer
+
+    :param b1: source SubdomainSpec
+    :param b2: target SubdomainSpec
+    :param src_slice_global: list of slices in the global coordinate system
+        identifying nodes from which information is sent to the target
+        subdomain
+    :param full_map: boolean array selecting the source nodes that have the
+        full set of distributions to be transferred to the target subdomain
+    :param slice_axes: list of axis numbers identifying axes spanning
+        the area of nodes sending information to the target node
+    """
+    dst_slice = []
+    dst_full_buf_slice = []
+    dst_low = []
+    for i, global_pos in enumerate(src_slice_global):
+        b2_start = b2.location[slice_axes[i]]
+        dst_low.append(global_pos.start - b2_start)
+
+    full_idxs = np.argwhere(full_map)
+    if len(full_idxs) > 0:
+        # Lowest and highest coordinate along each axis.
+        full_min = np.min(full_idxs, 0)
+        full_max = np.max(full_idxs, 0)
+        # Loop over axes.
+        for i, (lo, hi) in enumerate(zip(full_min, full_max)):
+            b1_start = b1.location[slice_axes[i]]
+            b2_start = b2.location[slice_axes[i]]
+            # Offset in the local real coordinate system of the target
+            # subdomain (same as dst_low).
+            curr_to_dist = src_slice_global[i].start - b2_start
+            dst_slice.append(slice(lo + curr_to_dist, hi + 1 + curr_to_dist))
+            dst_full_buf_slice.append(slice(lo, hi+1))
+
+    return dst_low, dst_slice, dst_full_buf_slice
+
+
+def _get_dst_partial_map(dists, grid, src_slice_global, b1, slice_axes,
+        conn_axis):
+    """Identifies nodes that only transmit partial information.
+
+    :param dists: indices of distributions that point to the target
+        subdomain
+    :param grid: grid object defining the connectivity of the lattice
+    :param src_slice_global: list of slices in the global coordinate system
+        identifying nodes from which information is sent to the target
+        subdomain
+    :param b1: source SubdomainSpec
+    :param slice_axes: list of axis numbers identifying axes spanning
+        the area of nodes sending information to the target node
+    :param conn_axis: axis along which the two subdomains are connected
+    """
+    # Location of the b1 block in global coordinates (real nodes only).
+    min_loc = np.uint32([b1.location[ax] for ax in slice_axes])
+    max_loc = np.uint32([b1.end_location[ax] for ax in slice_axes])
+
+    # Creates an array where the entry at [x,y] is the global coordinate pair
+    # corresponding to the node [x,y] in the transfer buffer.
+    src_coords = np.mgrid[src_slice_global]
+    # [2,x,y] -> [x,y,2]
+    src_coords = np.rollaxis(src_coords, 0, len(src_coords.shape))
+
+    last_axis = len(src_coords.shape) - 1
+
+    # Selects source nodes that have the full set of distributions (`dists`).
+    full_map = np.ones(src_coords.shape[:-1], dtype=np.bool)
+
+    # Maps distribution index to a boolean array selecting (in src_coords)
+    # nodes for which the distribution identified by the key is defined.
+    dist_idx_to_dist_map = {}
+
+    for dist_idx in dists:
+        # When we follow the basis vector backwards, do we end up at a
+        # real (non-ghost) node in the source subdomain?
+        basis_vec = list(grid.basis[dist_idx])
+        del basis_vec[conn_axis]
+        src_block_node = src_coords - basis_vec
+        dist_map = np.logical_and(src_block_node >= min_loc,
+                                  src_block_node < max_loc)
+
+        dist_map = np.logical_and.reduce(dist_map, last_axis)
+        full_map = np.logical_and(full_map, dist_map)
+        dist_idx_to_dist_map[dist_idx] = dist_map
+
+    # Maps distribution index to an array of indices (pairs in 3D, single
+    # coordinate in 2D) in the local subdomain coordinate system (real nodes).
+    dst_partial_map = {}
+    buf_min_loc = [span.start for span in src_slice_global]
+
+    for dist_idx, dist_map in dist_idx_to_dist_map.iteritems():
+        partial_nodes = src_coords[np.logical_and(dist_map,
+                                   np.logical_not(full_map))]
+        if len(partial_nodes) > 0:
+            partial_nodes -= buf_min_loc
+            dst_partial_map[dist_idx] = partial_nodes
+
+    return dst_partial_map, full_map
+
+
 class LBConnection(object):
     """Container object for detailed data about a directed connection between two
     blocks (at the level of the LB model)."""
 
     @classmethod
     def make(cls, b1, b2, face, grid):
-        """Tries to create an LBCollection for the face 'face' of block b1 to
-        block2.  If no connection exists, returns None.  Otherwise, returns
+        """Tries to create an LBCollection between two sudomains.
+
+        If no connection exists, returns None.  Otherwise, returns
         a new instance of LBConnection describing the connection details.
+
+        :param b1: SubdomainSpec for the source subdomain
+        :param b2: SubdomainSpec for the target subdomain
+        :param face: face ID along which the connection is to be created
+        :param grid: grid object defining the connectivity of the lattice
         """
-        dim = b1.dim
-        slice_axes = range(0, dim)
         conn_axis = b1.face_to_axis(face)
+        slice_axes = range(0, b1.dim)
         slice_axes.remove(conn_axis)
 
-        src_slice = []
-        src_slice_global = []
-
-        for axis in slice_axes:
-            b1_min = b1.location[axis] - b1.envelope_size
-            b1_max = b1.end_location[axis]-1 + b1.envelope_size
-
-            b2_min = b2.location[axis]
-            b2_max = b2.end_location[axis]-1
-
-            # In global simulation coordinates.
-            global_span_min = max(b1_min, b2_min)
-            global_span_max = min(b1_max, b2_max)
-
-            # No overlap, bail out.
-            if global_span_min > b1_max or global_span_max < b1_min:
-                return None
-
-            src_slice.append(slice(global_span_min - b1_min,
-                global_span_max - b1_min+1))
-            src_slice_global.append(slice(global_span_min,
-                global_span_max+1))
+        src_slice, src_slice_global = _get_src_slice(b1, b2, slice_axes)
+        if src_slice is None:
+            return
 
         normal = b1.face_to_normal(face)
         dists = sym.get_interblock_dists(grid, normal)
 
-        # Create an array where the entry at [x,y] is the global coordinate pair
-        # corresponding to the node [x,y] in the transfer buffer.
-        src_coords = np.mgrid[src_slice_global]
-        # [2,x,y] -> [x,y,2]
-        src_coords = np.rollaxis(src_coords, 0, len(src_coords.shape))
-        min_loc = []
-        max_loc = []
-
-        for axis in slice_axes:
-            min_loc.append(b1.location[axis])
-            max_loc.append(b1.end_location[axis])
-
-        # Location of the b1 block in global coordinates.
-        min_loc = np.uint32(min_loc)
-        max_loc = np.uint32(max_loc)
-        last_axis = len(src_coords.shape)-1
-        full_map = np.ones(src_coords.shape[:-1], dtype=np.bool)
-
-        dst_partial_map = {}
-        dist_idx_to_dist_map = {}
-
-        for dist_idx in dists:
-            basis_vec = list(grid.basis[dist_idx])
-            del basis_vec[conn_axis]
-
-            src_block_node = src_coords - basis_vec
-            dist_map = np.logical_and(src_block_node >= min_loc,
-                                      src_block_node < max_loc)
-            dist_map = np.logical_and.reduce(dist_map, last_axis)
-            full_map = np.logical_and(full_map, dist_map)
-            dist_idx_to_dist_map[dist_idx] = dist_map
-
-        buf_min_loc = []
-        for span in src_slice_global:
-            buf_min_loc.append(span.start)
-
-        for dist_idx, dist_map in dist_idx_to_dist_map.iteritems():
-            partial_nodes = src_coords[np.logical_and(dist_map,
-                                            np.logical_not(full_map))]
-            if len(partial_nodes) > 0:
-                partial_nodes -= buf_min_loc
-                dst_partial_map[dist_idx] = partial_nodes
-
-        # Slice selecting part of the buffer with nodes containing information
-        # about all distributions.
-        dst_slice = []
-        dst_full_buf_slice = []
-        dst_low = []
-        for i, global_pos in enumerate(src_slice_global):
-            b2_start = b2.location[slice_axes[i]]
-            dst_low.append(global_pos.start - b2_start)
-
-        full_idxs = np.argwhere(full_map)
-        if len(full_idxs) > 0:
-            full_min = np.min(full_idxs, 0)
-            full_max = np.max(full_idxs, 0)
-            for i, (lo, hi) in enumerate(zip(full_min, full_max)):
-                b1_start = b1.location[slice_axes[i]]
-                b2_start = b2.location[slice_axes[i]]
-                curr_to_dist = src_slice_global[i].start - b2_start
-                dst_slice.append(slice(lo+curr_to_dist, hi+1+curr_to_dist))
-                dst_full_buf_slice.append(slice(lo, hi+1))
+        dst_partial_map, full_map = _get_dst_partial_map(dists, grid,
+                src_slice_global, b1, slice_axes, conn_axis)
+        dst_low, dst_slice, dst_full_buf_slice = _get_dst_full_slice(
+                b1, b2, src_slice_global, full_map, slice_axes)
 
         # No full or partial connection means that the topology of the grid
         # is such that there are not distributions pointing to the 2nd block.
@@ -147,9 +222,9 @@ class LBConnection(object):
             the dest block
         dst_slice: slice in the non-ghost buffer of the dest block, to which
             full dists can be written
-        dst_full_buf_slice: slice in the buffer selecting nodes with all dists;
-            by definition: size(dst_full_buf_slice) == size(dst_slice)
-        dst_partial_map: dict mapping distribution indices to list of positions
+        dst_full_buf_slice: slice in the transfer buffer selecting nodes with
+            all dists; by definition: size(dst_full_buf_slice) == size(dst_slice)
+        dst_partial_map: dict mapping distribution indices to lists of positions
             in the transfer buffer
         """
         self.dists = dists
@@ -355,7 +430,7 @@ class SubdomainSpec(object):
         A connection can only be created when the blocks are next to each
         other.
 
-        :param block: block object to connect to
+        :param block: SubdomainSpec object to connect to
         :param `geo`: None for a local block connection; for a global
                connection due to lattice periodicity, a LBGeometry object
         :returns: True if the connection was successful

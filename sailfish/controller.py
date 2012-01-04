@@ -109,6 +109,9 @@ class LBGeometryProcessor(object):
     location."""
 
     def __init__(self, blocks, dim, geo):
+        """
+        :param blocks: list of SubdomainSpec objects
+        """
         self.blocks = blocks
         self.dim = dim
         self.geo = geo
