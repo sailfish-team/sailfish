@@ -1,11 +1,5 @@
-This is an experimental branch with support for multi-GPU simulations.
-Once stabilized and fully developed, this code will replace the main
-Sailfish branch.
-
-Many features are missing or broken in the multigpu branch.  Use it
-for development and exploration only, do NOT run any production
-simulations using this code unless you know excatly what you are doing.
-
-Please note that the code has not been optimized for speed yet.
+This is a development branch with support for multi-GPU simulations.
+Once all LB models have been ported, this branch will replace the current
+main branch.
 
 If you want to help, please e-mail sailfish-cfd@googlegroups.com.
