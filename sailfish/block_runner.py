@@ -937,7 +937,7 @@ class BlockRunner(object):
         return primary, secondary
 
     def _init_interblock_kernels(self):
-        """Returns kernels for collection and distribution of distribution
+        """Creates kernels for collection and distribution of distribution
         data."""
 
         collect_primary = []
@@ -1187,6 +1187,35 @@ class NNBlockRunner(BlockRunner):
     An arrow above symbolizes a dependency between the two streams.
     """
 
+    def _recv_macro(self):
+        pass
+
+    def _send_macro(self):
+        pass
+
+    def _init_buffers(self):
+        super(NNBlockRunner, self)._init_buffers()
+
+        self._block_to_macrobuf = defaultdict(list)
+        for face, block_id in self._block.connecting_blocks():
+            cpair = self._block.get_connection(face, block_id)
+
+    def _init_interblock_kernels(self):
+        super(NNBlockRunner, self)._init_interblock_kernels()
+
+        collect_block = 32
+        def _grid_dim1(x):
+            return int(math.ceil(x / float(collect_block)))
+
+        self._macro_collect_kernels = []
+        self._macro_distrib_kernels = []
+
+        for b_id, conn_bufs in self._block_to_macrobuf.iteritems():
+            for cbuf in conn_bufs:
+                pass
+                # CollectSparseData
+                # XXX: use memcpy for continous data?
+
     def step(self, output_req):
         """Runs one simulation step."""
 
@@ -1220,8 +1249,7 @@ class NNBlockRunner(BlockRunner):
 
         str_data.wait_for_event(self._timing_bnd_stop)
 
-        # FIXME: different collect kernels for the phi field
-        for kernel, grid in self._collect_kernels[it & 1]:
+        for kernel, grid in self._macro_collect_kernels:
             run(kernel, grid, str_data)
 
         #self._timing_coll_done = make_event(str_data, timing=True)
@@ -1238,16 +1266,14 @@ class NNBlockRunner(BlockRunner):
 
         self._recv_macro()
 
-        # FIXME: different distrib kernel for the phi field, normally
-        # at this point we assume we need it + 1
-        for kernel, grid in self._distrib_kernels[it & 1]:
+        for kernel, grid in self._macro_distrib_kernels:
             run(kernel, grid, str_data)
 
         # Actual simulation step.
         if has_boundary_split:
             run(bnd_kernel_sim, grid_bnd, str_calc)
         else:
-            run(bulk_kernel_sim, grid_bulk, stc_calc)
+            run(bulk_kernel_sim, grid_bulk, str_calc)
 
         ev = make_event(str_calc)
         str_data.wait_for_event(ev)
@@ -1259,6 +1285,8 @@ class NNBlockRunner(BlockRunner):
             run(bulk_kernel_sim, grid_bulk, str_calc)
 
         self._apply_pbc()
+        self._sim.iteration += 1
+
         self._send_dists()
         if self.need_quit():
             return False
@@ -1266,8 +1294,6 @@ class NNBlockRunner(BlockRunner):
         self._recv_dists()
         for kernel, grid in self._distrib_kernels[it & 1]:
             run(kernel, grid, str_data)
-
-        self._sim.iteration += 1
 
         return True
 
