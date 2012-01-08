@@ -16,7 +16,9 @@ import shutil
 import socket
 import subprocess
 import stat
+import sys
 import tempfile
+import time
 from multiprocessing import Process
 
 import execnet
@@ -396,35 +398,47 @@ class LBSimulationController(object):
         cluster = util.gpufile_to_clusterspec(os.environ['PBS_GPUFILE'],
                 self.config.cluster_pbs_interface)
         self._pbs_handlers = []
+        id_string = 'sailfish-%s' % os.getpid()
 
         def _start_socketserver(addr, port):
-            return subprocess.Popen(['pbsdsh', '-o', '-h',
+            return subprocess.Popen(['pbsdsh', '-h',
                 addr, 'sh', '-c',
-                ". %s ; python sailfish/socketserver.py :%s" %
-                (self.config.cluster_pbs_initscript, port)])
+                ". %s ; python sailfish/socketserver.py :%s %s" %
+                (self.config.cluster_pbs_initscript, port, id_string)])
 
         for node in cluster.nodes:
             port = node.get_port()
             self._pbs_handlers.append(_start_socketserver(node.addr, port))
 
+        def _try_next_port(i, node, still_starting):
+            port = node.get_port() + 1
+            node.set_port(port)
+            print 'retrying node %s:%s...' % (node.host, node.addr)
+            self._pbs_handlers[i] = _start_socketserver(node.addr, port)
+            still_starting.append((i, node))
+
         starting_nodes = list(enumerate(cluster.nodes))
         while starting_nodes:
-            still_starting = list()
+            still_starting = []
 
             for i, node in starting_nodes:
                 if self._pbs_handlers[i].returncode is not None:
-                    port = node.get_port() + 1
-                    node.set_port(port)
-                    self._pbs_handlers[i] = _start_socketserver(node.addr, port)
-                    still_staring.append((i, node))
+                    # Remote process terminated -- try to start again with a
+                    # different port.
+                    _try_next_port(i, node, still_starting)
                 else:
                     try:
-                        s = socket.create_connection((node.addr, port), timeout=5)
+                        s = socket.create_connection((node.addr, node.get_port()), timeout=5.0)
+                        if s.recv(256) != id_string:
+                            _try_next_port(i, node, still_starting)
                         s.close()
                     except (socket.timeout, socket.error):
                         still_starting.append((i, node))
+                        continue
 
             starting_nodes = still_starting
+            sys.stdout.flush()
+            time.sleep(0.5)
 
         return cluster
 

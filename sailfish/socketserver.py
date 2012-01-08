@@ -34,6 +34,11 @@ else:
     exec("""def exec_(source, locs):
     exec source in locs""")
 
+def hello(serversock, id):
+    clientsock, address = serversock.accept()
+    print_(progname, 'hello %s, from %s' % (serversock.getsockname(), address))
+    clientsock.send(id)
+
 def exec_from_one_connection(serversock):
     print_(progname, 'Entering Accept loop', serversock.getsockname())
     clientsock,address = serversock.accept()
@@ -72,11 +77,11 @@ def bind_and_listen(hostport):
     serversock.listen(5)
     return serversock
 
-def startserver(serversock, loop=False):
+def startserver(serversock, loop=False, id='sailfish'):
     # Allow two connections: first to test connectivity, and
     # second for the actual execnet channel.
-    count = 2
     try:
+        hello(serversock, id)
         while 1:
             try:
                 exec_from_one_connection(serversock)
@@ -90,9 +95,7 @@ def startserver(serversock, loop=False):
                     excinfo = sys.exc_info()
                     print_("got exception", excinfo[1])
             if not loop:
-                count -= 1
-                if count < 0:
-                    break
+                break
     finally:
         print_("leaving socketserver execloop")
         serversock.shutdown(2)
@@ -103,6 +106,11 @@ if __name__ == '__main__':
         hostport = sys.argv[1]
     else:
         hostport = ':8888'
+
+    if len(sys.argv) > 2:
+        id = sys.argv[2]
+    else:
+        id = 'sailfish'
     serversock = bind_and_listen(hostport)
-    startserver(serversock, loop=False)
+    startserver(serversock, loop=False, id=id)
 
