@@ -88,7 +88,7 @@ class MachineSpec(object):
 
     def set_port(self, port):
         curr_port = self.get_port()
-        self.host = self.host.replace(curr_port, port)
+        self.host = self.host.replace(str(curr_port), str(port))
 
     def __repr__(self):
         return 'MachineSpec({0}, {1}, {2}, {3})'.format(
