@@ -48,7 +48,7 @@
 
 
 ## TODO: support multiple grids with MRT?
-% if model == 'mrt' and simtype == 'fluid':
+% if model == 'mrt' and simtype == 'lbm':
 //
 // Relaxation in moment space.
 //
