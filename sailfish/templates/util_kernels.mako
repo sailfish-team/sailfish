@@ -333,7 +333,7 @@ ${kernel} void DistributeContinuousData(
 </%def>
 
 // Layout of the data in the buffer is the same as in the output buffer of
-// CollectOrthogonalGhostData.
+// CollectContinuousData.
 ${kernel} void DistributeContinuousData(
 		${global_ptr} float *dist, int face, int base_gx, int base_other,
 		int max_lx, int max_other, ${global_ptr} float *buffer)
@@ -405,3 +405,115 @@ ${kernel} void DistributeSparseData(
 	int gi = idx_array[idx];
 	dist[gi] = buffer[idx];
 }
+
+%if dim == 2:
+${kernel} void CollectContinuousMacroData(
+		${global_ptr} float *field, int base_gx, int max_lx, int gy,
+		${global_ptr} float *buffer)
+{
+	int idx = get_global_id(0);
+	if (idx >= max_lx) {
+		return;
+	}
+
+	int gi = getGlobalIdx(base_gx + idx, gy);
+	float tmp = field[gi];
+	buffer[idx] = tmp;
+}
+%else:
+<%def name="_get_global_macro_idx(face)">
+	## Y-axis
+	%if face < 4:
+		gi = getGlobalIdx(base_gx + gx, ${lat_linear_macro[face]}, base_other + other);
+	## Z-axis
+	%else:
+		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_macro[face]});
+	%endif
+</%def>
+
+// The data is collected from a rectangular area of the plane corresponding to 'face'.
+// The grid with which the kernel is to be called has the following dimensions:
+//
+//  x: # nodes along the X direction + any padding (real # nodes is identified by max_lx)
+//  y: # nodes along the Y/Z direction
+//
+${kernel} void CollectContinuousMacroData(
+		${global_ptr} float *field, int face, int base_gx, int base_other,
+		int max_lx, int max_other, ${global_ptr} float *buffer)
+{
+	int gx = get_global_id(0);
+	int other = get_global_id(1);
+
+	if (gx >= max_lx || other >= max_other) {
+		return;
+	}
+
+	// Index in the output buffer.
+	int idx = other * get_global_size(0) + gx;
+
+	switch (face) {
+	%for axis in range(2, 2 * dim):
+		case ${axis}: {
+			int gi;
+			${_get_global_macro_idx(axis)};
+			float tmp = field[gi];
+			buffer[idx] = tmp;
+			break;
+		}
+	%endfor
+	}
+}
+%endif  ## dim == 3
+
+%if dim == 2:
+${kernel} void DistributeContinuousMacroData(
+		${global_ptr} float *field, int base_gx, int max_lx, int gy,
+		${global_ptr} float *buffer)
+{
+	int idx = get_global_id(0);
+	if (idx >= max_lx) {
+		return;
+	}
+
+	float tmp = buffer[idx];
+	int gi = getGlobalIdx(base_gx + idx, gy);
+	field[gi] = tmp;
+}
+%else:
+<%def name="_get_global_macro_dist_idx(face)">
+	## Y-axis
+	%if face < 4:
+		gi = getGlobalIdx(base_gx + gx, ${lat_linear[face]}, base_other + other);
+	## Z-axis
+	%else:
+		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear[face]});
+	%endif
+</%def>
+
+${kernel} void DistributeContinuousMacroData(
+		${global_ptr} float *field, int face, int base_gx, int base_other,
+		int max_lx, int max_other, ${global_ptr} float *buffer)
+{
+	int gx = get_global_id(0);
+	int other = get_global_id(1);
+
+	if (gx >= max_lx || other >= max_other) {
+		return;
+	}
+
+	// Index in the input buffer.
+	int idx = other * get_global_size(0) + gx;
+	float tmp = buffer[idx];
+
+	switch (face) {
+	%for axis in range(2, 2 * dim):
+		case ${axis}: {
+			int gi;
+			${_get_global_macro_dist_idx(axis)};
+			field[gi] = tmp;
+			break;
+		}
+	%endfor
+	}
+}
+%endif  ## dim == 3
