@@ -58,7 +58,7 @@ class LBGeometry3D(LBGeometry):
         """Returns a 1-element list containing a single 3D block
         covering the whole domain."""
         return [SubdomainSpec3D((0, 0, 0),
-                          (self.config.lat_nx, self.config_lat_ny,
+                          (self.config.lat_nx, self.config.lat_ny,
                            self.config.lat_nz))]
 
 
