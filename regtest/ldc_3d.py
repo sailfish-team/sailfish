@@ -1,44 +1,98 @@
-#!/usr/bin/python -u
+#!/usr/bin/python 
 
-import os
 import numpy as np
 import matplotlib
-from optparse import OptionParser
 
+import math
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
+from optparse import OptionParser
+import os
+import shutil
+import tempfile
 
-from examples.lbm_ldc_3d import LBMGeoLDC, LDCSim
+from examples.lbm_ldc_multi_3d import LDCGeometry, LDCBlock, LDCSim
+from sailfish.controller import LBSimulationController
 from sailfish import geo
+from sailfish import geo_block
 
+tmpdir = tempfile.mkdtemp()
 MAX_ITERS = 50000
+LAT_NX = 128
+LAT_NY = 128
+LAT_NZ = 128
+output = ''
 
-def run_test(bc, precision, model, grid, name):
-    xvec = []
-    yvec = []
-    basepath = os.path.join('regtest/results', name, grid, model, precision)
+name = 'ldc3d'
 
+
+class TestLDCSim(LDCSim):  
+
+    @classmethod
+    def update_defaults(cls, defaults):
+        LDCBlock.max_v = 0.05
+        LDCSim.update_defaults(defaults)
+        defaults.update({
+            'max_iters': MAX_ITERS,
+            'lat_nx': LAT_NX,
+            'lat_ny': LAT_NY,
+            'lat_nz': LAT_NZ,
+            'output': os.path.join(tmpdir,'result')})        
+	
+    @classmethod
+    def modify_config(cls, config):
+        config.visc = (config.lat_nx-2) * LDCBlock.max_v / config.re
+        config.every = config.max_iters - 1
+	
+        # Protection in the event of max_iters changes from the command line.
+        global MAX_ITERS
+        MAX_ITERS = config.max_iters
+
+    @classmethod
+    def add_options(cls, group, dim):
+        LDCSim.add_options(group, dim)
+        group.add_argument('--re', dest="re", help = 'Reynolds number', type=int, default=400)
+
+
+def save_output(basepath):
+    name_digits = str(int(math.log10(MAX_ITERS)) + 1)
+    opt = ('%s_blk0_%0' + name_digits+ 'd'+'.npz') % (tmpdir+"/result", MAX_ITERS-1)
+    href = np.load(opt)
+
+    hrho = href['rho']
+    lat_nz, lat_ny, lat_nx = hrho.shape
+
+    vx = href['v'][0]
+    vy = href['v'][1]
+    vz = href['v'][2] 
+
+    nxh = lat_nx/2
+    nyh = lat_ny/2
+    nzh = lat_nz/2
+
+    res_vx = (vx[:, nyh, nxh] + vx[:, nyh-1, nxh-1]) / 2 / LDCBlock.max_v
+    res_vz = (vz[nzh, nyh, :] + vz[nzh-1, nyh-1, :]) / 2 / LDCBlock.max_v
+    
+    plt.plot(res_vx, np.linspace(-1.0, 1.0, lat_nz), label='Sailfish')
+    plt.plot(np.linspace(-1.0, 1.0, lat_nx), res_vz, label='Sailfish')
+
+    np.savetxt(os.path.join(basepath, 're400_vx.dat'), res_vx)
+    np.savetxt(os.path.join(basepath, 're400_vz.dat'), res_vz)
+
+		
+def run_test(name):   
+    basepath = os.path.join('results', name)
     if not os.path.exists(basepath):
         os.makedirs(basepath)
 
-    defaults = {'grid': grid, 'model': model, 'precision': precision,
-            'max_iters': MAX_ITERS, 'batch': True, 'quiet': True, 'verbose':
-            False}
-    sim = LTestLDCSim(defaults)
-    sim.run()
-
-    horiz = np.loadtxt('regtest/ldc_golden/re400_horiz', skiprows=1)
-    vert = np.loadtxt('regtest/ldc_golden/re400_vert', skiprows=1)
-
+    ctrl = LBSimulationController(TestLDCSim, LDCGeometry)     
+    ctrl.run()
+    horiz = np.loadtxt('ldc_golden/re400_horiz', skiprows=1)
+    vert = np.loadtxt('ldc_golden/re400_vert', skiprows=1)
+    
     plt.plot(2 * (horiz[:,0] - 0.5), -2 * (horiz[:,1] - 0.5), label='Sheu, Tsai paper')
     plt.plot(2 * (vert[:,0] - 0.5), -2 * (vert[:,1] - 0.5), label='Sheu, Tsai paper')
-
-    plt.plot(sim.res_vx, np.linspace(-1.0, 1.0, sim.options.lat_nz), label='Sailfish')
-    plt.plot(np.linspace(-1.0, 1.0, sim.options.lat_nx), sim.res_vz, label='Sailfish')
-
-    np.savetxt(os.path.join(basepath, 're400_vx.dat'), sim.res_vx)
-    np.savetxt(os.path.join(basepath, 're400_vz.dat'), sim.res_vz)
-
+    save_output(basepath)
     plt.legend(loc='lower right')
     plt.gca().yaxis.grid(True)
     plt.gca().xaxis.grid(True)
@@ -46,48 +100,13 @@ def run_test(bc, precision, model, grid, name):
     plt.gca().yaxis.grid(True, which='minor')
 
     plt.title('Lid Driven Cavity, Re = 400')
-    plt.savefig(os.path.join(basepath, 're400-%s.pdf' % bc), format='pdf')
-
+    print os.path.join(basepath, 're400.pdf' )
+    plt.savefig(os.path.join(basepath, 're400.pdf' ), format='pdf')
+	
     plt.clf()
     plt.cla()
-
-parser = OptionParser()
-parser.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
-parser.add_option('--model', dest='model', help='model', type='choice', choices=['mrt', 'bgk'], default='bgk')
-parser.add_option('--grid', dest='grid', help='grid', type='string', default='')
-parser.add_option('--bc', dest='bc', help='boundary conditions to test (comma separated', type='string', default='')
-(options, args) = parser.parse_args()
-
-name = 'ldc3d'
-
-if options.grid:
-    grid = options.grid
-else:
-    grid = 'D3Q19'
-
-geo_type = geo.LBMGeo.NODE_VELOCITY
-
-if options.bc:
-    bcs = filter(lambda x: geo_type in geo.get_bc(x).supported_types, options.bc.split(','))
-else:
-    bcs = [x.name for x in geo.SUPPORTED_BCS if geo_type in x.supported_types]
-
-class LTestLDCSim(LDCSim):
-    def __init__(self, defaults):
-        super(LTestLDCSim, self).__init__(LBMGeoLDC, defaults=defaults)
-        self.clear_hooks()
-        self.add_iter_hook(self.options.max_iters-1, self.save_output)
-
-    def save_output(self):
-        nxh = self.options.lat_nx/2
-        nyh = self.options.lat_ny/2
-        nzh = self.options.lat_nz/2
-
-        self.res_vx = (self.vx[:, nyh, nxh] + self.vx[:, nyh-1, nxh-1]) / 2 / self.geo.max_v
-        self.res_vz = (self.vz[nzh, nyh, :] + self.vz[nzh-1, nyh-1, :]) / 2 / self.geo.max_v
-
-
-for bc in bcs:
-    print 'Running test for "%s".' % bc
-    run_test(bc, options.precision, options.model, grid, name)
-
+    plt.show()
+    shutil.rmtree(tmpdir)
+ 
+   
+run_test(name)
