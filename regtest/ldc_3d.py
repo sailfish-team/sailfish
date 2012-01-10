@@ -1,4 +1,4 @@
-#!/usr/bin/python 
+#!/usr/bin/python
 
 import numpy as np
 import matplotlib
@@ -6,15 +6,12 @@ import matplotlib
 import math
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
-from optparse import OptionParser
 import os
 import shutil
 import tempfile
 
 from examples.lbm_ldc_multi_3d import LDCGeometry, LDCBlock, LDCSim
 from sailfish.controller import LBSimulationController
-from sailfish import geo
-from sailfish import geo_block
 
 tmpdir = tempfile.mkdtemp()
 MAX_ITERS = 50000
@@ -26,7 +23,7 @@ output = ''
 name = 'ldc3d'
 
 
-class TestLDCSim(LDCSim):  
+class TestLDCSim(LDCSim):
 
     @classmethod
     def update_defaults(cls, defaults):
@@ -37,13 +34,13 @@ class TestLDCSim(LDCSim):
             'lat_nx': LAT_NX,
             'lat_ny': LAT_NY,
             'lat_nz': LAT_NZ,
-            'output': os.path.join(tmpdir,'result')})        
-	
+            'output': os.path.join(tmpdir, 'result')})
+
     @classmethod
     def modify_config(cls, config):
         config.visc = (config.lat_nx-2) * LDCBlock.max_v / config.re
         config.every = config.max_iters - 1
-	
+
         # Protection in the event of max_iters changes from the command line.
         global MAX_ITERS
         MAX_ITERS = config.max_iters
@@ -64,7 +61,7 @@ def save_output(basepath):
 
     vx = href['v'][0]
     vy = href['v'][1]
-    vz = href['v'][2] 
+    vz = href['v'][2]
 
     nxh = lat_nx/2
     nyh = lat_ny/2
@@ -72,24 +69,24 @@ def save_output(basepath):
 
     res_vx = (vx[:, nyh, nxh] + vx[:, nyh-1, nxh-1]) / 2 / LDCBlock.max_v
     res_vz = (vz[nzh, nyh, :] + vz[nzh-1, nyh-1, :]) / 2 / LDCBlock.max_v
-    
+
     plt.plot(res_vx, np.linspace(-1.0, 1.0, lat_nz), label='Sailfish')
     plt.plot(np.linspace(-1.0, 1.0, lat_nx), res_vz, label='Sailfish')
 
     np.savetxt(os.path.join(basepath, 're400_vx.dat'), res_vx)
     np.savetxt(os.path.join(basepath, 're400_vz.dat'), res_vz)
 
-		
-def run_test(name):   
+
+def run_test(name):
     basepath = os.path.join('results', name)
     if not os.path.exists(basepath):
         os.makedirs(basepath)
 
-    ctrl = LBSimulationController(TestLDCSim, LDCGeometry)     
+    ctrl = LBSimulationController(TestLDCSim, LDCGeometry)
     ctrl.run()
     horiz = np.loadtxt('ldc_golden/re400_horiz', skiprows=1)
     vert = np.loadtxt('ldc_golden/re400_vert', skiprows=1)
-    
+
     plt.plot(2 * (horiz[:,0] - 0.5), -2 * (horiz[:,1] - 0.5), label='Sheu, Tsai paper')
     plt.plot(2 * (vert[:,0] - 0.5), -2 * (vert[:,1] - 0.5), label='Sheu, Tsai paper')
     save_output(basepath)
@@ -102,11 +99,11 @@ def run_test(name):
     plt.title('Lid Driven Cavity, Re = 400')
     print os.path.join(basepath, 're400.pdf' )
     plt.savefig(os.path.join(basepath, 're400.pdf' ), format='pdf')
-	
+
     plt.clf()
     plt.cla()
     plt.show()
     shutil.rmtree(tmpdir)
- 
-   
+
+
 run_test(name)
