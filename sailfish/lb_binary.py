@@ -12,7 +12,7 @@ from sailfish.lb_base import LBSim, ScalarField, VectorField
 class LBBinaryFluidBase(LBSim):
     """Base class for binary fluid simulations."""
 
-    subdomain_runner = block_runnner.NNBlockRunner
+    subdomain_runner = block_runner.NNBlockRunner
     kernel_file = 'binary_fluid.mako'
 
     def __init__(self, config):
@@ -103,9 +103,9 @@ class LBBinaryFluidBase(LBSim):
 
         sim_kernels = [
             runner.get_kernel('CollideAndPropagate', args1,
-                'P'*(len(args1)-1)+'i')),
+                'P'*(len(args1)-1)+'i'),
             runner.get_kernel('CollideAndPropagate', args2,
-                'P'*(len(args2)-1)+'i'))]
+                'P'*(len(args2)-1)+'i')]
         return zip(macro_kernels, sim_kernels)
 
     def initial_conditions(self, runner):

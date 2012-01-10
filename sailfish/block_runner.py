@@ -17,8 +17,38 @@ from sailfish import codegen, util
 # to be executed.
 KernelGrid = namedtuple('KernelGrid', 'kernel grid')
 
+class MacroConnectionBuffer(object):
+    """Contains buffers needed to transfer a single macroscopic field
+    between two subdomains."""
+
+    def __init__(self, face, cpair, coll_buf, coll_idx, recv_buf, dist_idx,
+            field):
+        """
+        :param face: face ID
+        :param cpair: ConnectionPair, a tuple of two LBConnection objects
+        :param coll_buf: GPUBuffer for information collected on the source
+            node to be sent to the destination node
+        :param coll_idx: GPUBuffer with an array of indices indicating sparse
+            nodes from which data is to be collected; this is only used for
+            connections via the X_LOW and X_HIGH faces
+        :param recv_buf: GPUBuffer for information received from the remote node
+        :param dist_idx: GPUBuffer with an array of indices indicating
+            the position of nodes to which data is to be distributed; this is
+            only used for connections via the X_LOW and X_HIGH faces
+        :param field: ScalarField that is being transferred using this buffer
+        """
+        self.face = face
+        self.cpair = cpair
+        self.coll_buf = coll_buf
+        self.coll_idx = coll_idx
+        self.recv_buf = recv_buf
+        self.dist_idx = dist_idx
+        self.field = field
 
 class ConnectionBuffer(object):
+    """Contains buffers needed to transfer distributions between two
+    subdomains."""
+
     def __init__(self, face, cpair, coll_buf, coll_idx, recv_buf,
             dist_partial_buf, dist_partial_idx, dist_partial_sel,
             dist_full_buf, dist_full_idx, grid_id=0):
@@ -214,6 +244,7 @@ class BlockRunner(object):
         ctx['boundary_size'] = self._boundary_size
         ctx['lat_linear'] = self.lat_linear
         ctx['lat_linear_dist'] = self.lat_linear_dist
+        ctx['lat_linear_macro'] = self.lat_linear_macro
 
         # FIXME(michalj)
         ctx['periodic_x'] = 0 #int(self._block.periodic_x)
@@ -409,13 +440,22 @@ class BlockRunner(object):
 
         # Used so that face values map to the limiting coordinate
         # along a specific axis, e.g. lat_linear[X_LOW] = 0
-        # TODO(michalj): Should this use _block.envelope_size instead of -1?
-        self.lat_linear = [0, self._lat_size[-1]-1, 0, self._lat_size[-2]-1]
-        self.lat_linear_dist = [self._lat_size[-1]-2, 1,  self._lat_size[-2]-2, 1]
+
+        evs = self._block.envelope_size
+        self.lat_linear = [0, self._lat_size[-1] - 1, 0, self._lat_size[-2] - 1]
+        self.lat_linear_dist = [self._lat_size[-1] - 1 - evs, evs,
+                self._lat_size[-2] - 1 - evs, evs]
+        self.lat_linear_macro = [evs, self._lat_size[-1] - 1 - evs, evs,
+                self._lat_size[-2] - 1 - evs]
+        # No need to define this, as it's the same as lat_linear above:
+        # self.lat_linear_macro_dist = [self._lat_size[-1] - 1, 0,
+        #         self._lat_size[-2] - 1, 0]
 
         if self._block.dim == 3:
-            self.lat_linear.extend([0, self._lat_size[-3]-1])
-            self.lat_linear_dist.extend([self._lat_size[-3]-2, 1])
+            self.lat_linear.extend([0, self._lat_size[-3] - 1])
+            self.lat_linear_dist.extend([self._lat_size[-3] - 1 - evs, evs])
+            self.lat_linear_macro.extend([evs, self._lat_size[-3] - 1 - evs])
+            #self.lat_linear_macro_dist.extend([self._lat_size[-3] - 1, 0])
 
     def _get_strides(self, type_):
         """Returns a list of strides for the NumPy array storing the lattice."""
@@ -435,7 +475,7 @@ class BlockRunner(object):
     def _get_compute_code(self):
         return self._bcg.get_code(self)
 
-    def _get_global_idx(self, location, dist_num):
+    def _get_global_idx(self, location, dist_num=0):
         """Returns a global index (in the distributions array).
 
         :param location: position of the node in the natural order
@@ -821,7 +861,7 @@ class BlockRunner(object):
 
         Returns: primary, secondary.
         """
-        # Data collection.
+        # Sparse data collection.
         if cbuf.coll_idx.host is not None:
             grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
 
@@ -834,6 +874,7 @@ class BlockRunner(object):
                     grid_size)
 
             return _get_sparse_coll_kernel(1), _get_sparse_coll_kernel(0)
+        # Continuous data collection.
         else:
             # [X, Z * dists] or [X, Y * dists]
             min_max = ([x.start for x in cbuf.cpair.src.src_slice] +
@@ -1188,17 +1229,158 @@ class NNBlockRunner(BlockRunner):
     """
 
     def _recv_macro(self):
-        pass
+        for b_id, connector in self._block._connectors.iteritems():
+            conn_bufs = self._block_to_macrobuf[b_id]
+            if len(conn_bufs) > 1:
+                dest = np.hstack([np.ravel(x.recv_buf.host) for x in conn_bufs])
+                # Returns false only if quit event is active.
+                if not connector.recv(dest, self._quit_event):
+                    return
+                i = 0
+                for cbuf in util.reverse_pairs(conn_bufs):
+                    l = cbuf.recv_buf.host.size
+                    cbuf.recv_buf.host[:] = dest[i:i+l].reshape(cbuf.recv_buf.host.shape)
+                    i += l
+                    self.backend.to_buf_async(cbuf.recv_buf.gpu, self._data_stream)
+            else:
+                cbuf = conn_bufs[0]
+                dest = np.ravel(cbuf.recv_buf.host)
+                # Returns false only if quit event is active.
+                if not connector.recv(dest, self._quit_event):
+                    return
+                if dest.flags.owndata:
+                    cbuf.recv_buf.host[:] = dest.reshape(cbuf.recv_buf.host.shape)
+                self.backend.to_buf_async(cbuf.recv_buf.gpu, self._data_stream)
 
     def _send_macro(self):
-        pass
+        for b_id, connector in self._block._connectors.iteritems():
+            conn_bufs = self._block_to_macrobuf[b_id]
+            for x in conn_bufs:
+                self.backend.from_buf_async(x.coll_buf.gpu, self._data_stream)
+
+        self._data_stream.synchronize()
+        for b_id, connector in self._block._connectors.iteritems():
+            conn_bufs = self._block_to_macrobuf[b_id]
+            if len(conn_bufs) > 1:
+                connector.send(np.hstack(
+                    [np.ravel(x.coll_buf.host) for x in conn_bufs]))
+            else:
+                # TODO(michalj): Use non-blocking sends here?
+                connector.send(np.ravel(conn_bufs[0].coll_buf.host))
+
+    def _macro_idx_helper(self, gx, buf_slice):
+        idx = np.mgrid[list(reversed(buf_slice))].astype(np.uint32)
+        if self.dim == 2:
+            return self._get_global_idx((gx, idx[0])).astype(np.uint32)
+        else:
+            return self._get_global_idx((gx, idx[1], idx[0])).astype(np.uint32)
+
+    def _get_src_macro_indices(self, face, cpair):
+        if face in (self._block.X_LOW, self._block.X_HIGH):
+            gx = self.lat_linear_macro[face]
+        else:
+            return None
+        return self._macro_idx_helper(gx, cpair.src.src_macro_slice)
+
+    def _get_dst_macro_indices(self, face, cpair):
+        if face in (self._block.X_LOW, self._block.X_HIGH):
+            gx = self.lat_linear[self._block.opposite_face(face)]
+        else:
+            return None
+        return self._macro_idx_helper(gx, cpair.src.dst_macro_slice)
 
     def _init_buffers(self):
         super(NNBlockRunner, self)._init_buffers()
 
+        alloc = self.backend.alloc_async_host_buf
         self._block_to_macrobuf = defaultdict(list)
         for face, block_id in self._block.connecting_blocks():
             cpair = self._block.get_connection(face, block_id)
+            coll_idx = GPUBuffer(self._get_src_macro_indices(face, cpair), self.backend)
+            dist_idx = GPUBuffer(self._get_dst_macro_indices(face, cpair), self.backend)
+
+            for field in self._scalar_fields:
+                if not field.need_nn:
+                    continue
+
+                recv_buf = alloc(cpair.dst.macro_transfer_shape, dtype=self.float)
+                coll_buf = alloc(cpair.src.macro_transfer_shape, dtype=self.float)
+
+                cbuf = MacroConnectionBuffer(face, cpair,
+                        GPUBuffer(coll_buf, self.backend),
+                        coll_idx,
+                        GPUBuffer(recv_buf, self.backend),
+                        dist_idx, field)
+
+                self._block_to_macrobuf[block_id].append(cbuf)
+
+    def _init_macro_collect_kernels(self, cbuf, grid_dim1, block_size):
+        # Sparse data collection.
+        if cbuf.coll_idx.host is not None:
+            grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
+            return KernelGrid(self.get_kernel('CollectSparseData',
+                    [cbuf.coll_idx.gpu, self._gpu_field_map[id(cbuf.field)],
+                     cbuf.coll_buf.gpu, cbuf.coll_buf.host.size], 'PPPi',
+                    (block_size,)), grid_size)
+        # Continuous data collection.
+        else:
+            if self.dim == 2:
+                grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
+            else:
+                grid_size = (grid_dim1(cbuf.coll_buf.host.shape[-1]),
+                    grid_dim1(cbuf.coll_buf.host.shape[-2]))
+
+            # [X, Z] or [X, Y] in 3D
+            min_max = ([x.start for x in cbuf.cpair.src.src_macro_slice] +
+                    list(reversed(cbuf.coll_buf.host.shape)))
+
+            if self.dim == 2:
+                gy = self.lat_linear_macro[cbuf.face]
+                return KernelGrid(self.get_kernel('CollectContinuousMacroData',
+                        [self._gpu_field_map[id(cbuf.field)]] + min_max + [gy,
+                         cbuf.coll_buf.gpu], 'PiiiP', (block_size,)),
+                         grid_size)
+            else:
+                return KernelGrid(self.get_kernel('CollectContinuousMacroData',
+                        [self._gpu_field_map[id(cbuf.field)], cbuf.face] +
+                        min_max + [cbuf.coll_buf.gpu], 'PiiiiiP', (block_size,)),
+                        grid_size)
+
+
+    def _init_macro_distrib_kernels(self, cbuf, grid_dim1, block_size):
+        kernels = []
+
+        # Sparse data distribution.
+        if cbuf.dist_full_idx.host is not None:
+            grid_size = (grid_dim1(cbuf.recv_buf.host.size),)
+            return KernelGrid(self.get_kernel('DistributeSparseData',
+                        [cbuf.dist_idx.gpu, self._gpu_field[id(cbuf.field)],
+                         cbuf.recv_buf.gpu, cbuf.recv_buf.host.size], 'PPPi',
+                        (block_size,)), grid_size)
+        # Continuous data distribution.
+        else:
+            if self.dim == 2:
+                grid_size = (grid_dim1(cbuf.recv_buf.host.size),)
+            else:
+                grid_size = (grid_dim1(cbuf.recv_buf.host.shape[-1]),
+                    grid_dim1(cbuf.recv_buf.host.shape[-2]))
+
+            # [X, Z] or [X, Y] in 3D
+            min_max = ([x.start for x in cbuf.cpair.src.dst_macro_slice] +
+                    list(reversed(cbuf.recv_buf.host.shape)))
+
+            if self.dim == 2:
+                gy = self.lat_linear[cbuf.face]
+                return KernelGrid(self.get_kernel('DistributeContinuousMacroData',
+                        [self._gpu_field_map[id(cbuf.field)]] + min_max + [gy,
+                         cbuf.recv_buf.gpu], 'PiiiP', (block_size,)),
+                         grid_size)
+            else:
+                return KernelGrid(self.get_kernel('DistributeContinuousMacroData',
+                        [self._gpu_field_map[id(cbuf.field)], cbuf.face] +
+                        min_max + [cbuf.recv_buf.gpu], 'PiiiiiP', (block_size,)),
+                        grid_size)
+
 
     def _init_interblock_kernels(self):
         super(NNBlockRunner, self)._init_interblock_kernels()
@@ -1212,9 +1394,12 @@ class NNBlockRunner(BlockRunner):
 
         for b_id, conn_bufs in self._block_to_macrobuf.iteritems():
             for cbuf in conn_bufs:
-                pass
-                # CollectSparseData
-                # XXX: use memcpy for continous data?
+                self._macro_collect_kernels.append(
+                        self._init_macro_collect_kernels(cbuf, _grid_dim1,
+                            collect_block))
+                self._macro_distrib_kernels.append(
+                        self._init_macro_distrib_kernels(cbuf, _grid_dim1,
+                            collect_block))
 
     def step(self, output_req):
         """Runs one simulation step."""
@@ -1226,7 +1411,7 @@ class NNBlockRunner(BlockRunner):
             bnd = self._kernels_bnd_none
             bulk = self._kernels_bulk_none
 
-        it = self._sim_iteration
+        it = self._sim.iteration
         bnd_kernel_macro, bnd_kernel_sim = bnd[it & 1]
         bulk_kernel_macro, bulk_kernel_sim = bulk[it & 1]
 

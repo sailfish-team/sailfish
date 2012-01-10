@@ -23,11 +23,15 @@ ConnectionPair = namedtuple('ConnectionPair', 'src dst')
 
 
 def _get_src_slice(b1, b2, slice_axes):
-    """Returns two slice lists identifying nodes in b1 from which
-    information is sent to b2.
+    """Returns three slice lists identifying nodes in b1 from which
+    information is sent to b2:
 
-    The first list contains slices in b1's dist buffer.  The second list
-    contains slices in the global coordinate system.
+    - slices in b1's dist buffer for distribution data
+    - slices in the global coordinate system for distribution data
+    - slices in a b1's field buffer from which macroscopic data is to be
+      collected
+    - slices in a b1's field buffer selecting nodes to which data from the
+      target subdomain is to be written
 
     The returned slices correspond to the axes specified in slice_axes.
 
@@ -38,30 +42,50 @@ def _get_src_slice(b1, b2, slice_axes):
     """
     src_slice = []
     src_slice_global = []
+    src_macro_slice = []
+    dst_macro_slice = []
 
     for axis in slice_axes:
-        # Effective span along the current axis, including ghost nodes.
-        b1_min = b1.location[axis] - b1.envelope_size
-        b1_max = b1.end_location[axis] - 1 + b1.envelope_size
+        # Effective span along the current axis, two versions: including
+        # ghost nodes, and including real nodes only.
+        b1_ghost_min = b1.location[axis] - b1.envelope_size
+        b1_ghost_max = b1.end_location[axis] - 1 + b1.envelope_size
+        b1_real_min = b1.location[axis]
+        b1_real_max = b1.end_location[axis] - 1
 
-        # Effective span along the current axis, real nodes only.
-        b2_min = b2.location[axis]
-        b2_max = b2.end_location[axis] - 1
+        # Same for the 2nd subdomain.
+        b2_real_min = b2.location[axis]
+        b2_real_max = b2.end_location[axis] - 1
+        b2_ghost_min = b2.location[axis] - b2.envelope_size
+        b2_ghost_max = b2.end_location[axis] - 1 + b2.envelope_size
 
-        # Span in global simulation coordinates.
-        global_span_min = max(b1_min, b2_min)
-        global_span_max = min(b1_max, b2_max)
+        # Span in global simulation coordinates.  Data is transferred
+        # from the ghost nodes to real nodes only.
+        global_span_min = max(b1_ghost_min, b2_real_min)
+        global_span_max = min(b1_ghost_max, b2_real_max)
 
         # No overlap, bail out.
-        if global_span_min > b1_max or global_span_max < b1_min:
-            return None, None
+        if global_span_min > b1_ghost_max or global_span_max < b1_ghost_min:
+            return None, None, None, None
 
-        src_slice.append(slice(global_span_min - b1_min,
-            global_span_max - b1_min + 1))
+        # For macroscopic fields, the inverse holds true: data is transferred
+        # from real nodes to ghost nodes.
+        macro_span_min = max(b2_ghost_min, b1_real_min)
+        macro_span_max = min(b2_ghost_max, b1_real_max)
+
+        macro_recv_min = max(b1_ghost_min, b2_real_min)
+        macro_recv_max = min(b1_ghost_max, b2_real_max)
+
+        src_slice.append(slice(global_span_min - b1_ghost_min,
+            global_span_max - b1_ghost_min + 1))
         src_slice_global.append(slice(global_span_min,
             global_span_max + 1))
+        src_macro_slice.append(slice(macro_span_min - b1_ghost_min,
+            macro_span_max - b1_ghost_min + 1))
+        dst_macro_slice.append(slice(macro_recv_min - b1_ghost_min,
+            macro_recv_max - b1_ghost_min + 1))
 
-    return src_slice, src_slice_global
+    return src_slice, src_slice_global, src_macro_slice, dst_macro_slice
 
 
 def _get_dst_full_slice(b1, b2, src_slice_global, full_map, slice_axes):
@@ -191,7 +215,8 @@ class LBConnection(object):
         slice_axes = range(0, b1.dim)
         slice_axes.remove(conn_axis)
 
-        src_slice, src_slice_global = _get_src_slice(b1, b2, slice_axes)
+        src_slice, src_slice_global, src_macro_slice, dst_macro_slice = \
+                _get_src_slice(b1, b2, slice_axes)
         if src_slice is None:
             return
 
@@ -209,10 +234,10 @@ class LBConnection(object):
             return None
 
         return LBConnection(dists, src_slice, dst_low, dst_slice, dst_full_buf_slice,
-                dst_partial_map, b1.id)
+                dst_partial_map, src_macro_slice, dst_macro_slice, b1.id)
 
     def __init__(self, dists, src_slice, dst_low, dst_slice, dst_full_buf_slice,
-            dst_partial_map, src_id):
+            dst_partial_map, src_macro_slice, dst_macro_slice, src_id):
         """
         In 3D, the order of all slices always follows the natural ordering: x, y, z
 
@@ -226,6 +251,12 @@ class LBConnection(object):
             all dists; by definition: size(dst_full_buf_slice) == size(dst_slice)
         dst_partial_map: dict mapping distribution indices to lists of positions
             in the transfer buffer
+        src_macro_slice: slice in a real scalar buffer (including ghost nodes)
+            selecting nodes from which field data is to be transferred to the
+            target subdomain
+        dst_macro_slice: slice in a real scalar buffer (including ghost nodes)
+            selecting nodes to which field data is to be written when received
+            from the target subdomain
         """
         self.dists = dists
         self.src_slice = src_slice
@@ -233,6 +264,8 @@ class LBConnection(object):
         self.dst_slice = dst_slice
         self.dst_full_buf_slice = dst_full_buf_slice
         self.dst_partial_map = dst_partial_map
+        self.src_macro_slice = src_macro_slice
+        self.dst_macro_slice = dst_macro_slice
         self.block_id = src_id
 
     @property
@@ -251,7 +284,15 @@ class LBConnection(object):
 
     @property
     def full_shape(self):
+        """Logical shape of the buffer for nodes with a full set of distributions."""
         return [len(self.dists)] + map(lambda x: int(x.stop - x.start), reversed(self.dst_slice))
+
+    @property
+    def macro_transfer_shape(self):
+        """Logical shape of the transfer buffer for a set of scalar macroscopic
+        fields."""
+        return map(lambda x: int(x.stop - x.start),
+                reversed(self.src_macro_slice))
 
 class SubdomainSpec(object):
     dim = None
