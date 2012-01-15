@@ -101,7 +101,6 @@ class LBFluidSim(LBSim):
         ctx['simtype'] = 'lbm'
         ctx['bgk_equilibrium'] = self.equilibrium
         ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
-        ctx['relaxation_enabled'] = self.config.relaxation_enabled
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)

@@ -51,6 +51,7 @@ class LBSim(object):
         ctx['grids'] = self.grids
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['constants'] = self.constants()
+        ctx['relaxation_enabled'] = self.config.relaxation_enabled
 
     def init_fields(self, runner):
         suffixes = ['x', 'y', 'z']
