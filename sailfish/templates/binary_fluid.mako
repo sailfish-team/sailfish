@@ -156,10 +156,15 @@ ${kernel} void PrepareMacroFields(
 	get0thMoment(&fi, type, orientation, &out);
 	orho[gi] = out;
 
-	int helper_idx = gi;
-
 	%if simtype == 'free-energy':
-		// Assume neutral wetting for all walls by setting adjusting the phase gradient
+		if (isWetNode(type)) {
+			getDist(&fi, dist2_in, gi);
+			get0thMoment(&fi, type, orientation, &out);
+			ophi[gi] = out;
+		}
+
+		int helper_idx = gi;
+		// Assume neutral wetting for all walls by adjusting the phase gradient
 		// near the wall.
 		//
 		// This wetting boundary condition implementation is as in option 2 in
@@ -202,29 +207,21 @@ ${kernel} void PrepareMacroFields(
 					}
 				%endfor
 			}
-		}
-	%endif
 
-	%if bc_wall == 'fullbb':
-		getDist(&fi, dist2_in, helper_idx);
-		get0thMoment(&fi, type, orientation, &out);
-		%if simtype == 'free-energy':
-			if (helper_idx != gi) {
+			%if bc_wall == 'halfbb':
+				ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+			%elif bc_wall == 'fullbb':
+				getDist(&fi, dist2_in, helper_idx);
+				get0thMoment(&fi, type, orientation, &out);
 				ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-			} else
-		%endif
-		{
-			ophi[gi] = out;
+			%else:
+				__UNIMPLEMENTED__
+			%endif
 		}
-	%elif bc_wall == 'halfbb':
+	%else:
 		getDist(&fi, dist2_in, gi);
 		get0thMoment(&fi, type, orientation, &out);
 		ophi[gi] = out;
-		%if simtype == 'free-energy':
-			if (helper_idx != gi) {
-				ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-			}
-		%endif
 	%endif
 }
 
