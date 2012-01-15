@@ -7,6 +7,8 @@ __license__ = 'GPL3'
 import ConfigParser
 import argparse
 import os
+import re
+
 
 class LBConfig(argparse.Namespace):
     """Specifies the configuration of a LB simulation.
@@ -76,3 +78,24 @@ class MachineSpec(object):
         self.gpus = gpus
         self.iface = iface
         self.settings = kwargs
+
+    # TODO(michalj): Optimize this.
+    def get_port(self):
+        matches = re.search(':(\d+)', self.host)
+        if matches is None:
+            return -1
+        return int(matches.group(1))
+
+    def set_port(self, port):
+        curr_port = self.get_port()
+        self.host = self.host.replace(str(curr_port), str(port))
+
+    def __repr__(self):
+        return 'MachineSpec({0}, {1}, {2}, {3})'.format(
+                self.host, self.addr, self.gpus, self.iface)
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
