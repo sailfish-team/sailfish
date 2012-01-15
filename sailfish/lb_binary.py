@@ -129,6 +129,7 @@ class LBBinaryFluidBase(LBSim):
         ctx['tau_phi'] = self.config.tau_phi
         ctx['bgk_equilibrium'] = self.equilibrium
         ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
+        ctx['model'] = 'bgk'
 
     # FIXME
     def _lbm_step(self, get_data, **kwargs):
@@ -189,12 +190,15 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
                 help='relaxation time for the A component')
         group.add_argument('--tau_b', type=float, default=1.0,
                 help='relaxation time for the B component')
+        group.add_argument('--model', type=str, choices=['bgk', 'mrt'],
+                default='bgk', help='LB model to use')
 
     def update_context(self, ctx):
         super(LBBinaryFluidFreeEnergy, self).update_context(ctx)
         ctx['simtype'] = 'free-energy'
         ctx['bc_wall_grad_phase'] = self.config.bc_wall_grad_phase
         ctx['bc_wall_grad_order'] = self.config.bc_wall_grad_order
+        ctx['model'] = self.config.model
 
     def _prepare_symbols(self):
         """Creates additional symbols and coefficients for the free-energy binary liquid model."""

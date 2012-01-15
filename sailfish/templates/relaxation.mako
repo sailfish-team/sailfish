@@ -200,7 +200,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 	%endif
 </%def>
 
-%if model == 'femrt' and simtype == 'free-energy':
+%if model == 'mrt' and simtype == 'free-energy':
 ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 %for i in range(0, len(grids)):
 	Dist *d${i},
@@ -237,7 +237,7 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 
 	${fluid_velocity(0, save=True)}
 }
-%endif  ## model == femrt
+%endif  ## model == mrt && simtype == 'free-energy'
 
 % if model == 'bgk':
 //
@@ -338,7 +338,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 	&d${i},
 %endfor
 	type, ncode);
-	%elif model == 'femrt':
+	%elif model == 'mrt' and simtype == 'free-energy':
 		FE_MRT_relaxate(${bgk_args()},
 %for i in range(0, len(grids)):
 	&d${i},
