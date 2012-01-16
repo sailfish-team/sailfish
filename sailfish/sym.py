@@ -896,6 +896,22 @@ def get_interblock_dists(grid, direction, opposite=False):
             ret.append(i)
     return process_dists(ret)
 
+#
+# Shan-Chen model.
+#
+def shan_chen_linear(field):
+    f = Symbol(field)
+    return f
+
+def shan_chen_classic(field):
+    rho0 = 1.0
+    f = Symbol(field)
+    return rho0 * (1.0 - sympy.exp(-f / rho0))
+
+SHAN_CHEN_POTENTIALS = {
+    'linear': shan_chen_linear,
+    'classic': shan_chen_classic
+}
 
 #
 # Sympy stuff.

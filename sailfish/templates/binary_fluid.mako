@@ -29,7 +29,9 @@ ${const_var} float visc = ${visc}f;		// viscosity
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
 %if simtype == 'shan-chen':
+	<%namespace file="shan_chen.mako" import="*" name="shan_chen"/>
 	${kernel_common.body(bgk_args_decl_sc)}
+	${shan_chen.body()}
 %elif simtype == 'free-energy':
 	${kernel_common.body(bgk_args_decl_fe)}
 %endif

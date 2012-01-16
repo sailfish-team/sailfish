@@ -319,10 +319,13 @@ class LBBinaryFluidShanChen(LBBinaryFluidBase):
         group.add_argument('--visc', type=float, default=1.0, help='numerical viscosity')
         group.add_argument('--G', type=float, default=1.0,
                 help='Shan-Chen interaction strenght constant')
+        group.add_argument('--sc_potential', type=str,
+                choices=sym.SHAN_CHEN_POTENTIALS, default='linear',
+                help='Shan-Chen pseudopotential function to use')
 
     def update_context(self, ctx):
         super(LBBinaryFluidShanChen, self).update_context(ctx)
         ctx['simtype'] = 'shan-chen'
-        ctx['sc_pseudopotential'] = 'sc_ppot_lin'
+        ctx['sc_potential'] = self.config.sc_potential
         ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0
         ctx['visc'] = self.config.visc
