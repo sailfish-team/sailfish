@@ -327,5 +327,5 @@ class LBBinaryFluidShanChen(LBBinaryFluidBase):
         super(LBBinaryFluidShanChen, self).update_context(ctx)
         ctx['simtype'] = 'shan-chen'
         ctx['sc_potential'] = self.config.sc_potential
-        ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0
+        ctx['tau'] = sym.relaxation_time(self.config.visc)
         ctx['visc'] = self.config.visc

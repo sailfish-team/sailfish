@@ -1,31 +1,42 @@
 #!/usr/bin/python
 
-import numpy
-from sailfish import geo, lb_binary
+import numpy as np
+
+from sailfish.geo import LBGeometry2D
+from sailfish.geo_block import Subdomain2D
+from sailfish.controller import LBSimulationController
+from sailfish.lb_binary import LBBinaryFluidFreeEnergy
+from sailfish.lb_single import LBForcedSim
 
 
-class GeoFE(geo.LBMGeo2D):
+class SeparationDomain(Subdomain2D):
+    def initial_conditions(self, sim, hx, hy):
+        self.rho[:] = 1.0
+        self.phi[:] = np.random.rand(*self.phi.shape) / 100.0
 
-    def init_fields(self):
-        hy, hx = numpy.mgrid[0:self.lat_ny, 0:self.lat_nx]
+    def boundary_conditions(self, hx, hy):
+        pass
 
-        self.sim.rho[:] = 1.0
-        self.sim.phi[:] = numpy.random.rand(*self.sim.phi.shape) / 100.0
 
-class FESim(lb_binary.BinaryFluidFreeEnergy):
-    filename = 'fe_seperation_2d'
+class SeparationFESim(LBBinaryFluidFreeEnergy, LBForcedSim):
+    subdomain = SeparationDomain
 
-    def __init__(self, geo_class, defaults={}):
-        settings = {'verbose': True, 'lat_nx': 256,
-                    'lat_ny': 256, 'grid': 'D2Q9',
-                    'kappa': 2e-4, 'Gamma': 25.0, 'A': 1e-4,
-                    'scr_scale': 2,
-                    'tau_a': 4.5, 'tau_b': 0.8, 'tau_phi': 1.0,
-                    'periodic_x': True, 'periodic_y': True}
-        settings.update(defaults)
+    @classmethod
+    def update_defaults(cls, defaults):
+        defaults.update({
+            'lat_nx': 256,
+            'lat_ny': 256,
+            'grid': 'D2Q9',
+            'kappa': 2e-4,
+            'Gamma': 25.0,
+            'A': 1e-4,
+            'tau_a': 4.5,
+            'tau_b': 0.8,
+            'tau_phi': 1.0,
+            'periodic_x': True,
+            'periodic_y': True})
 
-        lb_binary.BinaryFluidFreeEnergy.__init__(self, geo_class, options=[], defaults=settings)
 
 if __name__ == '__main__':
-    sim = FESim(GeoFE)
-    sim.run()
+    ctrl = LBSimulationController(SeparationFESim, LBGeometry2D)
+    ctrl.run()

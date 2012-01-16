@@ -17,11 +17,12 @@ class LBForcedSim(LBSim):
         super(LBForcedSim, self).__init__(config)
         self._forces = {}
         self._force_couplings = {}
+        self._force_term_for_eq = {}
 
     # TODO(michalj): Add support for dynamical forces via sympy expressions
     # and for global force fields via numpy arrays.
     def add_body_force(self, force, grid=0, accel=True):
-        """Add a constant global force field acting on the fluid.
+        """Adds a constant global force field acting on the fluid.
 
         Multiple calls to this function will add the value of `force` to any
         previously set value.  Forces and accelerations are processed separately
@@ -45,9 +46,31 @@ class LBForcedSim(LBSim):
         super(LBForcedSim, self).update_context(ctx)
         ctx['forces'] = self._forces
         ctx['force_couplings'] = self._force_couplings
-        ctx['force_for_eq'] = {}
+        ctx['force_for_eq'] = self._force_term_for_eq
+
+    def use_force_for_equlibrium(self, force_grid, target_grid):
+        """Makes it possible acceleration from force_grid when calculating
+        velocity for the equlibrium of target_grid.
+
+        For instance, to use the acceleration from grid 0 in relaxation of
+        grid 1, use the parameters (0, 1).
+
+        To disable acceleration on a grid, pass an invalid grid ID in force_grid
+        (e.g. None or -1).
+
+        :param force_grid: grid ID from which the acceleration will be used
+        :param target_grid: grid ID on which the acceleration will act
+        """
+        self._force_term_for_eq[target_grid] = force_grid
 
     def add_force_coupling(self, grid_a, grid_b, const_name):
+        """Adds a Shan-Chen type coupling between two lattices.
+
+        grid_a: numerical ID of the first lattice
+        grid_b: numerical ID of the second lattice
+        const_name: name of the global variable containing the value of the
+            coupling constant
+        """
         self._force_couplings[(grid_a, grid_b)] = const_name
 
 
@@ -95,7 +118,7 @@ class LBFluidSim(LBSim):
 
     def update_context(self, ctx):
         super(LBFluidSim, self).update_context(ctx)
-        ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0
+        ctx['tau'] = sym.relaxation_time(self.config.visc)
         ctx['visc'] = self.config.visc
         ctx['model'] = self.config.model
         ctx['simtype'] = 'lbm'

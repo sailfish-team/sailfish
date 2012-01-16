@@ -896,6 +896,8 @@ def get_interblock_dists(grid, direction, opposite=False):
             ret.append(i)
     return process_dists(ret)
 
+def relaxation_time(viscosity):
+    return (6.0 * viscosity + 1.0) / 2.0
 #
 # Shan-Chen model.
 #
