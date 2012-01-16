@@ -12,14 +12,14 @@ from sailfish.lb_single import LBForcedSim
 
 
 class CapillaryDomain(Subdomain2D):
-    maxv = 0.005
+    max_v = 0.005
 
     def boundary_conditions(self, hx, hy):
         chan_diam = 32 * self.gy / 200.0
         chan_len = 200 * self.gy / 200.0
         rem_y = (self.gy - chan_diam) / 2
 
-        geometry = np.zeros(list(reversed(self.shape)), dtype=np.bool)
+        geometry = np.zeros(hx.shape, dtype=np.bool)
         geometry[0,:] = True
         geometry[self.gy-1,:] = True
         geometry[np.logical_and(
@@ -35,10 +35,10 @@ class CapillaryDomain(Subdomain2D):
 
     def initial_conditions(self, sim, hx, hy):
         drop_diam = 30 * self.gy / 200.0
-        self.rho[:] = 1.0
-        self.phi[:] = 0.124
-        self.rho[(hx - drop_diam * 2) ** 2 + (hy - self.gy / 2.0)**2 < drop_diam**2] = 0.124
-        self.phi[(hx - drop_diam * 2) ** 2 + (hy - self.gy / 2.0)**2 < drop_diam**2] = 1.0
+        sim.rho[:] = 1.0
+        sim.phi[:] = 0.124
+        sim.rho[(hx - drop_diam * 2) ** 2 + (hy - self.gy / 2.0)**2 < drop_diam**2] = 0.124
+        sim.phi[(hx - drop_diam * 2) ** 2 + (hy - self.gy / 2.0)**2 < drop_diam**2] = 1.0
 
 
 class CapillarySCSim(LBBinaryFluidShanChen, LBForcedSim):
@@ -62,7 +62,7 @@ class CapillarySCSim(LBBinaryFluidShanChen, LBForcedSim):
 
     def __init__(self, config):
         super(CapillarySCSim, self).__init__(config)
-        f1 = self.geo_class.maxv * (8.0 * config.visc) / config.lat_ny
+        f1 = self.subdomain.max_v * (8.0 * config.visc) / config.lat_ny
         self.add_body_force((f1, 0.0), grid=0)
         self.add_body_force((f1, 0.0), grid=1)
 

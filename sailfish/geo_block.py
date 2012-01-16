@@ -357,6 +357,14 @@ class SubdomainSpec(object):
     def update_context(self, ctx):
         ctx['dim'] = self.dim
         ctx['envelope_size'] = self.envelope_size
+        # TODO(michalj): Fix this.
+        # This requires support for ghost nodes in the periodicity code
+        # on the GPU.
+        # ctx['periodicity'] = self._periodicity
+        ctx['periodicity'] = [False, False, False]
+        ctx['periodic_x'] = 0 #int(self._block.periodic_x)
+        ctx['periodic_y'] = 0 #int(self._block.periodic_y)
+        ctx['periodic_z'] = 0 #periodic_z
 
     def enable_local_periodicity(self, axis):
         """Makes the block locally periodic along a given axis."""

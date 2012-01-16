@@ -1,3 +1,8 @@
+## Utility kernels for moving data around on the device.
+## This includes:
+##  - handling periodic boundary conditions via ghost nodes
+##  - collecting data for transfer to other computational nodes
+##  - distribution data received from other computational nodes
 <%!
     from sailfish import sym
 %>
@@ -72,7 +77,7 @@
 					<%
 						done = True
 						# Keep track of the distributions and make sure no distribution
-						# appears with two different conditiosn.
+						# appears with two different conditions.
 						assert i not in done_dists
 						done_dists.add(i)
 					%>
@@ -109,7 +114,7 @@
 					<%
 						done = True
 						# Keep track of the distributions and make sure no distribution
-						# appears with two different conditiosn.
+						# appears with two different conditions.
 						assert i not in done_dists
 						done_dists.add(i)
 					%>
@@ -125,7 +130,7 @@
 	%endfor
 </%def>
 
-// Applies periodic boundary conditions within a single block.
+// Applies periodic boundary conditions within a single subdomain.
 //  dist: pointer to the distributions array
 //  axis: along which axis the PBCs are to be applied (0:x, 1:y, 2:z)
 ${kernel} void ApplyPeriodicBoundaryConditions(
@@ -136,6 +141,7 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 
 	// For single block PBC, the envelope size (width of the ghost node
 	// layer is always 1.
+	// TODO(michalj): Generalize this for the case when envelope_size != 1.
 	%if dim == 2:
 		if (axis == 0) {
 			if (idx1 >= ${lat_ny}) { return; }
@@ -165,6 +171,64 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 			gi_low = getGlobalIdx(idx1, idx2, 0);
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});
 			${pbc_helper(2, lat_nx-2, lat_ny-2)}
+		}
+	%endif
+}
+
+// Applies periodic boundary conditions to a scalar field within a single subdomain.
+//  dist: pointer to the array with the field data
+//  axis: along which axis the PBCs are to be applied (0:x, 1:y, 2:z)
+${kernel} void ApplyMacroPeriodicBoundaryConditions(
+		${global_ptr} float *field, int axis)
+{
+	int idx1 = get_global_id(0);
+	int gi_low, gi_high;
+
+	// TODO(michalj): Generalize this for the case when envelope_size != 1.
+	%if dim == 2:
+		if (axis == 0) {
+			if (idx1 >= ${lat_ny}) { return; }
+			gi_low = getGlobalIdx(0, idx1);					// ghost node
+			gi_high = getGlobalIdx(${lat_nx-2}, idx1);		// real node
+			field[gi_low] = field[gi_high];
+			gi_low = getGlobalIdx(1, idx1);					// real node
+			gi_high = getGlobalIdx(${lat_nx-1}, idx1);		// ghost node
+			field[gi_high] = field[gi_low];
+		} else if (axis == 1) {
+			if (idx1 >= ${lat_nx}) { return; }
+			gi_low = getGlobalIdx(idx1, 0);					// ghost node
+			gi_high = getGlobalIdx(idx1, ${lat_ny-2});		// real node
+			field[gi_low] = field[gi_high];
+			gi_low = getGlobalIdx(idx1, 1);					// real node
+			gi_high = getGlobalIdx(idx1, ${lat_ny-1});		// ghost node
+			field[gi_high] = field[gi_low];
+		}
+	%else:
+		int idx2 = get_global_id(1);
+		if (axis == 0) {
+			if (idx1 >= ${lat_ny} || idx2 >= ${lat_nz}) { return; }
+			gi_low = getGlobalIdx(0, idx1, idx2);				// ghost node
+			gi_high = getGlobalIdx(${lat_nx-2}, idx1, idx2);	// real node
+			field[gi_low] = field[gi_high];
+			gi_low = getGlobalIdx(1, idx1, idx2);				// real node
+			gi_high = getGlobalIdx(${lat_nx-1}, idx1, idx2);	// ghost node
+			field[gi_high] = field[gi_low];
+		} else if (axis == 1) {
+			if (idx1 >= ${lat_nx} || idx2 >= ${lat_nz}) { return; }
+			gi_low = getGlobalIdx(idx1, 0, idx2);				// ghost node
+			gi_high = getGlobalIdx(idx1, ${lat_ny-2}, idx2);	// real node
+			field[gi_low] = field[gi_high];
+			gi_low = getGlobalIdx(idx1, 1, idx2);				// real node
+			gi_high = getGlobalIdx(idx1, ${lat_ny-1}, idx2);	// ghost node
+			field[gi_high] = field[gi_low];
+		} else {
+			if (idx1 >= ${lat_nx} || idx2 >= ${lat_ny}) { return; }
+			gi_low = getGlobalIdx(idx1, idx2, 0);				// ghsot node
+			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});	// real node
+			field[gi_low] = field[gi_high];
+			gi_low = getGlobalIdx(idx1, idx2, 1);				// real node
+			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-1});	// ghost node
+			field[gi_high] = field[gi_low];
 		}
 	%endif
 }

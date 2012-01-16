@@ -23,8 +23,13 @@
 %if simtype == 'shan-chen':
 	${const_var} float tau0 = ${tau}f;		// relaxation time
 %endif
-${const_var} float tau1 = ${tau_phi}f;		// relaxation time for the order parameter
-${const_var} float visc = ${visc}f;		// viscosity
+
+%if simtype == 'shan-chen':
+	// Relaxation time for the 2nd fluid component.
+%else:
+	// Relaxation time for the order parameter field.
+%endif
+${const_var} float tau1 = ${tau_phi}f;
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>

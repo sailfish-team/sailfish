@@ -15,14 +15,14 @@ class RayleighTaylorDomain(Subdomain2D):
                 self.NODE_WALL)
 
     def initial_conditions(self, sim, hx, hy):
-        self.rho[:] = np.random.rand(*self.rho.shape) / 100.0
-        self.phi[:] = np.random.rand(*self.phi.shape) / 100.0
+        sim.rho[:] = np.random.rand(*sim.rho.shape) / 100.0
+        sim.phi[:] = np.random.rand(*sim.phi.shape) / 100.0
 
-        self.rho[(hy <= self.gy / 2)] += 1.0
-        self.phi[(hy <= self.gy / 2)] = 1e-4
+        sim.rho[(hy <= self.gy / 2)] += 1.0
+        sim.phi[(hy <= self.gy / 2)] = 1e-4
 
-        self.rho[(hy > self.gy / 2)] = 1e-4
-        self.phi[(hy > self.gy / 2)] += 1.0
+        sim.rho[(hy > self.gy / 2)] = 1e-4
+        sim.phi[(hy > self.gy / 2)] += 1.0
 
 
 class RayleighTaylorSCSim(LBBinaryFluidShanChen, LBForcedSim):
@@ -36,7 +36,7 @@ class RayleighTaylorSCSim(LBBinaryFluidShanChen, LBForcedSim):
             'grid': 'D2Q9',
             'G': 1.2,
             'visc': 1.0 / 6.0,
-            'periodic_x': False})
+            'periodic_x': True})
 
     @classmethod
     def modify_config(cls, config):

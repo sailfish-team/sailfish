@@ -4,9 +4,13 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+from collections import defaultdict, namedtuple
 import numpy as np
 from sailfish import block_runner, sym, util
 from sailfish.lb_base import LBSim, ScalarField, VectorField
+
+
+BinaryKernels = namedtuple('BinaryKernels', 'distributions macro')
 
 
 class LBBinaryFluidBase(LBSim):
@@ -50,22 +54,52 @@ class LBBinaryFluidBase(LBSim):
                     expr=lambda f: np.square(f['vx']) + np.square(f['vy']) +
                         np.square(f['vz']))]
 
-    # FIXME
     def get_pbc_kernels(self, runner):
         gpu_dist1a = runner.gpu_dist(0, 0)
         gpu_dist1b = runner.gpu_dist(0, 1)
         gpu_dist2a = runner.gpu_dist(1, 0)
         gpu_dist2b = runner.gpu_dist(1, 1)
 
-        kernels = []
-        for i in range(0, 3):
-            kernels.append(runner.get_kernel(
-                'ApplyPeriodicBoundaryConditions', [gpu_dist1a, np.uint32(i)], 'Pi'))
-        for i in range(0, 3):
-            kernels.append(runner.get_kernel(
-                'ApplyPeriodicBoundaryConditions', [gpu_dist1b, np.uint32(i)], 'Pi'))
+        # grid type (primary, secondary) -> axis -> kernels
+        dist_kernels = defaultdict(lambda: defaultdict(list))
+        macro_kernels = defaultdict(lambda: defaultdict(list))
 
-        return kernels
+        for i in range(0, 3):
+            dist_kernels[0][i] = [
+                    runner.get_kernel(
+                        'ApplyPeriodicBoundaryConditions', [gpu_dist1a,
+                            np.uint32(i)], 'Pi'),
+                    runner.get_kernel(
+                        'ApplyPeriodicBoundaryConditions', [gpu_dist2a,
+                            np.uint32(i)], 'Pi')]
+
+            for field_pair in self._scalar_fields:
+                if not field_pair.abstract.need_nn:
+                    continue
+                macro_kernels[0][i].append(
+                        runner.get_kernel('ApplyMacroPeriodicBoundaryConditions',
+                            [runner.gpu_field(field_pair.buffer), np.uint32(i)], 'Pi'))
+
+        for i in range(0, 3):
+            dist_kernels[1][i] = [
+                    runner.get_kernel(
+                        'ApplyPeriodicBoundaryConditions', [gpu_dist1b,
+                            np.uint32(i)], 'Pi'),
+                    runner.get_kernel(
+                        'ApplyPeriodicBoundaryConditions', [gpu_dist2b,
+                            np.uint32(i)], 'Pi')]
+
+            # This is the same as above -- for macroscopic fields, there is no
+            # distinction between primary and secondary buffers.
+            for field_pair in self._scalar_fields:
+                if not field_pair.abstract.need_nn:
+                    continue
+                macro_kernels[1][i].append(
+                        runner.get_kernel('ApplyMacroPeriodicBoundaryConditions',
+                            [runner.gpu_field(field_pair.buffer), np.uint32(i)], 'Pi'))
+
+        ret = BinaryKernels(macro=macro_kernels, distributions=dist_kernels)
+        return ret
 
     def get_compute_kernels(self, runner, full_output, bulk):
         gpu_rho = runner.gpu_field(self.rho)
@@ -131,23 +165,6 @@ class LBBinaryFluidBase(LBSim):
         ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
         ctx['model'] = 'bgk'
 
-    # FIXME
-    def _lbm_step(self, get_data, **kwargs):
-        kerns = self.kern_map[self.iter_ & 1]
-
-        self.backend.run_kernel(kerns[0], self.kern_grid_size)
-        self.backend.sync()
-
-        if get_data:
-            self.backend.run_kernel(kerns[2], self.kern_grid_size)
-            self.backend.sync()
-            self.hostsync_velocity()
-            self.hostsync_density()
-            self.backend.from_buf(self.gpu_phi)
-            self.backend.sync()
-        else:
-            self.backend.run_kernel(kerns[1], self.kern_grid_size)
-
     def _prepare_symbols(self):
         self.S.alias('phi', self.S.g1m0)
 
@@ -161,11 +178,11 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
 
     def constants(self):
         ret = super(LBBinaryFluidFreeEnergy, self).constants()
-        ret['Gamma'] = self.options.Gamma
-        ret['A'] = self.options.A
-        ret['kappa'] = self.options.kappa
-        ret['tau_a'] = self.options.tau_a
-        ret['tau_b'] = self.options.tau_b
+        ret['Gamma'] = self.config.Gamma
+        ret['A'] = self.config.A
+        ret['kappa'] = self.config.kappa
+        ret['tau_a'] = self.config.tau_a
+        ret['tau_b'] = self.config.tau_b
         return ret
 
     @classmethod

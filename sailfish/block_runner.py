@@ -246,12 +246,6 @@ class BlockRunner(object):
         ctx['lat_linear_dist'] = self.lat_linear_dist
         ctx['lat_linear_macro'] = self.lat_linear_macro
 
-        # FIXME(michalj)
-        ctx['periodic_x'] = 0 #int(self._block.periodic_x)
-        ctx['periodic_y'] = 0 #int(self._block.periodic_y)
-        ctx['periodic_z'] = 0 #periodic_z
-        ctx['periodicity'] = [0, 0, 0]
-
         ctx['bnd_limits'] = bnd_limits
         ctx['dist_size'] = self._get_nodes()
         ctx['sim'] = self._sim
@@ -704,46 +698,32 @@ class BlockRunner(object):
 
         return kernel, self._kernel_grid_bulk
 
-    def _apply_pbc(self):
-        if self._sim.iteration & 1:
-            base = 0
-        else:
-            base = 3
+    def _apply_pbc(self, kernels):
+        base = 1 - (self._sim.iteration & 1)
+        ceil = math.ceil
+        ls = self._lat_size
+        bs = self.config.block_size
 
         if self._block.periodic_x:
-            kernel = self._pbc_kernels[base]
             if self._block.dim == 2:
-                grid_size = (
-                        int(math.ceil(self._lat_size[0] /
-                            float(self.config.block_size))), 1)
+                grid_size = (int(ceil(ls[0] / float(bs))), 1)
             else:
-                grid_size = (
-                        int(math.ceil(self._lat_size[1] /
-                            float(self.config.block_size))),
-                        self._lat_size[0])
-
-            self.backend.run_kernel(kernel, grid_size, self._calc_stream)
+                grid_size = (int(ceil(ls[1] / float(bs))), ls[0])
+            for kernel in kernels[base][0]:
+                self.backend.run_kernel(kernel, grid_size, self._calc_stream)
 
         if self._block.periodic_y:
-            kernel = self._pbc_kernels[base + 1]
             if self._block.dim == 2:
-                grid_size = (
-                        int(math.ceil(self._lat_size[1] /
-                            float(self.config.block_size))), 1)
+                grid_size = (int(ceil(ls[1] / float(bs))), 1)
             else:
-                grid_size = (
-                        int(math.ceil(self._lat_size[2] /
-                            float(self.config.block_size))),
-                        self._lat_size[0])
-            self.backend.run_kernel(kernel, grid_size, self._calc_stream)
+                grid_size = (int(ceil(ls[2] / float(bs))), ls[0])
+            for kernel in kernels[base][1]:
+                self.backend.run_kernel(kernel, grid_size, self._calc_stream)
 
         if self._block.dim == 3 and self._block.periodic_z:
-            kernel = self._pbc_kernels[base + 2]
-            grid_size = (
-                    int(math.ceil(self._lat_size[2] /
-                        float(self.config.block_size))),
-                    self._lat_size[1])
-            self.backend.run_kernel(kernel, grid_size, self._calc_stream)
+            grid_size = (int(ceil(ls[2] / float(bs))), ls[1])
+            for kernel in kernels[base][2]:
+                self.backend.run_kernel(kernel, grid_size, self._calc_stream)
 
     def _step_bulk(self, output_req):
         """Runs one simulation step in the bulk domain.
@@ -760,7 +740,7 @@ class BlockRunner(object):
             kernel, grid = self._get_bulk_kernel(output_req)
             self.backend.run_kernel(kernel, grid, self._calc_stream)
 
-        self._apply_pbc()
+        self._apply_pbc(self._pbc_kernels)
         self._timing_calc_end = self.backend.make_event(self._calc_stream, timing=True)
 
     def _step_boundary(self, output_req):
@@ -1299,8 +1279,8 @@ class NNBlockRunner(BlockRunner):
             coll_idx = GPUBuffer(self._get_src_macro_indices(face, cpair), self.backend)
             dist_idx = GPUBuffer(self._get_dst_macro_indices(face, cpair), self.backend)
 
-            for field in self._scalar_fields:
-                if not field.need_nn:
+            for field_pair in self._sim._scalar_fields:
+                if not field_pair.abstract.need_nn:
                     continue
 
                 recv_buf = alloc(cpair.dst.macro_transfer_shape, dtype=self.float)
@@ -1310,7 +1290,7 @@ class NNBlockRunner(BlockRunner):
                         GPUBuffer(coll_buf, self.backend),
                         coll_idx,
                         GPUBuffer(recv_buf, self.backend),
-                        dist_idx, field)
+                        dist_idx, field_pair.buffer)
 
                 self._block_to_macrobuf[block_id].append(cbuf)
 
@@ -1319,7 +1299,7 @@ class NNBlockRunner(BlockRunner):
         if cbuf.coll_idx.host is not None:
             grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
             return KernelGrid(self.get_kernel('CollectSparseData',
-                    [cbuf.coll_idx.gpu, self._gpu_field_map[id(cbuf.field)],
+                    [cbuf.coll_idx.gpu, self.gpu_field(cbuf.field),
                      cbuf.coll_buf.gpu, cbuf.coll_buf.host.size], 'PPPi',
                     (block_size,)), grid_size)
         # Continuous data collection.
@@ -1337,12 +1317,12 @@ class NNBlockRunner(BlockRunner):
             if self.dim == 2:
                 gy = self.lat_linear_macro[cbuf.face]
                 return KernelGrid(self.get_kernel('CollectContinuousMacroData',
-                        [self._gpu_field_map[id(cbuf.field)]] + min_max + [gy,
+                        [self.gpu_field(cbuf.field)] + min_max + [gy,
                          cbuf.coll_buf.gpu], 'PiiiP', (block_size,)),
                          grid_size)
             else:
                 return KernelGrid(self.get_kernel('CollectContinuousMacroData',
-                        [self._gpu_field_map[id(cbuf.field)], cbuf.face] +
+                        [self.gpu_field(cbuf.field), cbuf.face] +
                         min_max + [cbuf.coll_buf.gpu], 'PiiiiiP', (block_size,)),
                         grid_size)
 
@@ -1354,7 +1334,7 @@ class NNBlockRunner(BlockRunner):
         if cbuf.dist_full_idx.host is not None:
             grid_size = (grid_dim1(cbuf.recv_buf.host.size),)
             return KernelGrid(self.get_kernel('DistributeSparseData',
-                        [cbuf.dist_idx.gpu, self._gpu_field[id(cbuf.field)],
+                        [cbuf.dist_idx.gpu, self.gpu_field(cbuf.field),
                          cbuf.recv_buf.gpu, cbuf.recv_buf.host.size], 'PPPi',
                         (block_size,)), grid_size)
         # Continuous data distribution.
@@ -1372,12 +1352,12 @@ class NNBlockRunner(BlockRunner):
             if self.dim == 2:
                 gy = self.lat_linear[cbuf.face]
                 return KernelGrid(self.get_kernel('DistributeContinuousMacroData',
-                        [self._gpu_field_map[id(cbuf.field)]] + min_max + [gy,
+                        [self.gpu_field(cbuf.field)] + min_max + [gy,
                          cbuf.recv_buf.gpu], 'PiiiP', (block_size,)),
                          grid_size)
             else:
                 return KernelGrid(self.get_kernel('DistributeContinuousMacroData',
-                        [self._gpu_field_map[id(cbuf.field)], cbuf.face] +
+                        [self.gpu_field(cbuf.field), cbuf.face] +
                         min_max + [cbuf.recv_buf.gpu], 'PiiiiiP', (block_size,)),
                         grid_size)
 
@@ -1443,6 +1423,8 @@ class NNBlockRunner(BlockRunner):
         if has_boundary_split:
             run(bulk_kernel_macro, grid_bulk, str_calc)
 
+        self._apply_pbc(self._pbc_kernels.macro)
+
         # self._timing_calc_end = make_event(str_calc, timing=True)
 
         self._send_macro()
@@ -1469,7 +1451,7 @@ class NNBlockRunner(BlockRunner):
         if has_boundary_split:
             run(bulk_kernel_sim, grid_bulk, str_calc)
 
-        self._apply_pbc()
+        self._apply_pbc(self._pbc_kernels.distributions)
         self._sim.iteration += 1
 
         self._send_dists()

@@ -14,9 +14,9 @@ class FingeringDomain(Subdomain3D):
         a = 100.0 - 8.0 * np.cos(2.0 * np.pi * hy / self.gy)
         b = 200.0 - 8.0 * np.cos(2.0 * np.pi * hy / self.gy)
 
-        self.rho[:] = 1.0
-        self.phi[:] = 1.0
-        self.phi[np.logical_or(hx <= a, hx >= b)] = -1.0
+        sim.rho[:] = 1.0
+        sim.phi[:] = 1.0
+        sim.phi[np.logical_or(hx <= a, hx >= b)] = -1.0
 
     def boundary_conditions(self, hx, hy, hz):
         self.set_geo(np.logical_or(hz == 0, hz == self.gz - 1), self.NODE_WALL)
