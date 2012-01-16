@@ -4,6 +4,7 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPLv3'
 
+from collections import defaultdict
 import numpy as np
 
 from sailfish import sym, util
@@ -172,13 +173,20 @@ class LBFluidSim(LBSim):
         gpu_dist1a = runner.gpu_dist(0, 0)
         gpu_dist1b = runner.gpu_dist(0, 1)
 
-        kernels = []
+        # grid type (primary, secondary) -> axis -> kernels
+        kernels = defaultdict(lambda: defaultdict(list))
+
+        # One kernel per axis, per grid.  Kernels for 3D are always prepared,
+        # and in 2D simulations the kernel for the Z dimension is simply
+        # ignored.
         for i in range(0, 3):
-            kernels.append(runner.get_kernel(
-                'ApplyPeriodicBoundaryConditions', [gpu_dist1a, np.uint32(i)], 'Pi'))
+            kernels[0][i] = [runner.get_kernel(
+                'ApplyPeriodicBoundaryConditions', [gpu_dist1a, np.uint32(i)],
+                'Pi')]
         for i in range(0, 3):
-            kernels.append(runner.get_kernel(
-                'ApplyPeriodicBoundaryConditions', [gpu_dist1b, np.uint32(i)], 'Pi'))
+            kernels[1][i] = [runner.get_kernel(
+                'ApplyPeriodicBoundaryConditions', [gpu_dist1b, np.uint32(i)],
+                'Pi')]
 
         return kernels
 

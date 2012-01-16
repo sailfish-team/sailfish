@@ -11,8 +11,8 @@ from sailfish.lb_single import LBForcedSim
 
 class SeparationDomain(Subdomain2D):
     def initial_conditions(self, sim, hx, hy):
-        self.rho[:] = 1.0
-        self.phi[:] = np.random.rand(*self.phi.shape) / 100.0
+        sim.rho[:] = 1.0
+        sim.phi[:] = np.random.rand(*sim.phi.shape) / 100.0
 
     def boundary_conditions(self, hx, hy):
         pass

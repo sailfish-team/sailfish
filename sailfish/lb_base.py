@@ -1,11 +1,15 @@
 """Base class for all lattice Boltzman simulations in Sailfish."""
 
+from collections import namedtuple
 from sailfish import sym
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL'
 __version__ = '0.3-alpha1'
+
+
+FieldPair = namedtuple('FieldPair', 'abstract buffer')
 
 
 class LBSim(object):
@@ -55,13 +59,17 @@ class LBSim(object):
 
     def init_fields(self, runner):
         suffixes = ['x', 'y', 'z']
+        self._scalar_fields = []
+        self._vector_fields = []
         for field in self.fields():
             if type(field) is ScalarField:
                 f = runner.make_scalar_field(name=field.name, async=True)
                 setattr(self, field.name, f)
+                self._scalar_fields.append(FieldPair(field, f))
             elif type(field) is VectorField:
                 f = runner.make_vector_field(name=field.name, async=True)
                 setattr(self, field.name, f)
+                self._vector_fields.append(FieldPair(field, f))
                 for i in range(0, self.grid.dim):
                     setattr(self, field.name + suffixes[i], f[i])
 
