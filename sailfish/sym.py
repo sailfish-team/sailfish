@@ -1080,16 +1080,36 @@ def gcd(*terms):
 
 
 def needs_coupling_accel(i, force_couplings):
+    """Returns True is a grid is coupled to any other grid.
+
+    :param i: grid ID
+    :param force_couplings: see fluid_accel()
+    """
     return (i in
         reduce(lambda x, y: operator.add(x, [y[0], y[1]]), force_couplings.keys(), []))
 
 def needs_accel(i, forces, force_couplings):
+    """Returns True if there a force acting on a grid.
+
+    :param i: grid ID
+    :param forces: see fluid_accel()
+    :param force_couplings: see fluid_accel()
+    """
     return (i in forces) or needs_coupling_accel(i, force_couplings)
 
-def fluid_accel(sim, i, dim, forces, force_couplings):
+def fluid_accel(sim, i, axis, forces, force_couplings):
+    """
+    :param sim: simulation object
+    :param i: grid ID
+    :param axis: base axis for the output vector
+    :param forces: dict: grid ID -> dict(accel -> value); accel is a boolean
+        indicating whether value is a force or acceleration
+    :param force_couplings: dict mapping pairs of grid IDs to the name of a
+        Shan-Chen coupling constant
+    """
     if needs_accel(i, forces, force_couplings):
         ea = accel_vector(sim.grid, i)
-        return ea[dim]
+        return ea[axis]
     else:
         return 0.0
 

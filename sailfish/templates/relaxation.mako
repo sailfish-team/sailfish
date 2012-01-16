@@ -115,6 +115,10 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 }
 % endif	## model == mrt
 
+## TODO(michalj): Split this function into two.
+## igrid: grid ID
+## equilibrium: if True, calculate velocity for the equilibrium distribution
+## save: if True, calculate velocity for the simulation output
 <%def name="fluid_velocity(igrid, equilibrium=False, save=False)">
 	%if save:
 		## For now, we assume a single fluid velocity regardless of the number of
