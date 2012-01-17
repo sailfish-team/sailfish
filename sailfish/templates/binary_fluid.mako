@@ -170,61 +170,63 @@ ${kernel} void PrepareMacroFields(
 			ophi[gi] = out;
 		}
 
-		int helper_idx = gi;
-		// Assume neutral wetting for all walls by adjusting the phase gradient
-		// near the wall.
-		//
-		// This wetting boundary condition implementation is as in option 2 in
-		// Halim Kusumaatmaja's PhD thesis, p.18.
-		if (isWallNode(type)) {
-			switch (orientation) {
-				%for dir in grid.dir2vecidx.keys():
-					## Symbols used on the schematics below:
-					##
-					## W: wall node (current node, pointed to by 'gi')
-					## F: fluid node
-					## |: actual location of the wall
-					## .: space between fluid nodes
-					## x: node from which data is read
-					## y: node to which data is being written
-					##
-					## The schematics assume a bc_wall_grad_order of 2.
-					case ${dir}: {
-						## Full BB: F . F | W
-						##          x ----> y
-						%if bc_wall == 'fullbb':
-							%if dim == 3:
-								helper_idx += ${rel_offset(*(bc_wall_grad_order*grid.dir_to_vec(dir)))};
+		%if bc_wall != None:
+			int helper_idx = gi;
+			// Assume neutral wetting for all walls by adjusting the phase gradient
+			// near the wall.
+			//
+			// This wetting boundary condition implementation is as in option 2 in
+			// Halim Kusumaatmaja's PhD thesis, p.18.
+			if (isWallNode(type)) {
+				switch (orientation) {
+					%for dir in grid.dir2vecidx.keys():
+						## Symbols used on the schematics below:
+						##
+						## W: wall node (current node, pointed to by 'gi')
+						## F: fluid node
+						## |: actual location of the wall
+						## .: space between fluid nodes
+						## x: node from which data is read
+						## y: node to which data is being written
+						##
+						## The schematics assume a bc_wall_grad_order of 2.
+						case ${dir}: {
+							## Full BB: F . F | W
+							##          x ----> y
+							%if bc_wall == 'fullbb':
+								%if dim == 3:
+									helper_idx += ${rel_offset(*(bc_wall_grad_order*grid.dir_to_vec(dir)))};
+								%else:
+									## rel_offset() needs a 3-vector, so make the z-coordinate 0
+									helper_idx += ${rel_offset(*(list(bc_wall_grad_order*grid.dir_to_vec(dir)) + [0]))};
+								%endif
+							## Full BB: F . W | U
+							##          x ----> y
+							%elif bc_wall == 'halfbb' and bc_wall_grad_order == 1:
+								%if dim == 3:
+									helper_idx -= ${rel_offset(*(grid.dir_to_vec(dir)))};
+								%else:
+									helper_idx -= ${rel_offset(*(list(grid.dir_to_vec(dir)) + [0]))};
+								%endif
 							%else:
-								## rel_offset() needs a 3-vector, so make the z-coordinate 0
-								helper_idx += ${rel_offset(*(list(bc_wall_grad_order*grid.dir_to_vec(dir)) + [0]))};
+								WETTING_BOUNDARY_CONDITIONS_UNSUPPORTED_FOR_${bc_wall}_AND_GRAD_ORDER_${bc_wall_grad_order}
 							%endif
-						## Full BB: F . W | U
-						##          x ----> y
-						%elif bc_wall == 'halfbb' and bc_wall_grad_order == 1:
-							%if dim == 3:
-								helper_idx -= ${rel_offset(*(grid.dir_to_vec(dir)))};
-							%else:
-								helper_idx -= ${rel_offset(*(list(grid.dir_to_vec(dir)) + [0]))};
-							%endif
-						%else:
-							WETTING_BOUNDARY_CONDITIONS_UNSUPPORTED_FOR_${bc_wall}_AND_GRAD_ORDER_${bc_wall_grad_order}
-						%endif
-						break;
-					}
-				%endfor
-			}
+							break;
+						}
+					%endfor
+				}
 
-			%if bc_wall == 'halfbb':
-				ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-			%elif bc_wall == 'fullbb':
-				getDist(&fi, dist2_in, helper_idx);
-				get0thMoment(&fi, type, orientation, &out);
-				ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-			%else:
-				__UNIMPLEMENTED__
-			%endif
-		}
+				%if bc_wall == 'halfbb':
+					ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+				%elif bc_wall == 'fullbb':
+					getDist(&fi, dist2_in, helper_idx);
+					get0thMoment(&fi, type, orientation, &out);
+					ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+				%else:
+					__UNIMPLEMENTED__
+				%endif
+			}
+		%endif
 	%else:
 		getDist(&fi, dist2_in, gi);
 		get0thMoment(&fi, type, orientation, &out);
