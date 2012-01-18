@@ -2,6 +2,8 @@
 	from sailfish import sym
 %>
 
+<%namespace file="utils.mako" import="get_field_off"/>
+
 <%def name="sc_calculate_accel()">
 ##
 ## Declare and evaluate the Shan-Chen accelerations.
@@ -58,11 +60,12 @@
 	%endfor
 </%def>
 
-<%def name="get_field_loc(xoff, yoff, zoff)">
-	nx = x + ${xoff};
-	ny = y + ${yoff};
+<%def name="get_field_loc(xoff, yoff, zoff=0)">
+{
+	int nx = x + ${xoff};
+	int ny = y + ${yoff};
 	%if dim == 3:
-		nz = z + ${zoff};
+		int nz = z + ${zoff};
 	%endif
 
 	%if xoff != 0:
@@ -120,6 +123,7 @@
 	%else:
 		gi = getGlobalIdx(nx, ny, nz);
 	%endif
+}
 </%def>
 
 // Calculates the Shan-Chan pseudopotential.
@@ -143,9 +147,8 @@ ${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, 
 		a1[${i}] = 0.0f;
 	%endfor
 
-	int nx, ny;
-	%if dim == 3:
-		int nz;
+	%if block.envelope_size != 0:
+		int off;
 	%endif
 
 	int gi;		// global index
@@ -153,10 +156,11 @@ ${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, 
 	%for i, ve in enumerate(grid.basis):
 		%if ve.dot(ve) != 0.0:
 			// ${ve}
-			%if dim == 3:
-				${get_field_loc(ve[0], ve[1], ve[2])};
+			%if block.envelope_size == 0:
+				${get_field_loc(*ve)};
 			%else:
-				${get_field_loc(ve[0], ve[1], 0)};
+				${get_field_off(*ve)}
+				gi = i + off;
 			%endif
 
 			t1 = sc_ppot(f1, gi);
@@ -174,12 +178,6 @@ ${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, 
 	%endfor
 
 	// Local node -- no offset.
-	nx = x;
-	ny = y;
-	%if dim == 3:
-		nz = z;
-	%endif
-
 	t1 = sc_ppot(f1, i);
 
 	%for i in range(0, dim):
@@ -210,9 +208,8 @@ float cc, float *a1, float *a2, int x, int y
 		a2[${i}] = 0.0f;
 	%endfor
 
-	int nx, ny;
-	%if dim == 3:
-		int nz;
+	%if block.envelope_size != 0:
+		int off;
 	%endif
 
 	int gi;		// global index
@@ -220,10 +217,11 @@ float cc, float *a1, float *a2, int x, int y
 	%for i, ve in enumerate(grid.basis):
 		%if ve.dot(ve) != 0.0:
 			// ${ve}
-			%if dim == 3:
-				${get_field_loc(ve[0], ve[1], ve[2])};
+			%if block.envelope_size == 0:
+				${get_field_loc(*ve)};
 			%else:
-				${get_field_loc(ve[0], ve[1], 0)};
+				${get_field_off(*ve)}
+				gi = i + off;
 			%endif
 
 			t1 = sc_ppot(f1, gi);
@@ -245,12 +243,6 @@ float cc, float *a1, float *a2, int x, int y
 	%endfor
 
 	// Local node -- no offset.
-	nx = x;
-	ny = y;
-	%if dim == 3:
-		nz = z;
-	%endif
-
 	t1 = sc_ppot(f1, i);
 	t2 = sc_ppot(f2, i);
 
