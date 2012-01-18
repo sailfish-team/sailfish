@@ -13,17 +13,17 @@ import tempfile
 
 from examples.lbm_ldc_multi import LDCGeometry, LDCBlock, LDCSim
 from sailfish.controller import LBSimulationController
-from sailfish import geo
-from sailfish import geo_block
 
 tmpdir = tempfile.mkdtemp()
-MAX_ITERS = 1000000
+
 LAT_NX = 512
 LAT_NY = 512
 output = ''
 RE = 1000
+MAX_ITERS = 500000
 
-reynolds = [1000, 2500, 5000]
+max_iters = [500000, 1000000, 2000000, 3000000, 4000000, 4500000, 4500000, 5500000, 5500000, 6000000]
+reynolds = [1000, 2500, 5000, 7500, 10000, 12500, 15000, 17500, 20000, 21000]
 name = 'ldc2d'
 
 
@@ -37,12 +37,12 @@ class TestLDCSim(LDCSim):
             'max_iters': MAX_ITERS,
             'lat_nx': LAT_NX,
             'lat_ny': LAT_NY,
-            'output': os.path.join(tmpdir,'result')})        
+            'output': os.path.join(tmpdir, 'result')})        
 	
     @classmethod
     def modify_config(cls, config):
         print config.re
-        config.visc = (config.lat_nx-2) * LDCBlock.max_v / config.re
+        config.visc = (config.lat_nx - 2) * LDCBlock.max_v / config.re
         config.every = config.max_iters - 1
 	
         # Protection in the event of max_iters changes from the command line.
@@ -52,12 +52,12 @@ class TestLDCSim(LDCSim):
     @classmethod
     def add_options(cls, group, dim):
         LDCSim.add_options(group, dim)
-        group.add_argument('--re', dest="re", help = 'Reynolds number', type=int, default=RE)
+        group.add_argument('--re', dest="re", help='Reynolds number', type=int, default=RE)
 
 
 def save_output(basepath):
     name_digits = str(int(math.log10(MAX_ITERS)) + 1)
-    opt = ('%s_blk0_%0' + name_digits+ 'd'+'.npz') % (tmpdir+"/result", MAX_ITERS-1)
+    opt = ('%s_blk0_%0' + name_digits+ 'd' + '.npz') % (os.path.join(tmpdir, 'result'), MAX_ITERS - 1)
     href = np.load(opt)
 
     hrho = href['rho']
@@ -72,8 +72,8 @@ def save_output(basepath):
     res_vx = (vx[:, nxh] + vx[:, nxh-1]) / 2 / LDCBlock.max_v
     res_vy = (vy[nyh, :] + vy[nyh-1, :]) / 2 / LDCBlock.max_v
     
-    plt.plot(res_vx, np.linspace(-1.0, 1.0, lat_ny) , label='Sailfish')
-    plt.plot(np.linspace(-1.0, 1.0, lat_nx), res_vy, label='Sailfish ')
+    plt.plot(res_vx, np.linspace(-1.0, 1.0, lat_ny), label='Sailfish')
+    plt.plot(np.linspace(-1.0, 1.0, lat_nx), res_vy, label='Sailfish')
 
     np.savetxt(os.path.join(basepath, 'vx.dat'), res_vx)
     np.savetxt(os.path.join(basepath, 'vy.dat'), res_vy)
@@ -82,6 +82,8 @@ def save_output(basepath):
 def run_test(name, i):   
     global RE 
     RE = reynolds[i]
+    global MAX_ITERS
+    MAX_ITERS = max_iters[i]
     basepath = os.path.join('results', name, 're%s' % RE)
     if not os.path.exists(basepath):
         os.makedirs(basepath)
@@ -91,8 +93,8 @@ def run_test(name, i):
     horiz = np.loadtxt('ldc_golden/vx2d', skiprows=1)
     vert = np.loadtxt('ldc_golden/vy2d', skiprows=1)
     
-    plt.plot(horiz[:,0]*2-1, horiz[:,i+1]  , label='Paper')
-    plt.plot(vert[:,i+1],2 * (vert[:,0] - 0.5) , label='Paper')
+    plt.plot(horiz[:, 0] * 2 - 1, horiz[:, i+1], label='Paper')
+    plt.plot(vert[:, i+1], 2 * (vert[:, 0] - 0.5), label='Paper')
     save_output(basepath)
     plt.legend(loc='lower right')
     plt.gca().yaxis.grid(True)
@@ -100,15 +102,15 @@ def run_test(name, i):
     plt.gca().xaxis.grid(True, which='minor')
     plt.gca().yaxis.grid(True, which='minor')
 
-    plt.title('Lid Driven Cavity, Re = %s'% RE)
+    plt.title('Lid Driven Cavity, Re = %s' % RE)
     print os.path.join(basepath, 'results.pdf')
-    plt.savefig(os.path.join(basepath,'results.pdf'), format='pdf')
+    plt.savefig(os.path.join(basepath, 'results.pdf'), format='pdf')
 	
     plt.clf()
     plt.cla()
     plt.show()
     
  
-for i in range(3):
+for i in range(10):
     run_test(name, i)
 shutil.rmtree(tmpdir)
