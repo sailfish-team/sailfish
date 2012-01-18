@@ -18,6 +18,7 @@ class LBBinaryFluidBase(LBSim):
 
     subdomain_runner = block_runner.NNBlockRunner
     kernel_file = 'binary_fluid.mako'
+    nonlocality = 1
 
     def __init__(self, config):
         super(LBBinaryFluidBase, self).__init__(config)
