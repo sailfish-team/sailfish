@@ -18,22 +18,57 @@
 		else:
 			offset = arr_nx * arr_ny
 
+		# Maps axis number to a list of other axes.
 		other_axes = [[1,2], [0,2], [0,1]]
+
+		def handle_corners(basis, axis_target):
+			if basis[axis] == 0:
+				return None, None
+
+			if dim == 2:
+				other = [1 - axis]
+			else:
+				other = other_axes[axis]
+
+			conditions = []
+			target = [''] * dim
+			target[axis] = str(axis_target)
+
+			for i, other_ax in enumerate(other):
+				if basis[other_ax] == 0 or not block_periodicity[other_ax]:
+					target[other_ax] = 'idx%d' % (i + 1)
+					continue
+
+				if basis[other_ax] == 1:
+					conditions.append('idx%d == %d' % ((i + 1), bnd_limits[other_ax] - 1))
+					target[other_ax] = '1'
+				elif basis[other_ax] == -1:
+					conditions.append('idx%d == 0' % (i + 1))
+					target[other_ax] = str(bnd_limits[other_ax] - 2)
+
+			return ' && '.join(conditions), ', '.join(target)
+
 
 		def make_cond_to_dists(axis_direction):
 			direction = [0] * dim
 			direction[axis] = axis_direction
 
+			# Maps condition (string) to a list of distributions.  The condition
+			# has to be satisfied in order for the distributions to filled in the
+			# source node.
 			cond_to_dists = {}
 
 			if dim == 2:
 				direction[1 - axis] = 1
 				corner_dists = sym.get_interblock_dists(grid, direction)
-				cond_to_dists['idx1 > 1'] = corner_dists
+				cond_to_dists['idx1 > 1 && idx1 <= {0}'.format(max_dim)] = corner_dists
+
 				direction[1 - axis] = -1
 				corner_dists = sym.get_interblock_dists(grid, direction)
-				cond_to_dists['idx1 < {0}'.format(max_dim)] = corner_dists
+				cond_to_dists['idx1 < {0} && idx1 >= 1'.format(max_dim)] = corner_dists
 			else:
+				# Covers full NN connectivity in 3D.  Needs to be extended for
+				# models with a higher level of connectivity.
 				for i in (1, 0, -1):
 					for j in (1, 0, -1):
 						if i == 0 and j == 0:
@@ -43,13 +78,13 @@
 						corner_dists = sym.get_interblock_dists(grid, direction)
 						conds = []
 						if i == 1:
-							conds.append('idx1 > 1')
+							conds.append('idx1 > 1 && idx1 <= {0}'.format(max_dim))
 						elif i == -1:
-							conds.append('idx1 < {0}'.format(max_dim))
+							conds.append('idx1 < {0} && idx1 >= 1'.format(max_dim))
 						if j == 1:
-							conds.append('idx2 > 1')
+							conds.append('idx2 > 1 && idx2 <= {0}'.format(max_dim2))
 						elif j == -1:
-							conds.append('idx2 < {0}'.format(max_dim2))
+							conds.append('idx2 < {0} && idx2 >= 1'.format(max_dim2))
 						cond = ' && '.join(conds)
 						cond_to_dists[cond] = corner_dists
 
@@ -74,6 +109,13 @@
 					if (${cond}) {
 						${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
 					}
+					<% corner_cond, target = handle_corners(grid.basis[i], bnd_limits[axis] - 2) %>
+					%if corner_cond:
+						else if (${corner_cond}) {
+							int gi_high2 = getGlobalIdx(${target});
+							${get_dist('dist', i, 'gi_high2')} = f${grid.idx_name[i]};
+						}
+					%endif
 					<%
 						done = True
 						# Keep track of the distributions and make sure no distribution
@@ -111,6 +153,13 @@
 					if (${cond}) {
 						${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
 					}
+					<% corner_cond, target = handle_corners(grid.basis[i], 1) %>
+					%if corner_cond:
+						else if (${corner_cond}) {
+							int gi_low2 = getGlobalIdx(${target});
+							${get_dist('dist', i, 'gi_low2')} = f${grid.idx_name[i]};
+						}
+					%endif
 					<%
 						done = True
 						# Keep track of the distributions and make sure no distribution
@@ -140,7 +189,7 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 	int gi_low, gi_high;
 
 	// For single block PBC, the envelope size (width of the ghost node
-	// layer is always 1.
+	// layer) is always 1.
 	// TODO(michalj): Generalize this for the case when envelope_size != 1.
 	%if dim == 2:
 		if (axis == 0) {

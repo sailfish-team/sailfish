@@ -235,11 +235,15 @@ class BlockRunner(object):
             ctx['lat_nz'] = self._lat_size[-3]
             ctx['arr_nz'] = self._physical_size[-3]
             periodic_z = int(self._block.periodic_z)
+            ctx['block_periodicity'] = [self._block.periodic_x,
+                    self._block.periodic_y, self._block.periodic_z]
         else:
             ctx['lat_nz'] = 1
             ctx['arr_nz'] = 1
             periodic_z = 0
             bnd_limits.append(1)
+            ctx['block_periodicity'] = [self._block.periodic_x,
+                    self._block.periodic_y, False]
 
         ctx['boundary_size'] = self._boundary_size
         ctx['lat_linear'] = self.lat_linear

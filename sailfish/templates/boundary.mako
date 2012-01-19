@@ -4,7 +4,6 @@
 
 <%namespace file="code_common.mako" import="*"/>
 <%namespace file="propagation.mako" import="rel_offset,get_odist"/>
-<%namespace file="utils.mako" import="get_field_off,nonlocal_fld,fld_args"/>
 
 <%def name="noneq_bb(orientation)">
 	case ${orientation}:

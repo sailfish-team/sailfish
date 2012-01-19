@@ -56,6 +56,7 @@ class BlockTest(Subdomain2D):
 block_size = 64
 tmpdir = None
 periodic_x = False
+periodic_y = False
 vi = lambda x, y: D2Q9.vec_idx([x, y])
 
 class SimulationTest(LBFluidSim, LBForcedSim):
@@ -63,9 +64,9 @@ class SimulationTest(LBFluidSim, LBForcedSim):
 
     @classmethod
     def modify_config(cls, config):
-        global periodic_x
         config.relaxation_enabled = False
         config.periodic_x = periodic_x
+        config.periodic_y = periodic_y
 
     @classmethod
     def update_defaults(cls, defaults):
@@ -102,8 +103,9 @@ class SimulationTest(LBFluidSim, LBForcedSim):
 
 class PeriodicPropagationTest(unittest.TestCase):
     def setUp(self):
-        global periodic_x
+        global periodic_x, periodic_y
         periodic_x = True
+        periodic_y = False
 
     def test_horiz_spread(self):
         global tmpdir
@@ -219,11 +221,40 @@ class PeriodicPropagationTest(unittest.TestCase):
         ae(b0[vi(1, 1), 1, 1], np.float32(0.77))
         ae(b0[vi(-1, -1), 256, 256], np.float32(0.66))
 
+    # Single block, periodic in both X and Y.
+    def test_corner_global_periodic(self):
+        global tmpdir, periodic_y
+        periodic_y = True
+
+        def ic(self, runner):
+            dbuf = runner._debug_get_dist()
+            dbuf[:] = 0.0
+            dbuf[vi(1, 1), 256, 256] = 0.11
+            dbuf[vi(-1, -1), 1, 1] = 0.12
+            dbuf[vi(1, -1), 1, 256] = 0.13
+            dbuf[vi(-1, 1), 256, 1] = 0.14
+            runner._debug_set_dist(dbuf)
+            runner._debug_set_dist(dbuf, False)
+
+        CornerTest = type('CornerTest', (SimulationTest,),
+                {'initial_conditions': ic})
+        ctrl = LBSimulationController(CornerTest)
+        ctrl.run()
+
+        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
+        ae = np.testing.assert_equal
+
+        ae(b0[vi(1, 1), 1, 1], np.float32(0.11))
+        ae(b0[vi(-1, -1), 256, 256], np.float32(0.12))
+        ae(b0[vi(1, -1), 256, 1], np.float32(0.13))
+        ae(b0[vi(-1, 1), 1, 256], np.float32(0.14))
+
 
 class TestCornerPropagation(unittest.TestCase):
     def setUp(self):
-        global periodic_x
+        global periodic_x, periodic_y
         periodic_x = False
+        periodic_y = False
 
     def test_4corners(self):
         global tmpdir
