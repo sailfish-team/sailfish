@@ -57,6 +57,7 @@ regtest:
 	python regtest/blocks/2d_cylinder.py
 	python regtest/blocks/3d_propagation.py
 	python regtest/blocks/3d_ldc.py
+	python regtest/blocks/binary_pbc.py
 
 # Necessary to trigger bulk/boundary split code.
 regtest_small_block:

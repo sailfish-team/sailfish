@@ -37,7 +37,7 @@
 </%def>
 
 <%def name="sc_macro_fields()">
-	// Calculate the density and velocity for the Shan-Chen coupled fields.
+	// Calculates the density and velocity for the Shan-Chen coupled fields.
 	// Density and velocity become weighted averages of the values for invidual components.
 	float total_dens;
 
@@ -51,7 +51,7 @@
 		total_dens += g${x}m0 / tau${x};
 	%endfor
 
-	// Transfer momentum and force into velocity and acceleration.
+	// Convert momentum and force into velocity and acceleration.
 	%for i in range(0, dim):
 		%for x in set(sum(force_couplings.keys(), ())):
 			sca${x}[${i}] /= g${x}m0;
@@ -67,9 +67,10 @@ ${device_func} inline float sc_ppot(${global_ptr} float *field, int gi)
 	return ${sym.SHAN_CHEN_POTENTIALS[sc_potential]('lfield')};
 }
 
-// Calculates the Shan-Chen force between a single fluid components (self-interaction).
+// Calculates the Shan-Chen force between a single fluid component (self-interaction).
 // The form of the interaction is the same as that of a force between two components (see below).
-${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1, float cc, float *a1, int x, int y
+${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1,
+		float cc, float *a1, int x, int y
 %if dim == 3:
 	, int z
 %endif

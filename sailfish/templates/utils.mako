@@ -123,22 +123,3 @@
 	%endif
 }
 </%def>
-
-<%def name="fld_args()">
-	nx, ny
-	%if dim == 3:
-		, nz
-	%endif
-</%def>
-
-<%def name="fld_arg_decl()">
-	int nx, int ny
-	%if dim == 3:
-		, int nz
-	%endif
-</%def>
-
-<%def name="nonlocal_fld(fld_id)">
-	f${fld_id}[idx]
-</%def>
-

@@ -3,6 +3,8 @@
     import sympy
 %>
 
+extern int printf (__const char *__restrict __format, ...);
+
 <%def name="bgk_args_decl_sc()">
 	float rho, float phi, float *iv0, float *ea0, float *ea1
 </%def>
