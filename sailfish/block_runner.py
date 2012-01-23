@@ -1033,10 +1033,10 @@ class BlockRunner(object):
         self.config.logger.info("Initializing block.")
 
         self._init_geometry()
+        self._sim.init_fields(self)
         self._init_buffers()
         self._init_compute()
         self.config.logger.debug("Initializing macroscopic fields.")
-        self._sim.init_fields(self)
         self._subdomain.init_fields(self._sim)
         self._init_gpu_data()
         self.config.logger.debug("Applying initial conditions.")
@@ -1335,7 +1335,7 @@ class NNBlockRunner(BlockRunner):
         kernels = []
 
         # Sparse data distribution.
-        if cbuf.dist_full_idx.host is not None:
+        if cbuf.dist_idx.host is not None:
             grid_size = (grid_dim1(cbuf.recv_buf.host.size),)
             return KernelGrid(self.get_kernel('DistributeSparseData',
                         [cbuf.dist_idx.gpu, self.gpu_field(cbuf.field),
