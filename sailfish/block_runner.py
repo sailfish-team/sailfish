@@ -297,9 +297,18 @@ class BlockRunner(object):
 
         field = np.ndarray(self._physical_size, buffer=buf,
                            dtype=dtype, strides=strides)
+
+        # Initialize floating point fields to inf to help surfacing problems
+        # with uninitialized nodes.
+        if dtype == self.float:
+            field[:] = np.inf
+
         assert field.base is buf
         fview = field[self._block._nonghost_slice]
         assert fview.base is field
+
+        # Zero the non-ghost part of the field.
+        fview[:] = 0
 
         if name is not None and register:
             self._output.register_field(fview, name)
@@ -1269,7 +1278,7 @@ class NNBlockRunner(BlockRunner):
 
     def _get_dst_macro_indices(self, face, cpair):
         if face in (self._block.X_LOW, self._block.X_HIGH):
-            gx = self.lat_linear[self._block.opposite_face(face)]
+            gx = self.lat_linear[face]
         else:
             return None
         return self._macro_idx_helper(gx, cpair.src.dst_macro_slice)
@@ -1418,7 +1427,6 @@ class NNBlockRunner(BlockRunner):
         else:
             run(bulk_kernel_macro, grid_bulk, str_calc)
         self._timing_bnd_stop = make_event(str_calc, timing=True)
-
         str_data.wait_for_event(self._timing_bnd_stop)
 
         for kernel, grid in self._macro_collect_kernels:
@@ -1440,8 +1448,12 @@ class NNBlockRunner(BlockRunner):
 
         self._recv_macro()
 
+        str_data.wait_for_event(self._timing_bnd_stop)
         for kernel, grid in self._macro_distrib_kernels:
             run(kernel, grid, str_data)
+
+        self._timing_macro_done = make_event(str_data, timing=True)
+        str_calc.wait_for_event(self._timing_macro_done)
 
         # Actual simulation step.
         if has_boundary_split:

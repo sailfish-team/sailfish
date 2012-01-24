@@ -15,7 +15,7 @@ class SeparationDomain(Subdomain2D):
 
     def boundary_conditions(self, hx, hy):
         wall_map = np.logical_or(np.logical_or(hx == 0, hy == 0),
-                     np.logical_or(hx == self.gx, hy == self.gy))
+                     np.logical_or(hx == self.gx-1, hy == self.gy-1))
         self.set_node(wall_map, self.NODE_WALL)
 
 class SeparationSCSim(LBBinaryFluidShanChen, LBForcedSim):
