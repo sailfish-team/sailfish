@@ -11,6 +11,7 @@ from sailfish import sym, util
 from sailfish.lb_base import LBSim, ScalarField, VectorField
 
 
+# TODO(michalj): Move this to lb_base.
 class LBForcedSim(LBSim):
     """Adds support for body forces."""
 

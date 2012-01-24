@@ -14,7 +14,9 @@ class SeparationDomain(Subdomain2D):
         sim.phi[:] = 1.0 + np.random.rand(*sim.phi.shape) / 1000.0
 
     def boundary_conditions(self, hx, hy):
-        pass
+        wall_map = np.logical_or(np.logical_or(hx == 0, hy == 0),
+                     np.logical_or(hx == self.gx, hy == self.gy))
+        self.set_node(wall_map, self.NODE_WALL)
 
 class SeparationSCSim(LBBinaryFluidShanChen, LBForcedSim):
     subdomain = SeparationDomain
@@ -27,8 +29,8 @@ class SeparationSCSim(LBBinaryFluidShanChen, LBForcedSim):
             'grid': 'D2Q9',
             'G': 1.2,
             'visc': 1.0/6.0,
-            'periodic_x': True,
-            'periodic_y': True})
+            'periodic_x': False,
+            'periodic_y': False})
 
 
 if __name__ == '__main__':

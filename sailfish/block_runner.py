@@ -633,8 +633,9 @@ class BlockRunner(object):
         self.config.logger.debug("Initializing compute unit.")
         code = self._get_compute_code()
         self.module = self.backend.build(code)
+        self._init_streams()
 
-        # Streams
+    def _init_streams(self):
         self._data_stream = self.backend.make_stream()
         self._calc_stream = self.backend.make_stream()
 
@@ -807,7 +808,7 @@ class BlockRunner(object):
                 # order of subbuffers in the recv buffer.  Note that this implicitly
                 # assumes the order of conn_bufs is the same for both blocks.
                 # TODO(michalj): Consider explicitly sorting conn_bufs.
-                for cbuf in util.reverse_pairs(conn_bufs):
+                for cbuf in util.reverse_pairs(conn_bufs, len(self._sim.grids)):
                     l = cbuf.recv_buf.size
                     cbuf.recv_buf[:] = dest[i:i+l].reshape(cbuf.recv_buf.shape)
                     i += l
@@ -1221,7 +1222,7 @@ class NNBlockRunner(BlockRunner):
                 if not connector.recv(dest, self._quit_event):
                     return
                 i = 0
-                for cbuf in util.reverse_pairs(conn_bufs):
+                for cbuf in util.reverse_pairs(conn_bufs, self._num_nn_fields):
                     l = cbuf.recv_buf.host.size
                     cbuf.recv_buf.host[:] = dest[i:i+l].reshape(cbuf.recv_buf.host.shape)
                     i += l
@@ -1278,6 +1279,8 @@ class NNBlockRunner(BlockRunner):
 
         alloc = self.backend.alloc_async_host_buf
         self._block_to_macrobuf = defaultdict(list)
+        self._num_nn_fields = sum((1 for fpair in self._sim._scalar_fields if
+            fpair.abstract.need_nn))
         for face, block_id in self._block.connecting_blocks():
             cpair = self._block.get_connection(face, block_id)
             coll_idx = GPUBuffer(self._get_src_macro_indices(face, cpair), self.backend)
@@ -1463,7 +1466,7 @@ class NNBlockRunner(BlockRunner):
             return False
 
         self._recv_dists()
-        for kernel, grid in self._distrib_kernels[it & 1]:
+        for kernel, grid in self._distrib_kernels[(it + 1) & 1]:
             run(kernel, grid, str_data)
 
         return True
