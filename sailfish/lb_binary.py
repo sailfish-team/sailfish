@@ -8,7 +8,7 @@ from collections import defaultdict, namedtuple
 import numpy as np
 from sailfish import block_runner, sym, util
 from sailfish.lb_base import LBSim, ScalarField, VectorField
-
+from sailfish.lb_single import LBForcedSim
 
 BinaryKernels = namedtuple('BinaryKernels', 'distributions macro')
 
@@ -309,7 +309,7 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
     #    self.vis.add_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
 
 
-class LBBinaryFluidShanChen(LBBinaryFluidBase):
+class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
     """Binary fluid mixture using the Shan-Chen model."""
 
     def __init__(self, config):
