@@ -38,7 +38,8 @@ class SCSimulationTest(SeparationSCSim):
     def update_defaults(cls, defaults):
         SeparationSCSim.update_defaults(defaults)
         defaults.update({
-            'every': 10,
+            'bulk_boundary_split': False,
+            'every': 1,
             'max_iters': 10,
             'quiet': True,
             'cuda_cache': False,
@@ -57,6 +58,22 @@ class Geometry4Blocks(LBGeometry2D):
                 SubdomainSpec2D((x1, 0), (x2, y1)),
                 SubdomainSpec2D((x1, y1), (x1, y2))]
 
+class Geometry2BlocksHoriz(LBGeometry2D):
+    def blocks(self, n=None):
+        x1 = self.gx / 2
+        x2 = self.gx - x1
+
+        return [SubdomainSpec2D((0, 0), (x1, self.gy)),
+                SubdomainSpec2D((x1, 0), (x2, self.gy))]
+
+
+class Geometry2BlocksVertical(LBGeometry2D):
+    def blocks(self, n=None):
+        y1 = self.gy / 2
+        y2 = self.gy - y1
+
+        return [SubdomainSpec2D((0, 0), (self.gx, y1)),
+                SubdomainSpec2D((0, y1), (self.gx, y2))]
 
 def rebuild_4blocks_field(f1, f2, f3, f4):
     p1 = np.vstack([f1, f2])
@@ -79,21 +96,60 @@ def test_4blocks(ref):
     np.testing.assert_array_almost_equal(vx, ref['v'][0])
     np.testing.assert_array_almost_equal(vy, ref['v'][1])
 
+def test_2blocks_horiz(ref):
+    t0 = np.load('%s_blk0_10.npz' % output)
+    t1 = np.load('%s_blk1_10.npz' % output)
+
+    rho  = np.hstack([t0['rho'], t1['rho']])
+    phi  = np.hstack([t0['phi'], t1['phi']])
+    vx   = np.hstack([t0['v'][0], t1['v'][0]])
+    vy   = np.hstack([t0['v'][1], t1['v'][1]])
+
+    np.testing.assert_array_almost_equal(rho, ref['rho'])
+    np.testing.assert_array_almost_equal(phi, ref['phi'])
+    np.testing.assert_array_almost_equal(vx, ref['v'][0])
+    np.testing.assert_array_almost_equal(vy, ref['v'][1])
+
+def test_2blocks_vert(ref):
+    t0 = np.load('%s_blk0_10.npz' % output)
+    t1 = np.load('%s_blk1_10.npz' % output)
+
+    rho  = np.vstack([t0['rho'], t1['rho']])
+    phi  = np.vstack([t0['phi'], t1['phi']])
+    vx   = np.vstack([t0['v'][0], t1['v'][0]])
+    vy   = np.vstack([t0['v'][1], t1['v'][1]])
+
+    np.testing.assert_array_almost_equal(rho, ref['rho'])
+    np.testing.assert_array_almost_equal(phi, ref['phi'])
+    np.testing.assert_array_almost_equal(vx, ref['v'][0])
+    np.testing.assert_array_almost_equal(vy, ref['v'][1])
+
 
 class TestInterblockPropagation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        global blocks, output
+        global output
         output = os.path.join(tmpdir, 'ref')
         LBSimulationController(SCSimulationTest, LBGeometry2D).run()
         cls.sc_ref = np.load('%s_blk0_10.npz' % output)
 
     def test_4blocks(self):
-        global blocks, output
+        global output
         output = os.path.join(tmpdir, '4blocks')
         LBSimulationController(SCSimulationTest, Geometry4Blocks).run()
         test_4blocks(self.sc_ref)
 
+    def test_2blocks_horiz(self):
+        global output
+        output = os.path.join(tmpdir, '2blocks_horiz')
+        LBSimulationController(SCSimulationTest, Geometry2BlocksHoriz).run()
+        test_2blocks_horiz(self.sc_ref)
+
+    def test_2blocks_vert(self):
+        global output
+        output = os.path.join(tmpdir, '2blocks_vert')
+        LBSimulationController(SCSimulationTest, Geometry2BlocksVertical).run()
+        test_2blocks_vert(self.sc_ref)
 
 def tearDownModule():
     shutil.rmtree(tmpdir)
