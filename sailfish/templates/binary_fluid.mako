@@ -132,9 +132,10 @@ ${kernel} void PrepareMacroFields(
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *dist2_in,
 	${global_ptr} float *orho,
-	${global_ptr} float *ophi)
+	${global_ptr} float *ophi,
+	int options)
 {
-	${local_indices()}
+	${local_indices_split()}
 
 	int ncode = map[gi];
 	int type = decodeNodeType(ncode);
@@ -245,9 +246,9 @@ ${kernel} void CollideAndPropagate(
 	${global_ptr} float *gg0m0,
 	${global_ptr} float *gg1m0,
 	${kernel_args_1st_moment('ov')}
-	int save_macro)
+	int options)
 {
-	${local_indices()}
+	${local_indices_split()}
 
 	// shared variables for in-block propagation
 	%for i in sym.get_prop_dists(grid, 1):
@@ -358,8 +359,8 @@ ${kernel} void CollideAndPropagate(
 		}
 	%endif
 
-	// only save the macroscopic quantities if requested to do so
-	if (save_macro == 1) {
+	// Only save the macroscopic quantities if requested to do so.
+	if (options & OPTION_SAVE_MACRO_FIELDS) {
 		%if simtype == 'shan-chen' and not bc_wall_.wet_nodes:
 			if (!isWallNode(type))
 		%endif

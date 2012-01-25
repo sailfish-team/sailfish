@@ -38,8 +38,8 @@ class SCSimulationTest(SeparationSCSim):
     def update_defaults(cls, defaults):
         SeparationSCSim.update_defaults(defaults)
         defaults.update({
-            'bulk_boundary_split': False,
-            'every': 1,
+            'bulk_boundary_split': True,
+            'every': 10,
             'max_iters': 10,
             'quiet': True,
             'cuda_cache': False,

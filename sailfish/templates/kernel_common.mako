@@ -48,6 +48,26 @@
 	}
 </%def>
 
+## Defines local indices for kernels that can be split into bulk and boundary.
+## Automatically handles the case when the split is disabled.
+<%def name="local_indices_split()">
+	%if boundary_size > 0:
+		int gx, gy, lx, gi;
+		%if dim == 3:
+			int gz;
+		%endif
+
+		if (options & OPTION_BULK) {
+			${local_indices_bulk()}
+		} else {
+			${local_indices_boundary()}
+		}
+	%else:
+		${local_indices()}
+	%endif
+
+</%def>
+
 ## Defines local indices for bulk kernels.
 ## This is the same as local_indices(), but with proper offsets to skip
 ## the boundary.

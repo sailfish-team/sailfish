@@ -101,7 +101,7 @@ ${kernel} void PrepareMacroFields(
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *orho)
 {
-	${local_indices()}
+	${local_indices_split()}
 
 	int ncode = map[gi];
 	int type = decodeNodeType(ncode);
@@ -132,20 +132,7 @@ ${kernel} void CollideAndPropagate(
 %endif
 	)
 {
-	%if boundary_size > 0:
-		int gx, gy, lx, gi;
-		%if dim == 3:
-			int gz;
-		%endif
-
-		if (options & OPTION_BULK) {
-			${local_indices_bulk()}
-		} else {
-			${local_indices_boundary()}
-		}
-	%else:
-		${local_indices()}
-	%endif
+	${local_indices_split()}
 
 	// Shared variables for in-block propagation
 	%for i in sym.get_prop_dists(grid, 1):
@@ -185,7 +172,7 @@ ${kernel} void CollideAndPropagate(
 	${relaxate(bgk_args)}
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out);
 
-	// only save the macroscopic quantities if requested to do so
+	// Only save the macroscopic quantities if requested to do so.
 	if (options & OPTION_SAVE_MACRO_FIELDS) {
 		orho[gi] = g0m0;
 		ovx[gi] = v[0];

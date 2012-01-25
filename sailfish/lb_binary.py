@@ -113,34 +113,34 @@ class LBBinaryFluidBase(LBSim):
         gpu_dist2a = runner.gpu_dist(1, 0)
         gpu_dist2b = runner.gpu_dist(1, 1)
 
-        args1 = [gpu_map, gpu_dist1a, gpu_dist1b, gpu_dist2a, gpu_dist2b,
-                gpu_rho, gpu_phi] + gpu_v
-        args2 = [gpu_map, gpu_dist1b, gpu_dist1a, gpu_dist2b, gpu_dist2a,
-                gpu_rho, gpu_phi] + gpu_v
-
         options = 0
         if full_output:
             options |= 1
         if bulk:
             options |= 2
 
-        args1.append(np.uint32(options))
-        args2.append(np.uint32(options))
+        options = np.uint32(options)
+        args1 = [gpu_map, gpu_dist1a, gpu_dist1b, gpu_dist2a, gpu_dist2b,
+                gpu_rho, gpu_phi] + gpu_v + [options]
+        args2 = [gpu_map, gpu_dist1b, gpu_dist1a, gpu_dist2b, gpu_dist2a,
+                gpu_rho, gpu_phi] + gpu_v + [options]
 
-        macro_args1 = [gpu_map, gpu_dist1a, gpu_dist2a, gpu_rho, gpu_phi]
-        macro_args2 = [gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi]
+        macro_args1 = [gpu_map, gpu_dist1a, gpu_dist2a, gpu_rho, gpu_phi,
+                options]
+        macro_args2 = [gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi,
+                options]
 
         macro_kernels = [
             runner.get_kernel('PrepareMacroFields', macro_args1,
-                'P' * len(macro_args1)),
+                'P' * (len(macro_args1) - 1) + 'i'),
             runner.get_kernel('PrepareMacroFields', macro_args2,
-                'P' * len(macro_args2))]
+                'P' * (len(macro_args2) - 1) + 'i')]
 
         sim_kernels = [
             runner.get_kernel('CollideAndPropagate', args1,
-                'P'*(len(args1)-1)+'i'),
+                'P' * (len(args1) - 1) + 'i'),
             runner.get_kernel('CollideAndPropagate', args2,
-                'P'*(len(args2)-1)+'i')]
+                'P' * (len(args2) - 1) + 'i')]
         return zip(macro_kernels, sim_kernels)
 
     def initial_conditions(self, runner):
