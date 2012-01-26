@@ -7,11 +7,13 @@ import unittest
 
 import numpy as np
 
+from examples.binary_fluid.fe_separation_2d import SeparationFESim
 from examples.binary_fluid.sc_separation_2d import SeparationSCSim, SeparationDomain
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import SubdomainSpec2D
 
+MAX_ITERS = 100
 output = ''
 tmpdir = tempfile.mkdtemp()
 
@@ -31,6 +33,7 @@ class SCTestDomain(SeparationDomain):
         sim.rho[:] = 1.0 + rho[y1:y2+1, x1:x2+1]
         sim.phi[:] = 1.0 + phi[y1:y2+1, x1:x2+1]
 
+
 class SCSimulationTest(SeparationSCSim):
     subdomain = SCTestDomain
 
@@ -38,9 +41,39 @@ class SCSimulationTest(SeparationSCSim):
     def update_defaults(cls, defaults):
         SeparationSCSim.update_defaults(defaults)
         defaults.update({
-            'bulk_boundary_split': True,
             'every': 10,
-            'max_iters': 10,
+            'max_iters': MAX_ITERS,
+            'quiet': True,
+            'cuda_cache': False,
+            'output': output})
+
+
+class FETestDomain(SeparationDomain):
+    def initial_conditions(self, sim, hx, hy):
+        np.random.seed(1234)
+
+        phi = np.random.rand(self.gy, self.gx) / 1000.0
+
+        x1 = np.min(hx)
+        x2 = np.max(hx)
+        y1 = np.min(hy)
+        y2 = np.max(hy)
+
+        sim.rho[:] = 1.0
+        sim.phi[:] = 1.0 + phi[y1:y2+1, x1:x2+1]
+
+
+class FESimulationTest(SeparationFESim):
+    subdomain = FETestDomain
+
+    @classmethod
+    def update_defaults(cls, defaults):
+        SeparationFESim.update_defaults(defaults)
+        defaults.update({
+            'periodic_x': False,
+            'periodic_y': False,
+            'every': 10,
+            'max_iters': MAX_ITERS,
             'quiet': True,
             'cuda_cache': False,
             'output': output})
@@ -81,10 +114,10 @@ def rebuild_4blocks_field(f1, f2, f3, f4):
     return np.hstack([p1, p2])
 
 def test_4blocks(ref):
-    t0 = np.load('%s_blk0_10.npz' % output)
-    t1 = np.load('%s_blk1_10.npz' % output)
-    t2 = np.load('%s_blk2_10.npz' % output)
-    t3 = np.load('%s_blk3_10.npz' % output)
+    t0 = np.load('%s_blk0_%d.npz' % (output, MAX_ITERS))
+    t1 = np.load('%s_blk1_%d.npz' % (output, MAX_ITERS))
+    t2 = np.load('%s_blk2_%d.npz' % (output, MAX_ITERS))
+    t3 = np.load('%s_blk3_%d.npz' % (output, MAX_ITERS))
 
     rho = rebuild_4blocks_field(t0['rho'], t1['rho'], t2['rho'], t3['rho'])
     phi = rebuild_4blocks_field(t0['phi'], t1['phi'], t2['phi'], t3['phi'])
@@ -97,8 +130,8 @@ def test_4blocks(ref):
     np.testing.assert_array_almost_equal(vy, ref['v'][1])
 
 def test_2blocks_horiz(ref):
-    t0 = np.load('%s_blk0_10.npz' % output)
-    t1 = np.load('%s_blk1_10.npz' % output)
+    t0 = np.load('%s_blk0_%d.npz' % (output, MAX_ITERS))
+    t1 = np.load('%s_blk1_%d.npz' % (output, MAX_ITERS))
 
     rho  = np.hstack([t0['rho'], t1['rho']])
     phi  = np.hstack([t0['phi'], t1['phi']])
@@ -111,8 +144,8 @@ def test_2blocks_horiz(ref):
     np.testing.assert_array_almost_equal(vy, ref['v'][1])
 
 def test_2blocks_vert(ref):
-    t0 = np.load('%s_blk0_10.npz' % output)
-    t1 = np.load('%s_blk1_10.npz' % output)
+    t0 = np.load('%s_blk0_%d.npz' % (output, MAX_ITERS))
+    t1 = np.load('%s_blk1_%d.npz' % (output, MAX_ITERS))
 
     rho  = np.vstack([t0['rho'], t1['rho']])
     phi  = np.vstack([t0['phi'], t1['phi']])
@@ -125,31 +158,59 @@ def test_2blocks_vert(ref):
     np.testing.assert_array_almost_equal(vy, ref['v'][1])
 
 
-class TestInterblockPropagation(unittest.TestCase):
+class TestSCInterblockPropagation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         global output
         output = os.path.join(tmpdir, 'ref')
         LBSimulationController(SCSimulationTest, LBGeometry2D).run()
-        cls.sc_ref = np.load('%s_blk0_10.npz' % output)
+        cls.ref = np.load('%s_blk0_%d.npz' % (output, MAX_ITERS))
 
     def test_4blocks(self):
         global output
         output = os.path.join(tmpdir, '4blocks')
         LBSimulationController(SCSimulationTest, Geometry4Blocks).run()
-        test_4blocks(self.sc_ref)
+        test_4blocks(self.ref)
 
     def test_2blocks_horiz(self):
         global output
         output = os.path.join(tmpdir, '2blocks_horiz')
         LBSimulationController(SCSimulationTest, Geometry2BlocksHoriz).run()
-        test_2blocks_horiz(self.sc_ref)
+        test_2blocks_horiz(self.ref)
 
     def test_2blocks_vert(self):
         global output
         output = os.path.join(tmpdir, '2blocks_vert')
         LBSimulationController(SCSimulationTest, Geometry2BlocksVertical).run()
-        test_2blocks_vert(self.sc_ref)
+        test_2blocks_vert(self.ref)
+
+
+class TestFEInterblockPropagation(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        global output
+        output = os.path.join(tmpdir, 'ref')
+        LBSimulationController(FESimulationTest, LBGeometry2D).run()
+        cls.ref = np.load('%s_blk0_%d.npz' % (output, MAX_ITERS))
+
+    def test_4blocks(self):
+        global output
+        output = os.path.join(tmpdir, '4blocks')
+        LBSimulationController(FESimulationTest, Geometry4Blocks).run()
+        test_4blocks(self.ref)
+
+    def test_2blocks_horiz(self):
+        global output
+        output = os.path.join(tmpdir, '2blocks_horiz')
+        LBSimulationController(FESimulationTest, Geometry2BlocksHoriz).run()
+        test_2blocks_horiz(self.ref)
+
+    def test_2blocks_vert(self):
+        global output
+        output = os.path.join(tmpdir, '2blocks_vert')
+        LBSimulationController(FESimulationTest, Geometry2BlocksVertical).run()
+        test_2blocks_vert(self.ref)
+
 
 def tearDownModule():
     shutil.rmtree(tmpdir)
