@@ -9,16 +9,16 @@ vi = lambda x, y: D2Q9.vec_idx([x, y])
 vi3 = lambda x, y, z: D3Q19.vec_idx([x, y, z])
 vi15 = lambda x, y, z: D3Q15.vec_idx([x, y, z])
 
+def _verify_partial_map(self, conn, expected_map):
+    self.assertEqual(set(conn.dst_partial_map.keys()),
+            set(expected_map.keys()))
+    for key, val in expected_map.iteritems():
+        self.assertEqual(
+                set([tuple(x) for x in val]),
+                set([tuple(x) for x in conn.dst_partial_map[key]]))
+
+
 class TestBlock3D(unittest.TestCase):
-
-    def _verify_partial_map(self, conn, expected_map):
-        self.assertEqual(set(conn.dst_partial_map.keys()),
-                set(expected_map.keys()))
-        for key, val in expected_map.iteritems():
-            self.assertEqual(
-                    set([tuple(x) for x in val]),
-                    set([tuple(x) for x in conn.dst_partial_map[key]]))
-
     def test_block_connection_y(self):
         base = SubdomainSpec3D((10, 10, 10), (10, 10, 12), envelope_size=1, id_=0)
         face_hi = SubdomainSpec3D.Y_HIGH
@@ -54,7 +54,7 @@ class TestBlock3D(unittest.TestCase):
                 vi3(0,1,1): r + t + b + tr + br,
                 vi3(0,1,-1): l + t + b + tl + bl,
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
     def test_block_connection_z(self):
         base = SubdomainSpec3D((10, 10, 10), (10, 12, 10), envelope_size=1, id_=0)
@@ -91,7 +91,7 @@ class TestBlock3D(unittest.TestCase):
                 vi3(0,1,1): r + t + b + tr + br,
                 vi3(0,-1,1): l + t + b + tl + bl,
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
     def test_block_connection_x(self):
         base = SubdomainSpec3D((10, 10, 10), (10, 12, 10), envelope_size=1, id_=0)
@@ -131,7 +131,7 @@ class TestBlock3D(unittest.TestCase):
                 vi3(1,0,1): r + t + b + tr + br,
                 vi3(1,0,-1): l + t + b + tl + bl,
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         base = SubdomainSpec3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
 
@@ -181,7 +181,7 @@ class TestBlock3D(unittest.TestCase):
                 vi3(1,0,1): r + t + b + tr + br + re,
                 vi3(1,0,-1): l + t + b + tl + bl + le,
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
 
         # top-left corner match (no connection in D3Q19 topology)
@@ -222,7 +222,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi3(x_dir,-1,0): [(0, z) for z in range(0, 10)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         # top edge match
         b2 = SubdomainSpec3D((x_low, 20, 10), (5, 5, 10), envelope_size=1, id_=2)
@@ -238,7 +238,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi3(x_dir,1,0): [(0, z) for z in range(0, 10)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         # right edge match
         b3 = SubdomainSpec3D((x_low, 10, 20), (5, 10, 5), envelope_size=1, id_=3)
@@ -254,7 +254,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi3(x_dir,0,1): [(y, 0) for y in range(0, 10)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         # left edge match
         b4 = SubdomainSpec3D((x_low, 10, 5), (5, 10, 5), envelope_size=1, id_=4)
@@ -270,7 +270,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi3(x_dir,0,-1): [(y, 0) for y in range(0, 10)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
     def test_block_connection_edge_x_low(self):
         self._x_edge_helper(SubdomainSpec3D.X_LOW)
@@ -292,7 +292,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi3(0, -1, -1): [(x, 0) for x in range(0, 10)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         b2 = SubdomainSpec3D((10, 20, 5), (10, 5, 5), envelope_size=1, id_=2)
         self.assertTrue(base.connect(b2, grid=D3Q19))
@@ -306,7 +306,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi3(0, 1, -1): [(x, 0) for x in range(0, 10)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         b3 = SubdomainSpec3D((10, 5, 20), (10, 5, 5), envelope_size=1, id_=3)
         self.assertTrue(base.connect(b3, grid=D3Q19))
@@ -320,7 +320,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi3(0, -1, 1): [(x, 0) for x in range(0, 10)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         b4 = SubdomainSpec3D((10, 20, 20), (10, 5, 5), envelope_size=1, id_=4)
         self.assertTrue(base.connect(b4, grid=D3Q19))
@@ -334,7 +334,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi3(0, 1, 1): [(x, 0) for x in range(0, 10)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
     def _corner_helper(self, face):
         base = SubdomainSpec3D((10, 10, 10), (10, 10, 10), envelope_size=1, id_=0)
@@ -358,7 +358,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi15(x_dir, -1, -1): [(0, 0)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         b2 = SubdomainSpec3D((x_low, 20, 5), (5, 5, 5), envelope_size=1, id_=2)
         self.assertTrue(base.connect(b2, grid=D3Q15))
@@ -372,7 +372,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi15(x_dir, 1, -1): [(0, 0)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         b3 = SubdomainSpec3D((x_low, 20, 20), (5, 5, 5), envelope_size=1, id_=3)
         self.assertTrue(base.connect(b3, grid=D3Q15))
@@ -386,7 +386,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi15(x_dir, 1, 1): [(0, 0)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         b4 = SubdomainSpec3D((x_low, 5, 20), (5, 5, 5), envelope_size=1, id_=4)
         self.assertTrue(base.connect(b4, grid=D3Q15))
@@ -400,7 +400,7 @@ class TestBlock3D(unittest.TestCase):
         expected_map = {
                 vi15(x_dir, -1, 1): [(0, 0)]
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
     def test_corner_x_low(self):
         self._corner_helper(SubdomainSpec3D.X_LOW)
@@ -446,7 +446,7 @@ class TestBlock2D(unittest.TestCase):
         expected_map = {vi(*f(1,-1)): np.array([[0]]),
                         vi(*f(1,1)): np.array([[9]]),
                         vi(*f(1,0)): np.array([[0],[9]])}
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         self.assertEqual(cpair.src.elements, 30)
         self.assertEqual(cpair.src.transfer_shape, [3, 10])
@@ -463,7 +463,7 @@ class TestBlock2D(unittest.TestCase):
         self.assertEqual(cpair.src.dst_full_buf_slice, [slice(2, 6)])
         expected_map = {vi(*f(1,-1)): np.array([[0], [1]]),
                         vi(*f(1,0)): np.array([[1]])}
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         # full overlap (2nd block is smaller)
         b3 = SubdomainSpec2D(f(20, 12), f(5, 7), envelope_size=1, id_=3)
@@ -495,7 +495,7 @@ class TestBlock2D(unittest.TestCase):
                 vi(*f(1,-1)): np.array([[0], [1]]),
                 vi(*f(1,0)): np.array([[1], [10]]),
                 vi(*f(1,1)): np.array([[10], [11]])}
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         # exact match at the bottom (2nd block is smaller)
         b5 = SubdomainSpec2D(f(20, 10), f(5, 5), envelope_size=1, id_=5)
@@ -509,7 +509,7 @@ class TestBlock2D(unittest.TestCase):
         expected_map = {
                 vi(*f(1,-1)): np.array([[0]]),
                 vi(*f(1,0)): np.array([[0]])}
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         # exact match at the bottom (2nd block is larger)
         b6 = SubdomainSpec2D(f(20, 10), f(5, 15), envelope_size=1, id_=6)
@@ -525,7 +525,7 @@ class TestBlock2D(unittest.TestCase):
                 vi(*f(1,0)): np.array([[0], [9]]),
                 vi(*f(1,1)): np.array([[9], [10]]),
             }
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         # note that the size of the src_slice is different, depending
         # on the direction of the transfer
@@ -563,8 +563,8 @@ class TestBlock2D(unittest.TestCase):
         self.assertEqual(cpair.src.dst_slice, [])
         self.assertEqual(cpair.src.dst_full_buf_slice, [])
         expected_map = {
-                vi(1,-1): np.array([0])}
-        self._verify_partial_map(cpair.src, expected_map)
+                vi(1,-1): np.array([[0]])}
+        _verify_partial_map(self, cpair.src, expected_map)
 
         self.assertEqual(cpair.dst.src_slice, [slice(6, 7)])
         self.assertEqual(cpair.dst.src_macro_slice, [slice(5, 6)])
@@ -572,8 +572,8 @@ class TestBlock2D(unittest.TestCase):
         self.assertEqual(cpair.dst.dst_slice, [])
         self.assertEqual(cpair.dst.dst_full_buf_slice, [])
         expected_map = {
-                vi(-1,1): np.array([0])}
-        self._verify_partial_map(cpair.dst, expected_map)
+                vi(-1,1): np.array([[0]])}
+        _verify_partial_map(self, cpair.dst, expected_map)
 
         # corner match (high)
         b7 = SubdomainSpec2D((20, 20), (5, 5), envelope_size=1, id_=7)
@@ -585,8 +585,8 @@ class TestBlock2D(unittest.TestCase):
         self.assertEqual(cpair.src.dst_slice, [])
         self.assertEqual(cpair.src.dst_full_buf_slice, [])
         expected_map = {
-                vi(1,1): np.array([0])}
-        self._verify_partial_map(cpair.src, expected_map)
+                vi(1,1): np.array([[0]])}
+        _verify_partial_map(self, cpair.src, expected_map)
 
         self.assertEqual(cpair.dst.src_slice, [slice(0, 1)])
         self.assertEqual(cpair.dst.src_macro_slice, [slice(1, 2)])
@@ -594,13 +594,14 @@ class TestBlock2D(unittest.TestCase):
         self.assertEqual(cpair.dst.dst_slice, [])
         self.assertEqual(cpair.dst.dst_full_buf_slice, [])
         expected_map = {
-                vi(-1,-1): np.array([0])}
-        self._verify_partial_map(cpair.dst, expected_map)
+                vi(-1,-1): np.array([[0]])}
+        _verify_partial_map(self, cpair.dst, expected_map)
 
     def test_global_block_connection_xy(self):
         config = LBConfig()
         config.lat_nx = 64
         config.lat_ny = 64
+        config.periodic_x = True
 
         def _verify_slices(cpair):
             self.assertEqual(cpair.src.src_slice, [slice(1, 33)])
@@ -612,7 +613,7 @@ class TestBlock2D(unittest.TestCase):
         geo = LBGeometry2D(config)
         b1 = SubdomainSpec2D((0, 0), (32, 32), envelope_size=1, id_=1)
         b2 = SubdomainSpec2D((32, 0), (32, 32), envelope_size=1, id_=2)
-        self.assertTrue(b1.connect(b2, geo, axis=0, grid=D2Q9))
+        self.assertTrue(b1.connect(b2, geo, 0, D2Q9, [True, False]))
 
         cpair = b1.get_connection(SubdomainSpec2D.X_LOW, b2.id)
         self.assertEqual(set(cpair.src.dists),
@@ -622,7 +623,7 @@ class TestBlock2D(unittest.TestCase):
                 vi(-1,-1): np.array([[0]]),
                 vi(-1, 0): np.array([[0],[31]]),
                 vi(-1, 1): np.array([[31]])}
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         cpair = b2.get_connection(SubdomainSpec2D.X_HIGH, b1.id)
         _verify_slices(cpair)
@@ -630,17 +631,17 @@ class TestBlock2D(unittest.TestCase):
                 vi(1,-1): np.array([[0]]),
                 vi(1, 0): np.array([[0],[31]]),
                 vi(1, 1): np.array([[31]])}
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         b3 = SubdomainSpec2D((0, 32), (32, 32), envelope_size=1, id_=3)
-        self.assertTrue(b3.connect(b1, geo, axis=1, grid=D2Q9))
+        self.assertTrue(b3.connect(b1, geo, 1, D2Q9, [True, True]))
         cpair = b1.get_connection(SubdomainSpec2D.Y_LOW, b3.id)
         _verify_slices(cpair)
         expected_map = {
                 vi(-1,-1): np.array([[0]]),
                 vi(0, -1): np.array([[0], [31]]),
                 vi(1, -1): np.array([[31]])}
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
 
         cpair = b3.get_connection(SubdomainSpec2D.Y_HIGH, b1.id)
         _verify_slices(cpair)
@@ -648,7 +649,73 @@ class TestBlock2D(unittest.TestCase):
                 vi(-1,1): np.array([[0]]),
                 vi(0, 1): np.array([[0], [31]]),
                 vi(1, 1): np.array([[31]])}
-        self._verify_partial_map(cpair.src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
+
+
+class TestBlock2DPeriodic(unittest.TestCase):
+
+    def test_4blocks(self):
+        config = LBConfig()
+        config.lat_nx = 64
+        config.lat_ny = 64
+        config.periodic_x = True
+        config.periodic_y = True
+
+        geo = LBGeometry2D(config)
+        b1 = SubdomainSpec2D((0, 0), (32, 32), envelope_size=1, id_=1)
+        b2 = SubdomainSpec2D((32, 0), (32, 32), envelope_size=1, id_=2)
+        b3 = SubdomainSpec2D((0, 32), (32, 32), envelope_size=1, id_=3)
+        b4 = SubdomainSpec2D((32, 32), (32, 32), envelope_size=1, id_=4)
+
+        self.assertTrue(b1.connect(b2, geo, 0, D2Q9, [True, True]))
+        self.assertTrue(b1.connect(b2, grid=D2Q9))
+
+        self.assertFalse(b1.connect(b3, geo, 0, D2Q9, [True, True]))
+
+        self.assertTrue(b1.connect(b4, geo, 0, D2Q9, [True, True]))
+        cpairs = b1.get_connections(SubdomainSpec2D.X_LOW, b4.id)
+        self.assertEqual(cpairs[0].src.dst_full_buf_slice, [])
+        self.assertEqual(cpairs[1].src.dst_full_buf_slice, [])
+        expected_map = {vi(-1, -1): np.array([[0]])}
+        _verify_partial_map(self, cpairs[1].src, expected_map)
+        expected_map = {vi(-1, 1): np.array([[0]])}
+        _verify_partial_map(self, cpairs[0].src, expected_map)
+
+        self.assertFalse(b1.connect(b2, geo, 1, D2Q9, [True, True]))
+
+        self.assertTrue(b1.connect(b3, geo, 1, D2Q9, [True, True]))
+        self.assertTrue(b1.connect(b3, grid=D2Q9))
+
+        self.assertTrue(b2.connect(b3, geo, 0, D2Q9, [True, True]))
+        cpairs = b2.get_connections(SubdomainSpec2D.X_HIGH, b3.id)
+        self.assertEqual(cpairs[0].src.dst_full_buf_slice, [])
+        self.assertEqual(cpairs[1].src.dst_full_buf_slice, [])
+        expected_map = {vi(1, 1): np.array([[0]])}
+        _verify_partial_map(self, cpairs[0].src, expected_map)
+        expected_map = {vi(1, -1): np.array([[0]])}
+        _verify_partial_map(self, cpairs[1].src, expected_map)
+
+
+    def test_2blocks(self):
+        return
+        config = LBConfig()
+        config.lat_nx = 64
+        config.lat_ny = 64
+        config.periodic_x = True
+
+        geo = LBGeometry2D(config)
+        b1 = SubdomainSpec2D((0, 0), (32, 64), envelope_size=1, id_=1)
+        b2 = SubdomainSpec2D((32, 0), (8, 64), envelope_size=1, id_=2)
+        b3 = SubdomainSpec2D((40, 0), (24, 64), envelope_size=1, id_=3)
+        self.assertTrue(b1.connect(b3, geo, 0, D2Q9, [True, False]))
+        cpair = b1.get_connection(SubdomainSpec2D.X_LOW, b3.id)
+
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 63)])
+        expected_map = {
+            vi(-1, 0): np.array([[0], [63]]),
+            vi(-1, 1): np.array([[63]]),
+            vi(-1, -1): np.array([[0]])}
+        _verify_partial_map(self, cpair.src, expected_map)
 
 
 if __name__ == '__main__':

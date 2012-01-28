@@ -81,6 +81,7 @@ class SimulationTest(LBFluidSim, LBForcedSim):
             'output': os.path.join(tmpdir, 'test_out'),
             'debug_dump_dists': True,
             'cuda_cache': False,
+            'save_src': '/tmp/foo.cu',
         })
 
     def initial_conditions(self, runner):
@@ -101,6 +102,53 @@ class SimulationTest(LBFluidSim, LBForcedSim):
         runner._debug_set_dist(dbuf)
         runner._debug_set_dist(dbuf, False)
 
+class MixedPeriodicPropagationTest(unittest.TestCase):
+    def setUp(self):
+        global periodic_x, periodic_y
+        periodic_x = False
+        periodic_y = True
+
+    def test_horiz_spread(self):
+        """Two blocks connected along the X axis, with Y PBC enabled.
+
+        This test verifies distribution streaming from the corner nodes
+        on the surface connecting the two blocks."""
+        def ic(self, runner):
+            dbuf = runner._debug_get_dist()
+            dbuf[:] = 0.0
+
+            if runner._block.id == 1:
+                # At the top
+                dbuf[vi(-1, 0), 256, 1] = 0.31
+                dbuf[vi(-1, 1), 256, 1] = 0.32
+                dbuf[vi(-1, -1), 256, 1] = 0.33
+            elif runner._block.id == 0:
+                # At the bottom
+                dbuf[vi(1, 0), 1, 128] = 0.41
+                dbuf[vi(1, 1), 1, 128] = 0.42
+                dbuf[vi(1, -1), 1, 128] = 0.43
+
+            runner._debug_set_dist(dbuf)
+            runner._debug_set_dist(dbuf, False)
+
+        HorizTest = type('HorizTest', (SimulationTest,),
+                {'initial_conditions': ic})
+        ctrl = LBSimulationController(HorizTest, DoubleBlockGeometryTest)
+        ctrl.run()
+
+        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
+        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        ae = np.testing.assert_equal
+
+        ae(b0[vi(-1, 0), 256, 128], np.float32(0.31))
+        ae(b0[vi(-1, -1), 255, 128], np.float32(0.33))
+        ae(b0[vi(-1, 1), 1, 128], np.float32(0.32))
+
+        ae(b1[vi(1, 0), 1, 1], np.float32(0.41))
+        ae(b1[vi(1, 1), 2, 1], np.float32(0.42))
+        ae(b1[vi(1, -1), 256, 1], np.float32(0.43))
+
+
 class PeriodicPropagationTest(unittest.TestCase):
     def setUp(self):
         global periodic_x, periodic_y
@@ -108,7 +156,6 @@ class PeriodicPropagationTest(unittest.TestCase):
         periodic_y = False
 
     def test_horiz_spread(self):
-        global tmpdir
 
         def ic(self, runner):
             dbuf = runner._debug_get_dist()

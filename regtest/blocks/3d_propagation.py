@@ -202,7 +202,6 @@ class PeriodicSimulationTest(LBFluidSim, LBForcedSim):
 
     @classmethod
     def update_defaults(cls, defaults):
-        global block_size, tmpdir
         defaults.update({
             'block_size': block_size,
             'lat_nx': 128,
@@ -244,10 +243,8 @@ class PeriodicSimulationTest(LBFluidSim, LBForcedSim):
         runner._debug_set_dist(dbuf)
         runner._debug_set_dist(dbuf, False)
 
-
 class PeriodicPropagationTest(unittest.TestCase):
     def test_horiz_spread(self):
-        global tmpdir
         ctrl = LBSimulationController(PeriodicSimulationTest, TwoBlocksXConnGeoTest)
         ctrl.run()
 
@@ -271,6 +268,53 @@ class PeriodicPropagationTest(unittest.TestCase):
         ae(b0[vi(1,-1, 0), 1, 31, 1], np.float32(0.35))
         ae(b0[vi(1, 0, 1), 2, 32, 1], np.float32(0.36))
 
+
+class PartialPeriodicSimulationTest(PeriodicSimulationTest):
+    @classmethod
+    def modify_config(cls, config):
+        config.relaxation_enabled = False
+        config.periodic_x = False
+        config.periodic_y = True
+        config.periodic_z = True
+
+    def initial_conditions(self, runner):
+        dbuf = runner._debug_get_dist()
+        dbuf[:] = 0.0
+
+        if runner._block.id == 0:
+            dbuf[vi(1, 1, 0), 32, 64, 64] = 0.11
+            dbuf[vi(1, 0, 1), 66, 32, 64] = 0.12
+            dbuf[vi(1, -1, 0), 32, 1, 64] = 0.13
+            dbuf[vi(1, 0, -1), 1, 32, 64] = 0.14
+        elif runner._block.id == 1:
+            dbuf[vi(-1, 1, 0), 20, 64, 1] = 0.21
+            dbuf[vi(-1, 0, 1), 66, 20, 1] = 0.22
+            dbuf[vi(-1, -1, 0), 20, 1, 1] = 0.23
+            dbuf[vi(-1, 0, -1), 1, 20, 1] = 0.24
+
+        runner._debug_set_dist(dbuf)
+        runner._debug_set_dist(dbuf, False)
+
+class PartialPeriodicPropagationTest(unittest.TestCase):
+    def test_x_conn(self):
+        ctrl = LBSimulationController(PartialPeriodicSimulationTest,
+                TwoBlocksXConnGeoTest).run()
+
+        b0 = np.load(os.path.join(tmpdir, 'per_horiz_out_blk0_dist_dump1.npy'))
+        b1 = np.load(os.path.join(tmpdir, 'per_horiz_out_blk1_dist_dump1.npy'))
+
+        ae = np.testing.assert_equal
+        ae(b1[vi(1, 1, 0), 32, 1, 1], np.float32(0.11))
+        ae(b1[vi(1, 0, 1), 1, 32, 1], np.float32(0.12))
+        ae(b1[vi(1, -1, 0), 32, 64, 1], np.float32(0.13))
+        ae(b1[vi(1, 0, -1), 66, 32, 1], np.float32(0.14))
+
+        ae(b0[vi(-1, 1, 0), 20, 1, 64], np.float32(0.21))
+        ae(b0[vi(-1, 0, 1), 1, 20, 64], np.float32(0.22))
+        ae(b0[vi(-1, -1, 0), 20, 64, 64], np.float32(0.23))
+        ae(b0[vi(-1, 0, -1), 66, 20, 64], np.float32(0.24))
+
+
 #############################################################################
 
 class SingleBlockGeoTest(LBGeometry3D):
@@ -289,7 +333,6 @@ class SingleBlockPeriodicSimulationTest(LBFluidSim, LBForcedSim):
 
     @classmethod
     def update_defaults(cls, defaults):
-        global block_size, tmpdir
         defaults.update({
             'block_size': block_size,
             'lat_nx': 64,
@@ -359,11 +402,9 @@ class SingleBlockPeriodicTest(unittest.TestCase):
         ae(b0[vi(0, -1, 0), 1, 62, 1], np.float32(0.22))
         ae(b0[vi(0, 0, -1), 66, 1, 1], np.float32(0.23))
 
-        # TODO(michalj): Fix this (distributions crossing 2+ principal
-        # planes with PBC enabled).
-        # ae(b0[vi(-1, -1, 0), 66, 62, 1], np.float32(0.24))
-        # ae(b0[vi(0, -1, -1), 1, 62, 64], np.float32(0.25))
-        # ae(b0[vi(-1, 0, -1), 66, 1, 64], np.flaot32(0.26))
+        ae(b0[vi(-1, -1, 0), 1, 62, 64], np.float32(0.24))
+        ae(b0[vi(0, -1, -1), 66, 62, 1], np.float32(0.25))
+        ae(b0[vi(-1, 0, -1), 66, 1, 64], np.float32(0.26))
 
         ae(b0[vi(-1, 0, 0), 32, 1, 64], np.float32(0.31))
         ae(b0[vi(-1, -1, 0), 32, 1, 64], np.float32(0.32))

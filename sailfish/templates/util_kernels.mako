@@ -61,11 +61,17 @@
 			if dim == 2:
 				direction[1 - axis] = 1
 				corner_dists = sym.get_interblock_dists(grid, direction)
-				cond_to_dists['idx1 > 1 && idx1 <= {0}'.format(max_dim)] = corner_dists
+				cond = 'idx1 > 1'
+				if block_periodicity[1 - axis] and block_periodicity[axis]:
+					cond += ' && idx1 <= {0}'.format(max_dim)
+				cond_to_dists[cond] = corner_dists
 
 				direction[1 - axis] = -1
 				corner_dists = sym.get_interblock_dists(grid, direction)
-				cond_to_dists['idx1 < {0} && idx1 >= 1'.format(max_dim)] = corner_dists
+				cond = 'idx1 < {0}'.format(max_dim)
+				if block_periodicity[1 - axis] and block_periodicity[axis]:
+					cond += ' && idx1 >= 1'
+				cond_to_dists[cond] = corner_dists
 			else:
 				# Covers full NN connectivity in 3D.  Needs to be extended for
 				# models with a higher level of connectivity.
@@ -73,18 +79,34 @@
 					for j in (1, 0, -1):
 						if i == 0 and j == 0:
 							continue
-						direction[other_axes[axis][0]] = i
-						direction[other_axes[axis][1]] = j
+						oa1 = other_axes[axis][0]
+						oa2 = other_axes[axis][1]
+
+						direction[oa1] = i
+						direction[oa2] = j
 						corner_dists = sym.get_interblock_dists(grid, direction)
 						conds = []
+						## XXX use smart limits as in 2D
 						if i == 1:
-							conds.append('idx1 > 1 && idx1 <= {0}'.format(max_dim))
+							cond = 'idx1 > 1'
+							if block_periodicity[axis] and block_periodicity[oa1]:
+								cond += ' && idx1 <= {0}'.format(max_dim)
+							conds.append(cond)
 						elif i == -1:
-							conds.append('idx1 < {0} && idx1 >= 1'.format(max_dim))
+							cond = 'idx1 < {0}'.format(max_dim)
+							if block_periodicity[axis] and block_periodicity[oa1]:
+								cond += ' && idx1 >= 1'
+							conds.append(cond)
 						if j == 1:
-							conds.append('idx2 > 1 && idx2 <= {0}'.format(max_dim2))
+							cond = 'idx2 > 1'
+							if block_periodicity[axis] and block_periodicity[oa2]:
+								cond += ' && idx2 <= {0}'.format(max_dim2)
+							conds.append(cond)
 						elif j == -1:
-							conds.append('idx2 < {0} && idx2 >= 1'.format(max_dim2))
+							cond = 'idx2 < {0}'.format(max_dim2)
+							if block_periodicity[axis] and block_periodicity[oa2]:
+								cond += ' && idx2 >= 1'
+							conds.append(cond)
 						cond = ' && '.join(conds)
 						cond_to_dists[cond] = corner_dists
 
