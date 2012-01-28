@@ -99,7 +99,8 @@ ${kernel} void SetInitialConditions(
 ${kernel} void PrepareMacroFields(
 	${global_ptr} int *map,
 	${global_ptr} float *dist1_in,
-	${global_ptr} float *orho)
+	${global_ptr} float *orho,
+	int options)
 {
 	${local_indices_split()}
 

@@ -369,7 +369,7 @@ class BlockRunner(object):
         # the grid size for boundary kernels.
         if self._block.dim == 2:
             arr_ny, arr_nx = self._physical_size
-            lat_nx, lat_ny = self._lat_size
+            lat_ny, lat_nx = self._lat_size
 
             ew_conns = 0        # east-west
             block = self._block
@@ -377,19 +377,19 @@ class BlockRunner(object):
             # Sometimes, due to misalignment, two blocks might be necessary to
             # cover the right boundary.
             padding = arr_nx - lat_nx
-            if block.has_face_conn(block.X_HIGH):
+            if block.has_face_conn(block.X_HIGH) or block.periodic_x:
                 if bs - padding < bns:
                     ew_conns = 1    # 1 block on the left, 1 block on the right
                 else:
                     ew_conns = 2    # 1 block on the left, 2 blocks on the right
 
-            if block.has_face_conn(block.X_LOW):
+            if block.has_face_conn(block.X_LOW) or block.periodic_x:
                 ew_conns += 1
 
             ns_conns = 0        # north-south
-            if block.has_face_conn(block.Y_LOW):
+            if block.has_face_conn(block.Y_LOW) or block.periodic_y:
                 ns_conns += 1
-            if block.has_face_conn(block.Y_HIGH):
+            if block.has_face_conn(block.Y_HIGH) or block.periodic_y:
                 ns_conns += 1
 
             self._boundary_blocks = (
@@ -399,7 +399,7 @@ class BlockRunner(object):
             self._kernel_grid_full = [arr_nx / bs, arr_ny]
         else:
             arr_nz, arr_ny, arr_nx = self._physical_size
-            lat_nx, lat_ny, lat_nz = self._lat_size
+            lat_nz, lat_ny, lat_nx = self._lat_size
 
             # Sometimes, due to misalignment, two blocks might be necessary to
             # cover the right boundary.
@@ -754,7 +754,6 @@ class BlockRunner(object):
             kernel, grid = self._get_bulk_kernel(output_req)
             self.backend.run_kernel(kernel, grid, self._calc_stream)
 
-        self._apply_pbc(self._pbc_kernels)
         self._timing_calc_end = self.backend.make_event(self._calc_stream, timing=True)
 
     def _step_boundary(self, output_req):
@@ -777,6 +776,7 @@ class BlockRunner(object):
 
         self._timing_bnd_start = make_event(blk_str, timing=True)
         self.backend.run_kernel(kernel, grid, blk_str)
+        self._apply_pbc(self._pbc_kernels)
         self._timing_bnd_stop = make_event(blk_str, timing=True)
 
         # Enqueue a wait so that the data collection will not start until the kernel
@@ -1438,8 +1438,6 @@ class NNBlockRunner(BlockRunner):
         if has_boundary_split:
             run(bulk_kernel_macro, grid_bulk, str_calc)
 
-        self._apply_pbc(self._pbc_kernels.macro)
-
         # self._timing_calc_end = make_event(str_calc, timing=True)
 
         self._send_macro()
@@ -1455,12 +1453,15 @@ class NNBlockRunner(BlockRunner):
         self._timing_macro_done = make_event(str_data, timing=True)
         str_calc.wait_for_event(self._timing_macro_done)
 
+        self._apply_pbc(self._pbc_kernels.macro)
+
         # Actual simulation step.
         if has_boundary_split:
             run(bnd_kernel_sim, grid_bnd, str_calc)
         else:
             run(bulk_kernel_sim, grid_bulk, str_calc)
 
+        self._apply_pbc(self._pbc_kernels.distributions)
         ev = make_event(str_calc)
         str_data.wait_for_event(ev)
 
@@ -1470,7 +1471,6 @@ class NNBlockRunner(BlockRunner):
         if has_boundary_split:
             run(bulk_kernel_sim, grid_bulk, str_calc)
 
-        self._apply_pbc(self._pbc_kernels.distributions)
         self._sim.iteration += 1
 
         self._send_dists()

@@ -15,6 +15,7 @@ class LBGeometry(object):
         self.config = config
         self.gx = config.lat_nx
         self.gy = config.lat_ny
+        self.gsize = [self.gx, self.gy]
 
 class LBGeometry2D(LBGeometry):
     """Describes the high-level 2D geometry of a LB simulation."""
@@ -53,6 +54,7 @@ class LBGeometry3D(LBGeometry):
     def __init__(self, config):
         LBGeometry.__init__(self, config)
         self.gz = config.lat_nz
+        self.gsize = [self.gx, self.gy, self.gz]
 
     def blocks(self):
         """Returns a 1-element list containing a single 3D block

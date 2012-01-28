@@ -25,7 +25,7 @@ import execnet
 import zmq
 from sailfish import codegen, config, io, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
-
+from sailfish.geo_block import SubdomainSpec3D
 
 def _start_machine_master(config, blocks, lb_class):
     """Starts a machine master process locally."""
@@ -137,10 +137,29 @@ class LBGeometryProcessor(object):
         # TOOD(michalj): Fix this for multi-grid models.
         grid = util.get_grid_from_config(config)
 
-        def try_connect(block1, block2, geo=None, axis=None):
-            if block1.connect(block2, geo, axis, grid):
+        def try_connect(block1, block2, geo=None, axis=None, periodicity=None):
+            if block1.connect(block2, geo, axis, grid, periodicity):
                 connected[block1.id] = True
                 connected[block2.id] = True
+
+        # Enable local periodicity in blocks.
+        if config.periodic_x:
+            for block in self._coord_map_list[0][0]:
+                # If the block spans the whole X axis of the domain, mark it
+                # as locally periodic and do not try to find any neigbor
+                # candidates.
+                if block.location[0] + block.size[0] == self.geo.gx:
+                    block.enable_local_periodicity(0)
+
+        if config.periodic_y:
+            for block in self._coord_map_list[1][0]:
+                if block.location[1] + block.size[1] == self.geo.gy:
+                    block.enable_local_periodicity(1)
+
+        if self.dim > 2 and config.periodic_z:
+            for block in self._coord_map_list[2][0]:
+                if block.location[2] + block.size[2] == self.geo.gz:
+                    block.enable_local_periodicity(2)
 
         for axis in range(self.dim):
             for block in sorted(self.blocks, key=lambda x: x.location[axis]):
@@ -151,17 +170,17 @@ class LBGeometryProcessor(object):
                         self._coord_map_list[axis][higher_coord]:
                     try_connect(block, neighbor_candidate)
 
+        periodicity = [config.periodic_x, config.periodic_y]
+        if self.dim == 3:
+            periodicity.append(config.periodic_z)
+
         # In case the simulation domain is globally periodic, try to connect
         # the blocks at the lower boundary of the domain along the periodic
         # axis (i.e. coordinate = 0) with blocks which have a boundary at the
         # highest global coordinate (gx, gy, gz).
         if config.periodic_x:
             for block in self._coord_map_list[0][0]:
-                # If the block spans the whole X axis of the domain, mark it
-                # as locally periodic and do not try to find any neigbor
-                # candidates.
-                if block.location[0] + block.size[0] == self.geo.gx:
-                    block.enable_local_periodicity(0)
+                if block.periodic_x:
                     continue
 
                 # Iterate over all blocks, for each one calculate the location
@@ -171,31 +190,41 @@ class LBGeometryProcessor(object):
                     for candidate in candidates:
                         if (candidate.location[0] + candidate.size[0]
                                == self.geo.gx):
-                            try_connect(block, candidate, self.geo, 0)
+                            try_connect(block, candidate, self.geo, 0,
+                                    periodicity)
 
         if config.periodic_y:
             for block in self._coord_map_list[1][0]:
-                if block.location[1] + block.size[1] == self.geo.gy:
-                    block.enable_local_periodicity(1)
+                if block.periodic_y:
                     continue
 
                 for y0, candidates in self._coord_map_list[1].iteritems():
                     for candidate in candidates:
                         if (candidate.location[1] + candidate.size[1]
-                               == self.geo.gy):
-                            try_connect(block, candidate, self.geo, 1)
+                               != self.geo.gy):
+                            continue
+
+                        if block.get_connection(SubdomainSpec3D.X_LOW, candidate.id) is not None:
+                            continue
+
+                        try_connect(block, candidate, self.geo, 1, periodicity)
 
         if self.dim > 2 and config.periodic_z:
             for block in self._coord_map_list[2][0]:
-                if block.location[2] + block.size[2] == self.geo.gz:
-                    block.enable_local_periodicity(2)
+                if block.periodic_z:
                     continue
 
                 for z0, candidates in self._coord_map_list[2].iteritems():
                     for candidate in candidates:
                         if (candidate.location[2] + candidate.size[2]
-                               == self.geo.gz):
-                            try_connect(block, candidate, self.geo, 2)
+                               != self.geo.gz):
+                            continue
+
+                        if ((block.get_connection(SubdomainSpec3D.X_LOW, candidate.id) is not None) or
+                            (block.get_connection(SubdomainSpec3D.Y_LOW, candidate.id) is not None)):
+                            continue
+
+                        try_connect(block, candidate, self.geo, 2, periodicity)
 
         # Ensure every block is connected to at least one other block.
         if not all(connected) and len(connected) > 1:
