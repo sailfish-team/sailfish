@@ -606,37 +606,37 @@ class BlockRunner(object):
         # used only when global periodic boundary conditions are enabled.
         self._block_to_connbuf = defaultdict(list)
         for face, block_id in self._block.connecting_blocks():
-            cpair = self._block.get_connection(face, block_id)
+            cpairs = self._block.get_connections(face, block_id)
+            for cpair in cpairs:
+                coll_idx = self._get_src_slice_indices(face, cpair)
+                coll_idx = GPUBuffer(coll_idx, self.backend)
 
-            coll_idx = self._get_src_slice_indices(face, cpair)
-            coll_idx = GPUBuffer(coll_idx, self.backend)
+                dist_full_idx = self._get_dst_slice_indices(face, cpair)
+                dist_full_idx = GPUBuffer(dist_full_idx, self.backend)
 
-            dist_full_idx = self._get_dst_slice_indices(face, cpair)
-            dist_full_idx = GPUBuffer(dist_full_idx, self.backend)
+                for i, grid in enumerate(self._sim.grids):
+                    # TODO(michalj): Optimize this by providing proper padding.
+                    coll_buf = alloc(cpair.src.transfer_shape, dtype=self.float)
+                    recv_buf = alloc(cpair.dst.transfer_shape, dtype=self.float)
+                    dist_full_buf = alloc(cpair.dst.full_shape, dtype=self.float)
 
-            for i, grid in enumerate(self._sim.grids):
-                # TODO(michalj): Optimize this by providing proper padding.
-                coll_buf = alloc(cpair.src.transfer_shape, dtype=self.float)
-                recv_buf = alloc(cpair.dst.transfer_shape, dtype=self.float)
-                dist_full_buf = alloc(cpair.dst.full_shape, dtype=self.float)
+                    # Any partial dists are serialized into a single continuous buffer.
+                    dist_partial_buf, dist_partial_idx, dist_partial_sel = \
+                            self._get_partial_dst_indices(face, cpair)
 
-                # Any partial dists are serialized into a single continuous buffer.
-                dist_partial_buf, dist_partial_idx, dist_partial_sel = \
-                        self._get_partial_dst_indices(face, cpair)
+                    cbuf = ConnectionBuffer(face, cpair,
+                            GPUBuffer(coll_buf, self.backend),
+                            coll_idx,
+                            recv_buf,
+                            GPUBuffer(dist_partial_buf, self.backend),
+                            GPUBuffer(dist_partial_idx, self.backend),
+                            dist_partial_sel,
+                            GPUBuffer(dist_full_buf, self.backend),
+                            dist_full_idx, i)
 
-                cbuf = ConnectionBuffer(face, cpair,
-                        GPUBuffer(coll_buf, self.backend),
-                        coll_idx,
-                        recv_buf,
-                        GPUBuffer(dist_partial_buf, self.backend),
-                        GPUBuffer(dist_partial_idx, self.backend),
-                        dist_partial_sel,
-                        GPUBuffer(dist_full_buf, self.backend),
-                        dist_full_idx, i)
-
-                self.config.logger.debug('adding buffer for conn: {0} -> {1} '
-                        '(face {2})'.format(self._block.id, block_id, face))
-                self._block_to_connbuf[block_id].append(cbuf)
+                    self.config.logger.debug('adding buffer for conn: {0} -> {1} '
+                            '(face {2})'.format(self._block.id, block_id, face))
+                    self._block_to_connbuf[block_id].append(cbuf)
 
     def _init_compute(self):
         self.config.logger.debug("Initializing compute unit.")
@@ -1291,24 +1291,25 @@ class NNBlockRunner(BlockRunner):
         self._num_nn_fields = sum((1 for fpair in self._sim._scalar_fields if
             fpair.abstract.need_nn))
         for face, block_id in self._block.connecting_blocks():
-            cpair = self._block.get_connection(face, block_id)
-            coll_idx = GPUBuffer(self._get_src_macro_indices(face, cpair), self.backend)
-            dist_idx = GPUBuffer(self._get_dst_macro_indices(face, cpair), self.backend)
+            cpairs = self._block.get_connections(face, block_id)
+            for cpair in cpairs:
+                coll_idx = GPUBuffer(self._get_src_macro_indices(face, cpair), self.backend)
+                dist_idx = GPUBuffer(self._get_dst_macro_indices(face, cpair), self.backend)
 
-            for field_pair in self._sim._scalar_fields:
-                if not field_pair.abstract.need_nn:
-                    continue
+                for field_pair in self._sim._scalar_fields:
+                    if not field_pair.abstract.need_nn:
+                        continue
 
-                recv_buf = alloc(cpair.dst.macro_transfer_shape, dtype=self.float)
-                coll_buf = alloc(cpair.src.macro_transfer_shape, dtype=self.float)
+                    recv_buf = alloc(cpair.dst.macro_transfer_shape, dtype=self.float)
+                    coll_buf = alloc(cpair.src.macro_transfer_shape, dtype=self.float)
 
-                cbuf = MacroConnectionBuffer(face, cpair,
-                        GPUBuffer(coll_buf, self.backend),
-                        coll_idx,
-                        GPUBuffer(recv_buf, self.backend),
-                        dist_idx, field_pair.buffer)
+                    cbuf = MacroConnectionBuffer(face, cpair,
+                            GPUBuffer(coll_buf, self.backend),
+                            coll_idx,
+                            GPUBuffer(recv_buf, self.backend),
+                            dist_idx, field_pair.buffer)
 
-                self._block_to_macrobuf[block_id].append(cbuf)
+                    self._block_to_macrobuf[block_id].append(cbuf)
 
     def _init_macro_collect_kernels(self, cbuf, grid_dim1, block_size):
         # Sparse data collection.

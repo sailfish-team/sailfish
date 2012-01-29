@@ -4,7 +4,7 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'GPL3'
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 import operator
 import numpy as np
 from sailfish import geo_encoder, sym
@@ -20,6 +20,12 @@ def span_area(span):
 
 
 ConnectionPair = namedtuple('ConnectionPair', 'src dst')
+
+# Used for creating connections between subdomains.  Without PBCs,
+# virtual == real.  With PBC, the real subdomain is the actual subdomain
+# as defined by the simulation geometry, and the virtual subdomain is a
+# copy created due to PBC.
+SubdomainPair = namedtuple('SubdomainPair', 'real virtual')
 
 
 def _get_src_slice(b1, b2, slice_axes):
@@ -272,6 +278,17 @@ class LBConnection(object):
         self.dst_macro_slice = dst_macro_slice
         self.block_id = src_id
 
+    def __eq__(self, other):
+        return ((self.dists == other.dists) and
+                (self.src_slice == other.src_slice) and
+                (self.dst_low == other.dst_low) and
+                (self.dst_slice == other.dst_slice) and
+                (self.dst_full_buf_slice == other.dst_full_buf_slice) and
+                (self.block_id == other.block_id))
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     @property
     def elements(self):
         """Size of the connection buffer in elements."""
@@ -326,7 +343,8 @@ class SubdomainSpec(object):
         self._periodicity = [False] * self.dim
 
     def __repr__(self):
-        return '{0}({1}, {2})'.format(self.__class__.__name__, self.location, self.size)
+        return '{0}({1}, {2}, id_={3})'.format(self.__class__.__name__,
+                self.location, self.size, self._id)
 
     @property
     def runner(self):
@@ -377,16 +395,13 @@ class SubdomainSpec(object):
         # TODO: As an optimization, we could drop the ghost node layer in this
         # case.
 
-    def _add_connection(self, face, cpair, allow_multiple_connections=False):
-        if face in self._connections and not allow_multiple_connections:
-            for pair in self._connections[face]:
-                # TODO(michalj) Replace this with an assertion.
-                if cpair.dst.block_id == pair.dst.block_id:
-                    return
-        self._connections.setdefault(face, []).append(cpair)
+    def _add_connection(self, face, cpair):
+        if cpair in self._connections[face]:
+            return
+        self._connections[face].append(cpair)
 
     def _clear_connections(self):
-        self._connections = {}
+        self._connections = defaultdict(list)
 
     def _clear_connectors(self):
         self._connectors = {}
@@ -486,131 +501,67 @@ class SubdomainSpec(object):
             elif dir_ == -1:
                 return cls.Z_HIGH
 
-    def connect(self, block, geo=None, axis=None, grid=None, periodicity=None):
+    def connect(self, pair, grid=None):
         """Creates a connection between this block and another block.
 
         A connection can only be created when the blocks are next to each
         other.
 
-        :param block: SubdomainSpec object to connect to
-        :param `geo`: None for a local block connection; for a global
-               connection due to lattice periodicity, a LBGeometry object
         :returns: True if the connection was successful
         :rtype: bool
         """
-        assert block.id != self.id
+        # Convenience helper for tests.
+        if type(pair) is not SubdomainPair:
+            pair = SubdomainPair(pair, pair)
 
-        def connect_x(b1, b2, pbc=False):
-            c1 = LBConnection.make(b1, b2, self.X_HIGH, grid)
-            c2 = LBConnection.make(b2, b1, self.X_LOW, grid)
+        assert pair.real.id != self.id
 
-            if c1 is None:
-                return False
-
-            self._add_connection(self.X_HIGH, ConnectionPair(c1, c2), pbc)
-            block._add_connection(self.X_LOW, ConnectionPair(c2, c1), pbc)
-            return True
-
-        def connect_y(b1, b2, pbc=False):
-            c1 = LBConnection.make(b1, b2, self.Y_HIGH, grid)
-            c2 = LBConnection.make(b2, b1, self.Y_LOW, grid)
+        def connect_x(r1, r2, v1, v2):
+            c1 = LBConnection.make(v1, v2, self.X_HIGH, grid)
+            c2 = LBConnection.make(v2, v1, self.X_LOW, grid)
 
             if c1 is None:
                 return False
 
-            self._add_connection(self.Y_HIGH, ConnectionPair(c1, c2), pbc)
-            block._add_connection(self.Y_LOW, ConnectionPair(c2, c1), pbc)
+            r1._add_connection(self.X_HIGH, ConnectionPair(c1, c2))
+            r2._add_connection(self.X_LOW, ConnectionPair(c2, c1))
             return True
 
-        def connect_z(b1, b2, pbc=False):
-            c1 = LBConnection.make(b1, b2, self.Z_HIGH, grid)
-            c2 = LBConnection.make(b2, b1, self.Z_LOW, grid)
+        def connect_y(r1, r2, v1, v2):
+            c1 = LBConnection.make(v1, v2, self.Y_HIGH, grid)
+            c2 = LBConnection.make(v2, v1, self.Y_LOW, grid)
 
             if c1 is None:
                 return False
 
-            self._add_connection(self.Z_HIGH, ConnectionPair(c1, c2), pbc)
-            block._add_connection(self.Z_LOW, ConnectionPair(c2, c1), pbc)
+            r1._add_connection(self.Y_HIGH, ConnectionPair(c1, c2))
+            r2._add_connection(self.Y_LOW, ConnectionPair(c2, c1))
             return True
 
-        def _fake_pbc_helper(loc, subdomain, axes):
-            if not axes:
-                return [tuple(loc)]
+        def connect_z(r1, r2, v1, v2):
+            c1 = LBConnection.make(v1, v2, self.Z_HIGH, grid)
+            c2 = LBConnection.make(v2, v1, self.Z_LOW, grid)
 
-            ret = []
-            ax = axes.pop()
-            if subdomain.location[ax] == 0 and periodicity[ax]:
-                ret.extend(_fake_pbc_helper(loc, subdomain, axes))
-                loc[ax] = geo.gsize[ax]
-                ret.extend(_fake_pbc_helper(loc, subdomain, axes))
-            elif subdomain.end_location[ax] == geo.gsize[ax] and periodicity[ax]:
-                ret.extend(_fake_pbc_helper(loc, subdomain, axes))
-                loc[ax] = -subdomain.size[ax]
-                ret.extend(_fake_pbc_helper(loc, subdomain, axes))
-            return ret
+            if c1 is None:
+                return False
 
-        def make_pbc_subdomains(subdomain, base_pbc_axis):
-            loc = list(subdomain.location)
-            if periodicity[base_pbc_axis] and loc[base_pbc_axis] == 0:
-                loc[base_pbc_axis] = geo.gsize[base_pbc_axis]
-            axes = [i for i in range(0, self.dim) if base_pbc_axis != i]
-            base_loc = tuple(loc)
-            locs = _fake_pbc_helper(loc, subdomain, axes)
-            if not locs:
-                locs.append(base_loc)
+            r1._add_connection(self.Z_HIGH, ConnectionPair(c1, c2))
+            r2._add_connection(self.Z_LOW, ConnectionPair(c2, c1))
+            return True
 
-            b = subdomain
-
-            return [b.__class__(loc, b.size, b.envelope_size, b._id) for loc in
-                    locs]
-
-        # Connections due to periodic boundary conditions.
-        if geo is not None:
-            assert axis is not None
-            if axis == 0:
-                if self.ox == 0 and block.ex == geo.gx:
-                    return block.connect(self, geo, axis, grid, periodicity)
-                elif block.ox == 0 and self.ex == geo.gx:
-                    fake_subdomains = make_pbc_subdomains(block, 0)
-                    connected = False
-                    for subdomain in fake_subdomains:
-                        r = connect_x(self, subdomain, True)
-                        connected = connected or r
-                    return connected
-            elif axis == 1:
-                if self.oy == 0 and block.ey == geo.gy:
-                    return block.connect(self, geo, axis, grid, periodicity)
-                elif block.oy == 0 and self.ey == geo.gy:
-                    fake_subdomains = make_pbc_subdomains(block, 1)
-                    connected = False
-                    for subdomain in fake_subdomains:
-                        r = connect_y(self, subdomain, True)
-                        connected = connected or r
-                        return connected
-            elif axis == 2:
-                if self.oz == 0 and block.ez == geo.gz:
-                    return block.connect(self, geo, axis, grid, periodicity)
-                elif block.oz == 0 and self.ez == geo.gz:
-                    fake_subdomains = make_pbc_subdomains(block, 2)
-                    connected = False
-                    for subdomain in fake_subdomains:
-                        r = connect_z(self, subdomain, True)
-                        connected = connected or r
-                    return connected
-        # Normal connections between neighboring blocks.
-        elif self.ex == block.ox:
-            return connect_x(self, block)
-        elif block.ex == self.ox:
-            return block.connect(self, grid=grid)
-        elif self.ey == block.oy:
-            return connect_y(self, block)
-        elif block.ey == self.oy:
-            return block.connect(self, grid=grid)
+        if self.ex == pair.virtual.ox:
+            return connect_x(self, pair.real, self, pair.virtual)
+        elif pair.virtual.ex == self.ox:
+            return connect_x(pair.real, self, pair.virtual, self)
+        elif self.ey == pair.virtual.oy:
+            return connect_y(self, pair.real, self, pair.virtual)
+        elif pair.virtual.ey == self.oy:
+            return connect_y(pair.real, self, pair.virtual, self)
         elif self.dim == 3:
-            if self.ez == block.oz:
-                return connect_z(self, block)
-            elif block.ez == self.oz:
-                return block.connect(self, grid=grid)
+            if self.ez == pair.virtual.oz:
+                return connect_z(self, pair.real, self, pair.virtual)
+            elif pair.virtual.ez == self.oz:
+                return connect_z(pair.real, self, pair.virtual, self)
 
         return False
 
