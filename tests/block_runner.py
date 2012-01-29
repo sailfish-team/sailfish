@@ -11,7 +11,7 @@ from sailfish.lb_base import LBSim
 from sailfish.lb_binary import LBBinaryFluidShanChen
 from sailfish.backend_dummy import DummyBackend
 from sailfish.block_runner import BlockRunner, NNBlockRunner
-from sailfish.geo_block import SubdomainSpec2D, SubdomainSpec3D
+from sailfish.geo_block import SubdomainSpec2D, SubdomainSpec3D, SubdomainPair
 from sailfish.io import LBOutput
 from sailfish.sym import D2Q9
 
@@ -106,7 +106,6 @@ class NNBlockRunnerTest(unittest.TestCase):
 
         # Establish connection between the two blocks.
         self.assertTrue(b1.connect(b2, grid=D2Q9))
-        self.assertTrue(b2.connect(b1, grid=D2Q9))
 
         cpair = b1.get_connection(*b1.connecting_blocks()[0])
         size1 = cpair.src.elements

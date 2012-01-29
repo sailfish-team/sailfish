@@ -1,6 +1,7 @@
 import numpy as np
 import unittest
 from sailfish.config import LBConfig
+from sailfish.controller import LBGeometryProcessor
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import SubdomainSpec2D, SubdomainSpec3D
 from sailfish.sym import D2Q9, D3Q15, D3Q19
@@ -597,62 +598,17 @@ class TestBlock2D(unittest.TestCase):
                 vi(-1,-1): np.array([[0]])}
         _verify_partial_map(self, cpair.dst, expected_map)
 
-    def test_global_block_connection_xy(self):
-        config = LBConfig()
-        config.lat_nx = 64
-        config.lat_ny = 64
-        config.periodic_x = True
-
-        def _verify_slices(cpair):
-            self.assertEqual(cpair.src.src_slice, [slice(1, 33)])
-            self.assertEqual(cpair.src.src_macro_slice, [slice(1, 33)])
-            self.assertEqual(cpair.src.dst_low, [0])
-            self.assertEqual(cpair.src.dst_slice, [slice(1, 31)])
-            self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 31)])
-
-        geo = LBGeometry2D(config)
-        b1 = SubdomainSpec2D((0, 0), (32, 32), envelope_size=1, id_=1)
-        b2 = SubdomainSpec2D((32, 0), (32, 32), envelope_size=1, id_=2)
-        self.assertTrue(b1.connect(b2, geo, 0, D2Q9, [True, False]))
-
-        cpair = b1.get_connection(SubdomainSpec2D.X_LOW, b2.id)
-        self.assertEqual(set(cpair.src.dists),
-                         set([vi(-1,0), vi(-1,1), vi(-1,-1)]))
-        _verify_slices(cpair)
-        expected_map = {
-                vi(-1,-1): np.array([[0]]),
-                vi(-1, 0): np.array([[0],[31]]),
-                vi(-1, 1): np.array([[31]])}
-        _verify_partial_map(self, cpair.src, expected_map)
-
-        cpair = b2.get_connection(SubdomainSpec2D.X_HIGH, b1.id)
-        _verify_slices(cpair)
-        expected_map = {
-                vi(1,-1): np.array([[0]]),
-                vi(1, 0): np.array([[0],[31]]),
-                vi(1, 1): np.array([[31]])}
-        _verify_partial_map(self, cpair.src, expected_map)
-
-        b3 = SubdomainSpec2D((0, 32), (32, 32), envelope_size=1, id_=3)
-        self.assertTrue(b3.connect(b1, geo, 1, D2Q9, [True, True]))
-        cpair = b1.get_connection(SubdomainSpec2D.Y_LOW, b3.id)
-        _verify_slices(cpair)
-        expected_map = {
-                vi(-1,-1): np.array([[0]]),
-                vi(0, -1): np.array([[0], [31]]),
-                vi(1, -1): np.array([[31]])}
-        _verify_partial_map(self, cpair.src, expected_map)
-
-        cpair = b3.get_connection(SubdomainSpec2D.Y_HIGH, b1.id)
-        _verify_slices(cpair)
-        expected_map = {
-                vi(-1,1): np.array([[0]]),
-                vi(0, 1): np.array([[0], [31]]),
-                vi(1, 1): np.array([[31]])}
-        _verify_partial_map(self, cpair.src, expected_map)
-
 
 class TestBlock2DPeriodic(unittest.TestCase):
+
+    def _check_partial_map(self, cpairs, src_slice, dst_partial_map):
+        for cpair in cpairs:
+            if cpair.src.src_slice == src_slice:
+                _verify_partial_map(self, cpair.src, dst_partial_map)
+                return True
+
+        return False
+
 
     def test_4blocks(self):
         config = LBConfig()
@@ -660,6 +616,7 @@ class TestBlock2DPeriodic(unittest.TestCase):
         config.lat_ny = 64
         config.periodic_x = True
         config.periodic_y = True
+        config.grid = 'D2Q9'
 
         geo = LBGeometry2D(config)
         b1 = SubdomainSpec2D((0, 0), (32, 32), envelope_size=1, id_=1)
@@ -667,47 +624,126 @@ class TestBlock2DPeriodic(unittest.TestCase):
         b3 = SubdomainSpec2D((0, 32), (32, 32), envelope_size=1, id_=3)
         b4 = SubdomainSpec2D((32, 32), (32, 32), envelope_size=1, id_=4)
 
-        self.assertTrue(b1.connect(b2, geo, 0, D2Q9, [True, True]))
-        self.assertTrue(b1.connect(b2, grid=D2Q9))
+        proc = LBGeometryProcessor([b1, b2, b3, b4], 2, geo)
+        proc._connect_blocks(config)
 
-        self.assertFalse(b1.connect(b3, geo, 0, D2Q9, [True, True]))
+        ## b1 - b4
 
-        self.assertTrue(b1.connect(b4, geo, 0, D2Q9, [True, True]))
         cpairs = b1.get_connections(SubdomainSpec2D.X_LOW, b4.id)
-        self.assertEqual(cpairs[0].src.dst_full_buf_slice, [])
-        self.assertEqual(cpairs[1].src.dst_full_buf_slice, [])
-        expected_map = {vi(-1, -1): np.array([[0]])}
-        _verify_partial_map(self, cpairs[1].src, expected_map)
-        expected_map = {vi(-1, 1): np.array([[0]])}
-        _verify_partial_map(self, cpairs[0].src, expected_map)
+        self.assertEqual(len(cpairs), 2)
+        self.assertTrue(
+                self._check_partial_map(cpairs, [slice(0, 1)],
+                    {vi(-1, -1): np.array([[0]])}))
+        self.assertTrue(
+                self._check_partial_map(cpairs, [slice(33, 34)],
+                    {vi(-1, 1): np.array([[0]])}))
 
-        self.assertFalse(b1.connect(b2, geo, 1, D2Q9, [True, True]))
+        cpairs = b1.get_connections(SubdomainSpec2D.X_HIGH, b4.id)
+        self.assertEqual(len(cpairs), 2)
+        self.assertTrue(
+                self._check_partial_map(cpairs, [slice(0, 1)],
+                    {vi(1, -1): np.array([[0]])}))
+        self.assertTrue(
+                self._check_partial_map(cpairs, [slice(33, 34)],
+                    {vi(1, 1): np.array([[0]])}))
 
-        self.assertTrue(b1.connect(b3, geo, 1, D2Q9, [True, True]))
-        self.assertTrue(b1.connect(b3, grid=D2Q9))
+        cpairs = b1.get_connections(SubdomainSpec2D.Y_LOW, b4.id)
+        self.assertEqual(len(cpairs), 0)
 
-        self.assertTrue(b2.connect(b3, geo, 0, D2Q9, [True, True]))
+        cpairs = b1.get_connections(SubdomainSpec2D.Y_HIGH, b4.id)
+        self.assertEqual(len(cpairs), 0)
+
+        ### b2 - b3
+
+        cpairs = b2.get_connections(SubdomainSpec2D.X_LOW, b3.id)
+
+        self.assertEqual(len(cpairs), 2)
+        self.assertTrue(
+                self._check_partial_map(cpairs, [slice(0, 1)],
+                    {vi(-1, -1): np.array([[0]])}))
+        self.assertTrue(
+                self._check_partial_map(cpairs, [slice(33, 34)],
+                    {vi(-1, 1): np.array([[0]])}))
+
         cpairs = b2.get_connections(SubdomainSpec2D.X_HIGH, b3.id)
-        self.assertEqual(cpairs[0].src.dst_full_buf_slice, [])
-        self.assertEqual(cpairs[1].src.dst_full_buf_slice, [])
-        expected_map = {vi(1, 1): np.array([[0]])}
-        _verify_partial_map(self, cpairs[0].src, expected_map)
+        self.assertEqual(len(cpairs), 2)
+        self.assertTrue(
+                self._check_partial_map(cpairs, [slice(0, 1)],
+                    {vi(1, -1): np.array([[0]])}))
+        self.assertTrue(
+                self._check_partial_map(cpairs, [slice(33, 34)],
+                    {vi(1, 1): np.array([[0]])}))
+
+        cpairs = b2.get_connections(SubdomainSpec2D.Y_LOW, b3.id)
+        self.assertEqual(len(cpairs), 0)
+
+        cpairs = b2.get_connections(SubdomainSpec2D.Y_HIGH, b3.id)
+        self.assertEqual(len(cpairs), 0)
+
+
+    def test_5blocks(self):
+        config = LBConfig()
+        config.lat_nx = 50
+        config.lat_ny = 75
+        config.periodic_x = True
+        config.periodic_y = True
+        config.grid = 'D2Q9'
+
+        geo = LBGeometry2D(config)
+        b1 = SubdomainSpec2D((0, 0), (25, 25), envelope_size=1, id_=1)
+        b2 = SubdomainSpec2D((25, 0), (25, 25), envelope_size=1, id_=2)
+        b3 = SubdomainSpec2D((0, 25), (50, 25), envelope_size=1, id_=3)
+        b4 = SubdomainSpec2D((0, 50), (25, 25), envelope_size=1, id_=4)
+        b5 = SubdomainSpec2D((25, 50), (25, 25), envelope_size=1, id_=5)
+
+        proc = LBGeometryProcessor([b1, b2, b3, b4, b5], 2, geo)
+        proc._connect_blocks(config)
+
+        cpair = b1.get_connection(SubdomainSpec2D.X_LOW, b5.id)
+        expected_map = {vi(-1, -1): np.array([[0]])}
+        _verify_partial_map(self, cpair.src, expected_map)
+
+        cpair = b1.get_connection(SubdomainSpec2D.X_HIGH, b5.id)
         expected_map = {vi(1, -1): np.array([[0]])}
-        _verify_partial_map(self, cpairs[1].src, expected_map)
+        _verify_partial_map(self, cpair.src, expected_map)
+
+        cpair = b1.get_connection(SubdomainSpec2D.Y_LOW, b4.id)
+        expected_map = {vi(0, -1): np.array([[0], [24]]),
+                        vi(1, -1): np.array([[24]]),
+                        vi(-1, -1): np.array([[0]])}
+        _verify_partial_map(self, cpair.src, expected_map)
+
+        cpair = b1.get_connection(SubdomainSpec2D.X_LOW, b2.id)
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 24)])
+
+        cpair = b1.get_connection(SubdomainSpec2D.X_HIGH, b2.id)
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 24)])
+
+        cpair = b1.get_connection(SubdomainSpec2D.Y_HIGH, b3.id)
+        self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 24)])
+
+        cpair = b1.get_connection(SubdomainSpec2D.X_LOW, b3.id)
+        self.assertEqual(cpair.src.dst_full_buf_slice, [])
+        expected_map = {vi(-1, 1): np.array([[0]])}
+        _verify_partial_map(self, cpair.src, expected_map)
 
 
     def test_2blocks(self):
-        return
         config = LBConfig()
         config.lat_nx = 64
         config.lat_ny = 64
         config.periodic_x = True
+        config.periodic_y = False
+        config.grid = 'D2Q9'
 
         geo = LBGeometry2D(config)
         b1 = SubdomainSpec2D((0, 0), (32, 64), envelope_size=1, id_=1)
         b2 = SubdomainSpec2D((32, 0), (8, 64), envelope_size=1, id_=2)
         b3 = SubdomainSpec2D((40, 0), (24, 64), envelope_size=1, id_=3)
-        self.assertTrue(b1.connect(b3, geo, 0, D2Q9, [True, False]))
+
+        proc = LBGeometryProcessor([b1, b2, b3], 2, geo)
+        proc._connect_blocks(config)
+
         cpair = b1.get_connection(SubdomainSpec2D.X_LOW, b3.id)
 
         self.assertEqual(cpair.src.dst_full_buf_slice, [slice(1, 63)])
