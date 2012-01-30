@@ -154,7 +154,8 @@ def _get_dst_partial_map(dists, grid, src_slice_global, b1, slice_axes,
         the area of nodes sending information to the target node
     :param conn_axis: axis along which the two subdomains are connected
     """
-    es = b1.envelope_size
+    # XXX
+    es = 0 #b1.envelope_size
 
     # Location of the b1 block in global coordinates (real nodes only).
     # Local periodic boundary conditions effectively extend the subdomain
@@ -430,10 +431,10 @@ class SubdomainSpec(object):
     def connecting_blocks(self):
         """Returns a list of pairs: (face, block ID) representing connections
         to different blocks."""
-        ids = []
+        ids = set([])
         for face, v in self._connections.iteritems():
             for pair in v:
-                ids.append((face, pair.dst.block_id))
+                ids.add((face, pair.dst.block_id))
         return ids
 
     def has_face_conn(self, face):

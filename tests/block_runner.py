@@ -94,7 +94,11 @@ class NNBlockRunnerTest(unittest.TestCase):
         self.ctx = zmq.Context()
 
     def tearDown(self):
-        self.ctx.destroy()
+        try:
+            self.ctx.destroy()
+        # Workaround for differences between zmq versions.
+        except AttributeError:
+            pass
 
     def test_macro_transfer_2d(self):
         """Verifies that macroscopic fields are correctly exchanged between two

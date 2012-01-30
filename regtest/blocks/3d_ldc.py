@@ -36,7 +36,7 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'ref')
         blocks = 1
         ctrl = LBSimulationController(SimulationTest, LDCGeometry)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
         cls.ref = np.load('%s_blk0_200.npz' % output)
         cls.rho = cls.ref['rho']
         cls.vx  = cls.ref['v'][0]
@@ -48,7 +48,7 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'horiz_8block')
         blocks = 8
         ctrl = LBSimulationController(SimulationTest, LDCGeometry)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
         testdata0 = np.load('%s_blk0_200.npz' % output)
         testdata1 = np.load('%s_blk1_200.npz' % output)
         testdata2 = np.load('%s_blk2_200.npz' % output)

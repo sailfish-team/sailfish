@@ -164,7 +164,7 @@ class TwoBlockPropagationTest(unittest.TestCase):
         global tmpdir
         HorizTest = type('HorizTest', (SimulationTest,), {'axis': 0})
         ctrl = LBSimulationController(HorizTest, TwoBlocksXConnGeoTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
         b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
@@ -174,7 +174,7 @@ class TwoBlockPropagationTest(unittest.TestCase):
         global tmpdir
         VertTest = type('VertTest', (SimulationTest,), {'axis': 1})
         ctrl = LBSimulationController(VertTest, TwoBlocksYConnGeoTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
         b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
@@ -184,7 +184,7 @@ class TwoBlockPropagationTest(unittest.TestCase):
         global tmpdir
         DepthTest = type('DepthTest', (SimulationTest,), {'axis': 2})
         ctrl = LBSimulationController(DepthTest, TwoBlocksZConnGeoTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
         b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
@@ -246,7 +246,7 @@ class PeriodicSimulationTest(LBFluidSim, LBForcedSim):
 class PeriodicPropagationTest(unittest.TestCase):
     def test_horiz_spread(self):
         ctrl = LBSimulationController(PeriodicSimulationTest, TwoBlocksXConnGeoTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'per_horiz_out_blk0_dist_dump1.npy'))
         b1 = np.load(os.path.join(tmpdir, 'per_horiz_out_blk1_dist_dump1.npy'))
@@ -298,7 +298,7 @@ class PartialPeriodicSimulationTest(PeriodicSimulationTest):
 class PartialPeriodicPropagationTest(unittest.TestCase):
     def test_x_conn(self):
         ctrl = LBSimulationController(PartialPeriodicSimulationTest,
-                TwoBlocksXConnGeoTest).run()
+                TwoBlocksXConnGeoTest).run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'per_horiz_out_blk0_dist_dump1.npy'))
         b1 = np.load(os.path.join(tmpdir, 'per_horiz_out_blk1_dist_dump1.npy'))
@@ -384,7 +384,7 @@ class SingleBlockPeriodicTest(unittest.TestCase):
         global tmpdir
         ctrl = LBSimulationController(SingleBlockPeriodicSimulationTest,
                 SingleBlockGeoTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'per_single_out_blk0_dist_dump1.npy'))
         ae = np.testing.assert_equal

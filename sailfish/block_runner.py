@@ -638,6 +638,18 @@ class BlockRunner(object):
                             '(face {2})'.format(self._block.id, block_id, face))
                     self._block_to_connbuf[block_id].append(cbuf)
 
+        # Explicitly sort connection buffers by their face ID.  Create a
+        # separate dictionary where the order of the connection buffers
+        # corresponds to that used by the _other_ subdomain.
+        self._recv_block_to_connbuf = defaultdict(list)
+        for subdomain_id, cbufs in self._block_to_connbuf.iteritems():
+            cbufs.sort(key=lambda x: (x.face, x.grid_id))
+            recv_bufs = list(cbufs)
+            recv_bufs.sort(key=lambda x: (self._block.opposite_face(x.face),
+                x.grid_id))
+            self._recv_block_to_connbuf[subdomain_id] = recv_bufs
+
+
     def _init_compute(self):
         self.config.logger.debug("Initializing compute unit.")
         code = self._get_compute_code()
@@ -698,6 +710,7 @@ class BlockRunner(object):
     def step(self, output_req):
         self._step_boundary(output_req)
         self._step_bulk(output_req)
+        self._apply_pbc(self._pbc_kernels)
         self._sim.iteration += 1
         self._send_dists()
         self._recv_dists()
@@ -776,7 +789,6 @@ class BlockRunner(object):
 
         self._timing_bnd_start = make_event(blk_str, timing=True)
         self.backend.run_kernel(kernel, grid, blk_str)
-        self._apply_pbc(self._pbc_kernels)
         self._timing_bnd_stop = make_event(blk_str, timing=True)
 
         # Enqueue a wait so that the data collection will not start until the kernel
@@ -806,18 +818,14 @@ class BlockRunner(object):
 
     def _recv_dists(self):
         for b_id, connector in self._block._connectors.iteritems():
-            conn_bufs = self._block_to_connbuf[b_id]
+            conn_bufs = self._recv_block_to_connbuf[b_id]
             if len(conn_bufs) > 1:
                 dest = np.hstack([np.ravel(x.recv_buf) for x in conn_bufs])
                 # Returns false only if quit event is active.
                 if not connector.recv(dest, self._quit_event):
                     return
                 i = 0
-                # In case there are 2 connections between the blocks, reverse the
-                # order of subbuffers in the recv buffer.  Note that this implicitly
-                # assumes the order of conn_bufs is the same for both blocks.
-                # TODO(michalj): Consider explicitly sorting conn_bufs.
-                for cbuf in util.reverse_pairs(conn_bufs, len(self._sim.grids)):
+                for cbuf in conn_bufs:
                     l = cbuf.recv_buf.size
                     cbuf.recv_buf[:] = dest[i:i+l].reshape(cbuf.recv_buf.shape)
                     i += l
@@ -1224,14 +1232,14 @@ class NNBlockRunner(BlockRunner):
 
     def _recv_macro(self):
         for b_id, connector in self._block._connectors.iteritems():
-            conn_bufs = self._block_to_macrobuf[b_id]
+            conn_bufs = self._recv_block_to_macrobuf[b_id]
             if len(conn_bufs) > 1:
                 dest = np.hstack([np.ravel(x.recv_buf.host) for x in conn_bufs])
                 # Returns false only if quit event is active.
                 if not connector.recv(dest, self._quit_event):
                     return
                 i = 0
-                for cbuf in util.reverse_pairs(conn_bufs, self._num_nn_fields):
+                for cbuf in conn_bufs:
                     l = cbuf.recv_buf.host.size
                     cbuf.recv_buf.host[:] = dest[i:i+l].reshape(cbuf.recv_buf.host.shape)
                     i += l
@@ -1310,6 +1318,16 @@ class NNBlockRunner(BlockRunner):
                             dist_idx, field_pair.buffer)
 
                     self._block_to_macrobuf[block_id].append(cbuf)
+
+        # Explicitly sort connection buffers by their face ID.  Create a
+        # separate dictionary where the order of the connection buffers
+        # corresponds to that used by the _other_ subdomain.
+        self._recv_block_to_macrobuf = defaultdict(list)
+        for subdomain_id, cbufs in self._block_to_macrobuf.iteritems():
+            cbufs.sort(key=lambda x:(x.face))
+            recv_bufs = list(cbufs)
+            recv_bufs.sort(key=lambda x: self._block.opposite_face(x.face))
+            self._recv_block_to_macrobuf[subdomain_id] = recv_bufs
 
     def _init_macro_collect_kernels(self, cbuf, grid_dim1, block_size):
         # Sparse data collection.

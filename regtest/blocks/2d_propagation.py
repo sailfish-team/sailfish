@@ -134,7 +134,7 @@ class MixedPeriodicPropagationTest(unittest.TestCase):
         HorizTest = type('HorizTest', (SimulationTest,),
                 {'initial_conditions': ic})
         ctrl = LBSimulationController(HorizTest, DoubleBlockGeometryTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
         b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
@@ -148,6 +148,65 @@ class MixedPeriodicPropagationTest(unittest.TestCase):
         ae(b1[vi(1, 1), 2, 1], np.float32(0.42))
         ae(b1[vi(1, -1), 256, 1], np.float32(0.43))
 
+
+class PeriodicCornerPropagationTest(unittest.TestCase):
+    def setUp(self):
+        global periodic_x, periodic_y
+        periodic_x = True
+        periodic_y = True
+
+    def test_spread(self):
+        def ic(self, runner):
+            dbuf = runner._debug_get_dist()
+            dbuf[:] = 0.0
+
+            if runner._block.id == 1:
+                dbuf[vi(1, 0), 1, 128] = 0.11
+                dbuf[vi(1, 1), 1, 128] = 0.12
+                dbuf[vi(1, -1), 1, 128] = 0.13
+
+                # At the top
+                dbuf[vi(1, 0), 256, 128] = 0.31
+                dbuf[vi(1, 1), 256, 128] = 0.32
+                dbuf[vi(1, -1), 256, 128] = 0.33
+
+            elif runner._block.id == 0:
+                dbuf[vi(-1, 0), 256, 1] = 0.21
+                dbuf[vi(-1, 1), 256, 1] = 0.22
+                dbuf[vi(-1, -1), 256, 1] = 0.23
+
+                # At the bottom
+                dbuf[vi(-1, 0), 1, 1] = 0.41
+                dbuf[vi(-1, 1), 1, 1] = 0.42
+                dbuf[vi(-1, -1), 1, 1] = 0.43
+
+            runner._debug_set_dist(dbuf)
+            runner._debug_set_dist(dbuf, False)
+
+        HorizTest = type('HorizTest', (SimulationTest,),
+                {'initial_conditions': ic})
+        ctrl = LBSimulationController(HorizTest, DoubleBlockGeometryTest)
+        ctrl.run(ignore_cmdline=True)
+
+        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
+        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        ae = np.testing.assert_equal
+
+        ae(b0[vi(1, 0), 1, 1], np.float32(0.11))
+        ae(b0[vi(1, 1), 2, 1], np.float32(0.12))
+        ae(b0[vi(1, -1), 256, 1], np.float32(0.13))
+
+        ae(b0[vi(1, 0), 256, 1], np.float32(0.31))
+        ae(b0[vi(1, 1), 1, 1], np.float32(0.32))
+        ae(b0[vi(1, -1), 255, 1], np.float32(0.33))
+
+        ae(b1[vi(-1, 0), 256, 128], np.float32(0.21))
+        ae(b1[vi(-1, 1), 1, 128], np.float32(0.22))
+        ae(b1[vi(-1, -1), 255, 128], np.float32(0.23))
+
+        ae(b1[vi(-1, 0), 1, 128], np.float32(0.41))
+        ae(b1[vi(-1, 1), 2, 128], np.float32(0.42))
+        ae(b1[vi(-1, -1), 256, 128], np.float32(0.43))
 
 class PeriodicPropagationTest(unittest.TestCase):
     def setUp(self):
@@ -190,7 +249,7 @@ class PeriodicPropagationTest(unittest.TestCase):
         HorizTest = type('HorizTest', (SimulationTest,),
                 {'initial_conditions': ic})
         ctrl = LBSimulationController(HorizTest, DoubleBlockGeometryTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
         b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
@@ -248,7 +307,7 @@ class PeriodicPropagationTest(unittest.TestCase):
         HorizTest = type('HorizTest', (SimulationTest,),
                 {'initial_conditions': ic})
         ctrl = LBSimulationController(HorizTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
         ae = np.testing.assert_equal
@@ -286,7 +345,7 @@ class PeriodicPropagationTest(unittest.TestCase):
         CornerTest = type('CornerTest', (SimulationTest,),
                 {'initial_conditions': ic})
         ctrl = LBSimulationController(CornerTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
         ae = np.testing.assert_equal
@@ -306,7 +365,7 @@ class TestCornerPropagation(unittest.TestCase):
     def test_4corners(self):
         global tmpdir
         ctrl = LBSimulationController(SimulationTest, GeometryTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
         b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
@@ -350,7 +409,7 @@ class TestCornerPropagation(unittest.TestCase):
 
         RightSide = type('RightSide', (SimulationTest,), {'initial_conditions': ic})
         ctrl = LBSimulationController(RightSide, GeometryTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
         b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
@@ -423,7 +482,7 @@ class TestThreeBlockPropagation(unittest.TestCase):
     def test_propagation(self):
         global tmpdir
         ctrl = LBSimulationController(ThreeBlocksSimulationTest, ThreeBlocksGeometryTest)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
 
         b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
         b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
