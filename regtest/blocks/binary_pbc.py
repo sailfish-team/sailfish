@@ -121,12 +121,12 @@ class TestShanChenShift(unittest.TestCase):
     def test_shift_2d(self):
         global output
         output = os.path.join(tmpdir, 'baseline')
-        ctrl = LBSimulationController(SCTestSim2D, LBGeometry2D).run()
+        ctrl = LBSimulationController(SCTestSim2D, LBGeometry2D).run(ignore_cmdline=True)
         ref = np.load('%s_blk0_1000.npz' % output)
 
         output = os.path.join(tmpdir, 'shifted')
         SCTestDomain2D.shift = True
-        LBSimulationController(SCTestSim2D, LBGeometry2D).run()
+        LBSimulationController(SCTestSim2D, LBGeometry2D).run(ignore_cmdline=True)
         shifted = np.load('%s_blk0_1000.npz' % output)
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])
@@ -134,12 +134,12 @@ class TestShanChenShift(unittest.TestCase):
     def test_shift_3d(self):
         global output
         output = os.path.join(tmpdir, 'baseline')
-        ctrl = LBSimulationController(SCTestSim3D, LBGeometry3D).run()
+        ctrl = LBSimulationController(SCTestSim3D, LBGeometry3D).run(ignore_cmdline=True)
         ref = np.load('%s_blk0_100.npz' % output)
 
         output = os.path.join(tmpdir, 'shifted')
         SCTestDomain3D.shift = True
-        LBSimulationController(SCTestSim3D, LBGeometry3D).run()
+        LBSimulationController(SCTestSim3D, LBGeometry3D).run(ignore_cmdline=True)
         shifted = np.load('%s_blk0_100.npz' % output)
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])
@@ -234,12 +234,12 @@ class TestFreeEnergyShift(unittest.TestCase):
     def test_shift_2d(self):
         global output
         output = os.path.join(tmpdir, 'baseline')
-        LBSimulationController(FETestSim2D, LBGeometry2D).run()
+        LBSimulationController(FETestSim2D, LBGeometry2D).run(ignore_cmdline=True)
         ref = np.load('%s_blk0_1000.npz' % output)
 
         output = os.path.join(tmpdir, 'shifted')
         FETestDomain2D.shift = True
-        LBSimulationController(FETestSim2D, LBGeometry2D).run()
+        LBSimulationController(FETestSim2D, LBGeometry2D).run(ignore_cmdline=True)
         shifted = np.load('%s_blk0_1000.npz' % output)
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])
@@ -247,12 +247,12 @@ class TestFreeEnergyShift(unittest.TestCase):
     def test_shift_3d(self):
         global output
         output = os.path.join(tmpdir, 'baseline')
-        LBSimulationController(FETestSim3D, LBGeometry3D).run()
+        LBSimulationController(FETestSim3D, LBGeometry3D).run(ignore_cmdline=True)
         ref = np.load('%s_blk0_100.npz' % output)
 
         output = os.path.join(tmpdir, 'shifted')
         FETestDomain3D.shift = True
-        LBSimulationController(FETestSim3D, LBGeometry3D).run()
+        LBSimulationController(FETestSim3D, LBGeometry3D).run(ignore_cmdline=True)
         shifted = np.load('%s_blk0_100.npz' % output)
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])

@@ -45,9 +45,7 @@ class SCSimulationTest(SeparationSCSim):
             'max_iters': MAX_ITERS,
             'quiet': True,
             'cuda_cache': False,
-            'save_src': '/tmp/foo.cu',
-            'output': output,
-            'debug_dump_dists': True})
+            'output': output})
 
 
 class FETestDomain(SeparationDomain):
@@ -165,27 +163,27 @@ class TestSCInterblockPropagation(unittest.TestCase):
     def setUpClass(cls):
         global output
         output = os.path.join(tmpdir, 'ref')
-        LBSimulationController(SCSimulationTest, LBGeometry2D).run()
+        LBSimulationController(SCSimulationTest, LBGeometry2D).run(ignore_cmdline=True)
         cls.ref = np.load('%s_blk0_%d.npz' % (output, MAX_ITERS))
 
     def test_4blocks(self):
         global output
+        return
         output = os.path.join(tmpdir, '4blocks')
-        LBSimulationController(SCSimulationTest, Geometry4Blocks).run()
+        LBSimulationController(SCSimulationTest, Geometry4Blocks).run(ignore_cmdline=True)
         test_4blocks(self.ref)
 
     def test_2blocks_horiz(self):
         global output
-        return
         output = os.path.join(tmpdir, '2blocks_horiz')
-        LBSimulationController(SCSimulationTest, Geometry2BlocksHoriz).run()
+        LBSimulationController(SCSimulationTest, Geometry2BlocksHoriz).run(ignore_cmdline=True)
         test_2blocks_horiz(self.ref)
 
     def test_2blocks_vert(self):
         global output
         return
         output = os.path.join(tmpdir, '2blocks_vert')
-        LBSimulationController(SCSimulationTest, Geometry2BlocksVertical).run()
+        LBSimulationController(SCSimulationTest, Geometry2BlocksVertical).run(ignore_cmdline=True)
         test_2blocks_vert(self.ref)
 
 
@@ -194,25 +192,25 @@ class TestFEInterblockPropagation(object): #unittest.TestCase):
     def setUpClass(cls):
         global output
         output = os.path.join(tmpdir, 'ref')
-        LBSimulationController(FESimulationTest, LBGeometry2D).run()
+        LBSimulationController(FESimulationTest, LBGeometry2D).run(ignore_cmdline=True)
         cls.ref = np.load('%s_blk0_%d.npz' % (output, MAX_ITERS))
 
     def test_4blocks(self):
         global output
         output = os.path.join(tmpdir, '4blocks')
-        LBSimulationController(FESimulationTest, Geometry4Blocks).run()
+        LBSimulationController(FESimulationTest, Geometry4Blocks).run(ignore_cmdline=True)
         test_4blocks(self.ref)
 
     def test_2blocks_horiz(self):
         global output
         output = os.path.join(tmpdir, '2blocks_horiz')
-        LBSimulationController(FESimulationTest, Geometry2BlocksHoriz).run()
+        LBSimulationController(FESimulationTest, Geometry2BlocksHoriz).run(ignore_cmdline=True)
         test_2blocks_horiz(self.ref)
 
     def test_2blocks_vert(self):
         global output
         output = os.path.join(tmpdir, '2blocks_vert')
-        LBSimulationController(FESimulationTest, Geometry2BlocksVertical).run()
+        LBSimulationController(FESimulationTest, Geometry2BlocksVertical).run(ignore_cmdline=True)
         test_2blocks_vert(self.ref)
 
 

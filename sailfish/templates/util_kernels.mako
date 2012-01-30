@@ -62,15 +62,15 @@
 				direction[1 - axis] = 1
 				corner_dists = sym.get_interblock_dists(grid, direction)
 				cond = 'idx1 > 1'
-				if block_periodicity[1 - axis] and block_periodicity[axis]:
-					cond += ' && idx1 <= {0}'.format(max_dim)
+				#if block_periodicity[1 - axis] and block_periodicity[axis]:
+				cond += ' && idx1 <= {0}'.format(max_dim)
 				cond_to_dists[cond] = corner_dists
 
 				direction[1 - axis] = -1
 				corner_dists = sym.get_interblock_dists(grid, direction)
 				cond = 'idx1 < {0}'.format(max_dim)
-				if block_periodicity[1 - axis] and block_periodicity[axis]:
-					cond += ' && idx1 >= 1'
+				#if block_periodicity[1 - axis] and block_periodicity[axis]:
+				cond += ' && idx1 >= 1'
 				cond_to_dists[cond] = corner_dists
 			else:
 				# Covers full NN connectivity in 3D.  Needs to be extended for

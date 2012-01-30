@@ -42,7 +42,7 @@ class LBConfigParser(object):
     def set_defaults(self, defaults):
         return self._parser.set_defaults(**defaults)
 
-    def parse(self):
+    def parse(self, args):
         config = ConfigParser.ConfigParser()
         config.read(['/etc/sailfishrc', os.path.expanduser('~/.sailfishrc'),
                 '.sailfishrc'])
@@ -50,7 +50,7 @@ class LBConfigParser(object):
             self._parser.set_defaults(**dict(config.items('main')))
         except ConfigParser.NoSectionError:
             pass
-        self._parser.parse_args(namespace=self.config)
+        self._parser.parse_args(args=args, namespace=self.config)
 
         # Additional internal config options, not settable via
         # command line parameters.

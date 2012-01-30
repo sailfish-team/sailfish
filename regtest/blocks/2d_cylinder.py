@@ -38,7 +38,7 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'href')
         blocks = 1
         ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
         cls.href = np.load('%s_blk0_100.npz' % output)
         cls.hrho = cls.href['rho']
         cls.hvx  = cls.href['v'][0]
@@ -47,7 +47,7 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'vref')
         vertical = True
         ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
         cls.vref = np.load('%s_blk0_100.npz' % output)
         cls.vrho = cls.vref['rho']
         cls.vvx  = cls.vref['v'][0]
@@ -59,7 +59,7 @@ class TestInterblockPropagation(unittest.TestCase):
         blocks = 2
         vertical = False
         ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
         testdata0 = np.load('%s_blk0_100.npz' % output)
         testdata1 = np.load('%s_blk1_100.npz' % output)
 
@@ -77,7 +77,7 @@ class TestInterblockPropagation(unittest.TestCase):
         blocks = 3
         vertical = False
         ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
         testdata0 = np.load('%s_blk0_100.npz' % output)
         testdata1 = np.load('%s_blk1_100.npz' % output)
         testdata2 = np.load('%s_blk2_100.npz' % output)
@@ -96,7 +96,7 @@ class TestInterblockPropagation(unittest.TestCase):
         blocks = 2
         vertical = True
         ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
         testdata0 = np.load('%s_blk0_100.npz' % output)
         testdata1 = np.load('%s_blk1_100.npz' % output)
 
@@ -114,7 +114,7 @@ class TestInterblockPropagation(unittest.TestCase):
         blocks = 3
         vertical = True
         ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
         testdata0 = np.load('%s_blk0_100.npz' % output)
         testdata1 = np.load('%s_blk1_100.npz' % output)
         testdata2 = np.load('%s_blk2_100.npz' % output)

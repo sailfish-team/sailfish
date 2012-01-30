@@ -551,10 +551,15 @@ class LBSimulationController(object):
         return None, None
 
 
-    def run(self):
+    def run(self, ignore_cmdline=False):
         """Runs a simulation."""
 
-        self.config = self._config_parser.parse()
+        if ignore_cmdline:
+            args = []
+        else:
+            args = sys.argv[1:]
+
+        self.config = self._config_parser.parse(args)
         self._lb_class.modify_config(self.config)
         self.geo = self._lb_geo(self.config)
 
