@@ -1,6 +1,10 @@
 #!/usr/bin/python 
 
-"""Compares Sailfish results for the 2D lid driven cavity test case with numerical results from the literature. Numerical solutions of 2-D steady incompressible driven cavity ow at high Reynolds numbers E. Erturk; T. C. Corke and C. Gokcol with numerical calculation of Navier-Stokes equations;  grid size: 601X601 """
+"""Compares Sailfish results for the 2D lid driven cavity test case with 
+numerical results from the literature. Numerical solutions of 2-D steady 
+incompressible driven cavity ow at high Reynolds numbers E. Erturk; T. C. Corke
+and C. Gokcol with numerical calculation of Navier-Stokes equations;  
+grid size: 601X601 """
 
 import numpy as np
 import matplotlib
@@ -92,8 +96,8 @@ def run_test(name, i):
     
     ctrl = LBSimulationController(TestLDCSim, LDCGeometry)  
     ctrl.run()
-    horiz = np.loadtxt('ldc_golden/vx2d', skiprows=2)
-    vert = np.loadtxt('ldc_golden/vy2d', skiprows=2)
+    horiz = np.loadtxt('ldc_golden/vx2d', skiprows=4)
+    vert = np.loadtxt('ldc_golden/vy2d', skiprows=4)
     
     plt.plot(horiz[:, 0] * 2 - 1, horiz[:, i+1], label='Paper')
     plt.plot(vert[:, i+1], 2 * (vert[:, 0] - 0.5), label='Paper')
