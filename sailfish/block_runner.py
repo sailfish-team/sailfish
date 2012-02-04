@@ -1047,6 +1047,9 @@ class BlockRunner(object):
             self.config.logger.debug('Sending timing information to controller.')
             assert self._summary_sender.recv() == 'ack'
 
+    def _initial_conditions(self):
+        self._sim.initial_conditions(self)
+
     def run(self):
         self.config.logger.info("Initializing block.")
 
@@ -1058,7 +1061,6 @@ class BlockRunner(object):
         self._subdomain.init_fields(self._sim)
         self._init_gpu_data()
         self.config.logger.debug("Applying initial conditions.")
-        self._sim.initial_conditions(self)
 
         self._init_interblock_kernels()
         self._kernels_bulk_full = self._sim.get_compute_kernels(self, True, True)
@@ -1066,6 +1068,8 @@ class BlockRunner(object):
         self._kernels_bnd_full = self._sim.get_compute_kernels(self, True, False)
         self._kernels_bnd_none = self._sim.get_compute_kernels(self, False, False)
         self._pbc_kernels = self._sim.get_pbc_kernels(self)
+
+        self._initial_conditions()
 
         if self.config.output:
             self._output.save(self._sim.iteration)
@@ -1415,6 +1419,29 @@ class NNBlockRunner(BlockRunner):
                 self._macro_distrib_kernels.append(
                         self._init_macro_distrib_kernels(cbuf, _grid_dim1,
                             collect_block))
+
+    def _initial_conditions(self):
+        """Prepares non-local fields prior to simulation start-up.
+
+        This is necessary for models that use non-local field values to set
+        the initial values of the distributions."""
+
+        for kernel, grid in self._macro_collect_kernels:
+            self.backend.run_kernel(kernel, grid, self._data_stream)
+
+        self._data_stream.synchronize()
+        self._apply_pbc(self._pbc_kernels.macro)
+        self._send_macro()
+        if self.need_quit():
+            return False
+
+        self._recv_macro()
+
+        for kernel, grid in self._macro_distrib_kernels:
+            self.backend.run_kernel(kernel, grid, self._data_stream)
+
+        self._data_stream.synchronize()
+        super(NNBlockRunner, self)._initial_conditions()
 
     def step(self, output_req):
         """Runs one simulation step."""
