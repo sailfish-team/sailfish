@@ -66,6 +66,8 @@ regtest_small_block:
 	python regtest/blocks/2d_cylinder.py --block_size=16
 	python regtest/blocks/3d_propagation.py --block_size=16
 	python regtest/blocks/3d_ldc.py --block_size=16
+	python regtest/blocks/binary_pbc.py --block_size=16
+	python regtest/blocks/2d_binary.py --block_size=16
 
 presubmit: test regtest regtest_small_block
 
