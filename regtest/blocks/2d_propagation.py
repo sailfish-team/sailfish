@@ -81,7 +81,6 @@ class SimulationTest(LBFluidSim, LBForcedSim):
             'output': os.path.join(tmpdir, 'test_out'),
             'debug_dump_dists': True,
             'cuda_cache': False,
-            'save_src': '/tmp/foo.cu',
         })
 
     def initial_conditions(self, runner):

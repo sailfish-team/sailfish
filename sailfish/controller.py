@@ -145,7 +145,8 @@ class LBGeometryProcessor(object):
                 return [tuple(loc)]
 
             ret = []
-            while axes:
+            axis_done = False
+            while axes and not axis_done:
                 ax = axes.pop()
                 if not periodicity[ax]:
                     continue
@@ -154,12 +155,13 @@ class LBGeometryProcessor(object):
                     ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
                     loc[ax] = self.geo.gsize[ax]
                     ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
-                    break
-                elif subdomain.end_location[ax] == self.geo.gsize[ax]:
+                    loc[ax] = 0
+                    axis_done = True
+                if subdomain.end_location[ax] == self.geo.gsize[ax]:
                     ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
                     loc[ax] = -subdomain.size[ax]
                     ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
-                    break
+                    axis_done = True
 
             return ret
 
@@ -176,8 +178,8 @@ class LBGeometryProcessor(object):
                 loc = list(subdomain.location)
                 loc[axis] = self.geo.gsize[axis]
 
-                locs = _pbc_helper(list(subdomain.location), subdomain,
-                    range(axis, self.dim))
+                locs = set(_pbc_helper(list(subdomain.location), subdomain,
+                    range(axis, self.dim)))
                 b = subdomain
                 locs.remove(b.location)
 
@@ -220,8 +222,6 @@ class LBGeometryProcessor(object):
                 if real.end_location[axis] == self.geo.gsize[axis]:
                     real.enable_local_periodicity(axis)
 
-        done = set()
-
         for axis in range(self.dim):
             for block in sorted(self.blocks, key=lambda x: x.location[axis]):
                 higher_coord = block.end_location[axis]
@@ -229,12 +229,7 @@ class LBGeometryProcessor(object):
                     continue
                 for neighbor_candidate in \
                         self._coord_map_list[axis][higher_coord]:
-
-                    if (block, neighbor_candidate.virtual) in done:
-                        continue
-
-                    if try_connect(block, neighbor_candidate):
-                        done.add((block, neighbor_candidate.virtual))
+                    try_connect(block, neighbor_candidate)
 
         # Ensure every block is connected to at least one other block.
         if len(self.blocks) > 1 and len(connected) != len(self.blocks):

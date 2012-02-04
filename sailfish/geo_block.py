@@ -154,14 +154,9 @@ def _get_dst_partial_map(dists, grid, src_slice_global, b1, slice_axes,
         the area of nodes sending information to the target node
     :param conn_axis: axis along which the two subdomains are connected
     """
-    # XXX
-    es = 0 #b1.envelope_size
-
     # Location of the b1 block in global coordinates (real nodes only).
-    # Local periodic boundary conditions effectively extend the subdomain
-    # by envelope_size nodes.
-    min_loc = np.int32([b1.location[ax] - es * int(b1._periodicity[ax]) for ax in slice_axes])
-    max_loc = np.int32([b1.end_location[ax] + es * int(b1._periodicity[ax]) for ax in slice_axes])
+    min_loc = np.int32([b1.location[ax] for ax in slice_axes])
+    max_loc = np.int32([b1.end_location[ax] for ax in slice_axes])
 
     # Creates an array where the entry at [x,y] is the global coordinate pair
     # corresponding to the node [x,y] in the transfer buffer.
@@ -435,7 +430,7 @@ class SubdomainSpec(object):
         for face, v in self._connections.iteritems():
             for pair in v:
                 ids.add((face, pair.dst.block_id))
-        return ids
+        return list(ids)
 
     def has_face_conn(self, face):
         return face in self._connections.keys()

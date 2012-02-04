@@ -1459,6 +1459,7 @@ class NNBlockRunner(BlockRunner):
 
         # self._timing_calc_end = make_event(str_calc, timing=True)
 
+        self._apply_pbc(self._pbc_kernels.macro)
         self._send_macro()
         if self.need_quit():
             return False
@@ -1472,15 +1473,12 @@ class NNBlockRunner(BlockRunner):
         self._timing_macro_done = make_event(str_data, timing=True)
         str_calc.wait_for_event(self._timing_macro_done)
 
-        self._apply_pbc(self._pbc_kernels.macro)
-
         # Actual simulation step.
         if has_boundary_split:
             run(bnd_kernel_sim, grid_bnd, str_calc)
         else:
             run(bulk_kernel_sim, grid_bulk, str_calc)
 
-        self._apply_pbc(self._pbc_kernels.distributions)
         ev = make_event(str_calc)
         str_data.wait_for_event(ev)
 
@@ -1490,6 +1488,7 @@ class NNBlockRunner(BlockRunner):
         if has_boundary_split:
             run(bulk_kernel_sim, grid_bulk, str_calc)
 
+        self._apply_pbc(self._pbc_kernels.distributions)
         self._sim.iteration += 1
 
         self._send_dists()

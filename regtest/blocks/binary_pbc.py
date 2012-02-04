@@ -17,12 +17,13 @@ from sailfish.geo_block import Subdomain2D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidShanChen, LBBinaryFluidFreeEnergy
 from sailfish.lb_single import LBForcedSim
+from regtest.blocks import util
 
 
 SHIFT = [17, 4, 13]
 output = ''
 tmpdir = tempfile.mkdtemp()
-
+block_size = 64
 
 def match_fields(reference, shifted):
     for axis in range(0, len(reference.shape)):
@@ -84,6 +85,8 @@ class SCTestSim2D(LBBinaryFluidShanChen, LBForcedSim):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
+            'block_size': block_size,
+            'cuda_cache': False,
             'lat_nx': 254,
             'lat_ny': 230,
             'grid': 'D2Q9',
@@ -102,6 +105,8 @@ class SCTestSim3D(LBBinaryFluidShanChen, LBForcedSim):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
+            'block_size': block_size,
+            'cuda_cache': False,
             'lat_nx': 62,
             'lat_ny': 48,
             'lat_nz': 40,
@@ -130,6 +135,10 @@ class TestShanChenShift(unittest.TestCase):
         shifted = np.load('%s_blk0_1000.npz' % output)
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])
+        self.assertFalse(np.any(np.isnan(ref['rho'])))
+        self.assertFalse(np.any(np.isnan(ref['phi'])))
+        self.assertFalse(np.any(np.isnan(shifted['rho'])))
+        self.assertFalse(np.any(np.isnan(shifted['phi'])))
 
     def test_shift_3d(self):
         global output
@@ -143,7 +152,10 @@ class TestShanChenShift(unittest.TestCase):
         shifted = np.load('%s_blk0_100.npz' % output)
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])
-
+        self.assertFalse(np.any(np.isnan(ref['rho'])))
+        self.assertFalse(np.any(np.isnan(ref['phi'])))
+        self.assertFalse(np.any(np.isnan(shifted['rho'])))
+        self.assertFalse(np.any(np.isnan(shifted['phi'])))
 #
 # Free-energy model.
 #
@@ -188,6 +200,8 @@ class FETestSim2D(LBBinaryFluidFreeEnergy, LBForcedSim):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
+            'block_size': block_size,
+            'cuda_cache': False,
             'lat_nx': 254,
             'lat_ny': 256,
             'grid': 'D2Q9',
@@ -211,6 +225,8 @@ class FETestSim3D(LBBinaryFluidFreeEnergy, LBForcedSim):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
+            'block_size': block_size,
+            'cuda_cache': False,
             'lat_nx': 62,
             'lat_ny': 48,
             'lat_nz': 40,
@@ -243,6 +259,10 @@ class TestFreeEnergyShift(unittest.TestCase):
         shifted = np.load('%s_blk0_1000.npz' % output)
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])
+        self.assertFalse(np.any(np.isnan(ref['rho'])))
+        self.assertFalse(np.any(np.isnan(ref['phi'])))
+        self.assertFalse(np.any(np.isnan(shifted['rho'])))
+        self.assertFalse(np.any(np.isnan(shifted['phi'])))
 
     def test_shift_3d(self):
         global output
@@ -256,12 +276,17 @@ class TestFreeEnergyShift(unittest.TestCase):
         shifted = np.load('%s_blk0_100.npz' % output)
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])
-
+        self.assertFalse(np.any(np.isnan(ref['rho'])))
+        self.assertFalse(np.any(np.isnan(ref['phi'])))
+        self.assertFalse(np.any(np.isnan(shifted['rho'])))
+        self.assertFalse(np.any(np.isnan(shifted['phi'])))
 
 def tearDownModule():
     shutil.rmtree(tmpdir)
 
 
 if __name__ == '__main__':
+    args = util.parse_cmd_line()
+    block_size = args.block_size
     unittest.main()
 

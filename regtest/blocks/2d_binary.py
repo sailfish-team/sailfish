@@ -12,8 +12,10 @@ from examples.binary_fluid.sc_separation_2d import SeparationSCSim, SeparationDo
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import SubdomainSpec2D
+from regtest.blocks import util
 
 MAX_ITERS = 10
+block_size = 64
 output = ''
 tmpdir = tempfile.mkdtemp()
 
@@ -41,6 +43,7 @@ class SCSimulationTest(SeparationSCSim):
     def update_defaults(cls, defaults):
         SeparationSCSim.update_defaults(defaults)
         defaults.update({
+            'block_size': block_size,
             'every': 1,
             'max_iters': MAX_ITERS,
             'quiet': True,
@@ -70,8 +73,7 @@ class FESimulationTest(SeparationFESim):
     def update_defaults(cls, defaults):
         SeparationFESim.update_defaults(defaults)
         defaults.update({
-            'periodic_x': False,
-            'periodic_y': False,
+            'block_size': block_size,
             'every': 10,
             'max_iters': MAX_ITERS,
             'quiet': True,
@@ -168,7 +170,6 @@ class TestSCInterblockPropagation(unittest.TestCase):
 
     def test_4blocks(self):
         global output
-        return
         output = os.path.join(tmpdir, '4blocks')
         LBSimulationController(SCSimulationTest, Geometry4Blocks).run(ignore_cmdline=True)
         test_4blocks(self.ref)
@@ -181,13 +182,12 @@ class TestSCInterblockPropagation(unittest.TestCase):
 
     def test_2blocks_vert(self):
         global output
-        return
         output = os.path.join(tmpdir, '2blocks_vert')
         LBSimulationController(SCSimulationTest, Geometry2BlocksVertical).run(ignore_cmdline=True)
         test_2blocks_vert(self.ref)
 
 
-class TestFEInterblockPropagation(object): #unittest.TestCase):
+class TestFEInterblockPropagation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         global output
@@ -215,8 +215,9 @@ class TestFEInterblockPropagation(object): #unittest.TestCase):
 
 
 def tearDownModule():
-    #shutil.rmtree(tmpdir)
-    print tmpdir
+    shutil.rmtree(tmpdir)
 
 if __name__ == '__main__':
+    args = util.parse_cmd_line()
+    block_size = args.block_size
     unittest.main()
