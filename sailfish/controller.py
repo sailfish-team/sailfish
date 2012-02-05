@@ -166,7 +166,7 @@ class LBGeometryProcessor(object):
             return ret
 
         # Handle PBCs by creating virtual copies of subdomains touching the
-        # lower wall of the global domain.
+        # lower boundary of the global domain.
         done = set()
         for axis in range(self.dim):
             if not periodicity[axis]:

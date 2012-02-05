@@ -303,11 +303,6 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
                     self.S.wxx.append(-Rational(1, 24))
                     self.S.wyy.append(-Rational(1, 24))
 
-    # FIXME
-    #def _init_fields(self, need_dist):
-    #    super(BinaryFluidFreeEnergy, self)._init_fields(need_dist)
-    #    self.vis.add_field((lambda: self.rho + self.phi, lambda: self.rho - self.phi), 'density')
-
 
 class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
     """Binary fluid mixture using the Shan-Chen model."""
