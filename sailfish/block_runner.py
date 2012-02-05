@@ -110,6 +110,94 @@ class GPUBuffer(object):
             self.gpu = None
 
 
+class TimeProfile(object):
+    # GPU events.
+    BULK = 0
+    BOUNDARY = 1
+    COLLECTION = 2
+    DISTRIB = 3
+    MACRO_BULK = 4
+    MACRO_BOUNDARY = 5
+    MACRO_COLLECTION = 6
+    MACRO_DISTRIB = 7
+
+    # CPU events.
+    SEND_DISTS = 8
+    RECV_DISTS = 9
+    SEND_MACRO = 10
+    RECV_MACRO = 11
+    STEP = 12
+
+    def __init__(self, runner):
+        self._runner = runner
+        self._make_event = runner.backend.make_event
+        self._events_start = {}
+        self._events_end = {}
+        self._times_start = {}
+        self._times_end = {}
+        self._timings = [0.0] * (self.STEP + 1)
+
+    def record_start(self):
+        self.t_start = time.time()
+
+    def record_end(self):
+        self.t_end = time.time()
+        if self._runner.config.mode != 'benchmark':
+            return
+        mi = self._runner.config.max_iters
+
+        ti = util.TimingInfo(
+                comp=(self._timings[self.BULK] + self._timings[self.BOUNDARY]) / mi,
+                bulk=self._timings[self.BULK] / mi,
+                bnd =self._timings[self.BOUNDARY] / mi,
+                coll=self._timings[self.COLLECTION] / mi,
+                data=0,
+                recv=self._timings[self.RECV_DISTS] / mi,
+                send=self._timings[self.SEND_DISTS] / mi,
+                wait=0,
+                total=self._timings[self.STEP] / mi,
+                block_id=self._runner._block.id)
+        self._runner.send_summary_info(ti)
+
+    def start_step(self):
+        self.record_cpu_start(self.STEP)
+
+    def end_step(self):
+        self.record_cpu_end(self.STEP)
+
+        for i, ev_start in self._events_start.iteritems():
+            self._timings[i] += self._events_end[i].time_since(ev_start) / 1e3
+
+        for i, t_start in self._times_start.iteritems():
+            self._timings[i] += self._times_end[i] - t_start
+
+    def record_gpu_start(self, event, stream):
+        ev = self._make_event(stream, timing=True)
+        self._events_start[event] = ev
+        return ev
+
+    def record_gpu_end(self, event, stream):
+        ev = self._make_event(stream, timing=True)
+        self._events_end[event] = ev
+        return ev
+
+    def record_cpu_start(self, event):
+        self._times_start[event] = time.time()
+
+    def record_cpu_end(self, event):
+        self._times_end[event] = time.time()
+
+
+def profile(profile_event):
+    def _profile(f):
+        def decorate(self, *args, **kwargs):
+            self._profile.record_cpu_start(profile_event)
+            ret = f(self, *args, **kwargs)
+            self._profile.record_cpu_end(profile_event)
+            return ret
+        return decorate
+    return _profile
+
 class BlockRunner(object):
     """Runs the simulation for a single Subdomain.
 
@@ -170,6 +258,7 @@ class BlockRunner(object):
         self._vis_map_cache = None
         self._quit_event = quit_event
 
+        self._profile = TimeProfile(self)
         # This only happens in unit tests.
         if master_addr is not None:
             self._init_network(master_addr, summary_addr)
@@ -473,6 +562,10 @@ class BlockRunner(object):
         """Returns the total amount of actual nodes in the lattice."""
         return reduce(operator.mul, self._physical_size)
 
+    @property
+    def num_nodes(self):
+        return reduce(operator.mul, self._lat_size)
+
     def _get_dist_bytes(self, grid):
         """Returns the number of bytes required to store a single set of
            distributions for the whole simulation domain."""
@@ -709,12 +802,13 @@ class BlockRunner(object):
     def step(self, output_req):
         self._step_boundary(output_req)
         self._step_bulk(output_req)
-        self._apply_pbc(self._pbc_kernels)
         self._sim.iteration += 1
         self._send_dists()
         self._recv_dists()
+        self._profile.record_gpu_start(TimeProfile.DISTRIB, self._data_stream)
         for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
             self.backend.run_kernel(kernel, grid, self._data_stream)
+        self._profile.record_gpu_end(TimeProfile.DISTRIB, self._data_stream)
 
     def _get_bulk_kernel(self, output_req):
         if output_req:
@@ -757,16 +851,16 @@ class BlockRunner(object):
         Bulk domain is defined to be all nodes that belong to CUDA
         blocks that do not depend on input from any ghost nodes.
         """
-        self._timing_calc_start = self.backend.make_event(self._calc_stream, timing=True)
-
         # The bulk kernel only needs to be run if the simulation has a bulk/boundary split.
         # If this split is not present, the whole domain is simulated in _step_boundary and
         # _step_bulk only needs to handle PBC (below).
+        self._profile.record_gpu_start(TimeProfile.BULK, self._calc_stream)
         if self._boundary_blocks is not None:
             kernel, grid = self._get_bulk_kernel(output_req)
             self.backend.run_kernel(kernel, grid, self._calc_stream)
 
-        self._timing_calc_end = self.backend.make_event(self._calc_stream, timing=True)
+        self._apply_pbc(self._pbc_kernels)
+        self._profile.record_gpu_end(TimeProfile.BULK, self._calc_stream)
 
     def _step_boundary(self, output_req):
         """Runs one simulation step for the boundary blocks.
@@ -784,22 +878,22 @@ class BlockRunner(object):
             kernel, grid = self._get_bulk_kernel(output_req)
 
         blk_str = self._calc_stream
-        make_event = self.backend.make_event
 
-        self._timing_bnd_start = make_event(blk_str, timing=True)
+        self._profile.record_gpu_start(TimeProfile.BOUNDARY, blk_str)
         self.backend.run_kernel(kernel, grid, blk_str)
-        self._timing_bnd_stop = make_event(blk_str, timing=True)
+        ev = self._profile.record_gpu_end(TimeProfile.BOUNDARY, blk_str)
 
         # Enqueue a wait so that the data collection will not start until the
         # kernel handling boundary calculations is completed (that kernel runs
         # in the calc stream so that it is automatically synchronized with
         # bulk calculations).
-        self._data_stream.wait_for_event(self._timing_bnd_stop)
+        self._data_stream.wait_for_event(ev)
+        self._profile.record_gpu_start(TimeProfile.COLLECTION, self._data_stream)
         for kernel, grid in self._collect_kernels[self._sim.iteration & 1]:
             self.backend.run_kernel(kernel, grid, self._data_stream)
+        self._profile.record_gpu_end(TimeProfile.COLLECTION, self._data_stream)
 
-        self._timing_coll_done = self.backend.make_event(self._data_stream, timing=True)
-
+    @profile(TimeProfile.SEND_DISTS)
     def _send_dists(self):
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
@@ -816,6 +910,7 @@ class BlockRunner(object):
                 # TODO(michalj): Use non-blocking sends here?
                 connector.send(np.ravel(conn_bufs[0].coll_buf.host))
 
+    @profile(TimeProfile.RECV_DISTS)
     def _recv_dists(self):
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._recv_block_to_connbuf[b_id]
@@ -1041,7 +1136,7 @@ class BlockRunner(object):
         gy = rest / arr_nx
         return dist_num, gy, gx
 
-    def _send_summary_info(self, timing_info):
+    def send_summary_info(self, timing_info):
         if self._summary_sender is not None:
             self._summary_sender.send_pyobj(timing_info)
             self.config.logger.debug('Sending timing information to controller.')
@@ -1079,10 +1174,7 @@ class BlockRunner(object):
         if not self.config.max_iters:
             self.config.logger.warning("Running infinite simulation.")
 
-        if self.config.mode == 'benchmark':
-            self.main_benchmark()
-        else:
-            self.main()
+        self.main()
 
         self.config.logger.info(
             "Simulation completed after {0} iterations.".format(
@@ -1100,7 +1192,9 @@ class BlockRunner(object):
         return False
 
     def main(self):
+        self._profile.record_start()
         while True:
+            self._profile.start_step()
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
 
             if output_req and self.config.debug_dump_dists:
@@ -1120,6 +1214,7 @@ class BlockRunner(object):
             self._calc_stream.synchronize()
             if output_req and self.config.output_required:
                 self._output.save(self._sim.iteration)
+            self._profile.end_step()
 
         # Receive any data from remote nodes prior to termination.  This ensures
         # we don't run into problems with zmq.
@@ -1128,78 +1223,7 @@ class BlockRunner(object):
         if output_req and self.config.output_required:
             self._output.save(self._sim.iteration)
 
-    def main_benchmark(self):
-        t_bulk = 0.0
-        t_bnd  = 0.0
-        t_coll = 0.0
-        t_total = 0.0
-        t_send = 0.0
-        t_recv = 0.0
-        t_data = 0.0
-        t_wait = 0.0
-
-        # XXX fix this.
-        for i in xrange(self.config.max_iters):
-            output_req = ((self._sim.iteration + 1) % self.config.every) == 0
-
-            t1 = time.time()
-            self.step(output_req)
-            t2 = time.time()
-
-            self.send_data()
-
-            t3 = time.time()
-            if output_req:
-                self._fields_to_host()
-            t4 = time.time()
-
-            self.recv_data()
-
-            for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
-                self.backend.run_kernel(kernel, grid, self._data_stream)
-
-            t5 = time.time()
-
-            self._calc_stream.synchronize()
-            self._data_stream.synchronize()
-
-            t6 = time.time()
-
-            t_bulk += self._timing_calc_end.time_since(self._timing_calc_start) / 1e3
-            t_bnd  += self._timing_bnd_stop.time_since(self._timing_bnd_start) / 1e3
-            t_coll += self._timing_coll_done.time_since(self._timing_bnd_stop) / 1e3
-
-            t_total += t6 - t1
-            t_recv += t5 - t4
-            t_send += t3 - t2
-            t_data += t4 - t3
-            t_wait += t6 - t5
-
-            if output_req:
-                mlups_base = self._sim.iteration * reduce(operator.mul,
-                             self._lat_size)
-                mlups_total = mlups_base / t_total * 1e-6
-                mlups_comp = mlups_base / (t_bulk + t_bnd) * 1e-6
-                self.config.logger.info(
-                        'MLUPS eff:{0:.2f}  comp:{1:.2f}  overhead:{2:.3f}'.format(
-                            mlups_total, mlups_comp, t_total / (t_bulk + t_bnd) - 1.0))
-
-                j = self._sim.iteration
-                self.config.logger.debug(
-                        'time bulk:{0:e}  bnd:{1:e}  coll:{2:e}  data:{3:e}  recv:{4:e}'
-                        '  send:{5:e}  wait:{6:e}  total:{7:e}'.format(
-                            t_bulk / j, t_bnd / j, t_coll / j, t_data / j, t_recv / j, t_send / j,
-                            t_wait / j, t_total / j))
-
-        # Early termination requested or master process is dead.
-        if self._quit_event.is_set() or self._ppid != os.getppid():
-            return
-
-        mi = self.config.max_iters
-        ti = util.TimingInfo((t_bulk + t_bnd) / mi, t_bulk / mi, t_bnd / mi,
-                t_coll / mi, t_data / mi, t_recv / mi, t_send / mi,
-                t_wait / mi, t_total / mi, self._block.id)
-        self._send_summary_info(ti)
+        self._profile.record_end()
 
 
 class NNBlockRunner(BlockRunner):
@@ -1236,6 +1260,7 @@ class NNBlockRunner(BlockRunner):
     An arrow above symbolizes a dependency between the two streams.
     """
 
+    @profile(TimeProfile.RECV_MACRO)
     def _recv_macro(self):
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._recv_block_to_macrobuf[b_id]
@@ -1260,6 +1285,7 @@ class NNBlockRunner(BlockRunner):
                     cbuf.recv_buf.host[:] = dest.reshape(cbuf.recv_buf.host.shape)
                 self.backend.to_buf_async(cbuf.recv_buf.gpu, self._data_stream)
 
+    @profile(TimeProfile.SEND_MACRO)
     def _send_macro(self):
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._block_to_macrobuf[b_id]
@@ -1463,61 +1489,65 @@ class NNBlockRunner(BlockRunner):
         has_boundary_split = self._boundary_blocks is not None
         str_calc = self._calc_stream
         str_data = self._data_stream
-        make_event = self.backend.make_event
         run = self.backend.run_kernel
         grid_bulk = self._kernel_grid_bulk
         grid_bnd = self._boundary_blocks
+        record_gpu_start = self._profile.record_gpu_start
+        record_gpu_end   = self._profile.record_gpu_end
 
         # Macroscopic variables.
-        # self._timing_bnd_start = make_event(str_calc, timing=True)
+        record_gpu_start(TimeProfile.MACRO_BOUNDARY, str_calc)
         if has_boundary_split:
             run(bnd_kernel_macro, grid_bnd, str_calc)
         else:
             run(bulk_kernel_macro, grid_bulk, str_calc)
-        self._timing_bnd_stop = make_event(str_calc, timing=True)
-        str_data.wait_for_event(self._timing_bnd_stop)
+        ev = record_gpu_end(TimeProfile.MACRO_BOUNDARY, str_calc)
+        str_data.wait_for_event(ev)
 
+        record_gpu_start(TimeProfile.MACRO_COLLECTION, str_data)
         for kernel, grid in self._macro_collect_kernels:
             run(kernel, grid, str_data)
+        record_gpu_end(TimeProfile.MACRO_COLLECTION, str_data)
 
-        #self._timing_coll_done = make_event(str_data, timing=True)
-        #self._timing_calc_start = make_event(str_calc, timing=True)
-
+        record_gpu_start(TimeProfile.MACRO_BULK, str_calc)
         if has_boundary_split:
             run(bulk_kernel_macro, grid_bulk, str_calc)
-
-        # self._timing_calc_end = make_event(str_calc, timing=True)
-
         self._apply_pbc(self._pbc_kernels.macro)
+        record_gpu_end(TimeProfile.MACRO_BULK, str_calc)
+
         self._send_macro()
         if self.need_quit():
             return False
 
         self._recv_macro()
 
-        str_data.wait_for_event(self._timing_bnd_stop)
+        record_gpu_start(TimeProfile.MACRO_DISTRIB, str_data)
         for kernel, grid in self._macro_distrib_kernels:
             run(kernel, grid, str_data)
 
-        self._timing_macro_done = make_event(str_data, timing=True)
-        str_calc.wait_for_event(self._timing_macro_done)
+        ev = record_gpu_end(TimeProfile.MACRO_DISTRIB, str_data)
+        str_calc.wait_for_event(ev)
 
         # Actual simulation step.
+        record_gpu_start(TimeProfile.BOUNDARY, str_calc)
         if has_boundary_split:
             run(bnd_kernel_sim, grid_bnd, str_calc)
         else:
             run(bulk_kernel_sim, grid_bulk, str_calc)
-
-        ev = make_event(str_calc)
+        ev = record_gpu_end(TimeProfile.BOUNDARY, str_calc)
         str_data.wait_for_event(ev)
 
+        record_gpu_start(TimeProfile.COLLECTION, str_data)
         for kernel, grid in self._collect_kernels[it & 1]:
             run(kernel, grid, str_data)
+        record_gpu_end(TimeProfile.COLLECTION, str_data)
 
+        record_gpu_start(TimeProfile.BULK, str_calc)
         if has_boundary_split:
             run(bulk_kernel_sim, grid_bulk, str_calc)
-
         self._apply_pbc(self._pbc_kernels.distributions)
+        record_gpu_end(TimeProfile.BULK, str_calc)
+
         self._sim.iteration += 1
 
         self._send_dists()
@@ -1525,8 +1555,10 @@ class NNBlockRunner(BlockRunner):
             return False
 
         self._recv_dists()
+        record_gpu_start(TimeProfile.DISTRIB, str_data)
         for kernel, grid in self._distrib_kernels[(it + 1) & 1]:
             run(kernel, grid, str_data)
+        record_gpu_end(TimeProfile.DISTRIB, str_data)
 
         return True
 
