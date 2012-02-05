@@ -126,7 +126,6 @@ ${kernel} void SetInitialConditions(
 	${init_dist_with_eq()}
 }
 
-## XXX: only do that for fields that are marked as need_nn
 ${kernel} void PrepareMacroFields(
 	${global_ptr} int *map,
 	${global_ptr} float *dist1_in,
@@ -162,9 +161,12 @@ ${kernel} void PrepareMacroFields(
 
 	Dist fi;
 	float out;
-	getDist(&fi, dist1_in, gi);
-	get0thMoment(&fi, type, orientation, &out);
-	orho[gi] = out;
+
+	%if sim._fields['rho'].abstract.need_nn:
+		getDist(&fi, dist1_in, gi);
+		get0thMoment(&fi, type, orientation, &out);
+		orho[gi] = out;
+	%endif
 
 	%if simtype == 'free-energy':
 		if (isWetNode(type)) {

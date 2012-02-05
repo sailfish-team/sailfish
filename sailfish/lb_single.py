@@ -51,7 +51,7 @@ class LBForcedSim(LBSim):
         ctx['force_for_eq'] = self._force_term_for_eq
 
     def use_force_for_equlibrium(self, force_grid, target_grid):
-        """Makes it possible acceleration from force_grid when calculating
+        """Makes it possible to use acceleration from force_grid when calculating
         velocity for the equlibrium of target_grid.
 
         For instance, to use the acceleration from grid 0 in relaxation of

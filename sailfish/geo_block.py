@@ -29,7 +29,7 @@ SubdomainPair = namedtuple('SubdomainPair', 'real virtual')
 
 
 def _get_src_slice(b1, b2, slice_axes):
-    """Returns three slice lists identifying nodes in b1 from which
+    """Returns slice lists identifying nodes in b1 from which
     information is sent to b2:
 
     - slices in b1's dist buffer for distribution data
@@ -98,7 +98,7 @@ def _get_dst_full_slice(b1, b2, src_slice_global, full_map, slice_axes):
     """Identifies nodes that transmit full information.
 
     Returns a tuple of:
-    - offset vector in the plane ortogonal to the connection axis in local
+    - offset vector in the plane ortogonal to the connection axis in the local
       coordinate system of the destination subdomain (real nodes only)
     - slice selecting part of the buffer (real nodes only) with nodes
       containing information about all distributions
@@ -224,7 +224,7 @@ class LBConnection(object):
         src_slice, src_slice_global, src_macro_slice, dst_macro_slice = \
                 _get_src_slice(b1, b2, slice_axes)
         if src_slice is None:
-            return
+            return None
 
         normal = b1.face_to_normal(face)
         dists = sym.get_interblock_dists(grid, normal)
@@ -263,6 +263,7 @@ class LBConnection(object):
         dst_macro_slice: slice in a real scalar buffer (including ghost nodes)
             selecting nodes to which field data is to be written when received
             from the target subdomain
+        src_id: ID of the source block
         """
         self.dists = dists
         self.src_slice = src_slice

@@ -61,24 +61,24 @@ class LBSim(object):
         suffixes = ['x', 'y', 'z']
         self._scalar_fields = []
         self._vector_fields = []
+        self._fields = {}
         for field in self.fields():
             if type(field) is ScalarField:
                 f = runner.make_scalar_field(name=field.name, async=True)
-                setattr(self, field.name, f)
                 self._scalar_fields.append(FieldPair(field, f))
             elif type(field) is VectorField:
                 f = runner.make_vector_field(name=field.name, async=True)
-                setattr(self, field.name, f)
                 self._vector_fields.append(FieldPair(field, f))
                 for i in range(0, self.grid.dim):
                     setattr(self, field.name + suffixes[i], f[i])
+            setattr(self, field.name, f)
+            self._fields[field.name] = FieldPair(field, f)
 
     def __init__(self, config):
         self.config = config
         self.S = sym.S()
         self.iteration = 0
 
-    # TODO(michalj): Restore support for force couplings.
     # TODO(michalj): Restore support for iter hooks.
     # TODO(michalj): Restore support for defining visualization fields.
     # TODO(michalj): Restore support for tracer particles.

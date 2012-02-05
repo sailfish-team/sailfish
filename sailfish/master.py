@@ -191,7 +191,7 @@ class LBMachineMaster(object):
         if self.config.mode != 'visualization':
             return lambda block: output_cls(self.config, block.id)
 
-        basic_fields = sim.fields()
+        # basic_fields = sim.fields()
         # XXX compute total storage requirements
 
         for block in self.blocks:

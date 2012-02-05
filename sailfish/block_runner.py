@@ -27,11 +27,12 @@ class MacroConnectionBuffer(object):
         :param face: face ID
         :param cpair: ConnectionPair, a tuple of two LBConnection objects
         :param coll_buf: GPUBuffer for information collected on the source
-            node to be sent to the destination node
+            subdomain to be sent to the destination subdomain
         :param coll_idx: GPUBuffer with an array of indices indicating sparse
             nodes from which data is to be collected; this is only used for
             connections via the X_LOW and X_HIGH faces
-        :param recv_buf: GPUBuffer for information received from the remote node
+        :param recv_buf: GPUBuffer for information received from the remote
+            subdomain
         :param dist_idx: GPUBuffer with an array of indices indicating
             the position of nodes to which data is to be distributed; this is
             only used for connections via the X_LOW and X_HIGH faces
@@ -56,12 +57,12 @@ class ConnectionBuffer(object):
         :param face: face ID
         :param cpair: ConnectionPair, a tuple of two LBConnection objects
         :param coll_buf: GPUBuffer for information collected on the source
-            node to be sent to the destination node
+            subdomain to be sent to the destination subdomain
         :param coll_idx: GPUBuffer with an array of indices indicating sparse
             nodes from which data is to be collected; this is only used for
             connections via the X_LOW and X_HIGH faces
         :param recv_buf: page-locked numpy buffer with information
-            received from the remote node
+            received from the remote subdomain
         :param dist_partial_buf: GPUBuffer, for partial distributions
         :param dist_partial_idx: GPUBuffer, for indices of the partial distributions
         :param dist_partial_sel: selector in recv_buf to get the partial
@@ -447,7 +448,6 @@ class BlockRunner(object):
 
         # Used so that face values map to the limiting coordinate
         # along a specific axis, e.g. lat_linear[X_LOW] = 0
-
         evs = self._block.envelope_size
         self.lat_linear = [0, self._lat_size[-1] - 1, 0, self._lat_size[-2] - 1]
         self.lat_linear_dist = [self._lat_size[-1] - 1 - evs, evs,
@@ -462,7 +462,6 @@ class BlockRunner(object):
             self.lat_linear.extend([0, self._lat_size[-3] - 1])
             self.lat_linear_dist.extend([self._lat_size[-3] - 1 - evs, evs])
             self.lat_linear_macro.extend([evs, self._lat_size[-3] - 1 - evs])
-            #self.lat_linear_macro_dist.extend([self._lat_size[-3] - 1, 0])
 
     def _get_strides(self, type_):
         """Returns a list of strides for the NumPy array storing the lattice."""
@@ -601,9 +600,9 @@ class BlockRunner(object):
         """Creates buffers for inter-block communication."""
         alloc = self.backend.alloc_async_host_buf
 
-        # Maps block ID to a list of ConnectionBuffer objects.  For every
-        # grid, the list will contain 1 or 2 elements, 2 elements being
-        # used only when global periodic boundary conditions are enabled.
+        # Maps block ID to a list of ConnectionBuffer objects.  The list will
+        # typically contain just 1 element, unless periodic boundary conditions
+        # are used.
         self._block_to_connbuf = defaultdict(list)
         for face, block_id in self._block.connecting_blocks():
             cpairs = self._block.get_connections(face, block_id)
@@ -791,9 +790,10 @@ class BlockRunner(object):
         self.backend.run_kernel(kernel, grid, blk_str)
         self._timing_bnd_stop = make_event(blk_str, timing=True)
 
-        # Enqueue a wait so that the data collection will not start until the kernel
-        # handling boundary calculations is completed (that kernel runs in the bulk
-        # stream so that it is automatically synchronized with bulk calculations).
+        # Enqueue a wait so that the data collection will not start until the
+        # kernel handling boundary calculations is completed (that kernel runs
+        # in the calc stream so that it is automatically synchronized with
+        # bulk calculations).
         self._data_stream.wait_for_event(self._timing_bnd_stop)
         for kernel, grid in self._collect_kernels[self._sim.iteration & 1]:
             self.backend.run_kernel(kernel, grid, self._data_stream)
@@ -847,10 +847,10 @@ class BlockRunner(object):
     def _fields_to_host(self):
         """Copies data for all fields from the GPU to the host."""
         for field in self._scalar_fields:
-            self.backend.from_buf_async(self._gpu_field_map[id(field)], self._calc_stream)
+            self.backend.from_buf_async(self.gpu_field(field), self._calc_stream)
 
         for field in self._vector_fields:
-            for component in self._gpu_field_map[id(field)]:
+            for component in self.gpu_field(field):
                 self.backend.from_buf_async(component, self._calc_stream)
 
     def _init_collect_kernels(self, cbuf, grid_dim1, block_size):
@@ -861,7 +861,7 @@ class BlockRunner(object):
             given the total size
         :param block_size: CUDA block size for the kernels
 
-        Returns: primary, secondary.
+        Returns: secondary, primary.
         """
         # Sparse data collection.
         if cbuf.coll_idx.host is not None:
@@ -1095,7 +1095,9 @@ class BlockRunner(object):
 
         if self._ppid != os.getppid():
             self.config.logger.info("Master process is dead -- terminating simulation.")
-            return False
+            return True
+
+        return False
 
     def main(self):
         while True:
