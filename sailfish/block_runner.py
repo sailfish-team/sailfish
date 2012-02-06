@@ -908,7 +908,7 @@ class BlockRunner(object):
                     [np.ravel(x.coll_buf.host) for x in conn_bufs]))
             else:
                 # TODO(michalj): Use non-blocking sends here?
-                connector.send(np.ravel(conn_bufs[0].coll_buf.host))
+                connector.send(np.ravel(conn_bufs[0].coll_buf.host).copy())
 
     @profile(TimeProfile.RECV_DISTS)
     def _recv_dists(self):
@@ -1300,7 +1300,7 @@ class NNBlockRunner(BlockRunner):
                     [np.ravel(x.coll_buf.host) for x in conn_bufs]))
             else:
                 # TODO(michalj): Use non-blocking sends here?
-                connector.send(np.ravel(conn_bufs[0].coll_buf.host))
+                connector.send(np.ravel(conn_bufs[0].coll_buf.host).copy())
 
     def _macro_idx_helper(self, gx, buf_slice):
         idx = np.mgrid[list(reversed(buf_slice))].astype(np.uint32)
