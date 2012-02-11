@@ -3,6 +3,8 @@
     import sympy
 %>
 
+extern int printf (__const char *__restrict __format, ...);
+
 <%def name="bgk_args_decl_sc()">
 	float rho, float phi, float *iv0, float *ea0, float *ea1
 </%def>
@@ -23,14 +25,20 @@
 %if simtype == 'shan-chen':
 	${const_var} float tau0 = ${tau}f;		// relaxation time
 %endif
-${const_var} float tau1 = ${tau_phi}f;		// relaxation time for the order parameter
-${const_var} float visc = ${visc}f;		// viscosity
+
+%if simtype == 'shan-chen':
+	// Relaxation time for the 2nd fluid component.
+%else:
+	// Relaxation time for the order parameter field.
+%endif
+${const_var} float tau1 = ${tau_phi}f;
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
-${kernel_common.nonlocal_fields_decl()}
 %if simtype == 'shan-chen':
+	<%namespace file="shan_chen.mako" import="*" name="shan_chen"/>
 	${kernel_common.body(bgk_args_decl_sc)}
+	${shan_chen.body()}
 %elif simtype == 'free-energy':
 	${kernel_common.body(bgk_args_decl_fe)}
 %endif
@@ -123,15 +131,16 @@ ${kernel} void PrepareMacroFields(
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *dist2_in,
 	${global_ptr} float *orho,
-	${global_ptr} float *ophi)
+	${global_ptr} float *ophi,
+	int options)
 {
-	${local_indices()}
+	${local_indices_split()}
 
 	int ncode = map[gi];
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isUnusedNode(type))
+	if (isUnusedNode(type) || isGhostNode(type))
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);
@@ -152,79 +161,81 @@ ${kernel} void PrepareMacroFields(
 
 	Dist fi;
 	float out;
-	getDist(&fi, dist1_in, gi);
-	get0thMoment(&fi, type, orientation, &out);
-	orho[gi] = out;
 
-	int helper_idx = gi;
-
-	%if simtype == 'free-energy':
-		// Assume neutral wetting for all walls by setting adjusting the phase gradient
-		// near the wall.
-		//
-		// This wetting boundary condition implementation is as in option 2 in
-		// Halim Kusumaatmaja's PhD thesis, p.18.
-		if (isWallNode(type)) {
-			switch (orientation) {
-				%for dir in grid.dir2vecidx.keys():
-					## Symbols used on the schematics below:
-					##
-					## W: wall node (current node, pointed to by 'gi')
-					## F: fluid node
-					## |: actual location of the wall
-					## .: space between fluid nodes
-					## x: node from which data is read
-					## y: node to which data is being written
-					##
-					## The schematics assume a bc_wall_grad_order of 2.
-					case ${dir}: {
-						## Full BB: F . F | W
-						##          x ----> y
-						%if bc_wall == 'fullbb':
-							%if dim == 3:
-								helper_idx += ${rel_offset(*(bc_wall_grad_order*grid.dir_to_vec(dir)))};
-							%else:
-								## rel_offset() needs a 3-vector, so make the z-coordinate 0
-								helper_idx += ${rel_offset(*(list(bc_wall_grad_order*grid.dir_to_vec(dir)) + [0]))};
-							%endif
-						## Full BB: F . W | U
-						##          x ----> y
-						%elif bc_wall == 'halfbb' and bc_wall_grad_order == 1:
-							%if dim == 3:
-								helper_idx -= ${rel_offset(*(grid.dir_to_vec(dir)))};
-							%else:
-								helper_idx -= ${rel_offset(*(list(grid.dir_to_vec(dir)) + [0]))};
-							%endif
-						%else:
-							WETTING_BOUNDARY_CONDITIONS_UNSUPPORTED_FOR_${bc_wall}_AND_GRAD_ORDER_${bc_wall_grad_order}
-						%endif
-						break;
-					}
-				%endfor
-			}
-		}
+	%if sim._fields['rho'].abstract.need_nn:
+		getDist(&fi, dist1_in, gi);
+		get0thMoment(&fi, type, orientation, &out);
+		orho[gi] = out;
 	%endif
 
-	%if bc_wall == 'fullbb':
-		getDist(&fi, dist2_in, helper_idx);
-		get0thMoment(&fi, type, orientation, &out);
-		%if simtype == 'free-energy':
-			if (helper_idx != gi) {
-				ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-			} else
-		%endif
-		{
+	%if simtype == 'free-energy':
+		if (isWetNode(type)) {
+			getDist(&fi, dist2_in, gi);
+			get0thMoment(&fi, type, orientation, &out);
 			ophi[gi] = out;
 		}
-	%elif bc_wall == 'halfbb':
+
+		%if bc_wall != None:
+			int helper_idx = gi;
+			// Assume neutral wetting for all walls by adjusting the phase gradient
+			// near the wall.
+			//
+			// This wetting boundary condition implementation is as in option 2 in
+			// Halim Kusumaatmaja's PhD thesis, p.18.
+			if (isWallNode(type)) {
+				switch (orientation) {
+					%for dir in grid.dir2vecidx.keys():
+						## Symbols used on the schematics below:
+						##
+						## W: wall node (current node, pointed to by 'gi')
+						## F: fluid node
+						## |: actual location of the wall
+						## .: space between fluid nodes
+						## x: node from which data is read
+						## y: node to which data is being written
+						##
+						## The schematics assume a bc_wall_grad_order of 2.
+						case ${dir}: {
+							## Full BB: F . F | W
+							##          x ----> y
+							%if bc_wall == 'fullbb':
+								%if dim == 3:
+									helper_idx += ${rel_offset(*(bc_wall_grad_order*grid.dir_to_vec(dir)))};
+								%else:
+									## rel_offset() needs a 3-vector, so make the z-coordinate 0
+									helper_idx += ${rel_offset(*(list(bc_wall_grad_order*grid.dir_to_vec(dir)) + [0]))};
+								%endif
+							## Full BB: F . W | U
+							##          x ----> y
+							%elif bc_wall == 'halfbb' and bc_wall_grad_order == 1:
+								%if dim == 3:
+									helper_idx -= ${rel_offset(*(grid.dir_to_vec(dir)))};
+								%else:
+									helper_idx -= ${rel_offset(*(list(grid.dir_to_vec(dir)) + [0]))};
+								%endif
+							%else:
+								WETTING_BOUNDARY_CONDITIONS_UNSUPPORTED_FOR_${bc_wall}_AND_GRAD_ORDER_${bc_wall_grad_order}
+							%endif
+							break;
+						}
+					%endfor
+				}
+
+				%if bc_wall == 'halfbb':
+					ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+				%elif bc_wall == 'fullbb':
+					getDist(&fi, dist2_in, helper_idx);
+					get0thMoment(&fi, type, orientation, &out);
+					ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+				%else:
+					__UNIMPLEMENTED__
+				%endif
+			}
+		%endif
+	%else:
 		getDist(&fi, dist2_in, gi);
 		get0thMoment(&fi, type, orientation, &out);
 		ophi[gi] = out;
-		%if simtype == 'free-energy':
-			if (helper_idx != gi) {
-				ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-			}
-		%endif
 	%endif
 }
 
@@ -237,9 +248,9 @@ ${kernel} void CollideAndPropagate(
 	${global_ptr} float *gg0m0,
 	${global_ptr} float *gg1m0,
 	${kernel_args_1st_moment('ov')}
-	int save_macro)
+	int options)
 {
-	${local_indices()}
+	${local_indices_split()}
 
 	// shared variables for in-block propagation
 	%for i in sym.get_prop_dists(grid, 1):
@@ -253,7 +264,7 @@ ${kernel} void CollideAndPropagate(
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isUnusedNode(type))
+	if (isUnusedNode(type) || isGhostNode(type))
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);
@@ -312,6 +323,7 @@ ${kernel} void CollideAndPropagate(
 
 	%if simtype == 'free-energy':
 		getMacro(&d0, ncode, type, orientation, &g0m0, v);
+		// TODO(michalj): Is this really needed?
 		get0thMoment(&d1, type, orientation, &g1m0);
 	%elif simtype == 'shan-chen':
 		${sc_macro_fields()}
@@ -349,8 +361,8 @@ ${kernel} void CollideAndPropagate(
 		}
 	%endif
 
-	// only save the macroscopic quantities if requested to do so
-	if (save_macro == 1) {
+	// Only save the macroscopic quantities if requested to do so.
+	if (options & OPTION_SAVE_MACRO_FIELDS) {
 		%if simtype == 'shan-chen' and not bc_wall_.wet_nodes:
 			if (!isWallNode(type))
 		%endif
@@ -368,4 +380,4 @@ ${kernel} void CollideAndPropagate(
 	${propagate('dist2_out', 'd1')}
 }
 
-
+<%include file="util_kernels.mako"/>

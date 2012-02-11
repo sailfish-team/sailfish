@@ -879,7 +879,7 @@ def get_prop_dists(grid, dir_, axis=0):
     return ret
 
 def get_interblock_dists(grid, direction, opposite=False):
-    """Computes a list of indices of the distributions that would be transferred
+    """Computes a list of indices of distributions that would be transferred
     to a node pointed to by the vector 'direction'.
     """
     d = Matrix((direction,))
@@ -896,6 +896,24 @@ def get_interblock_dists(grid, direction, opposite=False):
             ret.append(i)
     return process_dists(ret)
 
+def relaxation_time(viscosity):
+    return (6.0 * viscosity + 1.0) / 2.0
+#
+# Shan-Chen model.
+#
+def shan_chen_linear(field):
+    f = Symbol(field)
+    return f
+
+def shan_chen_classic(field):
+    rho0 = 1.0
+    f = Symbol(field)
+    return rho0 * (1.0 - sympy.exp(-f / rho0))
+
+SHAN_CHEN_POTENTIALS = {
+    'linear': shan_chen_linear,
+    'classic': shan_chen_classic
+}
 
 #
 # Sympy stuff.
@@ -1062,16 +1080,36 @@ def gcd(*terms):
 
 
 def needs_coupling_accel(i, force_couplings):
+    """Returns True is a grid is coupled to any other grid.
+
+    :param i: grid ID
+    :param force_couplings: see fluid_accel()
+    """
     return (i in
         reduce(lambda x, y: operator.add(x, [y[0], y[1]]), force_couplings.keys(), []))
 
 def needs_accel(i, forces, force_couplings):
+    """Returns True if there a force acting on a grid.
+
+    :param i: grid ID
+    :param forces: see fluid_accel()
+    :param force_couplings: see fluid_accel()
+    """
     return (i in forces) or needs_coupling_accel(i, force_couplings)
 
-def fluid_accel(sim, i, dim, forces, force_couplings):
+def fluid_accel(sim, i, axis, forces, force_couplings):
+    """
+    :param sim: simulation object
+    :param i: grid ID
+    :param axis: base axis for the output vector
+    :param forces: dict: grid ID -> dict(accel -> value); accel is a boolean
+        indicating whether value is a force or acceleration
+    :param force_couplings: dict mapping pairs of grid IDs to the name of a
+        Shan-Chen coupling constant
+    """
     if needs_accel(i, forces, force_couplings):
         ea = accel_vector(sim.grid, i)
-        return ea[dim]
+        return ea[axis]
     else:
         return 0.0
 

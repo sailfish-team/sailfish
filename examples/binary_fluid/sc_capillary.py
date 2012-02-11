@@ -1,71 +1,72 @@
 #!/usr/bin/python
 """A low Reynolds number flow of a drop through a capillary channel."""
 
-import numpy
-from sailfish import geo, lb_binary
+import numpy as np
 
-class GeoSC(geo.LBMGeo2D):
-    maxv = 0.005
+from sailfish import sym
+from sailfish.geo import LBGeometry2D
+from sailfish.geo_block import Subdomain2D
+from sailfish.controller import LBSimulationController
+from sailfish.lb_binary import LBBinaryFluidShanChen
+from sailfish.lb_single import LBForcedSim
 
-    def define_nodes(self):
-        chan_diam = 32 * self.lat_ny / 200.0
-        chan_len = 200 * self.lat_ny / 200.0
 
-        hy, hx = numpy.mgrid[0:self.lat_ny, 0:self.lat_nx]
+class CapillaryDomain(Subdomain2D):
+    max_v = 0.005
 
-        geometry = numpy.zeros(list(reversed(self.shape)), dtype=numpy.bool)
-        rem_y = (self.lat_ny - chan_diam) / 2
+    def boundary_conditions(self, hx, hy):
+        chan_diam = 32 * self.gy / 200.0
+        chan_len = 200 * self.gy / 200.0
+        rem_y = (self.gy - chan_diam) / 2
 
+        geometry = np.zeros(hx.shape, dtype=np.bool)
         geometry[0,:] = True
-        geometry[self.lat_ny-1,:] = True
-
-        geometry[numpy.logical_and(
+        geometry[self.gy-1,:] = True
+        geometry[np.logical_and(
                     hy < rem_y,
-                    hy < rem_y - (numpy.abs((hx - self.lat_nx/2)) - chan_len/2)
+                    hy < rem_y - (np.abs((hx - self.gx/2)) - chan_len/2)
+                )] = True
+        geometry[np.logical_and(
+                    (self.gy - hy) < rem_y,
+                    (self.gy - hy) < rem_y - (np.abs((hx - self.gx/2)) - chan_len/2)
                 )] = True
 
-        geometry[numpy.logical_and(
-                    (self.lat_ny - hy) < rem_y,
-                    (self.lat_ny - hy) < rem_y - (numpy.abs((hx - self.lat_nx/2)) - chan_len/2)
-                )] = True
+        self.set_node(geometry, self.NODE_WALL)
 
-        self.set_geo_from_bool_array(geometry)
-
-    def init_fields(self):
-
-        drop_diam = 30 * self.lat_ny / 200.0
-
-        hy, hx = numpy.mgrid[0:self.lat_ny, 0:self.lat_nx]
-
-        self.sim.rho[:] = 1.0
-        self.sim.phi[:] = 0.124
-        self.sim.rho[(hx - drop_diam * 2) ** 2 + (hy - self.lat_ny / 2.0)**2 < drop_diam**2] = 0.124
-        self.sim.phi[(hx - drop_diam * 2) ** 2 + (hy - self.lat_ny / 2.0)**2 < drop_diam**2] = 1.0
-
-    def get_reynolds(self, viscosity):
-        return int(self.lat_ny * self.maxv/viscosity)
+    def initial_conditions(self, sim, hx, hy):
+        drop_diam = 30 * self.gy / 200.0
+        sim.rho[:] = 1.0
+        sim.phi[:] = 0.124
+        sim.rho[(hx - drop_diam * 2) ** 2 + (hy - self.gy / 2.0)**2 < drop_diam**2] = 0.124
+        sim.phi[(hx - drop_diam * 2) ** 2 + (hy - self.gy / 2.0)**2 < drop_diam**2] = 1.0
 
 
-class SCSim(lb_binary.ShanChenBinary):
-    filename = 'sc_instability_2d'
+class CapillarySCSim(LBBinaryFluidShanChen, LBForcedSim):
+    subdomain = CapillaryDomain
 
-    def __init__(self, geo_class):
-        lb_binary.ShanChenBinary.__init__(self, geo_class, options=[],
-                              defaults={'bc_velocity': 'equilibrium', 'verbose': True, 'lat_nx': 640,
-                                'lat_ny': 200, 'grid': 'D2Q9', 'G': -1.2,
-                                'visc': 0.166666666666, 'periodic_x': True, 'periodic_y': True, 'scr_scale': 1})
+    @classmethod
+    def update_defaults(cls, defaults):
+        defaults.update({
+                'lat_nx': 640,
+                'lat_ny': 200,
+                'grid': 'D2Q9',
+                'G': 1.6,
+                'visc': 1.0 / 6.0,
+                'periodic_x': True,
+                'periodic_y': True,
+            })
 
-        self.options.tau_phi = self.get_tau()
+    @classmethod
+    def modify_config(cls, config):
+        config.tau_phi = sym.relaxation_time(config.visc)
 
-        f1 = self.geo_class.maxv * (8.0 * self.options.visc) / self.options.lat_ny
-
+    def __init__(self, config):
+        super(CapillarySCSim, self).__init__(config)
+        f1 = self.subdomain.max_v * (8.0 * config.visc) / config.lat_ny
         self.add_body_force((f1, 0.0), grid=0)
         self.add_body_force((f1, 0.0), grid=1)
 
-        self.add_iter_hook(100, self.average_dens, every=True)
 
-    def average_dens(self):
-        print self.iter_, numpy.average(self.rho), numpy.average(self.phi)
-
-sim = SCSim(GeoSC)
-sim.run()
+if __name__ == '__main__':
+    ctrl = LBSimulationController(CapillarySCSim, LBGeometry2D)
+    ctrl.run()

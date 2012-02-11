@@ -7,15 +7,8 @@ __license__ = 'GPL3'
 from collections import defaultdict, namedtuple
 import operator
 import numpy as np
-from sailfish import sym
+from sailfish import geo_encoder, sym
 
-def bit_len(num):
-    """Returns the minimal number of bits necesary to encode `num`."""
-    length = 0
-    while num:
-        num >>= 1
-        length += 1
-    return max(length, 1)
 
 def span_area(span):
     area = 1
@@ -25,113 +18,221 @@ def span_area(span):
         area *= elem.stop - elem.start
     return area
 
+
 ConnectionPair = namedtuple('ConnectionPair', 'src dst')
 
-# TODO(michalj): Add support for data about complementary distributions and
-# additional macroscopic variables (necessary for multifluid models).
+# Used for creating connections between subdomains.  Without PBCs,
+# virtual == real.  With PBC, the real subdomain is the actual subdomain
+# as defined by the simulation geometry, and the virtual subdomain is a
+# copy created due to PBC.
+SubdomainPair = namedtuple('SubdomainPair', 'real virtual')
+
+
+def _get_src_slice(b1, b2, slice_axes):
+    """Returns slice lists identifying nodes in b1 from which
+    information is sent to b2:
+
+    - slices in b1's dist buffer for distribution data
+    - slices in the global coordinate system for distribution data
+    - slices in a b1's field buffer from which macroscopic data is to be
+      collected
+    - slices in a b1's field buffer selecting nodes to which data from the
+      target subdomain is to be written
+
+    The returned slices correspond to the axes specified in slice_axes.
+
+    :param b1: source SubdomainSpec
+    :parma b2: target SubdomainSpec
+    :param slice_axes: list of axis numbers identifying axes spanning
+        the area of nodes sending information to the target node
+    """
+    src_slice = []
+    src_slice_global = []
+    src_macro_slice = []
+    dst_macro_slice = []
+
+    for axis in slice_axes:
+        # Effective span along the current axis, two versions: including
+        # ghost nodes, and including real nodes only.
+        b1_ghost_min = b1.location[axis] - b1.envelope_size
+        b1_ghost_max = b1.end_location[axis] - 1 + b1.envelope_size
+        b1_real_min = b1.location[axis]
+        b1_real_max = b1.end_location[axis] - 1
+
+        # Same for the 2nd subdomain.
+        b2_real_min = b2.location[axis]
+        b2_real_max = b2.end_location[axis] - 1
+        b2_ghost_min = b2.location[axis] - b2.envelope_size
+        b2_ghost_max = b2.end_location[axis] - 1 + b2.envelope_size
+
+        # Span in global simulation coordinates.  Data is transferred
+        # from the ghost nodes to real nodes only.
+        global_span_min = max(b1_ghost_min, b2_real_min)
+        global_span_max = min(b1_ghost_max, b2_real_max)
+
+        # No overlap, bail out.
+        if global_span_min > b1_ghost_max or global_span_max < b1_ghost_min:
+            return None, None, None, None
+
+        # For macroscopic fields, the inverse holds true: data is transferred
+        # from real nodes to ghost nodes.
+        macro_span_min = max(b2_ghost_min, b1_real_min)
+        macro_span_max = min(b2_ghost_max, b1_real_max)
+
+        macro_recv_min = max(b1_ghost_min, b2_real_min)
+        macro_recv_max = min(b1_ghost_max, b2_real_max)
+
+        src_slice.append(slice(global_span_min - b1_ghost_min,
+            global_span_max - b1_ghost_min + 1))
+        src_slice_global.append(slice(global_span_min,
+            global_span_max + 1))
+        src_macro_slice.append(slice(macro_span_min - b1_ghost_min,
+            macro_span_max - b1_ghost_min + 1))
+        dst_macro_slice.append(slice(macro_recv_min - b1_ghost_min,
+            macro_recv_max - b1_ghost_min + 1))
+
+    return src_slice, src_slice_global, src_macro_slice, dst_macro_slice
+
+
+def _get_dst_full_slice(b1, b2, src_slice_global, full_map, slice_axes):
+    """Identifies nodes that transmit full information.
+
+    Returns a tuple of:
+    - offset vector in the plane ortogonal to the connection axis in the local
+      coordinate system of the destination subdomain (real nodes only)
+    - slice selecting part of the buffer (real nodes only) with nodes
+      containing information about all distributions
+    - same as the previous one, but the slice is for the transfer buffer
+
+    :param b1: source SubdomainSpec
+    :param b2: target SubdomainSpec
+    :param src_slice_global: list of slices in the global coordinate system
+        identifying nodes from which information is sent to the target
+        subdomain
+    :param full_map: boolean array selecting the source nodes that have the
+        full set of distributions to be transferred to the target subdomain
+    :param slice_axes: list of axis numbers identifying axes spanning
+        the area of nodes sending information to the target node
+    """
+    dst_slice = []
+    dst_full_buf_slice = []
+    dst_low = []
+    for i, global_pos in enumerate(src_slice_global):
+        b2_start = b2.location[slice_axes[i]]
+        dst_low.append(global_pos.start - b2_start)
+
+    full_idxs = np.argwhere(full_map)
+    if len(full_idxs) > 0:
+        # Lowest and highest coordinate along each axis.
+        full_min = np.min(full_idxs, 0)
+        full_max = np.max(full_idxs, 0)
+        # Loop over axes.
+        for i, (lo, hi) in enumerate(zip(full_min, full_max)):
+            b1_start = b1.location[slice_axes[i]]
+            b2_start = b2.location[slice_axes[i]]
+            # Offset in the local real coordinate system of the target
+            # subdomain (same as dst_low).
+            curr_to_dist = src_slice_global[i].start - b2_start
+            dst_slice.append(slice(lo + curr_to_dist, hi + 1 + curr_to_dist))
+            dst_full_buf_slice.append(slice(lo, hi+1))
+
+    return dst_low, dst_slice, dst_full_buf_slice
+
+
+def _get_dst_partial_map(dists, grid, src_slice_global, b1, slice_axes,
+        conn_axis):
+    """Identifies nodes that only transmit partial information.
+
+    :param dists: indices of distributions that point to the target
+        subdomain
+    :param grid: grid object defining the connectivity of the lattice
+    :param src_slice_global: list of slices in the global coordinate system
+        identifying nodes from which information is sent to the target
+        subdomain
+    :param b1: source SubdomainSpec
+    :param slice_axes: list of axis numbers identifying axes spanning
+        the area of nodes sending information to the target node
+    :param conn_axis: axis along which the two subdomains are connected
+    """
+    # Location of the b1 block in global coordinates (real nodes only).
+    min_loc = np.int32([b1.location[ax] for ax in slice_axes])
+    max_loc = np.int32([b1.end_location[ax] for ax in slice_axes])
+
+    # Creates an array where the entry at [x,y] is the global coordinate pair
+    # corresponding to the node [x,y] in the transfer buffer.
+    src_coords = np.mgrid[src_slice_global]
+    # [2,x,y] -> [x,y,2]
+    src_coords = np.rollaxis(src_coords, 0, len(src_coords.shape))
+
+    last_axis = len(src_coords.shape) - 1
+
+    # Selects source nodes that have the full set of distributions (`dists`).
+    full_map = np.ones(src_coords.shape[:-1], dtype=np.bool)
+
+    # Maps distribution index to a boolean array selecting (in src_coords)
+    # nodes for which the distribution identified by the key is defined.
+    dist_idx_to_dist_map = {}
+
+    for dist_idx in dists:
+        # When we follow the basis vector backwards, do we end up at a
+        # real (non-ghost) node in the source subdomain?
+        basis_vec = list(grid.basis[dist_idx])
+        del basis_vec[conn_axis]
+        src_block_node = src_coords - basis_vec
+        dist_map = np.logical_and(src_block_node >= min_loc,
+                                  src_block_node < max_loc)
+
+        dist_map = np.logical_and.reduce(dist_map, last_axis)
+        full_map = np.logical_and(full_map, dist_map)
+        dist_idx_to_dist_map[dist_idx] = dist_map
+
+    # Maps distribution index to an array of indices (pairs in 3D, single
+    # coordinate in 2D) in the local subdomain coordinate system (real nodes).
+    dst_partial_map = {}
+    buf_min_loc = [span.start for span in src_slice_global]
+
+    for dist_idx, dist_map in dist_idx_to_dist_map.iteritems():
+        partial_nodes = src_coords[np.logical_and(dist_map,
+                                   np.logical_not(full_map))]
+        if len(partial_nodes) > 0:
+            partial_nodes -= buf_min_loc
+            dst_partial_map[dist_idx] = partial_nodes
+
+    return dst_partial_map, full_map
+
+
 class LBConnection(object):
     """Container object for detailed data about a directed connection between two
     blocks (at the level of the LB model)."""
 
     @classmethod
     def make(cls, b1, b2, face, grid):
-        """Tries to create an LBCollection for the face 'face' of block b1 to
-        block2.  If no connection exists, returns None.  Otherwise, returns
+        """Tries to create an LBCollection between two sudomains.
+
+        If no connection exists, returns None.  Otherwise, returns
         a new instance of LBConnection describing the connection details.
+
+        :param b1: SubdomainSpec for the source subdomain
+        :param b2: SubdomainSpec for the target subdomain
+        :param face: face ID along which the connection is to be created
+        :param grid: grid object defining the connectivity of the lattice
         """
-        dim = b1.dim
-        slice_axes = range(0, dim)
         conn_axis = b1.face_to_axis(face)
+        slice_axes = range(0, b1.dim)
         slice_axes.remove(conn_axis)
 
-        src_slice = []
-        src_slice_global = []
-
-        for axis in slice_axes:
-            b1_min = b1.location[axis] - b1.envelope_size
-            b1_max = b1.end_location[axis]-1 + b1.envelope_size
-
-            b2_min = b2.location[axis]
-            b2_max = b2.end_location[axis]-1
-
-            # In global simulation coordinates.
-            global_span_min = max(b1_min, b2_min)
-            global_span_max = min(b1_max, b2_max)
-
-            # No overlap, bail out.
-            if global_span_min > b1_max or global_span_max < b1_min:
-                return None
-
-            src_slice.append(slice(global_span_min - b1_min,
-                global_span_max - b1_min+1))
-            src_slice_global.append(slice(global_span_min,
-                global_span_max+1))
+        src_slice, src_slice_global, src_macro_slice, dst_macro_slice = \
+                _get_src_slice(b1, b2, slice_axes)
+        if src_slice is None:
+            return None
 
         normal = b1.face_to_normal(face)
         dists = sym.get_interblock_dists(grid, normal)
 
-        # Create an array where the entry at [x,y] is the global coordinate pair
-        # corresponding to the node [x,y] in the transfer buffer.
-        src_coords = np.mgrid[src_slice_global]
-        # [2,x,y] -> [x,y,2]
-        src_coords = np.rollaxis(src_coords, 0, len(src_coords.shape))
-        min_loc = []
-        max_loc = []
-
-        for axis in slice_axes:
-            min_loc.append(b1.location[axis])
-            max_loc.append(b1.end_location[axis])
-
-        # Location of the b1 block in global coordinates.
-        min_loc = np.uint32(min_loc)
-        max_loc = np.uint32(max_loc)
-        last_axis = len(src_coords.shape)-1
-        full_map = np.ones(src_coords.shape[:-1], dtype=np.bool)
-
-        dst_partial_map = {}
-        dist_idx_to_dist_map = {}
-
-        for dist_idx in dists:
-            basis_vec = list(grid.basis[dist_idx])
-            del basis_vec[conn_axis]
-
-            src_block_node = src_coords - basis_vec
-            dist_map = np.logical_and(src_block_node >= min_loc,
-                                      src_block_node < max_loc)
-            dist_map = np.logical_and.reduce(dist_map, last_axis)
-            full_map = np.logical_and(full_map, dist_map)
-            dist_idx_to_dist_map[dist_idx] = dist_map
-
-        buf_min_loc = []
-        for span in src_slice_global:
-            buf_min_loc.append(span.start)
-
-        for dist_idx, dist_map in dist_idx_to_dist_map.iteritems():
-            partial_nodes = src_coords[np.logical_and(dist_map,
-                                            np.logical_not(full_map))]
-            if len(partial_nodes) > 0:
-                partial_nodes -= buf_min_loc
-                dst_partial_map[dist_idx] = partial_nodes
-
-        # Slice selecting part of the buffer with nodes containing information
-        # about all distributions.
-        dst_slice = []
-        dst_full_buf_slice = []
-        dst_low = []
-        for i, global_pos in enumerate(src_slice_global):
-            b2_start = b2.location[slice_axes[i]]
-            dst_low.append(global_pos.start - b2_start)
-
-        full_idxs = np.argwhere(full_map)
-        if len(full_idxs) > 0:
-            full_min = np.min(full_idxs, 0)
-            full_max = np.max(full_idxs, 0)
-            for i, (lo, hi) in enumerate(zip(full_min, full_max)):
-                b1_start = b1.location[slice_axes[i]]
-                b2_start = b2.location[slice_axes[i]]
-                curr_to_dist = src_slice_global[i].start - b2_start
-                dst_slice.append(slice(lo+curr_to_dist, hi+1+curr_to_dist))
-                dst_full_buf_slice.append(slice(lo, hi+1))
+        dst_partial_map, full_map = _get_dst_partial_map(dists, grid,
+                src_slice_global, b1, slice_axes, conn_axis)
+        dst_low, dst_slice, dst_full_buf_slice = _get_dst_full_slice(
+                b1, b2, src_slice_global, full_map, slice_axes)
 
         # No full or partial connection means that the topology of the grid
         # is such that there are not distributions pointing to the 2nd block.
@@ -139,10 +240,10 @@ class LBConnection(object):
             return None
 
         return LBConnection(dists, src_slice, dst_low, dst_slice, dst_full_buf_slice,
-                dst_partial_map, b1.id)
+                dst_partial_map, src_macro_slice, dst_macro_slice, b1.id)
 
     def __init__(self, dists, src_slice, dst_low, dst_slice, dst_full_buf_slice,
-            dst_partial_map, src_id):
+            dst_partial_map, src_macro_slice, dst_macro_slice, src_id):
         """
         In 3D, the order of all slices always follows the natural ordering: x, y, z
 
@@ -152,10 +253,17 @@ class LBConnection(object):
             the dest block
         dst_slice: slice in the non-ghost buffer of the dest block, to which
             full dists can be written
-        dst_full_buf_slice: slice in the buffer selecting nodes with all dists;
-            by definition: size(dst_full_buf_slice) == size(dst_slice)
-        dst_partial_map: dict mapping distribution indices to list of positions
+        dst_full_buf_slice: slice in the transfer buffer selecting nodes with
+            all dists; by definition: size(dst_full_buf_slice) == size(dst_slice)
+        dst_partial_map: dict mapping distribution indices to lists of positions
             in the transfer buffer
+        src_macro_slice: slice in a real scalar buffer (including ghost nodes)
+            selecting nodes from which field data is to be transferred to the
+            target subdomain
+        dst_macro_slice: slice in a real scalar buffer (including ghost nodes)
+            selecting nodes to which field data is to be written when received
+            from the target subdomain
+        src_id: ID of the source block
         """
         self.dists = dists
         self.src_slice = src_slice
@@ -163,7 +271,20 @@ class LBConnection(object):
         self.dst_slice = dst_slice
         self.dst_full_buf_slice = dst_full_buf_slice
         self.dst_partial_map = dst_partial_map
+        self.src_macro_slice = src_macro_slice
+        self.dst_macro_slice = dst_macro_slice
         self.block_id = src_id
+
+    def __eq__(self, other):
+        return ((self.dists == other.dists) and
+                (self.src_slice == other.src_slice) and
+                (self.dst_low == other.dst_low) and
+                (self.dst_slice == other.dst_slice) and
+                (self.dst_full_buf_slice == other.dst_full_buf_slice) and
+                (self.block_id == other.block_id))
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     @property
     def elements(self):
@@ -181,7 +302,15 @@ class LBConnection(object):
 
     @property
     def full_shape(self):
+        """Logical shape of the buffer for nodes with a full set of distributions."""
         return [len(self.dists)] + map(lambda x: int(x.stop - x.start), reversed(self.dst_slice))
+
+    @property
+    def macro_transfer_shape(self):
+        """Logical shape of the transfer buffer for a set of scalar macroscopic
+        fields."""
+        return map(lambda x: int(x.stop - x.start),
+                reversed(self.src_macro_slice))
 
 class SubdomainSpec(object):
     dim = None
@@ -210,8 +339,9 @@ class SubdomainSpec(object):
         self.vis_geo_buffer = None
         self._periodicity = [False] * self.dim
 
-    def __str__(self):
-        return '{0}({1}, {2})'.format(self.__class__.__name__, self.location, self.size)
+    def __repr__(self):
+        return '{0}({1}, {2}, id_={3})'.format(self.__class__.__name__,
+                self.location, self.size, self._id)
 
     @property
     def runner(self):
@@ -246,6 +376,14 @@ class SubdomainSpec(object):
     def update_context(self, ctx):
         ctx['dim'] = self.dim
         ctx['envelope_size'] = self.envelope_size
+        # TODO(michalj): Fix this.
+        # This requires support for ghost nodes in the periodicity code
+        # on the GPU.
+        # ctx['periodicity'] = self._periodicity
+        ctx['periodicity'] = [False, False, False]
+        ctx['periodic_x'] = 0 #int(self._block.periodic_x)
+        ctx['periodic_y'] = 0 #int(self._block.periodic_y)
+        ctx['periodic_z'] = 0 #periodic_z
 
     def enable_local_periodicity(self, axis):
         """Makes the block locally periodic along a given axis."""
@@ -255,16 +393,12 @@ class SubdomainSpec(object):
         # case.
 
     def _add_connection(self, face, cpair):
-        if face in self._connections:
-            for pair in self._connections[face]:
-                # We already have a connection for this face.
-                # TODO(michalj): Make this an assertion.
-                if cpair.dst.block_id == pair.dst.block_id:
-                    return
-        self._connections.setdefault(face, []).append(cpair)
+        if cpair in self._connections[face]:
+            return
+        self._connections[face].append(cpair)
 
     def _clear_connections(self):
-        self._connections = {}
+        self._connections = defaultdict(list)
 
     def _clear_connectors(self):
         self._connectors = {}
@@ -276,18 +410,28 @@ class SubdomainSpec(object):
     def get_connection(self, face, block_id):
         """Returns a LBConnection object describing the connection to 'block_id'
         via 'face'."""
+        try:
+            for pair in self._connections[face]:
+                if pair.dst.block_id == block_id:
+                    return pair
+        except KeyError:
+            pass
+
+    def get_connections(self, face, block_id):
+        ret = []
         for pair in self._connections[face]:
             if pair.dst.block_id == block_id:
-                return pair
+                ret.append(pair)
+        return ret
 
     def connecting_blocks(self):
         """Returns a list of pairs: (face, block ID) representing connections
         to different blocks."""
-        ids = []
+        ids = set([])
         for face, v in self._connections.iteritems():
             for pair in v:
-                ids.append((face, pair.dst.block_id))
-        return ids
+                ids.add((face, pair.dst.block_id))
+        return list(ids)
 
     def has_face_conn(self, face):
         return face in self._connections.keys()
@@ -354,84 +498,67 @@ class SubdomainSpec(object):
             elif dir_ == -1:
                 return cls.Z_HIGH
 
-    def connect(self, block, geo=None, axis=None, grid=None):
+    def connect(self, pair, grid=None):
         """Creates a connection between this block and another block.
 
         A connection can only be created when the blocks are next to each
         other.
 
-        :param block: block object to connect to
-        :param `geo`: None for a local block connection; for a global
-               connection due to lattice periodicity, a LBGeometry object
         :returns: True if the connection was successful
         :rtype: bool
         """
-        assert block.id != self.id
+        # Convenience helper for tests.
+        if type(pair) is not SubdomainPair:
+            pair = SubdomainPair(pair, pair)
 
-        def connect_x():
-            c1 = LBConnection.make(self, block, self.X_HIGH, grid)
-            c2 = LBConnection.make(block, self, self.X_LOW, grid)
+        assert pair.real.id != self.id
 
-            if c1 is None:
-                return False
-
-            self._add_connection(self.X_HIGH, ConnectionPair(c1, c2))
-            block._add_connection(self.X_LOW, ConnectionPair(c2, c1))
-            return True
-
-        def connect_y():
-            c1 = LBConnection.make(self, block, self.Y_HIGH, grid)
-            c2 = LBConnection.make(block, self, self.Y_LOW, grid)
+        def connect_x(r1, r2, v1, v2):
+            c1 = LBConnection.make(v1, v2, self.X_HIGH, grid)
+            c2 = LBConnection.make(v2, v1, self.X_LOW, grid)
 
             if c1 is None:
                 return False
 
-            self._add_connection(self.Y_HIGH, ConnectionPair(c1, c2))
-            block._add_connection(self.Y_LOW, ConnectionPair(c2, c1))
+            r1._add_connection(self.X_HIGH, ConnectionPair(c1, c2))
+            r2._add_connection(self.X_LOW, ConnectionPair(c2, c1))
             return True
 
-        def connect_z():
-            c1 = LBConnection.make(self, block, self.Z_HIGH, grid)
-            c2 = LBConnection.make(block, self, self.Z_LOW, grid)
+        def connect_y(r1, r2, v1, v2):
+            c1 = LBConnection.make(v1, v2, self.Y_HIGH, grid)
+            c2 = LBConnection.make(v2, v1, self.Y_LOW, grid)
 
             if c1 is None:
                 return False
 
-            self._add_connection(self.Z_HIGH, ConnectionPair(c1, c2))
-            block._add_connection(self.Z_LOW, ConnectionPair(c2, c1))
+            r1._add_connection(self.Y_HIGH, ConnectionPair(c1, c2))
+            r2._add_connection(self.Y_LOW, ConnectionPair(c2, c1))
             return True
 
-        if geo is not None:
-            assert axis is not None
-            if axis == 0:
-                if self.ox == 0 and block.ex == geo.gx:
-                    return block.connect(self, geo, axis, grid)
-                elif block.ox == 0 and self.ex == geo.gx:
-                    return connect_x()
-            elif axis == 1:
-                if self.oy == 0 and block.ey == geo.gy:
-                    return block.connect(self, geo, axis, grid)
-                elif block.oy == 0 and self.ey == geo.gy:
-                    return connect_y()
-            elif axis == 2:
-                if self.oz == 0 and block.ez == geo.gz:
-                    return block.connect(self, geo, axis, grid)
-                elif block.oz == 0 and self.ez == geo.gz:
-                    return connect_z()
+        def connect_z(r1, r2, v1, v2):
+            c1 = LBConnection.make(v1, v2, self.Z_HIGH, grid)
+            c2 = LBConnection.make(v2, v1, self.Z_LOW, grid)
 
-        elif self.ex == block.ox:
-            return connect_x()
-        elif block.ex == self.ox:
-            return block.connect(self, grid=grid)
-        elif self.ey == block.oy:
-            return connect_y()
-        elif block.ey == self.oy:
-            return block.connect(self, grid=grid)
+            if c1 is None:
+                return False
+
+            r1._add_connection(self.Z_HIGH, ConnectionPair(c1, c2))
+            r2._add_connection(self.Z_LOW, ConnectionPair(c2, c1))
+            return True
+
+        if self.ex == pair.virtual.ox:
+            return connect_x(self, pair.real, self, pair.virtual)
+        elif pair.virtual.ex == self.ox:
+            return connect_x(pair.real, self, pair.virtual, self)
+        elif self.ey == pair.virtual.oy:
+            return connect_y(self, pair.real, self, pair.virtual)
+        elif pair.virtual.ey == self.oy:
+            return connect_y(pair.real, self, pair.virtual, self)
         elif self.dim == 3:
-            if self.ez == block.oz:
-                return connect_z()
-            elif block.ez == self.oz:
-                return block.connect(self, grid=grid)
+            if self.ez == pair.virtual.oz:
+                return connect_z(self, pair.real, self, pair.virtual)
+            elif pair.virtual.ez == self.oz:
+                return connect_z(pair.real, self, pair.virtual, self)
 
         return False
 
@@ -479,163 +606,6 @@ class SubdomainSpec3D(SubdomainSpec):
         return self._periodicity[2]
 
 
-
-class GeoEncoder(object):
-    """Takes information about geometry as specified by the simulation and
-    encodes it into buffers suitable for processing on a GPU.
-
-    This is an abstract class.  Its implementations provide a specific encoding
-    scheme."""
-    def __init__(self, geo_block):
-        self._type_id_map = {}
-        self.geo_block = geo_block
-
-    def encode(self):
-        raise NotImplementedError("encode() should be implemented in a subclass")
-
-    def update_context(self, ctx):
-        raise NotImplementedError("update_context() should be implemented in a subclass")
-
-    def _type_id(self, node_type):
-        if node_type in self._type_id_map:
-            return self._type_id_map[node_type]
-        else:
-            # Does not end with 0xff to make sure the compiler will not complain
-            # that x < <val> always evaluates true.
-            return 0xfffffffe
-
-
-class GeoEncoderConst(GeoEncoder):
-    """Encodes information about the type, optional parameters and orientation
-    of a node into a single uint32.  Optional parameters are stored in const
-    memory."""
-
-    def __init__(self, geo_block):
-        GeoEncoder.__init__(self, geo_block)
-
-        self._bits_type = 0
-        self._bits_param = 0
-        self._type_map = None
-        self._param_map = None
-        self._geo_params = []
-        # TODO: Generalize this.
-        self._num_velocities = 0
-        self.config = geo_block.block.runner.config
-
-    def prepare_encode(self, type_map, param_map, param_dict):
-        """
-        Args:
-          type_map: uint32 array representing node type information
-        """
-        uniq_types = np.unique(type_map)
-
-        for i, node_type in enumerate(uniq_types):
-            self._type_id_map[node_type] = i
-
-        self._bits_type = bit_len(uniq_types.size)
-        self._type_map = type_map
-        self._param_map = param_map
-
-        # Group parameters by type.
-        type_dict = defaultdict(list)
-        for param_hash, (node_type, val) in param_dict.iteritems():
-            type_dict[node_type].append((param_hash, val))
-
-        max_len = 0
-        for node_type, values in type_dict.iteritems():
-            l = len(values)
-            if node_type == Subdomain.NODE_VELOCITY:
-                self._num_velocities = l
-            max_len = max(max_len, l)
-        self._bits_param = bit_len(max_len)
-
-        # TODO(michalj): Generalize this to other node types.
-        for param_hash, val in type_dict[Subdomain.NODE_VELOCITY]:
-            self._geo_params.extend(val)
-        for param_hash, val in type_dict[Subdomain.NODE_PRESSURE]:
-            self._geo_params.append(val)
-
-        self._type_dict = type_dict
-
-    def encode(self):
-        assert self._type_map is not None
-
-        # TODO: optimize this using numpy's built-in routines
-        param = np.zeros_like(self._type_map)
-        for node_type, values in self._type_dict.iteritems():
-            for i, (hash_value, _) in enumerate(values):
-                param[self._param_map == hash_value] = i
-
-        orientation = np.zeros_like(self._type_map)
-        cnt = np.zeros_like(self._type_map)
-
-        for i, vec in enumerate(self.geo_block.grid.basis):
-            l = len(list(vec)) - 1
-            shifted_map = self._type_map
-            for j, shift in enumerate(vec):
-                shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
-
-            cnt[(shifted_map == Subdomain.NODE_WALL)] += 1
-            # FIXME: we're currently only processing the primary directions
-            # here
-            if vec.dot(vec) == 1:
-                idx = np.logical_and(self._type_map != Subdomain.NODE_FLUID,
-                        shifted_map == Subdomain.NODE_FLUID)
-                orientation[idx] = self.geo_block.grid.vec_to_dir(list(vec))
-
-            # Mark any nodes completely surrounded by walls as unused.
-            self._type_map[(cnt == self.geo_block.grid.Q)] = Subdomain.NODE_UNUSED
-
-        # Remap type IDs.
-        max_type_code = max(self._type_id_map.keys())
-        type_choice_map = np.zeros(max_type_code+1, dtype=np.uint32)
-        for orig_code, new_code in self._type_id_map.iteritems():
-            type_choice_map[orig_code] = new_code
-
-        self._type_map[:] = self._encode_node(orientation, param,
-                np.choose(np.int32(self._type_map), type_choice_map))
-
-        # Drop the reference to the map array.
-        self._type_map = None
-
-    def update_context(self, ctx):
-        ctx.update({
-            'geo_fluid': self._type_id(Subdomain.NODE_FLUID),
-            'geo_wall': self._type_id(Subdomain.NODE_WALL),
-            'geo_slip': self._type_id(Subdomain.NODE_SLIP),
-            'geo_unused': self._type_id(Subdomain.NODE_UNUSED),
-            'geo_velocity': self._type_id(Subdomain.NODE_VELOCITY),
-            'geo_pressure': self._type_id(Subdomain.NODE_PRESSURE),
-            'geo_boundary': self._type_id(Subdomain.NODE_BOUNDARY),
-            'geo_ghost': self._type_id(Subdomain.NODE_GHOST),
-            'geo_misc_shift': self._bits_type,
-            'geo_type_mask': (1 << self._bits_type) - 1,
-            'geo_param_shift': self._bits_param,
-            'geo_obj_shift': 0,
-            'geo_dir_other': 0,
-            'geo_num_velocities': self._num_velocities,
-            'geo_params': self._geo_params
-        })
-
-    def _encode_node(self, orientation, param, node_type):
-        """Encodes information for a single node into a uint32.
-
-        The node code consists of the following bit fields:
-          orientation | param_index | node_type
-        """
-        misc_data = (orientation << self._bits_param) | param
-        return node_type | (misc_data << self._bits_type)
-
-
-# TODO: Implement this class.
-class GeoEncoderBuffer(GeoEncoder):
-    pass
-
-# TODO: Implement this class.
-class GeoEncoderMap(GeoEncoder):
-    pass
-
-
 class Subdomain(object):
     """Abstract class for the geometry of a SubdomainSpec."""
 
@@ -674,6 +644,7 @@ class Subdomain(object):
         self._param_map = block.runner.make_scalar_field(np.uint32, register=False)
         self._params = {}
         self._encoder = None
+        self._seen_types = set()
 
     @property
     def config(self):
@@ -687,15 +658,23 @@ class Subdomain(object):
         raise NotImplementedError('initial_conditions() not defined in a child '
                 'class')
 
-    def set_node(self, where, type_, params=None):
+    # TOOD(michalj): Add support for BC classes here..
+    def set_node(self, where, node_type, params=None):
+        """Set a boundary condition at selected node(s).
+
+        :param where: index expression selecting nodes to set
+        :param node_type: constant identifying node type
+        :param params: optional parameters for the node (e.g. velocity)
+        """
         assert not self._type_map_encoded
 
         # TODO: if type_ is a class, we should just store its ID; if it's
         # an object, the ID should be dynamically assigned
-        self._type_map[where] = type_
-        key = (type_, params)
+        self._type_map[where] = node_type
+        key = (node_type, params)
         self._param_map[where] = hash(key)
         self._params[hash(key)] = key
+        self._seen_types.add(node_type)
 
     def reset(self):
         self._type_map_encoded = False
@@ -709,7 +688,7 @@ class Subdomain(object):
         self._define_ghosts()
 
         # TODO: At this point, we should decide which GeoEncoder class to use.
-        self._encoder = GeoEncoderConst(self)
+        self._encoder = geo_encoder.GeoEncoderConst(self)
         self._encoder.prepare_encode(self._type_map.base, self._param_map,
                 self._params)
 
@@ -723,9 +702,19 @@ class Subdomain(object):
         self._encoder.update_context(ctx)
 
         # FIXME(michalj)
+        if Subdomain.NODE_VELOCITY in self._seen_types:
+            bc_velocity = 'equilibrium'
+        else:
+            bc_velocity = None
+
+        if Subdomain.NODE_WALL in self._seen_types:
+            bc_wall = 'fullbb'
+        else:
+            bc_wall = None
+
         ctx.update({
-                'bc_wall': 'fullbb',
-                'bc_velocity': 'equilibrium',
+                'bc_wall': bc_wall,
+                'bc_velocity': bc_velocity,
                 'bc_wall_': BCWall,
                 'bc_velocity_': BCWall,
                 'bc_pressure_': BCWall,
