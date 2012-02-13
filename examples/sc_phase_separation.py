@@ -1,36 +1,40 @@
 #!/usr/bin/python
 
-import numpy
-import math
-from sailfish import geo, lb_single
+import numpy as np
+
+from sailfish.geo import LBGeometry2D
+from sailfish.geo_block import Subdomain2D
+from sailfish.controller import LBSimulationController
+from sailfish.lb_single import LBSingleFluidShanChen
 
 
-class GeoSC(geo.LBMGeo2D):
+class SeparationSubdomain(Subdomain2D):
+    def boundary_conditions(self, hx, hy):
+        pass
 
-    def init_fields(self):
-        hy, hx = numpy.mgrid[0:self.lat_ny, 0:self.lat_nx]
+    def initial_conditions(self, sim, hx, hy):
+        sim.rho[:] = np.random.rand(*sim.rho.shape) / 100 + 0.693
 
-        self.sim.rho[:] = numpy.random.rand(*self.sim.rho.shape) / 100
-        self.sim.rho[:] += 0.693
 
-class SCSim(lb_single.ShanChenSingle):
-    filename = 'sc_phase_2d'
+class SCSim(LBSingleFluidShanChen):
+    subdomain = SeparationSubdomain
 
-    def __init__(self, geo_class, defaults={}):
-        settings={'bc_velocity': 'equilibrium', 'verbose': True, 'lat_nx': 256,
-                                'lat_ny': 256, 'grid': 'D2Q9', 'G': 5.0,
-                                'visc': 0.166666666666, 'periodic_x': True, 'periodic_y': True, 'every': 20,
-                                'scr_scale': 1}
-        settings.update(defaults)
-
-        lb_single.ShanChenSingle.__init__(self, geo_class, options=[], defaults=settings)
-        self.add_iter_hook(1000, self.stats, every=True)
+    @classmethod
+    def update_defaults(cls, defaults):
+        defaults.update({
+            'lat_nx': 256,
+            'lat_ny': 256,
+            'G': 5.0,
+            'visc': 1.0 / 6.0,
+            'periodic_x': True,
+            'periodic_y': True,
+            'sc_potential': 'classic',
+            'every': 20})
 
     def stats(self):
-        avg = numpy.average(self.rho)
-        order = math.sqrt(numpy.average(numpy.square(self.rho - avg))) / avg
-        self._stats = numpy.min(self.rho), numpy.max(self.rho), order
+        avg = np.average(self.rho)
+        order = np.sqrt(np.average(np.square(self.rho - avg))) / avg
+        self._stats = np.min(self.rho), np.max(self.rho), order
 
 if __name__ == '__main__':
-    sim = SCSim(GeoSC)
-    sim.run()
+    LBSimulationController(SCSim, LBGeometry2D).run()

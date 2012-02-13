@@ -1015,6 +1015,8 @@ class KernelCodePrinter(CCodePrinter):
     def _print_Function(self, expr):
         if expr.func.__name__ == 'log':
             return 'logf(%s)' % self.stringify(expr.args, ', ')
+        elif expr.func.__name__ == 'exp':
+            return 'expf(%s)' % self.stringify(expr.args, ', ')
         else:
             return super(KernelCodePrinter, self)._print_Function(expr)
 
