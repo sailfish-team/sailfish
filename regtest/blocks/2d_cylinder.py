@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from examples.lbm_cylinder_multi import CylinderSimulation, CylinderGeometry
+from examples.cylinder import CylinderSimulation, CylinderGeometry
 from sailfish.controller import LBSimulationController
 from regtest.blocks import util
 
