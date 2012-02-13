@@ -30,6 +30,11 @@ ${const_var} float visc = ${visc}f;		// viscosity
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
 ${kernel_common.body(bgk_args_decl)}
 
+%if simtype == 'shan-chen':
+	<%namespace file="shan_chen.mako" import="*" name="shan_chen"/>
+	${shan_chen.body()}
+%endif
+
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="code_common.mako" import="*"/>
 <%namespace file="boundary.mako" import="*" name="boundary"/>
@@ -47,32 +52,6 @@ ${kernel_common.body(bgk_args_decl)}
 		${get_odist('dist1_in', i)} = ${cex(feq, vectors=True)};
 	%endfor
 </%def>
-
-%if dim == 2:
-${kernel} void SetLocalVelocity(
-	${global_ptr} float *dist1_in,
-	${global_ptr} float *irho,
-	${kernel_args_1st_moment('ov')}
-	int x, int y, float vx, float vy)
-{
-	int gx = x + get_global_id(0) - get_local_size(1) / 2;
-	int gy = y + get_global_id(1) - get_local_size(1) / 2;
-
-	${wrap_coords()}
-
-	int gi = gx + ${arr_nx}*gy;
-	float rho = irho[gi];
-	float v0[${dim}];
-
-	v0[0] = vx;
-	v0[1] = vy;
-
-	${init_dist_with_eq()}
-
-	ovx[gi] = vx;
-	ovy[gi] = vy;
-}
-%endif
 
 // A kernel to set the node distributions using the equilibrium distributions
 // and the macroscopic fields.
@@ -125,12 +104,9 @@ ${kernel} void CollideAndPropagate(
 	${global_ptr} int *map,
 	${global_ptr} float *dist_in,
 	${global_ptr} float *dist_out,
-	${global_ptr} float *orho,
+	${global_ptr} float *gg0m0,
 	${kernel_args_1st_moment('ov')}
 	int options
-%if simtype == 'shan-chen':
-	,${global_ptr} float *gg0m0
-%endif
 	)
 {
 	${local_indices_split()}
@@ -175,7 +151,7 @@ ${kernel} void CollideAndPropagate(
 
 	// Only save the macroscopic quantities if requested to do so.
 	if (options & OPTION_SAVE_MACRO_FIELDS) {
-		orho[gi] = g0m0;
+		gg0m0[gi] = g0m0;
 		ovx[gi] = v[0];
 		ovy[gi] = v[1];
 		%if dim == 3:
