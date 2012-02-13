@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from examples.lbm_sphere_multi_3d import SphereSimulation, SphereGeometry
+from examples.sphere_3d import SphereSimulation, SphereGeometry
 from sailfish.controller import LBSimulationController
 from regtest.blocks import util
 

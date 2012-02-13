@@ -10,7 +10,7 @@ import os
 import shutil
 import tempfile
 
-from examples.lbm_ldc_multi_3d import LDCGeometry, LDCBlock, LDCSim
+from examples.ldc_3d import LDCGeometry, LDCBlock, LDCSim
 from sailfish.controller import LBSimulationController
 
 tmpdir = tempfile.mkdtemp()

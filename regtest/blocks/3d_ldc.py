@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from examples.lbm_ldc_multi_3d import LDCGeometry, LDCSim
+from examples.ldc_3d import LDCGeometry, LDCSim
 from sailfish.controller import LBSimulationController
 from regtest.blocks import util
 
