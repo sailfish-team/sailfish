@@ -22,6 +22,8 @@ class TestPbsUtils(unittest.TestCase):
                      'node2.domain', [0], None)],
                 cluster.nodes)
 
+
+class TestMiscUtils(unittest.TestCase):
     def test_reverse_pairs(self):
         l1 = [1, 2, 3, 4]
         l2 = list(util.reverse_pairs(l1))

@@ -3,6 +3,8 @@
 from collections import namedtuple
 from sailfish import sym
 
+import numpy as np
+
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL'
@@ -74,6 +76,13 @@ class LBSim(object):
             setattr(self, field.name, f)
             self._fields[field.name] = FieldPair(field, f)
 
+    def verify_fields(self):
+        """Verifies that fields have not accidentally been overridden."""
+        for name, field_pair in self._fields.iteritems():
+            assert getattr(self, name) is field_pair.buffer,\
+                    'Field {0} redefined (probably in initial_conditions())'.format(
+                            name)
+
     def __init__(self, config):
         self.config = config
         self.S = sym.S()
@@ -82,7 +91,6 @@ class LBSim(object):
     # TODO(michalj): Restore support for iter hooks.
     # TODO(michalj): Restore support for defining visualization fields.
     # TODO(michalj): Restore support for tracer particles.
-    # TODO(michalj): Restore support for free-surface LB.
 
 class Field(object):
     def __init__(self, name, expr=None, need_nn=False):
