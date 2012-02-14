@@ -48,6 +48,7 @@ perf_block_plots:
 test:
 	python tests/block_runner.py
 	python tests/geo_block.py
+	python tests/sim.py
 	python tests/sym.py
 	python tests/util.py
 
