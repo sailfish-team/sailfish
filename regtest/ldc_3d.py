@@ -17,7 +17,7 @@ from sailfish import geo
 from sailfish import geo_block
 
 tmpdir = tempfile.mkdtemp()
-MAX_ITERS = 50000
+MAX_ITERS = 100
 LAT_NX = 128
 LAT_NY = 128
 LAT_NZ = 128
