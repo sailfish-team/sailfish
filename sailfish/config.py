@@ -40,6 +40,9 @@ class LBConfigParser(object):
         return self._parser.add_argument_group(name)
 
     def set_defaults(self, defaults):
+        for option in defaults.iterkeys():
+            assert self._parser.get_default(option) is not None,\
+                    'Unknown option "{0}" specified in update_defaults()'.format(option)
         return self._parser.set_defaults(**defaults)
 
     def parse(self, args):
