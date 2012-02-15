@@ -31,10 +31,6 @@ class SCSim(LBSingleFluidShanChen):
             'sc_potential': 'classic',
             'every': 20})
 
-    def stats(self):
-        avg = np.average(self.rho)
-        order = np.sqrt(np.average(np.square(self.rho - avg))) / avg
-        self._stats = np.min(self.rho), np.max(self.rho), order
 
 if __name__ == '__main__':
     LBSimulationController(SCSim, LBGeometry2D).run()
