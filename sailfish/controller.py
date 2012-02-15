@@ -563,9 +563,9 @@ class LBSimulationController(object):
 
         blocks = self.geo.blocks()
         assert blocks is not None, \
-                "Make sure the block list is returned in geo_class.blocks()"
+                "Make sure the subdomain list is returned in geo_class.blocks()"
         assert len(blocks) > 0, \
-                "Make sure at least one block is returned in geo_class.blocks()"
+                "Make sure at least one subdomain is returned in geo_class.blocks()"
 
         sim = self._lb_class(self.config)
         self._init_block_envelope(sim, blocks)
