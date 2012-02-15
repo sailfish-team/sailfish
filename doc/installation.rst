@@ -25,7 +25,6 @@ Visualization (optional):
 
 Data output (optional):
 
-* pytables-2.1.1 (HDF5 output)
 * tvtk (VTK output)
 
 Tests:

@@ -102,65 +102,6 @@ class VisualizationWrapper(LBOutput):
             self._geo_buffer[0:self.nodes] = np.ravel(self.block.runner.visualization_map())
 
 
-# TODO: Correctly process vector and scalar fields in these clases.
-class HDF5FlatOutput(LBOutput):
-    """Saves simulation data in a HDF5 file."""
-    format_name = 'h5flat'
-
-    def __init__(self, fname, sim):
-        LBOutput.__init__(self)
-
-        # FIXME: Port this class.
-        raise NotImplementedError('This class has not been ported yet.')
-
-        self.sim = sim
-        import tables
-        self.h5file = tables.openFile(fname, mode='w')
-        self.h5grp = self.h5file.createGroup('/', 'results', 'simulation results')
-        self.h5file.setNodeAttr(self.h5grp, 'viscosity', sim.options.visc)
-        self.h5file.setNodeAttr(self.h5grp, 'sample_rate', sim.options.every)
-        self.h5file.setNodeAttr(self.h5grp, 'model', sim.lbm_model)
-
-    def save(self, i):
-        h5t = self.h5file.createGroup(self.h5grp, 'iter%d' % i, 'iteration %d' % i)
-        self.h5file.createArray(h5t, 'v', np.dstack(self.sim.velocity), 'velocity')
-        self.h5file.createArray(h5t, 'rho', self.sim.rho, 'density')
-
-
-class HDF5NestedOutput(HDF5FlatOutput):
-    """Saves simulation data in a HDF5 file."""
-    format_name = 'h5nested'
-
-    def __init__(self, fname, sim):
-        # FIXME: Port this class.
-        raise NotImplementedError('This class has not been ported yet.')
-
-        super(HDF5NestedOutput, self).__init__(fname, sim)
-        import tables
-        desc = {
-            'iter': tables.Float32Col(pos=0),
-            'vx': tables.Float32Col(pos=1, shape=sim.vx.shape),
-            'vy': tables.Float32Col(pos=2, shape=sim.vy.shape),
-            'rho': tables.Float32Col(pos=4, shape=sim.rho.shape)
-        }
-
-        if sim.grid.dim == 3:
-            desc['vz'] = tables.Float32Col(pos=2, shape=sim.vz.shape)
-
-        self.h5tbl = self.h5file.createTable(self.h5grp, 'results', desc, 'results')
-
-    def save(self, i):
-        record = self.h5tbl.row
-        record['iter'] = i
-        record['vx'] = self.sim.vx
-        record['vy'] = self.sim.vy
-        if self.sim.grid.dim == 3:
-            record['vz'] = self.sim.vz
-        record['rho'] = self.sim.rho
-        record.append()
-        self.h5tbl.flush()
-
-
 def _get_fname_digits(max_iters=0):
     if max_iters:
         return str(int(math.log10(max_iters)) + 1)
@@ -252,7 +193,7 @@ class MatlabOutput(LBOutput):
         data.update(self._vector_fields)
         scipy.io.savemat(fname, data)
 
-_OUTPUTS = [NPYOutput, HDF5FlatOutput, HDF5NestedOutput, VTKOutput, MatlabOutput]
+_OUTPUTS = [NPYOutput, VTKOutput, MatlabOutput]
 
 format_name_to_cls = {}
 for output_class in _OUTPUTS:
