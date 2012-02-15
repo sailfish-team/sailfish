@@ -3,10 +3,10 @@
 Sailfish is an Open Source project.  Its code is licensed under the terms of
 the LGPL v3.
 
-The source code is hosted in a git repository at http://code.google.com/p/sailfish-cfd/
+The source code is hosted in a git repository at https://github.com/sailfish-team/sailfish
 To get a recent copy, run:
 
- $ git clone https://code.google.com/p/sailfish-cfd/ sailfish-cfd
+ $ git clone https://github.com/sailfish-team/sailfish sailfish-cfd
 
 If you have any questions, patches, suggestions etc. feel free to send a
 message to the project mailing list:
@@ -29,5 +29,5 @@ e.g.:
 
 $ export PYTHONPATH=$PWD:$PYTHONPATH
 $ cd examples
-$ ./lbm_ldc.py
+$ ./ldc_2d.py
 
