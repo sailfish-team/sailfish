@@ -543,6 +543,10 @@ class LBSimulationController(object):
 
         return None, None
 
+    def save_subdomain_config(self, subdomains):
+        if self.config.output:
+            pickle.dump(subdomains,
+                    open(self.config.output + '.subdomains', 'w'))
 
     def run(self, ignore_cmdline=False):
         """Runs a simulation."""
@@ -561,17 +565,18 @@ class LBSimulationController(object):
         port = summary_receiver.bind_to_random_port('tcp://127.0.0.1')
         self.config._zmq_port = port
 
-        blocks = self.geo.blocks()
-        assert blocks is not None, \
+        subdomains = self.geo.blocks()
+        assert subdomains is not None, \
                 "Make sure the subdomain list is returned in geo_class.blocks()"
-        assert len(blocks) > 0, \
+        assert len(subdomains) > 0, \
                 "Make sure at least one subdomain is returned in geo_class.blocks()"
 
         sim = self._lb_class(self.config)
-        self._init_block_envelope(sim, blocks)
+        self._init_block_envelope(sim, subdomains)
 
-        proc = LBGeometryProcessor(blocks, self.dim, self.geo)
-        blocks = proc.transform(self.config)
+        proc = LBGeometryProcessor(subdomains, self.dim, self.geo)
+        subdomains = proc.transform(self.config)
+        self.save_subdomain_config(subdomains)
 
-        self._start_simulation(blocks)
-        return self._finish_simulation(blocks, summary_receiver)
+        self._start_simulation(subdomains)
+        return self._finish_simulation(subdomains, summary_receiver)
