@@ -17,6 +17,7 @@ from sailfish.geo_block import Subdomain2D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidShanChen, LBBinaryFluidFreeEnergy
 from sailfish.lb_single import LBForcedSim
+from sailfish import io
 from regtest.blocks import util
 
 
@@ -24,6 +25,8 @@ SHIFT = [17, 4, 13]
 output = ''
 tmpdir = tempfile.mkdtemp()
 block_size = 64
+MAX_ITERS_2D = 1000
+MAX_ITERS_3D = 100
 
 def match_fields(reference, shifted):
     for axis in range(0, len(reference.shape)):
@@ -96,7 +99,7 @@ class SCTestSim2D(LBBinaryFluidShanChen, LBForcedSim):
             'periodic_y': True,
             'output': output,
             'quiet': True,
-            'max_iters': 1000,
+            'max_iters': MAX_ITERS_2D,
             'every': 500})
 
 class SCTestSim3D(LBBinaryFluidShanChen, LBForcedSim):
@@ -118,7 +121,7 @@ class SCTestSim3D(LBBinaryFluidShanChen, LBForcedSim):
             'periodic_z': True,
             'output': output,
             'quiet': True,
-            'max_iters': 100,
+            'max_iters': MAX_ITERS_3D,
             'every': 50})
 
 
@@ -127,12 +130,13 @@ class TestShanChenShift(unittest.TestCase):
         global output
         output = os.path.join(tmpdir, 'baseline')
         ctrl = LBSimulationController(SCTestSim2D, LBGeometry2D).run(ignore_cmdline=True)
-        ref = np.load('%s_blk0_1000.npz' % output)
+        digits = io.filename_iter_digits(MAX_ITERS_2D)
+        ref = np.load(io.filename(output, digits, 0, MAX_ITERS_2D))
 
         output = os.path.join(tmpdir, 'shifted')
         SCTestDomain2D.shift = True
         LBSimulationController(SCTestSim2D, LBGeometry2D).run(ignore_cmdline=True)
-        shifted = np.load('%s_blk0_1000.npz' % output)
+        shifted = np.load(io.filename(output, digits, 0, MAX_ITERS_2D))
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])
         self.assertFalse(np.any(np.isnan(ref['rho'])))
@@ -144,12 +148,13 @@ class TestShanChenShift(unittest.TestCase):
         global output
         output = os.path.join(tmpdir, 'baseline')
         ctrl = LBSimulationController(SCTestSim3D, LBGeometry3D).run(ignore_cmdline=True)
-        ref = np.load('%s_blk0_100.npz' % output)
+        digits = io.filename_iter_digits(MAX_ITERS_3D)
+        ref = np.load(io.filename(output, digits, 0, MAX_ITERS_3D))
 
         output = os.path.join(tmpdir, 'shifted')
         SCTestDomain3D.shift = True
         LBSimulationController(SCTestSim3D, LBGeometry3D).run(ignore_cmdline=True)
-        shifted = np.load('%s_blk0_100.npz' % output)
+        shifted = np.load(io.filename(output, digits, 0, MAX_ITERS_3D))
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])
         self.assertFalse(np.any(np.isnan(ref['rho'])))
@@ -251,12 +256,13 @@ class TestFreeEnergyShift(unittest.TestCase):
         global output
         output = os.path.join(tmpdir, 'baseline')
         LBSimulationController(FETestSim2D, LBGeometry2D).run(ignore_cmdline=True)
-        ref = np.load('%s_blk0_1000.npz' % output)
+        digits = io.filename_iter_digits(MAX_ITERS_2D)
+        ref = np.load(io.filename(output, digits, 0, MAX_ITERS_2D))
 
         output = os.path.join(tmpdir, 'shifted')
         FETestDomain2D.shift = True
         LBSimulationController(FETestSim2D, LBGeometry2D).run(ignore_cmdline=True)
-        shifted = np.load('%s_blk0_1000.npz' % output)
+        shifted = np.load(io.filename(output, digits, 0, MAX_ITERS_2D))
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])
         self.assertFalse(np.any(np.isnan(ref['rho'])))
@@ -268,12 +274,13 @@ class TestFreeEnergyShift(unittest.TestCase):
         global output
         output = os.path.join(tmpdir, 'baseline')
         LBSimulationController(FETestSim3D, LBGeometry3D).run(ignore_cmdline=True)
-        ref = np.load('%s_blk0_100.npz' % output)
+        digits = io.filename_iter_digits(MAX_ITERS_3D)
+        ref = np.load(io.filename(output, digits, 0, MAX_ITERS_3D))
 
         output = os.path.join(tmpdir, 'shifted')
         FETestDomain3D.shift = True
         LBSimulationController(FETestSim3D, LBGeometry3D).run(ignore_cmdline=True)
-        shifted = np.load('%s_blk0_100.npz' % output)
+        shifted = np.load(io.filename(output, digits, 0, MAX_ITERS_3D))
         match_fields(ref['rho'], shifted['rho'])
         match_fields(ref['phi'], shifted['phi'])
         self.assertFalse(np.any(np.isnan(ref['rho'])))
