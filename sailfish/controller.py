@@ -546,7 +546,7 @@ class LBSimulationController(object):
     def save_subdomain_config(self, subdomains):
         if self.config.output:
             pickle.dump(subdomains,
-                    open(self.config.output + '.subdomains', 'w'))
+                    open(io.subdomains_filename(self.config.output), 'w'))
 
     def run(self, ignore_cmdline=False):
         """Runs a simulation."""
