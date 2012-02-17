@@ -4,25 +4,27 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPLv3'
 
+from collections import defaultdict
 import numpy as np
 
 from sailfish import sym, util
-from sailfish.lb_base import LBSim
+from sailfish.lb_base import LBSim, ScalarField, VectorField
 
-class GridError(Exception):
-    pass
 
+# TODO(michalj): Move this to lb_base.
 class LBForcedSim(LBSim):
     """Adds support for body forces."""
 
     def __init__(self, config):
         super(LBForcedSim, self).__init__(config)
         self._forces = {}
+        self._force_couplings = {}
+        self._force_term_for_eq = {}
 
     # TODO(michalj): Add support for dynamical forces via sympy expressions
     # and for global force fields via numpy arrays.
     def add_body_force(self, force, grid=0, accel=True):
-        """Add a constant global force field acting on the fluid.
+        """Adds a constant global force field acting on the fluid.
 
         Multiple calls to this function will add the value of `force` to any
         previously set value.  Forces and accelerations are processed separately
@@ -45,10 +47,37 @@ class LBForcedSim(LBSim):
     def update_context(self, ctx):
         super(LBForcedSim, self).update_context(ctx)
         ctx['forces'] = self._forces
+        ctx['force_couplings'] = self._force_couplings
+        ctx['force_for_eq'] = self._force_term_for_eq
+
+    def use_force_for_equlibrium(self, force_grid, target_grid):
+        """Makes it possible to use acceleration from force_grid when calculating
+        velocity for the equlibrium of target_grid.
+
+        For instance, to use the acceleration from grid 0 in relaxation of
+        grid 1, use the parameters (0, 1).
+
+        To disable acceleration on a grid, pass an invalid grid ID in force_grid
+        (e.g. None or -1).
+
+        :param force_grid: grid ID from which the acceleration will be used
+        :param target_grid: grid ID on which the acceleration will act
+        """
+        self._force_term_for_eq[target_grid] = force_grid
+
+    def add_force_coupling(self, grid_a, grid_b, const_name):
+        """Adds a Shan-Chen type coupling between two lattices.
+
+        grid_a: numerical ID of the first lattice
+        grid_b: numerical ID of the second lattice
+        const_name: name of the global variable containing the value of the
+            coupling constant
+        """
+        self._force_couplings[(grid_a, grid_b)] = const_name
 
 
 class LBFluidSim(LBSim):
-    """Simulates a single phase fluid."""
+    """Simulates a single fluid."""
 
     kernel_file = "single_fluid.mako"
 
@@ -79,7 +108,7 @@ class LBFluidSim(LBSim):
         grid = util.get_grid_from_config(config)
 
         if grid is None:
-            raise GridError('Invalid grid selected: {0}'.format(config.grid))
+            raise util.GridError('Invalid grid selected: {0}'.format(config.grid))
 
         self.grids = [grid]
         self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(grid)
@@ -91,20 +120,12 @@ class LBFluidSim(LBSim):
 
     def update_context(self, ctx):
         super(LBFluidSim, self).update_context(ctx)
-        ctx['tau'] = (6.0 * self.config.visc + 1.0)/2.0
+        ctx['tau'] = sym.relaxation_time(self.config.visc)
         ctx['visc'] = self.config.visc
         ctx['model'] = self.config.model
-        ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['simtype'] = 'lbm'
-        ctx['grid'] = self.grid
-        ctx['grids'] = self.grids
         ctx['bgk_equilibrium'] = self.equilibrium
         ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
-
-        ctx['relaxation_enabled'] = self.config.relaxation_enabled
-        ctx['force_couplings'] = {}
-        ctx['force_for_eq'] = {}
-        ctx['image_fields'] = set()
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
@@ -153,29 +174,35 @@ class LBFluidSim(LBSim):
         gpu_dist1a = runner.gpu_dist(0, 0)
         gpu_dist1b = runner.gpu_dist(0, 1)
 
-        kernels = []
+        # grid type (primary, secondary) -> axis -> kernels
+        kernels = defaultdict(lambda: defaultdict(list))
+
+        # One kernel per axis, per grid.  Kernels for 3D are always prepared,
+        # and in 2D simulations the kernel for the Z dimension is simply
+        # ignored.
         for i in range(0, 3):
-            kernels.append(runner.get_kernel(
-                'ApplyPeriodicBoundaryConditions', [gpu_dist1a, np.uint32(i)], 'Pi'))
+            kernels[0][i] = [runner.get_kernel(
+                'ApplyPeriodicBoundaryConditions', [gpu_dist1a, np.uint32(i)],
+                'Pi')]
         for i in range(0, 3):
-            kernels.append(runner.get_kernel(
-                'ApplyPeriodicBoundaryConditions', [gpu_dist1b, np.uint32(i)], 'Pi'))
+            kernels[1][i] = [runner.get_kernel(
+                'ApplyPeriodicBoundaryConditions', [gpu_dist1b, np.uint32(i)],
+                'Pi')]
 
         return kernels
 
-    def init_fields(self, runner):
-        self.rho = runner.make_scalar_field(name='rho', async=True)
-        self.v = runner.make_vector_field(name='v', async=True)
+    @classmethod
+    def fields(cls):
+        return [ScalarField('rho'), VectorField('v')]
 
-        if self.grid.dim == 2:
-            self.vx, self.vy = self.v
-            runner.add_visualization_field(
-                    lambda: np.square(self.vx) + np.square(self.vy),
-                    name='v^2')
+    @classmethod
+    def visualization_fields(cls, dim):
+        if dim == 2:
+            return [ScalarField('v^2',
+                    expr=lambda f: np.square(f['vx']) + np.square(f['vy']))]
         else:
-            self.vx, self.vy, self.vz = self.v
-            runner.add_visualization_field(
-                    lambda: np.square(self.vx) + np.square(self.vy) +
-                    np.square(self.vz), name='v^2')
+            return [ScalarField('v^2',
+                    expr=lambda f: np.square(f['vx']) + np.square(f['vy']) +
+                        np.square(f['vz']))]
 
 # TODO(michalj): Port the single-phase Shan-Chen class.

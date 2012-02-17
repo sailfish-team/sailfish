@@ -26,6 +26,7 @@ class SimulationTest(LDCSim):
         defaults['max_iters'] = 200
         defaults['quiet'] = True
         defaults['output'] = output
+        defaults['cuda_cache'] = False
 
 # NOTE: This test class is not thread safe.
 class TestInterblockPropagation(unittest.TestCase):
@@ -35,7 +36,7 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'ref')
         blocks = 1
         ctrl = LBSimulationController(SimulationTest, LDCGeometry)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
         cls.ref = np.load('%s_blk0_200.npz' % output)
         cls.rho = cls.ref['rho']
         cls.vx  = cls.ref['v'][0]
@@ -47,7 +48,7 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'horiz_8block')
         blocks = 8
         ctrl = LBSimulationController(SimulationTest, LDCGeometry)
-        ctrl.run()
+        ctrl.run(ignore_cmdline=True)
         testdata0 = np.load('%s_blk0_200.npz' % output)
         testdata1 = np.load('%s_blk1_200.npz' % output)
         testdata2 = np.load('%s_blk2_200.npz' % output)
@@ -95,8 +96,11 @@ class TestInterblockPropagation(unittest.TestCase):
         np.testing.assert_array_almost_equal(vz, self.vz)
 
 
+def tearDownModule():
+    shutil.rmtree(tmpdir)
+
+
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
     unittest.main()
-    shutil.rmtree(tmpdir)

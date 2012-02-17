@@ -124,13 +124,11 @@ class BlockCodeGenerator(object):
 #        ctx['sim'] = self
 #        ctx['bgk_equilibrium'] = self.equilibrium
 #        ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
-#        ctx['constants'] = self.constants
 #        ctx['grids'] = [self.grid]
 #
 #        ctx['forces'] = self.forces
 #        ctx['force_couplings'] = self._force_couplings
 #        ctx['force_for_eq'] = self._force_term_for_eq
-#        ctx['image_fields'] = self.image_fields
 #
 #        # TODO: Find a more general way of specifying whether sentinels are
 #        # necessary.

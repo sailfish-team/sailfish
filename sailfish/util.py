@@ -14,6 +14,11 @@ from sailfish import sym
 
 TimingInfo = namedtuple('TimingInfo', 'comp bulk bnd coll data recv send wait total block_id')
 
+
+class GridError(Exception):
+    pass
+
+
 def get_grid_from_config(config):
     for x in sym.KNOWN_GRIDS:
         if x.__name__ == config.grid:
@@ -82,4 +87,24 @@ def gpufile_to_clusterspec(gpufile, iface=''):
             self.nodes = nodes
 
     return Cluster(cluster)
+
+def reverse_pairs(iterable, subitems=1):
+    it = iter(iterable)
+    while it:
+        x = []
+        for i in range(0, subitems):
+            x.append(it.next())
+
+        try:
+            y = []
+            for i in range(0, subitems):
+                y.append(it.next())
+
+            for i in y:
+                yield i
+        except StopIteration:
+            pass
+
+        for i in x:
+            yield i
 
