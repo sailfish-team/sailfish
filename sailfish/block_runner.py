@@ -1144,6 +1144,7 @@ class BlockRunner(object):
 
     def _initial_conditions(self):
         self._sim.initial_conditions(self)
+        self._sim.verify_fields()
 
     def run(self):
         self.config.logger.info("Initializing block.")

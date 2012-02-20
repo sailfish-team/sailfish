@@ -89,6 +89,7 @@ class NNBlockRunnerTest(unittest.TestCase):
         config.logger = DummyLogger()
         config.grid = 'D2Q9'
         config.bulk_boundary_split = False
+        config.output = ''
         self.config = config
         self.backend = DummyBackend()
         self.ctx = zmq.Context()
@@ -121,9 +122,11 @@ class NNBlockRunnerTest(unittest.TestCase):
         # Create simulation object and block runnners.
         sim1 = LBBinaryFluidShanChen(self.config)
         sim2 = LBBinaryFluidShanChen(self.config)
-        br1 = NNBlockRunner(sim1, b1, output=LBOutput(), backend=self.backend,
+        br1 = NNBlockRunner(sim1, b1, output=LBOutput(self.config, b1.id),
+                backend=self.backend,
                 quit_event=DummyEvent())
-        br2 = NNBlockRunner(sim2, b2, output=LBOutput(), backend=self.backend,
+        br2 = NNBlockRunner(sim2, b2, output=LBOutput(self.config, b2.id),
+                backend=self.backend,
                 quit_event=DummyEvent())
 
         br1._init_shape()

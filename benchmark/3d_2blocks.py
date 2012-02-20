@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from examples.lbm_ldc_multi_3d import LDCSim
+from examples.ldc_3d import LDCSim
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry3D
 from sailfish.geo_block import SubdomainSpec3D

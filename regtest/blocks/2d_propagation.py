@@ -7,10 +7,11 @@ import unittest
 
 import numpy as np
 
+from sailfish import io
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import SubdomainSpec2D, Subdomain2D
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFluidSim, LBForcedSim
+from sailfish.lb_single import LBFluidSim
 from sailfish.sym import D2Q9
 from regtest.blocks import util
 
@@ -59,7 +60,7 @@ periodic_x = False
 periodic_y = False
 vi = lambda x, y: D2Q9.vec_idx([x, y])
 
-class SimulationTest(LBFluidSim, LBForcedSim):
+class SimulationTest(LBFluidSim):
     subdomain = BlockTest
 
     @classmethod
@@ -135,8 +136,9 @@ class MixedPeriodicPropagationTest(unittest.TestCase):
         ctrl = LBSimulationController(HorizTest, DoubleBlockGeometryTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
-        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
         ae = np.testing.assert_equal
 
         ae(b0[vi(-1, 0), 256, 128], np.float32(0.31))
@@ -187,8 +189,9 @@ class PeriodicCornerPropagationTest(unittest.TestCase):
         ctrl = LBSimulationController(HorizTest, DoubleBlockGeometryTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
-        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
         ae = np.testing.assert_equal
 
         ae(b0[vi(1, 0), 1, 1], np.float32(0.11))
@@ -250,8 +253,10 @@ class PeriodicPropagationTest(unittest.TestCase):
         ctrl = LBSimulationController(HorizTest, DoubleBlockGeometryTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
-        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+
         ae = np.testing.assert_equal
 
         ae(b0[vi(1, 0), 128, 1], np.float32(0.11))
@@ -308,7 +313,8 @@ class PeriodicPropagationTest(unittest.TestCase):
         ctrl = LBSimulationController(HorizTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
         ae = np.testing.assert_equal
 
         ae(b0[vi(1, 0), 128, 1], np.float32(0.11))
@@ -346,7 +352,8 @@ class PeriodicPropagationTest(unittest.TestCase):
         ctrl = LBSimulationController(CornerTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
         ae = np.testing.assert_equal
 
         ae(b0[vi(1, 1), 1, 1], np.float32(0.11))
@@ -366,10 +373,11 @@ class TestCornerPropagation(unittest.TestCase):
         ctrl = LBSimulationController(SimulationTest, GeometryTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
-        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
-        b2 = np.load(os.path.join(tmpdir, 'test_out_blk2_dist_dump1.npy'))
-        b3 = np.load(os.path.join(tmpdir, 'test_out_blk3_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b2 = np.load(io.dists_filename(output, 1, 2, 1))
+        b3 = np.load(io.dists_filename(output, 1, 3, 1))
 
         np.testing.assert_equal(b0[vi(-1, -1), 128, 128], np.float32(0.44))
         np.testing.assert_equal(b1[vi(-1, 1), 1, 128], np.float32(0.33))
@@ -410,11 +418,11 @@ class TestCornerPropagation(unittest.TestCase):
         ctrl = LBSimulationController(RightSide, GeometryTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
-        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
-        b2 = np.load(os.path.join(tmpdir, 'test_out_blk2_dist_dump1.npy'))
-        b3 = np.load(os.path.join(tmpdir, 'test_out_blk3_dist_dump1.npy'))
-
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b2 = np.load(io.dists_filename(output, 1, 2, 1))
+        b3 = np.load(io.dists_filename(output, 1, 3, 1))
         ae = np.testing.assert_equal
 
         ae(b3[vi(1, 1), 1, 1], np.float32(0.11))
@@ -434,7 +442,7 @@ class TestCornerPropagation(unittest.TestCase):
         ae(b3[vi(1, -1), 126, 1], np.float32(0.62))
 
 
-class ThreeBlocksSimulationTest(LBFluidSim, LBForcedSim):
+class ThreeBlocksSimulationTest(LBFluidSim):
     subdomain = BlockTest
 
     @classmethod
@@ -483,9 +491,10 @@ class TestThreeBlockPropagation(unittest.TestCase):
         ctrl = LBSimulationController(ThreeBlocksSimulationTest, ThreeBlocksGeometryTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
-        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
-        b2 = np.load(os.path.join(tmpdir, 'test_out_blk2_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b2 = np.load(io.dists_filename(output, 1, 2, 1))
 
         ae = np.testing.assert_equal
 
