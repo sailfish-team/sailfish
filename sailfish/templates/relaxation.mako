@@ -48,7 +48,7 @@
 
 
 ## TODO: support multiple grids with MRT?
-% if model == 'mrt' and simtype == 'fluid':
+% if model == 'mrt' and simtype == 'lbm':
 //
 // Relaxation in moment space.
 //
@@ -115,6 +115,10 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 }
 % endif	## model == mrt
 
+## TODO(michalj): Split this function into two.
+## igrid: grid ID
+## equilibrium: if True, calculate velocity for the equilibrium distribution
+## save: if True, calculate velocity for the simulation output
 <%def name="fluid_velocity(igrid, equilibrium=False, save=False)">
 	%if save:
 		## For now, we assume a single fluid velocity regardless of the number of
@@ -200,7 +204,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 	%endif
 </%def>
 
-%if model == 'femrt' and simtype == 'free-energy':
+%if model == 'mrt' and simtype == 'free-energy':
 ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 %for i in range(0, len(grids)):
 	Dist *d${i},
@@ -237,7 +241,7 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 
 	${fluid_velocity(0, save=True)}
 }
-%endif  ## model == femrt
+%endif  ## model == mrt && simtype == 'free-energy'
 
 % if model == 'bgk':
 //
@@ -338,7 +342,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 	&d${i},
 %endfor
 	type, ncode);
-	%elif model == 'femrt':
+	%elif model == 'mrt' and simtype == 'free-energy':
 		FE_MRT_relaxate(${bgk_args()},
 %for i in range(0, len(grids)):
 	&d${i},

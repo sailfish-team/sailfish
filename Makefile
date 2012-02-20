@@ -49,6 +49,7 @@ test:
 	python tests/block_runner.py
 	python tests/geo_block.py
 	python tests/sym.py
+	python tests/util.py
 
 regtest:
 	python regtest/blocks/2d_propagation.py
@@ -56,6 +57,8 @@ regtest:
 	python regtest/blocks/2d_cylinder.py
 	python regtest/blocks/3d_propagation.py
 	python regtest/blocks/3d_ldc.py
+	python regtest/blocks/binary_pbc.py
+	python regtest/blocks/2d_binary.py
 
 # Necessary to trigger bulk/boundary split code.
 regtest_small_block:
@@ -64,6 +67,8 @@ regtest_small_block:
 	python regtest/blocks/2d_cylinder.py --block_size=16
 	python regtest/blocks/3d_propagation.py --block_size=16
 	python regtest/blocks/3d_ldc.py --block_size=16
+	python regtest/blocks/binary_pbc.py --block_size=16
+	python regtest/blocks/2d_binary.py --block_size=16
 
 presubmit: test regtest regtest_small_block
 

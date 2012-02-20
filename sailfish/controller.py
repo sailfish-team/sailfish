@@ -11,13 +11,22 @@ import imp
 import logging
 import os
 import platform
+import re
+import shutil
+import socket
+import subprocess
+import stat
+import sys
+import tempfile
+import time
+from collections import namedtuple, defaultdict
 from multiprocessing import Process
 
 import execnet
 import zmq
 from sailfish import codegen, config, io, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
-
+from sailfish.geo_block import SubdomainSpec3D, SubdomainPair
 
 def _start_machine_master(config, blocks, lb_class):
     """Starts a machine master process locally."""
@@ -101,6 +110,9 @@ class LBGeometryProcessor(object):
     location."""
 
     def __init__(self, blocks, dim, geo):
+        """
+        :param blocks: list of SubdomainSpec objects
+        """
         self.blocks = blocks
         self.dim = dim
         self.geo = geo
@@ -111,88 +123,120 @@ class LBGeometryProcessor(object):
         for i, block in enumerate(self.blocks):
             block.id = i
 
-    def _init_lower_coord_map(self):
+    def _add_pair(self, pair):
+        for i, coord in enumerate(pair.virtual.location):
+            self._coord_map_list[i][coord].append(pair)
+
+    def _init_lower_coord_map(self, config):
         # List position corresponds to the principal axis (X, Y, Z).  List
         # items are maps from lower coordinate along the specific axis to
-        # a list of block IDs.
-        self._coord_map_list = [{}, {}, {}]
+        # a list of SubdomainPairs
+        self._coord_map_list = [defaultdict(list), defaultdict(list),
+                defaultdict(list)]
         for block in self.blocks:
-            for i, coord in enumerate(block.location):
-                self._coord_map_list[i].setdefault(coord, []).append(block)
+            self._add_pair(SubdomainPair(block, block))
+
+        periodicity = [config.periodic_x, config.periodic_y]
+        if self.dim == 3:
+            periodicity.append(config.periodic_z)
+
+        def _pbc_helper(loc, subdomain, axes):
+            if not axes:
+                return [tuple(loc)]
+
+            ret = []
+            axis_done = False
+            while axes and not axis_done:
+                ax = axes.pop()
+                if not periodicity[ax]:
+                    continue
+
+                if subdomain.location[ax] == 0:
+                    ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
+                    loc[ax] = self.geo.gsize[ax]
+                    ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
+                    loc[ax] = 0
+                    axis_done = True
+                if subdomain.end_location[ax] == self.geo.gsize[ax]:
+                    ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
+                    loc[ax] = -subdomain.size[ax]
+                    ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
+                    axis_done = True
+
+            return ret
+
+        # Handle PBCs by creating virtual copies of subdomains touching the
+        # lower boundary of the global domain.
+        done = set()
+        for axis in range(self.dim):
+            if not periodicity[axis]:
+                continue
+
+            for subdomain, _ in self._coord_map_list[axis][0]:
+                if subdomain.id in done:
+                    continue
+                loc = list(subdomain.location)
+                loc[axis] = self.geo.gsize[axis]
+
+                locs = set(_pbc_helper(list(subdomain.location), subdomain,
+                    range(axis, self.dim)))
+                b = subdomain
+                locs.remove(b.location)
+
+                for loc in locs:
+                    virtual = b.__class__(loc, b.size, b.envelope_size, b._id)
+                    pair = SubdomainPair(b, virtual)
+                    self._add_pair(pair)
+
+                done.add(b.id)
 
     def _connect_blocks(self, config):
-        connected = [False] * len(self.blocks)
+        self._init_lower_coord_map(config)
+        connected = set()
 
         # TOOD(michalj): Fix this for multi-grid models.
         grid = util.get_grid_from_config(config)
 
-        def try_connect(block1, block2, geo=None, axis=None):
-            if block1.connect(block2, geo, axis, grid):
-                connected[block1.id] = True
-                connected[block2.id] = True
+        def try_connect(subdomain, pair):
+            if subdomain.id == pair.real.id:
+                return False
+
+            if subdomain.connect(pair, grid):
+                connected.add(subdomain.id)
+                connected.add(pair.real.id)
+                return True
+
+            return False
+
+        periodicity = [config.periodic_x, config.periodic_y]
+        if self.dim == 3:
+            periodicity.append(config.periodic_z)
+
+        for axis in range(self.dim):
+            if not periodicity[axis]:
+                continue
+
+            for real, virtual in self._coord_map_list[axis][0]:
+                # If the block spans a whole axis of the domain, mark it
+                # as locally periodic.
+                if real.end_location[axis] == self.geo.gsize[axis]:
+                    real.enable_local_periodicity(axis)
 
         for axis in range(self.dim):
             for block in sorted(self.blocks, key=lambda x: x.location[axis]):
-                higher_coord = block.location[axis] + block.size[axis]
+                higher_coord = block.end_location[axis]
                 if higher_coord not in self._coord_map_list[axis]:
                     continue
                 for neighbor_candidate in \
                         self._coord_map_list[axis][higher_coord]:
                     try_connect(block, neighbor_candidate)
 
-        # In case the simulation domain is globally periodic, try to connect
-        # the blocks at the lower boundary of the domain along the periodic
-        # axis (i.e. coordinate = 0) with blocks which have a boundary at the
-        # highest global coordinate (gx, gy, gz).
-        if config.periodic_x:
-            for block in self._coord_map_list[0][0]:
-                # If the block spans the whole X axis of the domain, mark it
-                # as locally periodic and do not try to find any neigbor
-                # candidates.
-                if block.location[0] + block.size[0] == self.geo.gx:
-                    block.enable_local_periodicity(0)
-                    continue
-
-                # Iterate over all blocks, for each one calculate the location
-                # of its top boundary and compare it to the size of the whole
-                # simulation domain.
-                for x0, candidates in self._coord_map_list[0].iteritems():
-                    for candidate in candidates:
-                        if (candidate.location[0] + candidate.size[0]
-                               == self.geo.gx):
-                            try_connect(block, candidate, self.geo, 0)
-
-        if config.periodic_y:
-            for block in self._coord_map_list[1][0]:
-                if block.location[1] + block.size[1] == self.geo.gy:
-                    block.enable_local_periodicity(1)
-                    continue
-
-                for y0, candidates in self._coord_map_list[1].iteritems():
-                    for candidate in candidates:
-                        if (candidate.location[1] + candidate.size[1]
-                               == self.geo.gy):
-                            try_connect(block, candidate, self.geo, 1)
-
-        if self.dim > 2 and config.periodic_z:
-            for block in self._coord_map_list[2][0]:
-                if block.location[2] + block.size[2] == self.geo.gz:
-                    block.enable_local_periodicity(2)
-                    continue
-
-                for z0, candidates in self._coord_map_list[2].iteritems():
-                    for candidate in candidates:
-                        if (candidate.location[2] + candidate.size[2]
-                               == self.geo.gz):
-                            try_connect(block, candidate, self.geo, 2)
-
         # Ensure every block is connected to at least one other block.
-        if not all(connected) and len(connected) > 1:
+        if len(self.blocks) > 1 and len(connected) != len(self.blocks):
             raise GeometryError()
 
     def transform(self, config):
         self._annotate()
-        self._init_lower_coord_map()
         self._connect_blocks(config)
         return self.blocks
 
@@ -213,6 +257,7 @@ class LBSimulationController(object):
                 lb_geo = LBGeometry3D
 
         self._lb_geo = lb_geo
+        self._tmpdir = tempfile.mkdtemp()
 
         group = self._config_parser.add_group('Runtime mode settings')
         group.add_argument('--mode', help='runtime mode', type=str,
@@ -253,7 +298,17 @@ class LBSimulationController(object):
         group.add_argument('--cluster_sync', type=str, default='',
                 help='local_path:dest_path; if specified, will send the '
                 'contents of "local_path" to "dest_path" on all cluster '
-                'machines before starting the simulation')
+                'machines before starting the simulation.')
+        group.add_argument('--cluster_pbs', type=bool, default=True,
+                help='If True, standard PBS variables will be used to run '
+                'the job in a cluster.')
+        group.add_argument('--cluster_pbs_initscript', type=str,
+                default='sailfish-init.sh', help='Script to execute on remote '
+                'nodes in order to set the environment prior to starting '
+                'a machine master.')
+        group.add_argument('--cluster_pbs_interface', type=str,
+                default='', help='Network interface to use on PBS nodes for '
+                'internode communication.')
 
         group = self._config_parser.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)
@@ -284,8 +339,13 @@ class LBSimulationController(object):
         lb_class.update_defaults(defaults)
         self._config_parser.set_defaults(defaults)
 
+        # TODO(michalj): Verify that options in defaults correspond to options
+        # defined as command line arguments.
         if default_config is not None:
             self._config_parser.set_defaults(default_config)
+
+    def __del__(self):
+        shutil.rmtree(self._tmpdir)
 
     @property
     def dim(self):
@@ -305,13 +365,15 @@ class LBSimulationController(object):
         for block in blocks:
             block.set_actual_size(envelope_size)
 
-    def _start_cluster_simulation(self, subdomains):
+    def _start_cluster_simulation(self, subdomains, cluster=None):
         """Starts a simulation on a cluster of nodes."""
-        try:
-            cluster = imp.load_source('cluster', self.config.cluster_spec)
-        except IOError, e:
-            cluster = imp.load_source('cluster',
-                    os.path.expanduser('~/.sailfish/{0}'.format(self.config.cluster_spec)))
+
+        if cluster is None:
+            try:
+                cluster = imp.load_source('cluster', self.config.cluster_spec)
+            except IOError, e:
+                cluster = imp.load_source('cluster',
+                        os.path.expanduser('~/.sailfish/{0}'.format(self.config.cluster_spec)))
 
         self._cluster_gateways = []
         self._node_subdomains = split_subdomains_between_nodes(cluster.nodes, subdomains)
@@ -370,13 +432,71 @@ class LBSimulationController(object):
                     args=(self.config, subdomains, self._lb_class))
         self._simulation_process.start()
 
+    def _start_pbs_handlers(self):
+        cluster = util.gpufile_to_clusterspec(os.environ['PBS_GPUFILE'],
+                self.config.cluster_pbs_interface)
+        self._pbs_handlers = []
+        id_string = 'sailfish-%s' % os.getpid()
+
+        def _start_socketserver(addr, port):
+            return subprocess.Popen(['pbsdsh', '-h',
+                addr, 'sh', '-c',
+                ". %s ; python sailfish/socketserver.py :%s %s" %
+                (self.config.cluster_pbs_initscript, port, id_string)])
+
+        for node in cluster.nodes:
+            port = node.get_port()
+            self._pbs_handlers.append(_start_socketserver(node.addr, port))
+
+        def _try_next_port(i, node, still_starting):
+            port = node.get_port() + 1
+            node.set_port(port)
+            print 'retrying node %s:%s...' % (node.host, node.addr)
+            self._pbs_handlers[i] = _start_socketserver(node.addr, port)
+            still_starting.append((i, node))
+
+        starting_nodes = list(enumerate(cluster.nodes))
+        while starting_nodes:
+            still_starting = []
+
+            for i, node in starting_nodes:
+                if self._pbs_handlers[i].returncode is not None:
+                    # Remote process terminated -- try to start again with a
+                    # different port.
+                    _try_next_port(i, node, still_starting)
+                else:
+                    try:
+                        s = socket.create_connection((node.addr, node.get_port()), timeout=5.0)
+                        if s.recv(256) != id_string:
+                            _try_next_port(i, node, still_starting)
+                        s.close()
+                    except (socket.timeout, socket.error):
+                        still_starting.append((i, node))
+                        continue
+
+            starting_nodes = still_starting
+            sys.stdout.flush()
+            time.sleep(0.5)
+
+        return cluster
+
+    def _is_pbs_cluster(self):
+        return self.config.cluster_pbs and 'PBS_GPUFILE' in os.environ
+
     def _start_simulation(self, subdomains):
         """Starts a simulation.
 
         :param subdomains: list of SubdomainSpec objects
         """
 
-        if self.config.cluster_spec:
+        # A PBS implementation with GPU-aware scheduling is required.
+        if self._is_pbs_cluster():
+            assert self.config.cluster_spec == '', ('Cluster specifications '
+                    'are not supported when running under PBS.')
+
+            cluster = self._start_pbs_handlers()
+            self._start_cluster_simulation(subdomains, cluster)
+        elif self.config.cluster_spec:
             self._start_cluster_simulation(subdomains)
         else:
             self._start_local_simulation(subdomains)
@@ -384,7 +504,7 @@ class LBSimulationController(object):
     def _finish_simulation(self, blocks, summary_receiver):
         timing_infos = []
 
-        if self.config.cluster_spec:
+        if self.config.cluster_spec or self._is_pbs_cluster():
             if self.config.mode == 'benchmark':
                 for ch, subdomains in zip(self._cluster_channels, self._node_subdomains):
                     for sub in subdomains:
@@ -395,6 +515,10 @@ class LBSimulationController(object):
                 assert data == 'FIN'
             for gw in self._cluster_gateways:
                 gw.exit()
+
+            if self._is_pbs_cluster():
+                for handler in self._pbs_handlers:
+                    handler.terminate()
         else:
             if self.config.mode == 'benchmark':
                 # Collect timing information from all blocks.
@@ -422,10 +546,15 @@ class LBSimulationController(object):
         return None, None
 
 
-    def run(self):
+    def run(self, ignore_cmdline=False):
         """Runs a simulation."""
 
-        self.config = self._config_parser.parse()
+        if ignore_cmdline:
+            args = []
+        else:
+            args = sys.argv[1:]
+
+        self.config = self._config_parser.parse(args)
         self._lb_class.modify_config(self.config)
         self.geo = self._lb_geo(self.config)
 

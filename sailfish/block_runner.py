@@ -17,11 +17,64 @@ from sailfish import codegen, util
 # to be executed.
 KernelGrid = namedtuple('KernelGrid', 'kernel grid')
 
+class MacroConnectionBuffer(object):
+    """Contains buffers needed to transfer a single macroscopic field
+    between two subdomains."""
+
+    def __init__(self, face, cpair, coll_buf, coll_idx, recv_buf, dist_idx,
+            field):
+        """
+        :param face: face ID
+        :param cpair: ConnectionPair, a tuple of two LBConnection objects
+        :param coll_buf: GPUBuffer for information collected on the source
+            subdomain to be sent to the destination subdomain
+        :param coll_idx: GPUBuffer with an array of indices indicating sparse
+            nodes from which data is to be collected; this is only used for
+            connections via the X_LOW and X_HIGH faces
+        :param recv_buf: GPUBuffer for information received from the remote
+            subdomain
+        :param dist_idx: GPUBuffer with an array of indices indicating
+            the position of nodes to which data is to be distributed; this is
+            only used for connections via the X_LOW and X_HIGH faces
+        :param field: ScalarField that is being transferred using this buffer
+        """
+        self.face = face
+        self.cpair = cpair
+        self.coll_buf = coll_buf
+        self.coll_idx = coll_idx
+        self.recv_buf = recv_buf
+        self.dist_idx = dist_idx
+        self.field = field
 
 class ConnectionBuffer(object):
+    """Contains buffers needed to transfer distributions between two
+    subdomains."""
+
     def __init__(self, face, cpair, coll_buf, coll_idx, recv_buf,
             dist_partial_buf, dist_partial_idx, dist_partial_sel,
-            dist_full_buf, dist_full_idx):
+            dist_full_buf, dist_full_idx, grid_id=0):
+        """
+        :param face: face ID
+        :param cpair: ConnectionPair, a tuple of two LBConnection objects
+        :param coll_buf: GPUBuffer for information collected on the source
+            subdomain to be sent to the destination subdomain
+        :param coll_idx: GPUBuffer with an array of indices indicating sparse
+            nodes from which data is to be collected; this is only used for
+            connections via the X_LOW and X_HIGH faces
+        :param recv_buf: page-locked numpy buffer with information
+            received from the remote subdomain
+        :param dist_partial_buf: GPUBuffer, for partial distributions
+        :param dist_partial_idx: GPUBuffer, for indices of the partial distributions
+        :param dist_partial_sel: selector in recv_buf to get the partial
+            distributions
+        :param dist_full_buf: GPUBuffer for information to be distributed; this
+            is used for nodes where a complete set of distributions is available
+            (e.g. not corner or edge nodes)
+        :param dist_full_idx: GPUBuffer with an array of indices indicating
+            the position of nodes to which data is to be distributed; this is
+            only used for connections via the X_LOW and X_HIGH faces
+        :param grid_id: grid ID
+        """
         self.face = face
         self.cpair = cpair
         self.coll_buf = coll_buf
@@ -32,14 +85,17 @@ class ConnectionBuffer(object):
         self.dist_partial_sel = dist_partial_sel
         self.dist_full_buf = dist_full_buf
         self.dist_full_idx = dist_full_idx
+        self.grid_id = grid_id
 
     def distribute(self, backend, stream):
+        # Serialize partial distributions into a contiguous buffer.
         if self.dist_partial_sel is not None:
             self.dist_partial_buf.host[:] = self.recv_buf[self.dist_partial_sel]
             backend.to_buf_async(self.dist_partial_buf.gpu, stream)
 
         if self.cpair.dst.dst_slice:
-            slc = [slice(0, self.recv_buf.shape[0])] + list(reversed(self.cpair.dst.dst_full_buf_slice))
+            slc = [slice(0, self.recv_buf.shape[0])] + list(
+                    reversed(self.cpair.dst.dst_full_buf_slice))
             self.dist_full_buf.host[:] = self.recv_buf[slc]
             backend.to_buf_async(self.dist_full_buf.gpu, stream)
 
@@ -54,8 +110,112 @@ class GPUBuffer(object):
             self.gpu = None
 
 
+class TimeProfile(object):
+    # GPU events.
+    BULK = 0
+    BOUNDARY = 1
+    COLLECTION = 2
+    DISTRIB = 3
+    MACRO_BULK = 4
+    MACRO_BOUNDARY = 5
+    MACRO_COLLECTION = 6
+    MACRO_DISTRIB = 7
+
+    # CPU events.
+    SEND_DISTS = 8
+    RECV_DISTS = 9
+    SEND_MACRO = 10
+    RECV_MACRO = 11
+    STEP = 12
+
+    def __init__(self, runner):
+        self._runner = runner
+        self._make_event = runner.backend.make_event
+        self._events_start = {}
+        self._events_end = {}
+        self._times_start = {}
+        self._times_end = {}
+        self._timings = [0.0] * (self.STEP + 1)
+
+    def record_start(self):
+        self.t_start = time.time()
+
+    def record_end(self):
+        self.t_end = time.time()
+        if self._runner.config.mode != 'benchmark':
+            return
+        mi = self._runner.config.max_iters
+
+        ti = util.TimingInfo(
+                comp=(self._timings[self.BULK] + self._timings[self.BOUNDARY]) / mi,
+                bulk=self._timings[self.BULK] / mi,
+                bnd =self._timings[self.BOUNDARY] / mi,
+                coll=self._timings[self.COLLECTION] / mi,
+                data=0,
+                recv=self._timings[self.RECV_DISTS] / mi,
+                send=self._timings[self.SEND_DISTS] / mi,
+                wait=0,
+                total=self._timings[self.STEP] / mi,
+                block_id=self._runner._block.id)
+        self._runner.send_summary_info(ti)
+
+    def start_step(self):
+        self.record_cpu_start(self.STEP)
+
+    def end_step(self):
+        self.record_cpu_end(self.STEP)
+
+        for i, ev_start in self._events_start.iteritems():
+            self._timings[i] += self._events_end[i].time_since(ev_start) / 1e3
+
+        for i, t_start in self._times_start.iteritems():
+            self._timings[i] += self._times_end[i] - t_start
+
+    def record_gpu_start(self, event, stream):
+        ev = self._make_event(stream, timing=True)
+        self._events_start[event] = ev
+        return ev
+
+    def record_gpu_end(self, event, stream):
+        ev = self._make_event(stream, timing=True)
+        self._events_end[event] = ev
+        return ev
+
+    def record_cpu_start(self, event):
+        self._times_start[event] = time.time()
+
+    def record_cpu_end(self, event):
+        self._times_end[event] = time.time()
+
+
+def profile(profile_event):
+    def _profile(f):
+        def decorate(self, *args, **kwargs):
+            self._profile.record_cpu_start(profile_event)
+            ret = f(self, *args, **kwargs)
+            self._profile.record_cpu_end(profile_event)
+            return ret
+        return decorate
+    return _profile
+
 class BlockRunner(object):
-    """Runs the simulation for a single SubdomainSpec.
+    """Runs the simulation for a single Subdomain.
+
+    The simulation proceeds into two streams, which is used for overlapping
+    calculations with data transfers.  The subdomain is divided into two
+    regions -- boundary and bulk.  The nodes in the bulk region are those
+    that do not send information to any nodes in other subdomains.  The
+    boundary region includes all the remaining nodes, including the ghost
+    node envelope used for data storage only.
+
+    calc stream                    data stream
+    -----------------------------------------------
+    boundary sim. step    --->     collect data
+    bulk sim. step                 ...
+                                   distribute data
+                       <- sync ->
+
+    An arrow above symbolizes a dependency between the two streams.
     """
     def __init__(self, simulation, block, output, backend, quit_event,
             summary_addr=None, master_addr=None, summary_channel=None):
@@ -98,6 +258,7 @@ class BlockRunner(object):
         self._vis_map_cache = None
         self._quit_event = quit_event
 
+        self._profile = TimeProfile(self)
         # This only happens in unit tests.
         if master_addr is not None:
             self._init_network(master_addr, summary_addr)
@@ -121,7 +282,8 @@ class BlockRunner(object):
             if connector.is_ready():
                 connector.init_runner(self._ctx)
                 if connector.port is not None:
-                    ports[(self._block.id, b_id)] = connector.port
+                    ports[(self._block.id, b_id)] = (connector.get_addr(),
+                            connector.port)
             else:
                 unready.append(b_id)
 
@@ -130,7 +292,9 @@ class BlockRunner(object):
 
         for b_id in unready:
             connector = self._block._connectors[b_id]
-            connector.port = remote_ports[(b_id, self._block.id)]
+            addr, port = remote_ports[(b_id, self._block.id)]
+            connector.port = port
+            connector.set_addr(addr)
             connector.init_runner(self._ctx)
 
     @property
@@ -161,30 +325,25 @@ class BlockRunner(object):
             ctx['lat_nz'] = self._lat_size[-3]
             ctx['arr_nz'] = self._physical_size[-3]
             periodic_z = int(self._block.periodic_z)
+            ctx['block_periodicity'] = [self._block.periodic_x,
+                    self._block.periodic_y, self._block.periodic_z]
         else:
             ctx['lat_nz'] = 1
             ctx['arr_nz'] = 1
             periodic_z = 0
             bnd_limits.append(1)
+            ctx['block_periodicity'] = [self._block.periodic_x,
+                    self._block.periodic_y, False]
 
         ctx['boundary_size'] = self._boundary_size
         ctx['lat_linear'] = self.lat_linear
         ctx['lat_linear_dist'] = self.lat_linear_dist
-
-        ctx['periodic_x'] = 0 #int(self._block.periodic_x)
-        ctx['periodic_y'] = 0 #int(self._block.periodic_y)
-        ctx['periodic_z'] = 0 #periodic_z
-        ctx['periodicity'] = [0, 0, 0]
-
-#[int(self._block.periodic_x), int(self._block.periodic_y), periodic_z]
+        ctx['lat_linear_macro'] = self.lat_linear_macro
 
         ctx['bnd_limits'] = bnd_limits
         ctx['dist_size'] = self._get_nodes()
         ctx['sim'] = self._sim
         ctx['block'] = self._block
-
-        # FIXME Additional constants.
-        ctx['constants'] = []
 
         arr_nx = self._physical_size[-1]
         arr_ny = self._physical_size[-2]
@@ -228,9 +387,18 @@ class BlockRunner(object):
 
         field = np.ndarray(self._physical_size, buffer=buf,
                            dtype=dtype, strides=strides)
+
+        # Initialize floating point fields to inf to help surfacing problems
+        # with uninitialized nodes.
+        if dtype == self.float:
+            field[:] = np.inf
+
         assert field.base is buf
         fview = field[self._block._nonghost_slice]
         assert fview.base is field
+
+        # Zero the non-ghost part of the field.
+        fview[:] = 0
 
         if name is not None and register:
             self._output.register_field(fview, name)
@@ -283,7 +451,7 @@ class BlockRunner(object):
 
         # CUDA block/grid size for standard kernel call.
         self._kernel_block_size = (bs, 1)
-        self._boundary_size = self._block.envelope_size + 1
+        self._boundary_size = self._block.envelope_size * 2
         bns = self._boundary_size
         assert bns < bs
 
@@ -291,7 +459,7 @@ class BlockRunner(object):
         # the grid size for boundary kernels.
         if self._block.dim == 2:
             arr_ny, arr_nx = self._physical_size
-            lat_nx, lat_ny = self._lat_size
+            lat_ny, lat_nx = self._lat_size
 
             ew_conns = 0        # east-west
             block = self._block
@@ -299,19 +467,19 @@ class BlockRunner(object):
             # Sometimes, due to misalignment, two blocks might be necessary to
             # cover the right boundary.
             padding = arr_nx - lat_nx
-            if block.has_face_conn(block.X_HIGH):
+            if block.has_face_conn(block.X_HIGH) or block.periodic_x:
                 if bs - padding < bns:
                     ew_conns = 1    # 1 block on the left, 1 block on the right
                 else:
                     ew_conns = 2    # 1 block on the left, 2 blocks on the right
 
-            if block.has_face_conn(block.X_LOW):
+            if block.has_face_conn(block.X_LOW) or block.periodic_x:
                 ew_conns += 1
 
             ns_conns = 0        # north-south
-            if block.has_face_conn(block.Y_LOW):
+            if block.has_face_conn(block.Y_LOW) or block.periodic_y:
                 ns_conns += 1
-            if block.has_face_conn(block.Y_HIGH):
+            if block.has_face_conn(block.Y_HIGH) or block.periodic_y:
                 ns_conns += 1
 
             self._boundary_blocks = (
@@ -321,7 +489,7 @@ class BlockRunner(object):
             self._kernel_grid_full = [arr_nx / bs, arr_ny]
         else:
             arr_nz, arr_ny, arr_nx = self._physical_size
-            lat_nx, lat_ny, lat_nz = self._lat_size
+            lat_nz, lat_ny, lat_nx = self._lat_size
 
             # Sometimes, due to misalignment, two blocks might be necessary to
             # cover the right boundary.
@@ -369,13 +537,20 @@ class BlockRunner(object):
 
         # Used so that face values map to the limiting coordinate
         # along a specific axis, e.g. lat_linear[X_LOW] = 0
-        # TODO(michalj): Should this use _block.envelope_size instead of -1?
-        self.lat_linear = [0, self._lat_size[-1]-1, 0, self._lat_size[-2]-1]
-        self.lat_linear_dist = [self._lat_size[-1]-2, 1,  self._lat_size[-2]-2, 1]
+        evs = self._block.envelope_size
+        self.lat_linear = [0, self._lat_size[-1] - 1, 0, self._lat_size[-2] - 1]
+        self.lat_linear_dist = [self._lat_size[-1] - 1 - evs, evs,
+                self._lat_size[-2] - 1 - evs, evs]
+        self.lat_linear_macro = [evs, self._lat_size[-1] - 1 - evs, evs,
+                self._lat_size[-2] - 1 - evs]
+        # No need to define this, as it's the same as lat_linear above:
+        # self.lat_linear_macro_dist = [self._lat_size[-1] - 1, 0,
+        #         self._lat_size[-2] - 1, 0]
 
         if self._block.dim == 3:
-            self.lat_linear.extend([0, self._lat_size[-3]-1])
-            self.lat_linear_dist.extend([self._lat_size[-3]-2, 1])
+            self.lat_linear.extend([0, self._lat_size[-3] - 1])
+            self.lat_linear_dist.extend([self._lat_size[-3] - 1 - evs, evs])
+            self.lat_linear_macro.extend([evs, self._lat_size[-3] - 1 - evs])
 
     def _get_strides(self, type_):
         """Returns a list of strides for the NumPy array storing the lattice."""
@@ -387,6 +562,10 @@ class BlockRunner(object):
         """Returns the total amount of actual nodes in the lattice."""
         return reduce(operator.mul, self._physical_size)
 
+    @property
+    def num_nodes(self):
+        return reduce(operator.mul, self._lat_size)
+
     def _get_dist_bytes(self, grid):
         """Returns the number of bytes required to store a single set of
            distributions for the whole simulation domain."""
@@ -395,7 +574,12 @@ class BlockRunner(object):
     def _get_compute_code(self):
         return self._bcg.get_code(self)
 
-    def _get_global_idx(self, location, dist_num):
+    def _get_global_idx(self, location, dist_num=0):
+        """Returns a global index (in the distributions array).
+
+        :param location: position of the node in the natural order
+        :param dist_num: distribution number
+        """
         if self.dim == 2:
             gx, gy = location
             arr_nx = self._physical_size[1]
@@ -419,6 +603,12 @@ class BlockRunner(object):
                     idx[0]).astype(np.uint32)
 
     def _get_src_slice_indices(self, face, cpair):
+        """Returns a numpy array of indices of sparse nodes from which
+        data is to be collected.
+
+        :param face: face ID for the connection
+        :param cpair: ConnectionPair describing the connection
+        """
         if face in (self._block.X_LOW, self._block.X_HIGH):
             gx = self.lat_linear[face]
         else:
@@ -426,6 +616,12 @@ class BlockRunner(object):
         return self._idx_helper(gx, cpair.src.src_slice, cpair.src.dists)
 
     def _get_dst_slice_indices(self, face, cpair):
+        """Returns a numpy array of indices of sparse nodes to which
+        data is to be distributed.
+
+        :param face: face ID for the connection
+        :param cpair: ConnectionPair describing the connection
+        """
         if not cpair.dst.dst_slice:
             return None
         if face in (self._block.X_LOW, self._block.X_HIGH):
@@ -452,6 +648,19 @@ class BlockRunner(object):
             return face_loc + [missing_loc]
 
     def _get_partial_dst_indices(self, face, cpair):
+        """Returns objects used to store data for nodes for which a partial
+        set of distributions is available.
+
+        This has the form of a triple:
+        - a page-locked numpy buffer for the distributions
+        - a numpy array of indices of nodes to which partial data is to be
+          distributed
+        - a selector to be applied to the receive buffer to get the partial
+          distributions.
+
+        :param face: face ID for the connection
+        :param cpair: ConnectionPair describing the connection
+        """
         if cpair.dst.partial_nodes == 0:
             return None, None, None
         buf = self.backend.alloc_async_host_buf(cpair.dst.partial_nodes,
@@ -481,52 +690,67 @@ class BlockRunner(object):
         return buf, idx, sel2
 
     def _init_buffers(self):
-        # TODO(michalj): Fix this for multi-grid models.
-        grid = util.get_grid_from_config(self.config)
+        """Creates buffers for inter-block communication."""
         alloc = self.backend.alloc_async_host_buf
 
-        # Maps block ID to a list of 1 or 2 ConnectionBuffer
-        # objects.  The list will contain 2 elements  only when
-        # global periodic boundary conditions are enabled).
+        # Maps block ID to a list of ConnectionBuffer objects.  The list will
+        # typically contain just 1 element, unless periodic boundary conditions
+        # are used.
         self._block_to_connbuf = defaultdict(list)
         for face, block_id in self._block.connecting_blocks():
-            cpair = self._block.get_connection(face, block_id)
+            cpairs = self._block.get_connections(face, block_id)
+            for cpair in cpairs:
+                coll_idx = self._get_src_slice_indices(face, cpair)
+                coll_idx = GPUBuffer(coll_idx, self.backend)
 
-            # Buffers for collecting and sending information.
-            # TODO(michalj): Optimize this by providing proper padding.
-            coll_buf = alloc(cpair.src.transfer_shape, dtype=self.float)
-            coll_idx = self._get_src_slice_indices(face, cpair)
+                dist_full_idx = self._get_dst_slice_indices(face, cpair)
+                dist_full_idx = GPUBuffer(dist_full_idx, self.backend)
 
-            # Buffers for receiving and distributing information.
-            recv_buf = alloc(cpair.dst.transfer_shape, dtype=self.float)
-            # Any partial dists are serialized into a single continuous buffer.
-            dist_partial_buf, dist_partial_idx, dist_partial_sel = \
-                    self._get_partial_dst_indices(face, cpair)
-            dist_full_buf = alloc(cpair.dst.full_shape, dtype=self.float)
-            dist_full_idx = self._get_dst_slice_indices(face, cpair)
+                for i, grid in enumerate(self._sim.grids):
+                    # TODO(michalj): Optimize this by providing proper padding.
+                    coll_buf = alloc(cpair.src.transfer_shape, dtype=self.float)
+                    recv_buf = alloc(cpair.dst.transfer_shape, dtype=self.float)
+                    dist_full_buf = alloc(cpair.dst.full_shape, dtype=self.float)
 
-            cbuf = ConnectionBuffer(face, cpair,
-                    GPUBuffer(coll_buf, self.backend),
-                    GPUBuffer(coll_idx, self.backend),
-                    recv_buf,
-                    GPUBuffer(dist_partial_buf, self.backend),
-                    GPUBuffer(dist_partial_idx, self.backend),
-                    dist_partial_sel,
-                    GPUBuffer(dist_full_buf, self.backend),
-                    GPUBuffer(dist_full_idx, self.backend))
+                    # Any partial dists are serialized into a single continuous buffer.
+                    dist_partial_buf, dist_partial_idx, dist_partial_sel = \
+                            self._get_partial_dst_indices(face, cpair)
 
-            self.config.logger.debug('adding buffer for conn: {0} -> {1} '
-                    '(face {2})'.format(self._block.id, block_id, face))
-            self._block_to_connbuf[block_id].append(cbuf)
+                    cbuf = ConnectionBuffer(face, cpair,
+                            GPUBuffer(coll_buf, self.backend),
+                            coll_idx,
+                            recv_buf,
+                            GPUBuffer(dist_partial_buf, self.backend),
+                            GPUBuffer(dist_partial_idx, self.backend),
+                            dist_partial_sel,
+                            GPUBuffer(dist_full_buf, self.backend),
+                            dist_full_idx, i)
+
+                    self.config.logger.debug('adding buffer for conn: {0} -> {1} '
+                            '(face {2})'.format(self._block.id, block_id, face))
+                    self._block_to_connbuf[block_id].append(cbuf)
+
+        # Explicitly sort connection buffers by their face ID.  Create a
+        # separate dictionary where the order of the connection buffers
+        # corresponds to that used by the _other_ subdomain.
+        self._recv_block_to_connbuf = defaultdict(list)
+        for subdomain_id, cbufs in self._block_to_connbuf.iteritems():
+            cbufs.sort(key=lambda x: (x.face, x.grid_id))
+            recv_bufs = list(cbufs)
+            recv_bufs.sort(key=lambda x: (self._block.opposite_face(x.face),
+                x.grid_id))
+            self._recv_block_to_connbuf[subdomain_id] = recv_bufs
+
 
     def _init_compute(self):
         self.config.logger.debug("Initializing compute unit.")
         code = self._get_compute_code()
         self.module = self.backend.build(code)
+        self._init_streams()
 
-        # Streams
-        self._boundary_stream = self.backend.make_stream()
-        self._bulk_stream = self.backend.make_stream()
+    def _init_streams(self):
+        self._data_stream = self.backend.make_stream()
+        self._calc_stream = self.backend.make_stream()
 
     def _init_gpu_data(self):
         self.config.logger.debug("Initializing compute unit data.")
@@ -579,6 +803,12 @@ class BlockRunner(object):
         self._step_boundary(output_req)
         self._step_bulk(output_req)
         self._sim.iteration += 1
+        self._send_dists()
+        self._recv_dists()
+        self._profile.record_gpu_start(TimeProfile.DISTRIB, self._data_stream)
+        for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
+            self.backend.run_kernel(kernel, grid, self._data_stream)
+        self._profile.record_gpu_end(TimeProfile.DISTRIB, self._data_stream)
 
     def _get_bulk_kernel(self, output_req):
         if output_req:
@@ -588,62 +818,49 @@ class BlockRunner(object):
 
         return kernel, self._kernel_grid_bulk
 
+    def _apply_pbc(self, kernels):
+        base = 1 - (self._sim.iteration & 1)
+        ceil = math.ceil
+        ls = self._lat_size
+        bs = self.config.block_size
+
+        if self._block.periodic_x:
+            if self._block.dim == 2:
+                grid_size = (int(ceil(ls[0] / float(bs))), 1)
+            else:
+                grid_size = (int(ceil(ls[1] / float(bs))), ls[0])
+            for kernel in kernels[base][0]:
+                self.backend.run_kernel(kernel, grid_size, self._calc_stream)
+
+        if self._block.periodic_y:
+            if self._block.dim == 2:
+                grid_size = (int(ceil(ls[1] / float(bs))), 1)
+            else:
+                grid_size = (int(ceil(ls[2] / float(bs))), ls[0])
+            for kernel in kernels[base][1]:
+                self.backend.run_kernel(kernel, grid_size, self._calc_stream)
+
+        if self._block.dim == 3 and self._block.periodic_z:
+            grid_size = (int(ceil(ls[2] / float(bs))), ls[1])
+            for kernel in kernels[base][2]:
+                self.backend.run_kernel(kernel, grid_size, self._calc_stream)
+
     def _step_bulk(self, output_req):
         """Runs one simulation step in the bulk domain.
 
         Bulk domain is defined to be all nodes that belong to CUDA
         blocks that do not depend on input from any ghost nodes.
         """
-        self._timing_calc_start = self.backend.make_event(self._bulk_stream, timing=True)
-
         # The bulk kernel only needs to be run if the simulation has a bulk/boundary split.
         # If this split is not present, the whole domain is simulated in _step_boundary and
         # _step_bulk only needs to handle PBC (below).
+        self._profile.record_gpu_start(TimeProfile.BULK, self._calc_stream)
         if self._boundary_blocks is not None:
             kernel, grid = self._get_bulk_kernel(output_req)
-            self.backend.run_kernel(kernel, grid, self._bulk_stream)
+            self.backend.run_kernel(kernel, grid, self._calc_stream)
 
-        if self._sim.iteration & 1:
-            base = 0
-        else:
-            base = 3
-
-        if self._block.periodic_x:
-            kernel = self._pbc_kernels[base]
-            if self._block.dim == 2:
-                grid_size = (
-                        int(math.ceil(self._lat_size[0] /
-                            float(self.config.block_size))), 1)
-            else:
-                grid_size = (
-                        int(math.ceil(self._lat_size[1] /
-                            float(self.config.block_size))),
-                        self._lat_size[0])
-
-            self.backend.run_kernel(kernel, grid_size, self._bulk_stream)
-
-        if self._block.periodic_y:
-            kernel = self._pbc_kernels[base + 1]
-            if self._block.dim == 2:
-                grid_size = (
-                        int(math.ceil(self._lat_size[1] /
-                            float(self.config.block_size))), 1)
-            else:
-                grid_size = (
-                        int(math.ceil(self._lat_size[2] /
-                            float(self.config.block_size))),
-                        self._lat_size[0])
-            self.backend.run_kernel(kernel, grid_size, self._bulk_stream)
-
-        if self._block.dim == 3 and self._block.periodic_z:
-            kernel = self._pbc_kernels[base + 2]
-            grid_size = (
-                    int(math.ceil(self._lat_size[2] /
-                        float(self.config.block_size))),
-                    self._lat_size[1])
-            self.backend.run_kernel(kernel, grid_size, self._bulk_stream)
-
-        self._timing_calc_end = self.backend.make_event(self._bulk_stream, timing=True)
+        self._apply_pbc(self._pbc_kernels)
+        self._profile.record_gpu_end(TimeProfile.BULK, self._calc_stream)
 
     def _step_boundary(self, output_req):
         """Runs one simulation step for the boundary blocks.
@@ -660,32 +877,30 @@ class BlockRunner(object):
         else:
             kernel, grid = self._get_bulk_kernel(output_req)
 
-        blk_str = self._bulk_stream
-        make_event = self.backend.make_event
+        blk_str = self._calc_stream
 
-        self._timing_bnd_start = make_event(blk_str, timing=True)
+        self._profile.record_gpu_start(TimeProfile.BOUNDARY, blk_str)
         self.backend.run_kernel(kernel, grid, blk_str)
-        self._timing_bnd_stop = make_event(blk_str, timing=True)
+        ev = self._profile.record_gpu_end(TimeProfile.BOUNDARY, blk_str)
 
-        # Enqueue a wait so that the data collection will not start until the kernel
-        # handling boundary calculations is completed (that kernel runs in the bulk
-        # stream so that it is automatically synchronized with bulk calculations.
-        # This is done to ensure that boundary calculations are completed before bulk
-        # ones, so that the bulk time calculation can maximally overlap with data
-        # transfer.
-        self._boundary_stream.wait_for_event(self._timing_bnd_stop)
+        # Enqueue a wait so that the data collection will not start until the
+        # kernel handling boundary calculations is completed (that kernel runs
+        # in the calc stream so that it is automatically synchronized with
+        # bulk calculations).
+        self._data_stream.wait_for_event(ev)
+        self._profile.record_gpu_start(TimeProfile.COLLECTION, self._data_stream)
         for kernel, grid in self._collect_kernels[self._sim.iteration & 1]:
-            self.backend.run_kernel(kernel, grid, self._boundary_stream)
+            self.backend.run_kernel(kernel, grid, self._data_stream)
+        self._profile.record_gpu_end(TimeProfile.COLLECTION, self._data_stream)
 
-        self._timing_coll_done = self.backend.make_event(self._boundary_stream, timing=True)
-
-    def send_data(self):
+    @profile(TimeProfile.SEND_DISTS)
+    def _send_dists(self):
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
             for x in conn_bufs:
-                self.backend.from_buf_async(x.coll_buf.gpu, self._boundary_stream)
+                self.backend.from_buf_async(x.coll_buf.gpu, self._data_stream)
 
-        self._boundary_stream.synchronize()
+        self._data_stream.synchronize()
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
             if len(conn_bufs) > 1:
@@ -693,26 +908,23 @@ class BlockRunner(object):
                     [np.ravel(x.coll_buf.host) for x in conn_bufs]))
             else:
                 # TODO(michalj): Use non-blocking sends here?
-                connector.send(np.ravel(conn_bufs[0].coll_buf.host))
+                connector.send(np.ravel(conn_bufs[0].coll_buf.host).copy())
 
-    def recv_data(self):
+    @profile(TimeProfile.RECV_DISTS)
+    def _recv_dists(self):
         for b_id, connector in self._block._connectors.iteritems():
-            conn_bufs = self._block_to_connbuf[b_id]
+            conn_bufs = self._recv_block_to_connbuf[b_id]
             if len(conn_bufs) > 1:
                 dest = np.hstack([np.ravel(x.recv_buf) for x in conn_bufs])
                 # Returns false only if quit event is active.
                 if not connector.recv(dest, self._quit_event):
                     return
                 i = 0
-                # In case there are 2 connections between the blocks, reverse the
-                # order of subbuffers in the recv buffer.  Note that this implicitly
-                # assumes the order of conn_bufs is the same for both blocks.
-                # TODO(michalj): Consider explicitly sorting conn_bufs.
-                for cbuf in reversed(conn_bufs):
+                for cbuf in conn_bufs:
                     l = cbuf.recv_buf.size
                     cbuf.recv_buf[:] = dest[i:i+l].reshape(cbuf.recv_buf.shape)
                     i += l
-                    cbuf.distribute(self.backend, self._boundary_stream)
+                    cbuf.distribute(self.backend, self._data_stream)
             else:
                 cbuf = conn_bufs[0]
                 dest = np.ravel(cbuf.recv_buf)
@@ -725,19 +937,146 @@ class BlockRunner(object):
                 # copy.
                 if dest.flags.owndata:
                     cbuf.recv_buf[:] = dest.reshape(cbuf.recv_buf.shape)
-                cbuf.distribute(self.backend, self._boundary_stream)
+                cbuf.distribute(self.backend, self._data_stream)
 
     def _fields_to_host(self):
         """Copies data for all fields from the GPU to the host."""
         for field in self._scalar_fields:
-            self.backend.from_buf_async(self._gpu_field_map[id(field)], self._bulk_stream)
+            self.backend.from_buf_async(self.gpu_field(field), self._calc_stream)
 
         for field in self._vector_fields:
-            for component in self._gpu_field_map[id(field)]:
-                self.backend.from_buf_async(component, self._bulk_stream)
+            for component in self.gpu_field(field):
+                self.backend.from_buf_async(component, self._calc_stream)
+
+    def _init_collect_kernels(self, cbuf, grid_dim1, block_size):
+        """Returns collection kernels for a connection.
+
+        :param cbuf: ConnectionBuffer
+        :param grid_dim1: callable returning the size of the CUDA grid
+            given the total size
+        :param block_size: CUDA block size for the kernels
+
+        Returns: secondary, primary.
+        """
+        # Sparse data collection.
+        if cbuf.coll_idx.host is not None:
+            grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
+
+            def _get_sparse_coll_kernel(i):
+                return KernelGrid(
+                    self.get_kernel('CollectSparseData',
+                    [cbuf.coll_idx.gpu, self.gpu_dist(cbuf.grid_id, i),
+                     cbuf.coll_buf.gpu, cbuf.coll_buf.host.size],
+                    'PPPi', (block_size,)),
+                    grid_size)
+
+            return _get_sparse_coll_kernel(1), _get_sparse_coll_kernel(0)
+        # Continuous data collection.
+        else:
+            # [X, Z * dists] or [X, Y * dists]
+            min_max = ([x.start for x in cbuf.cpair.src.src_slice] +
+                    list(reversed(cbuf.coll_buf.host.shape[1:])))
+            min_max[-1] = min_max[-1] * len(cbuf.cpair.src.dists)
+            if self.dim == 2:
+                signature = 'PiiiP'
+                grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
+            else:
+                signature = 'PiiiiiP'
+                grid_size = (grid_dim1(cbuf.coll_buf.host.shape[-1]),
+                    cbuf.coll_buf.host.shape[-2] * len(cbuf.cpair.src.dists))
+
+            def _get_cont_coll_kernel(i):
+                return KernelGrid(
+                    self.get_kernel('CollectContinuousData',
+                    [self.gpu_dist(cbuf.grid_id, i),
+                     cbuf.face] + min_max + [cbuf.coll_buf.gpu],
+                     signature, (block_size,)),
+                     grid_size)
+
+            return _get_cont_coll_kernel(1), _get_cont_coll_kernel(0)
+
+    def _init_distrib_kernels(self, cbuf, grid_dim1, block_size):
+        """Returns distribution kernels for a connection.
+
+        :param cbuf: ConnectionBuffer
+        :param grid_dim1: callable returning the size of the CUDA grid
+            given the total size
+        :param block_size: CUDA block size for the kernels
+
+        Returns: lists of: primary, secondary.
+        """
+        primary = []
+        secondary = []
+
+        # Data distribution
+        # Partial nodes.
+        if cbuf.dist_partial_idx.host is not None:
+            grid_size = (grid_dim1(cbuf.dist_partial_buf.host.size),)
+
+            def _get_sparse_dist_kernel(i):
+                return KernelGrid(
+                        self.get_kernel('DistributeSparseData',
+                            [cbuf.dist_partial_idx.gpu,
+                             self.gpu_dist(cbuf.grid_id, i),
+                             cbuf.dist_partial_buf.gpu,
+                             cbuf.dist_partial_buf.host.size],
+                            'PPPi', (block_size,)),
+                        grid_size)
+
+            primary.append(_get_sparse_dist_kernel(0))
+            secondary.append(_get_sparse_dist_kernel(1))
+
+        # Full nodes (all transfer distributions).
+        if cbuf.dist_full_buf.host is not None:
+            # Sparse indexing (connection along X-axis).
+            if cbuf.dist_full_idx.host is not None:
+                grid_size = (grid_dim1(cbuf.dist_full_buf.host.size),)
+
+                def _get_sparse_fdist_kernel(i):
+                    return KernelGrid(
+                            self.get_kernel('DistributeSparseData',
+                                [cbuf.dist_full_idx.gpu,
+                                 self.gpu_dist(cbuf.grid_id, i),
+                                 cbuf.dist_full_buf.gpu,
+                                 cbuf.dist_full_buf.host.size],
+                            'PPPi', (block_size,)),
+                            grid_size)
+
+                primary.append(_get_sparse_fdist_kernel(0))
+                secondary.append(_get_sparse_fdist_kernel(1))
+            # Continuous indexing.
+            elif cbuf.cpair.dst.dst_slice:
+                # [X, Z * dists] or [X, Y * dists]
+                low = [x + self._block.envelope_size for x in cbuf.cpair.dst.dst_low]
+                min_max = ([(x + y.start) for x, y in zip(low, cbuf.cpair.dst.dst_slice)] +
+                        list(reversed(cbuf.dist_full_buf.host.shape[1:])))
+                min_max[-1] = min_max[-1] * len(cbuf.cpair.dst.dists)
+
+                if self.dim == 2:
+                    signature = 'PiiiP'
+                    grid_size = (grid_dim1(cbuf.dist_full_buf.host.size),)
+                else:
+                    signature = 'PiiiiiP'
+                    grid_size = (grid_dim1(cbuf.dist_full_buf.host.shape[-1]),
+                        cbuf.dist_full_buf.host.shape[-2] * len(cbuf.cpair.dst.dists))
+
+                def _get_cont_dist_kernel(i):
+                    return KernelGrid(
+                            self.get_kernel('DistributeContinuousData',
+                            [self.gpu_dist(cbuf.grid_id, i),
+                             self._block.opposite_face(cbuf.face)] +
+                            min_max + [cbuf.dist_full_buf.gpu],
+                            signature, (block_size,)),
+                            grid_size)
+
+                primary.append(_get_cont_dist_kernel(0))
+                secondary.append(_get_cont_dist_kernel(1))
+
+        return primary, secondary
 
     def _init_interblock_kernels(self):
-        # TODO(michalj): Extend this for multi-grid models.
+        """Creates kernels for collection and distribution of distribution
+        data."""
 
         collect_primary = []
         collect_secondary = []
@@ -752,107 +1091,15 @@ class BlockRunner(object):
 
         for b_id, conn_bufs in self._block_to_connbuf.iteritems():
             for cbuf in conn_bufs:
-                # Data collection.
-                if cbuf.coll_idx.host is not None:
-                    grid_size = (_grid_dim1(cbuf.coll_buf.host.size),)
+                primary, secondary = self._init_collect_kernels(cbuf,
+                        _grid_dim1, collect_block)
+                collect_primary.append(primary)
+                collect_secondary.append(secondary)
 
-                    def _get_sparse_coll_kernel(i):
-                        return KernelGrid(
-                            self.get_kernel('CollectSparseData',
-                            [cbuf.coll_idx.gpu, self.gpu_dist(0, i),
-                             cbuf.coll_buf.gpu, cbuf.coll_buf.host.size],
-                            'PPPi', (collect_block,)),
-                            grid_size)
-
-                    collect_primary.append(_get_sparse_coll_kernel(1))
-                    collect_secondary.append(_get_sparse_coll_kernel(0))
-                else:
-                    # [X, Z * dists] or [X, Y * dists]
-                    min_max = ([x.start for x in cbuf.cpair.src.src_slice] +
-                            list(reversed(cbuf.coll_buf.host.shape[1:])))
-                    min_max[-1] = min_max[-1] * len(cbuf.cpair.src.dists)
-                    if self.dim == 2:
-                        signature = 'PiiiP'
-                        grid_size = (_grid_dim1(cbuf.coll_buf.host.size),)
-                    else:
-                        signature = 'PiiiiiP'
-                        grid_size = (_grid_dim1(cbuf.coll_buf.host.shape[-1]),
-                            cbuf.coll_buf.host.shape[-2] * len(cbuf.cpair.src.dists))
-
-                    def _get_cont_coll_kernel(i):
-                        return KernelGrid(
-                            self.get_kernel('CollectContinuousData',
-                            [self.gpu_dist(0, i),
-                             cbuf.face] + min_max + [cbuf.coll_buf.gpu],
-                             signature, (collect_block,)),
-                             grid_size)
-
-                    collect_primary.append(_get_cont_coll_kernel(1))
-                    collect_secondary.append(_get_cont_coll_kernel(0))
-
-                # Data distribution
-                # Partial nodes.
-                if cbuf.dist_partial_idx.host is not None:
-                    grid_size = (_grid_dim1(cbuf.dist_partial_buf.host.size),)
-
-                    def _get_sparse_dist_kernel(i):
-                        return KernelGrid(
-                                self.get_kernel('DistributeSparseData',
-                                    [cbuf.dist_partial_idx.gpu,
-                                     self.gpu_dist(0, i),
-                                     cbuf.dist_partial_buf.gpu,
-                                     cbuf.dist_partial_buf.host.size],
-                                    'PPPi', (collect_block,)),
-                                grid_size)
-
-                    distrib_primary.append(_get_sparse_dist_kernel(0))
-                    distrib_secondary.append(_get_sparse_dist_kernel(1))
-
-                # Full nodes (all transfer distributions).
-                if cbuf.dist_full_buf.host is not None:
-                    # Sparse indexing (connection along X-axis).
-                    if cbuf.dist_full_idx.host is not None:
-                        grid_size = (_grid_dim1(cbuf.dist_full_buf.host.size),)
-
-                        def _get_sparse_fdist_kernel(i):
-                            return KernelGrid(
-                                    self.get_kernel('DistributeSparseData',
-                                        [cbuf.dist_full_idx.gpu,
-                                         self.gpu_dist(0, i),
-                                         cbuf.dist_full_buf.gpu,
-                                         cbuf.dist_full_buf.host.size],
-                                    'PPPi', (collect_block,)),
-                                    grid_size)
-
-                        distrib_primary.append(_get_sparse_fdist_kernel(0))
-                        distrib_secondary.append(_get_sparse_fdist_kernel(1))
-                    # Continuous indexing.
-                    elif cbuf.cpair.dst.dst_slice:
-                        # [X, Z * dists] or [X, Y * dists]
-                        low = [x + self._block.envelope_size for x in cbuf.cpair.dst.dst_low]
-                        min_max = ([(x + y.start) for x, y in zip(low, cbuf.cpair.dst.dst_slice)] +
-                                list(reversed(cbuf.dist_full_buf.host.shape[1:])))
-                        min_max[-1] = min_max[-1] * len(cbuf.cpair.dst.dists)
-
-                        if self.dim == 2:
-                            signature = 'PiiiP'
-                            grid_size = (_grid_dim1(cbuf.dist_full_buf.host.size),)
-                        else:
-                            signature = 'PiiiiiP'
-                            grid_size = (_grid_dim1(cbuf.dist_full_buf.host.shape[-1]),
-                                cbuf.dist_full_buf.host.shape[-2] * len(cbuf.cpair.dst.dists))
-
-                        def _get_cont_dist_kernel(i):
-                            return KernelGrid(
-                                    self.get_kernel('DistributeContinuousData',
-                                    [self.gpu_dist(0, i),
-                                     self._block.opposite_face(cbuf.face)] +
-                                    min_max + [cbuf.dist_full_buf.gpu],
-                                    signature, (collect_block,)),
-                                    grid_size)
-
-                        distrib_primary.append(_get_cont_dist_kernel(0))
-                        distrib_secondary.append(_get_cont_dist_kernel(1))
+                primary, secondary = self._init_distrib_kernels(cbuf,
+                        _grid_dim1, collect_block)
+                distrib_primary.extend(primary)
+                distrib_secondary.extend(secondary)
 
         self._collect_kernels = (collect_primary, collect_secondary)
         self._distrib_kernels = (distrib_primary, distrib_secondary)
@@ -889,24 +1136,26 @@ class BlockRunner(object):
         gy = rest / arr_nx
         return dist_num, gy, gx
 
-    def _send_summary_info(self, timing_info):
+    def send_summary_info(self, timing_info):
         if self._summary_sender is not None:
             self._summary_sender.send_pyobj(timing_info)
             self.config.logger.debug('Sending timing information to controller.')
             assert self._summary_sender.recv() == 'ack'
 
+    def _initial_conditions(self):
+        self._sim.initial_conditions(self)
+
     def run(self):
         self.config.logger.info("Initializing block.")
 
         self._init_geometry()
+        self._sim.init_fields(self)
         self._init_buffers()
         self._init_compute()
         self.config.logger.debug("Initializing macroscopic fields.")
-        self._sim.init_fields(self)
         self._subdomain.init_fields(self._sim)
         self._init_gpu_data()
         self.config.logger.debug("Applying initial conditions.")
-        self._sim.initial_conditions(self)
 
         self._init_interblock_kernels()
         self._kernels_bulk_full = self._sim.get_compute_kernels(self, True, True)
@@ -914,6 +1163,8 @@ class BlockRunner(object):
         self._kernels_bnd_full = self._sim.get_compute_kernels(self, True, False)
         self._kernels_bnd_none = self._sim.get_compute_kernels(self, False, False)
         self._pbc_kernels = self._sim.get_pbc_kernels(self)
+
+        self._initial_conditions()
 
         if self.config.output:
             self._output.save(self._sim.iteration)
@@ -923,17 +1174,27 @@ class BlockRunner(object):
         if not self.config.max_iters:
             self.config.logger.warning("Running infinite simulation.")
 
-        if self.config.mode == 'benchmark':
-            self.main_benchmark()
-        else:
-            self.main()
+        self.main()
 
         self.config.logger.info(
             "Simulation completed after {0} iterations.".format(
                 self._sim.iteration))
 
+    def need_quit(self):
+        if self._quit_event.is_set():
+            self.config.logger.info("Simulation termination requested.")
+            return True
+
+        if self._ppid != os.getppid():
+            self.config.logger.info("Master process is dead -- terminating simulation.")
+            return True
+
+        return False
+
     def main(self):
+        self._profile.record_start()
         while True:
+            self._profile.start_step()
             output_req = ((self._sim.iteration + 1) % self.config.every) == 0
 
             if output_req and self.config.debug_dump_dists:
@@ -941,7 +1202,6 @@ class BlockRunner(object):
                 self._output.dump_dists(dbuf, self._sim.iteration)
 
             self.step(output_req)
-            self.send_data()
 
             if output_req and self.config.output_required:
                 self._fields_to_host()
@@ -950,99 +1210,355 @@ class BlockRunner(object):
                     self.config.max_iters):
                 break
 
-            if self._quit_event.is_set():
-                self.config.logger.info("Simulation termination requested.")
-                break
-
-            if self._ppid != os.getppid():
-                self.config.logger.info("Master process is dead -- terminating simulation.")
-                break
-
-            self.recv_data()
-            if self._quit_event.is_set():
-                self.config.logger.info("Simulation termination requested.")
-
-            for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
-                self.backend.run_kernel(kernel, grid, self._boundary_stream)
-
-            self._boundary_stream.synchronize()
-            self._bulk_stream.synchronize()
+            self._data_stream.synchronize()
+            self._calc_stream.synchronize()
             if output_req and self.config.output_required:
                 self._output.save(self._sim.iteration)
+            self._profile.end_step()
 
-        self._boundary_stream.synchronize()
-        self._bulk_stream.synchronize()
+        # Receive any data from remote nodes prior to termination.  This ensures
+        # we don't run into problems with zmq.
+        self._data_stream.synchronize()
+        self._calc_stream.synchronize()
         if output_req and self.config.output_required:
             self._output.save(self._sim.iteration)
 
-    def main_benchmark(self):
-        t_bulk = 0.0
-        t_bnd  = 0.0
-        t_coll = 0.0
-        t_total = 0.0
-        t_send = 0.0
-        t_recv = 0.0
-        t_data = 0.0
-        t_wait = 0.0
+        self._profile.record_end()
 
-        for i in xrange(self.config.max_iters):
-            output_req = ((self._sim.iteration + 1) % self.config.every) == 0
 
-            t1 = time.time()
-            self.step(output_req)
-            t2 = time.time()
+class NNBlockRunner(BlockRunner):
+    """Runs a fluid simulation for a single subdomain.
 
-            self.send_data()
+    This is a specialization of the BlockRunner class for models which
+    require access to macroscopic fields from the nearest neighbor nodes.
+    It changes the steps executed on the GPU as follows:
 
-            t3 = time.time()
-            if output_req:
-                self._fields_to_host()
-            t4 = time.time()
+    calc stream                    data stream
+    -------------------------------------------------------
+    boundary macro fields    --->  collect macro data
+    bulk macro fields              ...
+    boundary sim. step       <---  distribute macro data
+                             --->  collect distrib. data
+    bulk sim. step                 ...
+                                   distribute distrib. data
+                       <- sync ->
 
-            self.recv_data()
+    TODO(michalj): Try the alternative scheme:
 
-            for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
-                self.backend.run_kernel(kernel, grid, self._boundary_stream)
+    calc stream                    data stream
+    -------------------------------------------------------
+    boundary macro fields    --->  collect macro data
+    bulk macro fields              ...
+    bulk sim. step
+    boundary sim. step       <---  distribute macro data
+                             --->  collect distrib. data
+                                   ...
+                                   distribute distrib. data
+                       <- sync ->
 
-            t5 = time.time()
 
-            self._bulk_stream.synchronize()
-            self._boundary_stream.synchronize()
+    An arrow above symbolizes a dependency between the two streams.
+    """
 
-            t6 = time.time()
+    @profile(TimeProfile.RECV_MACRO)
+    def _recv_macro(self):
+        for b_id, connector in self._block._connectors.iteritems():
+            conn_bufs = self._recv_block_to_macrobuf[b_id]
+            if len(conn_bufs) > 1:
+                dest = np.hstack([np.ravel(x.recv_buf.host) for x in conn_bufs])
+                # Returns false only if quit event is active.
+                if not connector.recv(dest, self._quit_event):
+                    return
+                i = 0
+                for cbuf in conn_bufs:
+                    l = cbuf.recv_buf.host.size
+                    cbuf.recv_buf.host[:] = dest[i:i+l].reshape(cbuf.recv_buf.host.shape)
+                    i += l
+                    self.backend.to_buf_async(cbuf.recv_buf.gpu, self._data_stream)
+            else:
+                cbuf = conn_bufs[0]
+                dest = np.ravel(cbuf.recv_buf.host)
+                # Returns false only if quit event is active.
+                if not connector.recv(dest, self._quit_event):
+                    return
+                if dest.flags.owndata:
+                    cbuf.recv_buf.host[:] = dest.reshape(cbuf.recv_buf.host.shape)
+                self.backend.to_buf_async(cbuf.recv_buf.gpu, self._data_stream)
 
-            t_bulk += self._timing_calc_end.time_since(self._timing_calc_start) / 1e3
-            t_bnd  += self._timing_bnd_stop.time_since(self._timing_bnd_start) / 1e3
-            t_coll += self._timing_coll_done.time_since(self._timing_bnd_stop) / 1e3
+    @profile(TimeProfile.SEND_MACRO)
+    def _send_macro(self):
+        for b_id, connector in self._block._connectors.iteritems():
+            conn_bufs = self._block_to_macrobuf[b_id]
+            for x in conn_bufs:
+                self.backend.from_buf_async(x.coll_buf.gpu, self._data_stream)
 
-            t_total += t6 - t1
-            t_recv += t5 - t4
-            t_send += t3 - t2
-            t_data += t4 - t3
-            t_wait += t6 - t5
+        self._data_stream.synchronize()
+        for b_id, connector in self._block._connectors.iteritems():
+            conn_bufs = self._block_to_macrobuf[b_id]
+            if len(conn_bufs) > 1:
+                connector.send(np.hstack(
+                    [np.ravel(x.coll_buf.host) for x in conn_bufs]))
+            else:
+                # TODO(michalj): Use non-blocking sends here?
+                connector.send(np.ravel(conn_bufs[0].coll_buf.host).copy())
 
-            if output_req:
-                mlups_base = self._sim.iteration * reduce(operator.mul,
-                             self._lat_size)
-                mlups_total = mlups_base / t_total * 1e-6
-                mlups_comp = mlups_base / (t_bulk + t_bnd) * 1e-6
-                self.config.logger.info(
-                        'MLUPS eff:{0:.2f}  comp:{1:.2f}  overhead:{2:.3f}'.format(
-                            mlups_total, mlups_comp, t_total / (t_bulk + t_bnd) - 1.0))
+    def _macro_idx_helper(self, gx, buf_slice):
+        idx = np.mgrid[list(reversed(buf_slice))].astype(np.uint32)
+        if self.dim == 2:
+            return self._get_global_idx((gx, idx[0])).astype(np.uint32)
+        else:
+            return self._get_global_idx((gx, idx[1], idx[0])).astype(np.uint32)
 
-                j = self._sim.iteration
-                self.config.logger.debug(
-                        'time bulk:{0:e}  bnd:{1:e}  coll:{2:e}  data:{3:e}  recv:{4:e}'
-                        '  send:{5:e}  wait:{6:e}  total:{7:e}'.format(
-                            t_bulk / j, t_bnd / j, t_coll / j, t_data / j, t_recv / j, t_send / j,
-                            t_wait / j, t_total / j))
+    def _get_src_macro_indices(self, face, cpair):
+        if face in (self._block.X_LOW, self._block.X_HIGH):
+            gx = self.lat_linear_macro[face]
+        else:
+            return None
+        return self._macro_idx_helper(gx, cpair.src.src_macro_slice)
 
-        # Early termination requested or master process is dead.
-        if self._quit_event.is_set() or self._ppid != os.getppid():
-            return
+    def _get_dst_macro_indices(self, face, cpair):
+        if face in (self._block.X_LOW, self._block.X_HIGH):
+            gx = self.lat_linear[face]
+        else:
+            return None
+        return self._macro_idx_helper(gx, cpair.src.dst_macro_slice)
 
-        mi = self.config.max_iters
-        ti = util.TimingInfo((t_bulk + t_bnd) / mi, t_bulk / mi, t_bnd / mi,
-                t_coll / mi, t_data / mi, t_recv / mi, t_send / mi,
-                t_wait / mi, t_total / mi, self._block.id)
-        self._send_summary_info(ti)
+    def _init_buffers(self):
+        super(NNBlockRunner, self)._init_buffers()
+
+        alloc = self.backend.alloc_async_host_buf
+        self._block_to_macrobuf = defaultdict(list)
+        self._num_nn_fields = sum((1 for fpair in self._sim._scalar_fields if
+            fpair.abstract.need_nn))
+        for face, block_id in self._block.connecting_blocks():
+            cpairs = self._block.get_connections(face, block_id)
+            for cpair in cpairs:
+                coll_idx = GPUBuffer(self._get_src_macro_indices(face, cpair), self.backend)
+                dist_idx = GPUBuffer(self._get_dst_macro_indices(face, cpair), self.backend)
+
+                for field_pair in self._sim._scalar_fields:
+                    if not field_pair.abstract.need_nn:
+                        continue
+
+                    recv_buf = alloc(cpair.dst.macro_transfer_shape, dtype=self.float)
+                    coll_buf = alloc(cpair.src.macro_transfer_shape, dtype=self.float)
+
+                    cbuf = MacroConnectionBuffer(face, cpair,
+                            GPUBuffer(coll_buf, self.backend),
+                            coll_idx,
+                            GPUBuffer(recv_buf, self.backend),
+                            dist_idx, field_pair.buffer)
+
+                    self._block_to_macrobuf[block_id].append(cbuf)
+
+        # Explicitly sort connection buffers by their face ID.  Create a
+        # separate dictionary where the order of the connection buffers
+        # corresponds to that used by the _other_ subdomain.
+        self._recv_block_to_macrobuf = defaultdict(list)
+        for subdomain_id, cbufs in self._block_to_macrobuf.iteritems():
+            cbufs.sort(key=lambda x:(x.face))
+            recv_bufs = list(cbufs)
+            recv_bufs.sort(key=lambda x: self._block.opposite_face(x.face))
+            self._recv_block_to_macrobuf[subdomain_id] = recv_bufs
+
+    def _init_macro_collect_kernels(self, cbuf, grid_dim1, block_size):
+        # Sparse data collection.
+        if cbuf.coll_idx.host is not None:
+            grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
+            return KernelGrid(self.get_kernel('CollectSparseData',
+                    [cbuf.coll_idx.gpu, self.gpu_field(cbuf.field),
+                     cbuf.coll_buf.gpu, cbuf.coll_buf.host.size], 'PPPi',
+                    (block_size,)), grid_size)
+        # Continuous data collection.
+        else:
+            if self.dim == 2:
+                grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
+            else:
+                grid_size = (grid_dim1(cbuf.coll_buf.host.shape[-1]),
+                    grid_dim1(cbuf.coll_buf.host.shape[-2]))
+
+            # [X, Z] or [X, Y] in 3D
+            min_max = ([x.start for x in cbuf.cpair.src.src_macro_slice] +
+                    list(reversed(cbuf.coll_buf.host.shape)))
+
+            if self.dim == 2:
+                gy = self.lat_linear_macro[cbuf.face]
+                return KernelGrid(self.get_kernel('CollectContinuousMacroData',
+                        [self.gpu_field(cbuf.field)] + min_max + [gy,
+                         cbuf.coll_buf.gpu], 'PiiiP', (block_size,)),
+                         grid_size)
+            else:
+                return KernelGrid(self.get_kernel('CollectContinuousMacroData',
+                        [self.gpu_field(cbuf.field), cbuf.face] +
+                        min_max + [cbuf.coll_buf.gpu], 'PiiiiiP', (block_size,)),
+                        grid_size)
+
+
+    def _init_macro_distrib_kernels(self, cbuf, grid_dim1, block_size):
+        kernels = []
+
+        # Sparse data distribution.
+        if cbuf.dist_idx.host is not None:
+            grid_size = (grid_dim1(cbuf.recv_buf.host.size),)
+            return KernelGrid(self.get_kernel('DistributeSparseData',
+                        [cbuf.dist_idx.gpu, self.gpu_field(cbuf.field),
+                         cbuf.recv_buf.gpu, cbuf.recv_buf.host.size], 'PPPi',
+                        (block_size,)), grid_size)
+        # Continuous data distribution.
+        else:
+            if self.dim == 2:
+                grid_size = (grid_dim1(cbuf.recv_buf.host.size),)
+            else:
+                grid_size = (grid_dim1(cbuf.recv_buf.host.shape[-1]),
+                    grid_dim1(cbuf.recv_buf.host.shape[-2]))
+
+            # [X, Z] or [X, Y] in 3D
+            min_max = ([x.start for x in cbuf.cpair.src.dst_macro_slice] +
+                    list(reversed(cbuf.recv_buf.host.shape)))
+
+            if self.dim == 2:
+                gy = self.lat_linear[cbuf.face]
+                return KernelGrid(self.get_kernel('DistributeContinuousMacroData',
+                        [self.gpu_field(cbuf.field)] + min_max + [gy,
+                         cbuf.recv_buf.gpu], 'PiiiP', (block_size,)),
+                         grid_size)
+            else:
+                return KernelGrid(self.get_kernel('DistributeContinuousMacroData',
+                        [self.gpu_field(cbuf.field), cbuf.face] +
+                        min_max + [cbuf.recv_buf.gpu], 'PiiiiiP', (block_size,)),
+                        grid_size)
+
+
+    def _init_interblock_kernels(self):
+        super(NNBlockRunner, self)._init_interblock_kernels()
+
+        collect_block = 32
+        def _grid_dim1(x):
+            return int(math.ceil(x / float(collect_block)))
+
+        self._macro_collect_kernels = []
+        self._macro_distrib_kernels = []
+
+        for b_id, conn_bufs in self._block_to_macrobuf.iteritems():
+            for cbuf in conn_bufs:
+                self._macro_collect_kernels.append(
+                        self._init_macro_collect_kernels(cbuf, _grid_dim1,
+                            collect_block))
+                self._macro_distrib_kernels.append(
+                        self._init_macro_distrib_kernels(cbuf, _grid_dim1,
+                            collect_block))
+
+    def _initial_conditions(self):
+        """Prepares non-local fields prior to simulation start-up.
+
+        This is necessary for models that use non-local field values to set
+        the initial values of the distributions."""
+
+        for kernel, grid in self._macro_collect_kernels:
+            self.backend.run_kernel(kernel, grid, self._data_stream)
+
+        self._data_stream.synchronize()
+        self._apply_pbc(self._pbc_kernels.macro)
+        self._send_macro()
+        if self.need_quit():
+            return False
+
+        self._recv_macro()
+
+        for kernel, grid in self._macro_distrib_kernels:
+            self.backend.run_kernel(kernel, grid, self._data_stream)
+
+        self._data_stream.synchronize()
+        super(NNBlockRunner, self)._initial_conditions()
+
+    def step(self, output_req):
+        """Runs one simulation step."""
+
+        if output_req:
+            bnd = self._kernels_bnd_full
+            bulk = self._kernels_bulk_full
+        else:
+            bnd = self._kernels_bnd_none
+            bulk = self._kernels_bulk_none
+
+        it = self._sim.iteration
+        bnd_kernel_macro, bnd_kernel_sim = bnd[it & 1]
+        bulk_kernel_macro, bulk_kernel_sim = bulk[it & 1]
+
+        # Local aliases.
+        has_boundary_split = self._boundary_blocks is not None
+        str_calc = self._calc_stream
+        str_data = self._data_stream
+        run = self.backend.run_kernel
+        grid_bulk = self._kernel_grid_bulk
+        grid_bnd = self._boundary_blocks
+        record_gpu_start = self._profile.record_gpu_start
+        record_gpu_end   = self._profile.record_gpu_end
+
+        # Macroscopic variables.
+        record_gpu_start(TimeProfile.MACRO_BOUNDARY, str_calc)
+        if has_boundary_split:
+            run(bnd_kernel_macro, grid_bnd, str_calc)
+        else:
+            run(bulk_kernel_macro, grid_bulk, str_calc)
+        ev = record_gpu_end(TimeProfile.MACRO_BOUNDARY, str_calc)
+        str_data.wait_for_event(ev)
+
+        record_gpu_start(TimeProfile.MACRO_COLLECTION, str_data)
+        for kernel, grid in self._macro_collect_kernels:
+            run(kernel, grid, str_data)
+        record_gpu_end(TimeProfile.MACRO_COLLECTION, str_data)
+
+        record_gpu_start(TimeProfile.MACRO_BULK, str_calc)
+        if has_boundary_split:
+            run(bulk_kernel_macro, grid_bulk, str_calc)
+        self._apply_pbc(self._pbc_kernels.macro)
+        record_gpu_end(TimeProfile.MACRO_BULK, str_calc)
+
+        self._send_macro()
+        if self.need_quit():
+            return False
+
+        self._recv_macro()
+
+        record_gpu_start(TimeProfile.MACRO_DISTRIB, str_data)
+        for kernel, grid in self._macro_distrib_kernels:
+            run(kernel, grid, str_data)
+
+        ev = record_gpu_end(TimeProfile.MACRO_DISTRIB, str_data)
+        str_calc.wait_for_event(ev)
+
+        # Actual simulation step.
+        record_gpu_start(TimeProfile.BOUNDARY, str_calc)
+        if has_boundary_split:
+            run(bnd_kernel_sim, grid_bnd, str_calc)
+        else:
+            run(bulk_kernel_sim, grid_bulk, str_calc)
+        ev = record_gpu_end(TimeProfile.BOUNDARY, str_calc)
+        str_data.wait_for_event(ev)
+
+        record_gpu_start(TimeProfile.COLLECTION, str_data)
+        for kernel, grid in self._collect_kernels[it & 1]:
+            run(kernel, grid, str_data)
+        record_gpu_end(TimeProfile.COLLECTION, str_data)
+
+        record_gpu_start(TimeProfile.BULK, str_calc)
+        if has_boundary_split:
+            run(bulk_kernel_sim, grid_bulk, str_calc)
+        self._apply_pbc(self._pbc_kernels.distributions)
+        record_gpu_end(TimeProfile.BULK, str_calc)
+
+        self._sim.iteration += 1
+
+        self._send_dists()
+        if self.need_quit():
+            return False
+
+        self._recv_dists()
+        record_gpu_start(TimeProfile.DISTRIB, str_data)
+        for kernel, grid in self._distrib_kernels[(it + 1) & 1]:
+            run(kernel, grid, str_data)
+        record_gpu_end(TimeProfile.DISTRIB, str_data)
+
+        return True
+

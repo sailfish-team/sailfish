@@ -1,17 +1,5 @@
 <%page args="bgk_args_decl"/>
 
-<%def name="nonlocal_fields_decl()">
-	%if backend == 'cuda':
-		%for i in image_fields:
-			%if precision == 'single':
-				texture<float, 2> img_f${i};
-			%else:
-				texture<int2, 2> img_f${i};
-			%endif
-		%endfor
-	%endif
-</%def>
-
 <%def name="kernel_args_1st_moment(name)">
 	${global_ptr} float *${name}x,
 	${global_ptr} float *${name}y,
@@ -60,6 +48,26 @@
 	}
 </%def>
 
+## Defines local indices for kernels that can be split into bulk and boundary.
+## Automatically handles the case when the split is disabled.
+<%def name="local_indices_split()">
+	%if boundary_size > 0:
+		int gx, gy, lx, gi;
+		%if dim == 3:
+			int gz;
+		%endif
+
+		if (options & OPTION_BULK) {
+			${local_indices_bulk()}
+		} else {
+			${local_indices_boundary()}
+		}
+	%else:
+		${local_indices()}
+	%endif
+
+</%def>
+
 ## Defines local indices for bulk kernels.
 ## This is the same as local_indices(), but with proper offsets to skip
 ## the boundary.
@@ -67,12 +75,12 @@
 	lx = get_local_id(0);	// ID inside the current block
 	%if dim == 2:
 		<%
-			if block.has_face_conn(block.X_LOW):
+			if block.has_face_conn(block.X_LOW) or block.periodic_x:
 				xoff = block_size
 			else:
 				xoff = 0
 
-			if block.has_face_conn(block.Y_LOW):
+			if block.has_face_conn(block.Y_LOW) or block.periodic_y:
 				yoff = boundary_size
 			else:
 				yoff = 0
@@ -100,17 +108,17 @@
 	int gid = get_group_id(0) + get_group_id(1) * get_global_size(0) / get_local_size(0);
 	%if dim == 2:
 		<%
-			has_ylow = int(block.has_face_conn(block.Y_LOW))
-			has_yhigh = int(block.has_face_conn(block.Y_HIGH))
-			has_xlow = int(block.has_face_conn(block.X_LOW))
-			has_xhigh = int(block.has_face_conn(block.X_HIGH))
+			has_ylow = int(block.has_face_conn(block.Y_LOW) or block.periodic_y)
+			has_yhigh = int(block.has_face_conn(block.Y_HIGH) or block.periodic_y)
+			has_xlow = int(block.has_face_conn(block.X_LOW) or block.periodic_x)
+			has_xhigh = int(block.has_face_conn(block.X_HIGH) or block.periodic_x)
 
 			ns_conns = has_ylow + has_yhigh
 			xblocks = arr_nx / block_size
 			yblocks = arr_ny - ns_conns * boundary_size
 
 			padding = arr_nx - lat_nx
-			if block.has_face_conn(block.X_HIGH) and block_size - padding >= boundary_size:
+			if bool(has_xhigh) and block_size - padding >= boundary_size:
 				aux_ew = 1	# 2 blocks on the right due to misalignment
 			else:
 				aux_ew = 0	# 1 block on the right
@@ -123,26 +131,26 @@
 		%>
 		// x: ${xblocks}, y: ${yblocks}
 		if (0) {;}
-		%if block.has_face_conn(block.Y_LOW):
+		%if block.has_face_conn(block.Y_LOW) or block.periodic_y:
 			else if (gid < ${bottom_idx}) {
 				gx = (gid % ${xblocks}) * ${block_size} + lx;
 				gy = gid / ${xblocks};
 			}
 		%endif
-		%if block.has_face_conn(block.Y_HIGH):
+		%if block.has_face_conn(block.Y_HIGH) or block.periodic_y:
 			else if (gid < ${left_idx}) {
 				gid -= ${bottom_idx};
 				gx = (gid % ${xblocks}) * ${block_size} + lx;
 				gy = ${lat_ny-1} - gid / ${xblocks};
 			}
 		%endif
-		%if block.has_face_conn(block.X_LOW):
+		%if block.has_face_conn(block.X_LOW) or block.periodic_x:
 			else if (gid < ${right_idx}) {
 				gx = lx;
 				gy = gid + ${has_ylow * boundary_size - left_idx};
 			}
 		%endif
-		%if block.has_face_conn(block.X_HIGH):
+		%if block.has_face_conn(block.X_HIGH) or block.periodic_x:
 			else if (gid < ${right2_idx}) {
 				gx = ${arr_nx - block_size} + lx;
 				gy = gid + ${has_ylow * boundary_size - right_idx};
@@ -269,7 +277,7 @@
 
 #define DT 1.0f
 
-%for name, val in constants:
+%for name, val in constants.iteritems():
 	${const_var} float ${name} = ${val}f;
 %endfor
 

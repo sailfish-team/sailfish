@@ -4,12 +4,20 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
-from collections import namedtuple
+from collections import defaultdict, namedtuple
+import random
+import socket
 import sys
 
+from sailfish import config
 from sailfish import sym
 
 TimingInfo = namedtuple('TimingInfo', 'comp bulk bnd coll data recv send wait total block_id')
+
+
+class GridError(Exception):
+    pass
+
 
 def get_grid_from_config(config):
     for x in sym.KNOWN_GRIDS:
@@ -45,3 +53,58 @@ def get_visualization_engines():
             yield sys.modules[module].engine
         except ImportError:
             pass
+
+def gpufile_to_clusterspec(gpufile, iface=''):
+    """Builds a Sailfish cluster definition based on a PBS GPUFILE."""
+
+    nodes = defaultdict(set)
+    f = open(gpufile, 'r')
+    for line in f:
+        line = line.strip()
+        host, _, gpu = line.partition('-gpu')
+        try:
+            gpu = int(gpu)
+        except ValueError:
+            continue
+        nodes[host].add(gpu)
+    f.close()
+
+    port = random.randint(8000, 16000)
+    if not iface:
+        iface = None
+
+    cluster = []
+    for node, gpus in nodes.iteritems():
+        try:
+            ipaddr = socket.gethostbyname(node)
+        except socket.error:
+            ipaddr = node
+        cluster.append(config.MachineSpec('socket=%s:%s' % (ipaddr, port),
+            node, gpus=list(gpus), iface=iface))
+
+    class Cluster(object):
+        def __init__(self, nodes):
+            self.nodes = nodes
+
+    return Cluster(cluster)
+
+def reverse_pairs(iterable, subitems=1):
+    it = iter(iterable)
+    while it:
+        x = []
+        for i in range(0, subitems):
+            x.append(it.next())
+
+        try:
+            y = []
+            for i in range(0, subitems):
+                y.append(it.next())
+
+            for i in y:
+                yield i
+        except StopIteration:
+            pass
+
+        for i in x:
+            yield i
+
