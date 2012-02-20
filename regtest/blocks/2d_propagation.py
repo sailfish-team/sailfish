@@ -11,7 +11,7 @@ from sailfish import io
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import SubdomainSpec2D, Subdomain2D
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFluidSim, LBForcedSim
+from sailfish.lb_single import LBFluidSim
 from sailfish.sym import D2Q9
 from regtest.blocks import util
 
@@ -60,7 +60,7 @@ periodic_x = False
 periodic_y = False
 vi = lambda x, y: D2Q9.vec_idx([x, y])
 
-class SimulationTest(LBFluidSim, LBForcedSim):
+class SimulationTest(LBFluidSim):
     subdomain = BlockTest
 
     @classmethod
@@ -442,7 +442,7 @@ class TestCornerPropagation(unittest.TestCase):
         ae(b3[vi(1, -1), 126, 1], np.float32(0.62))
 
 
-class ThreeBlocksSimulationTest(LBFluidSim, LBForcedSim):
+class ThreeBlocksSimulationTest(LBFluidSim):
     subdomain = BlockTest
 
     @classmethod

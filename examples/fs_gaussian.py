@@ -4,7 +4,7 @@ import numpy as np
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import Subdomain2D
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFreeSurface, LBForcedSim
+from sailfish.lb_single import LBFreeSurface
 
 
 class FSSubdomain(Subdomain2D):
@@ -19,7 +19,7 @@ class FSSubdomain(Subdomain2D):
             np.square(hy - self.gy / 2.0)) / sigma**2)
 
 
-class FSSim(LBFreeSurface, LBForcedSim):
+class FSSim(LBFreeSurface):
     subdomain = FSSubdomain
 
     @classmethod

@@ -23,27 +23,29 @@
 </%def>
 
 <%def name="body_force(accel=True, need_vars_declaration=True, grid_id=None)">
-	%for i in range(0, len(grids)):
-		%if (grid_id is None or grid_id == i) and sym.needs_accel(i, forces, force_couplings):
-			%if accel:
-				// Body force acceleration.
-			%else:
-				// Body force.
-			%endif
-			%if not sym.needs_coupling_accel(i, force_couplings):
-				%if need_vars_declaration:
-					float ea${i}[${dim}];
-				%endif
-				%for j in range(0, dim):
-					ea${i}[${j}] = ${cex(sym.body_force_accel(i, j, forces, accel=accel), vectors=True)};
-				%endfor
-			%else:
-				%for j in range(0, dim):
-					ea${i}[${j}] += ${cex(sym.body_force_accel(i, j, forces, accel=accel), vectors=True)};
-				%endfor
-			%endif
+	%if forces is not UNDEFINED:
+		%if accel:
+			// Body force acceleration.
+		%else:
+			// Body force.
 		%endif
-	%endfor
+		%for i in range(0, len(grids)):
+			%if (grid_id is None or grid_id == i) and sym.needs_accel(i, forces, force_couplings):
+				%if not sym.needs_coupling_accel(i, force_couplings):
+					%if need_vars_declaration:
+						float ea${i}[${dim}];
+					%endif
+					%for j in range(0, dim):
+						ea${i}[${j}] = ${cex(sym.body_force_accel(i, j, forces, accel=accel), vectors=True)};
+					%endfor
+				%else:
+					%for j in range(0, dim):
+						ea${i}[${j}] += ${cex(sym.body_force_accel(i, j, forces, accel=accel), vectors=True)};
+					%endfor
+				%endif
+			%endif
+		%endfor
+	%endif
 </%def>
 
 
@@ -120,21 +122,29 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 ## equilibrium: if True, calculate velocity for the equilibrium distribution
 ## save: if True, calculate velocity for the simulation output
 <%def name="fluid_velocity(igrid, equilibrium=False, save=False)">
-	%if save:
-		## For now, we assume a single fluid velocity regardless of the number of
-		## components and grids used.  If this assumption is ever changed, the code
-		## below will have to be extended appropriately.
-		%for j in range(0, dim):
-			iv0[${j}] += ${cex(0.5 * sym.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
-		%endfor
+	%if forces is not UNDEFINED:
+		%if save:
+			## For now, we assume a single fluid velocity regardless of the number of
+			## components and grids used.  If this assumption is ever changed, the code
+			## below will have to be extended appropriately.
+			%for j in range(0, dim):
+				iv0[${j}] += ${cex(0.5 * sym.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
+			%endfor
+		%else:
+			%for j in range(0, dim):
+				%if igrid in force_for_eq and equilibrium:
+					v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], j, forces, force_couplings), vectors=True)};
+				%else:
+					v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
+				%endif
+			%endfor
+		%endif
 	%else:
-		%for j in range(0, dim):
-			%if igrid in force_for_eq and equilibrium:
-				v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], j, forces, force_couplings), vectors=True)};
-			%else:
-				v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
-			%endif
-		%endfor
+		%if not save:
+			%for j in range(0, dim):
+				v0[${j}] = iv0[${j}];
+			%endfor
+		%endif
 	%endif
 </%def>
 

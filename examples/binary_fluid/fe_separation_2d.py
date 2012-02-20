@@ -6,7 +6,6 @@ from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import Subdomain2D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidFreeEnergy
-from sailfish.lb_single import LBForcedSim
 
 
 class SeparationDomain(Subdomain2D):
@@ -18,7 +17,7 @@ class SeparationDomain(Subdomain2D):
         pass
 
 
-class SeparationFESim(LBBinaryFluidFreeEnergy, LBForcedSim):
+class SeparationFESim(LBBinaryFluidFreeEnergy):
     subdomain = SeparationDomain
 
     @classmethod
