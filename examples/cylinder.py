@@ -2,7 +2,7 @@
 
 import numpy as np
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import SubdomainSpec2D, Subdomain2D
+from sailfish.geo_block import SubdomainSpec2D, Subdomain2D, NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
 
@@ -35,18 +35,18 @@ class CylinderBlock(Subdomain2D):
             x0 = self.gx / 2
             y0 = 2 * diam
 
-            self.set_node(hx == 0, self.NODE_WALL)
-            self.set_node(hx == self.gx - 1, self.NODE_WALL)
+            self.set_node(hx == 0, NTFullBBWall)
+            self.set_node(hx == self.gx - 1, NTFullBBWall)
         else:
             diam = self.gy / 3
             x0 = 2 * diam
             y0 = self.gy / 2
 
-            self.set_node(hy == 0, self.NODE_WALL)
-            self.set_node(hy == self.gy - 1, self.NODE_WALL)
+            self.set_node(hy == 0, NTFullBBWall)
+            self.set_node(hy == self.gy - 1, NTFullBBWall)
 
         cylinder_map = np.square(hx - x0) + np.square(hy - y0) < diam**2 / 4.0
-        self.set_node(cylinder_map, self.NODE_WALL)
+        self.set_node(cylinder_map, NTFullBBWall)
 
     def initial_conditions(self, sim, hx, hy):
         sim.rho[:] = 1.0

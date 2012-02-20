@@ -75,9 +75,8 @@ that ``nvcc`` is in your ``$PATH``.  You can get the necessary files at http://n
 
 To install the required packages on an Ubuntu system::
 
-  apt-get install gcc-4.4 g++-4.4 python-pygame mayavi2 python-matplotlib python-numpy python-tables python-scipy python-sympy
-  apt-get install python-mako python-decorator python-pytools  build-essential python-dev python-setuptools libboost-python-dev libboost-thread-dev
-  apt-get install git-core
+  apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-scipy python-mako python-sympy python-decorator
+  apt-get install git-core python-setuptools libboost-dev python-execnet python-zmq libboost-python-dev libboost-thread-dev
   git clone http://git.tiker.net/trees/pycuda.git
   cd pycuda
   git submodule init

@@ -145,7 +145,7 @@ ${kernel} void PrepareMacroFields(
 
 	int orientation = decodeNodeOrientation(ncode);
 
-	%if simtype == 'shan-chen' and not bc_wall_.wet_nodes:
+	%if simtype == 'shan-chen' and not bc_wall_.wet_node:
 		// Do not update the macroscopic fields for wall nodes which do not
 		// represent any fluid.
 		if (isWallNode(type))
@@ -363,7 +363,7 @@ ${kernel} void CollideAndPropagate(
 
 	// Only save the macroscopic quantities if requested to do so.
 	if (options & OPTION_SAVE_MACRO_FIELDS) {
-		%if simtype == 'shan-chen' and not bc_wall_.wet_nodes:
+		%if simtype == 'shan-chen' and not bc_wall_.wet_node:
 			if (!isWallNode(type))
 		%endif
 		{

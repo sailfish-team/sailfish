@@ -1,20 +1,21 @@
 #!/usr/bin/python -u
 """Demonstrates how to load geometry from a boolean numpy array."""
 
-import sys
 import numpy as np
 
 from sailfish.geo import LBGeometry3D
-from sailfish.geo_block import Subdomain3D
+from sailfish.geo_block import Subdomain3D, NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
 
 
 class BoolSubdomain(Subdomain3D):
+
     def initial_conditions(self, sim, hx, hy, hz):
         sim.rho[:] = 1.0
 
     def boundary_conditions(self, hx, hy, hz):
+        wall_bc = NTFullBBWall
         if hasattr(self.config, 'wall_map'):
             x0 = np.min(hx)
             x1 = np.max(hx)
@@ -24,7 +25,7 @@ class BoolSubdomain(Subdomain3D):
             z1 = np.max(hz)
 
             partial_wall_map = self.config.wall_map[z0:z1+1, y0:y1+1, x0:x1+1]
-            self.set_node(partial_wall_map, self.NODE_WALL)
+            self.set_node(partial_wall_map, wall_bc)
 
 
 class BoolSimulation(LBFluidSim, LBForcedSim):
@@ -43,6 +44,7 @@ class BoolSimulation(LBFluidSim, LBForcedSim):
         if not config.geometry:
             return
 
+        # Override lattice size based on the geometry file.
         wall_map = np.load(config.geometry)
         config.lat_nz, config.lat_ny, config.lat_nx = wall_map.shape
         config._wall_map = wall_map

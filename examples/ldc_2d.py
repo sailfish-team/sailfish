@@ -4,8 +4,10 @@ import math
 import numpy as np
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import SubdomainSpec2D, Subdomain2D
+from sailfish.geo_block import NTFullBBWall, NTEquilibriumVelocity
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFluidSim, LBForcedSim
+from sailfish.lb_single import LBFluidSim
+
 
 class LDCGeometry(LBGeometry2D):
     def blocks(self, n=None):
@@ -55,11 +57,17 @@ class LDCBlock(Subdomain2D):
     max_v = 0.1
 
     def boundary_conditions(self, hx, hy):
-        wall_map = np.logical_or(
-                np.logical_or(hx == self.gx-1, hx == 0), hy == 0)
+        wall_bc = NTFullBBWall
+        velocity_bc = NTEquilibriumVelocity
 
-        self.set_node(hy == self.gy-1, self.NODE_VELOCITY, (self.max_v, 0.0))
-        self.set_node(wall_map, self.NODE_WALL)
+        lor = np.logical_or
+        land = np.logical_and
+        lnot = np.logical_not
+
+        wall_map = land(lor(lor(hx == self.gx-1, hx == 0), hy == 0),
+                        lnot(hy == self.gy-1))
+        self.set_node(hy == self.gy-1, velocity_bc((self.max_v, 0.0)))
+        self.set_node(wall_map, wall_bc)
 
     def initial_conditions(self, sim, hx, hy):
         sim.rho[:] = 1.0
