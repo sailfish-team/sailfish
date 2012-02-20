@@ -3,6 +3,7 @@
 import numpy as np
 from sailfish.geo import LBGeometry3D
 from sailfish.geo_block import SubdomainSpec3D, Subdomain3D
+from sailfish.geo_block import NTFullBBWall, NTEquilibriumVelocity
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
 
@@ -48,17 +49,22 @@ class LDCBlock(Subdomain3D):
     max_v = 0.05
 
     def boundary_conditions(self, hx, hy, hz):
-        wall_map = np.logical_or(hz == 0, np.logical_or(
-                np.logical_or(hx == self.gx-1, hx == 0),
-                np.logical_or(hy == self.gy-1, hy == 0)))
+        wall_bc = NTFullBBWall
+        velocity_bc = NTEquilibriumVelocity
 
-        self.set_node(wall_map, self.NODE_WALL)
-        self.set_node(hz == self.gz-1, self.NODE_VELOCITY,
-                (self.max_v, 0.0, 0.0))
+        lor = np.logical_or
+        land = np.logical_and
+        lnot = np.logical_not
+
+        wall_map = land(lor(hz == 0, lor(lor(hx == self.gx - 1, hx == 0),
+                        lor(hy == self.gy - 1, hy == 0))), lnot(hz == self.gz - 1))
+
+        self.set_node(wall_map, wall_bc)
+        self.set_node(hz == self.gz - 1, velocity_bc((self.max_v, 0.0, 0.0)))
 
     def initial_conditions(self, sim, hx, hy, hz):
         sim.rho[:] = 1.0
-        sim.vx[hz == self.gz-1] = self.max_v
+        sim.vx[hz == self.gz - 1] = self.max_v
 
 
 class LDCSim(LBFluidSim):

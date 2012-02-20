@@ -65,17 +65,17 @@ ${device_func} inline bool isGhostNode(unsigned int type) {
 // Wet nodes are nodes that undergo a standard collision procedure.
 ${device_func} inline bool isWetNode(unsigned int type) {
 	return (
-		%if bc_wall_.wet_nodes:
+		%if bc_wall_.wet_node:
 			isFluidOrWallNode(type)
 		%else:
 			isFluidNode(type)
 		%endif
 
-		%if bc_velocity_.wet_nodes:
+		%if bc_velocity_.wet_node:
 			|| isVelocityNode(type)
 		%endif
 
-		%if bc_pressure_.wet_nodes:
+		%if bc_pressure_.wet_node:
 			|| isPressureNode(type)
 		%endif
 	);
@@ -91,10 +91,6 @@ ${device_func} inline unsigned int decodeNodeOrientation(unsigned int nodetype) 
 
 ${device_func} inline unsigned int decodeNodeParam(unsigned int nodetype) {
 	return (nodetype >> ${geo_misc_shift}) & ${(1 << geo_param_shift)-1};
-}
-
-${device_func} inline unsigned int encodeBoundaryNode(unsigned int dir_mask, unsigned int obj_id) {
-	return ${geo_boundary} | (obj_id << ${geo_misc_shift}) | (dir_mask << ${geo_misc_shift + geo_obj_shift});
 }
 
 %if dim == 2:

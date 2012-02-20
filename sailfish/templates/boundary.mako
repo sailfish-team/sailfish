@@ -38,7 +38,7 @@
 </%def>
 
 <%def name="get_boundary_pressure(node_param, rho)">
-	${rho} = geo_params[${geo_num_velocities * dim} + ${node_param}] * 3.0f;
+	${rho} = geo_params[${node_param}] * 3.0f;
 </%def>
 
 <%def name="fill_missing_distributions()">
@@ -166,7 +166,7 @@ ${device_func} inline void getMacro(Dist *fi, int ncode, int node_type, int orie
 	if (isFluidOrWallNode(node_type) || isSlipNode(node_type) || orientation == ${geo_dir_other}) {
 		compute_macro_quant(fi, rho, v0);
 		if (isWallNode(node_type)) {
-			%if bc_wall_.location == 0.0 and bc_wall_.wet_nodes:
+			%if bc_wall_.location == 0.0 and bc_wall_.wet_node:
 				v0[0] = 0.0f;
 				v0[1] = 0.0f;
 				%if dim == 3:

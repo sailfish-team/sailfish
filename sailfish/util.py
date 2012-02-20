@@ -9,6 +9,8 @@ import random
 import socket
 import sys
 
+import numpy as np
+
 from sailfish import config
 from sailfish import sym
 
@@ -107,4 +109,12 @@ def reverse_pairs(iterable, subitems=1):
 
         for i in x:
             yield i
+
+def in_anyd(arr1, arr2):
+    """Wrapper around np.in1d which returns an array with the same shape as arr1"""
+    return np.in1d(arr1, arr2).reshape(arr1.shape)
+
+
+def is_number(param):
+    return type(param) is float or type(param) is int or isinstance(param, np.number)
 

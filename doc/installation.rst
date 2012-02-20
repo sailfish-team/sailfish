@@ -62,8 +62,8 @@ Ubuntu installation instructions
 
 To install the required packages on an Ubuntu system::
 
-  apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-tables python-scipy python-mako python-decorator
-  apt-get install git-core python-setuptools libboost-dev
+  apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-scipy python-mako python-decorator
+  apt-get install git-core python-setuptools libboost-dev python-execnet python-zmq
   git clone git://github.com/sympy/sympy
   git clone http://git.tiker.net/trees/pytools.git
   git clone http://git.tiker.net/trees/pycuda.git
