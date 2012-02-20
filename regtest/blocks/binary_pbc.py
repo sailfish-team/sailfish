@@ -16,7 +16,6 @@ from sailfish.geo import LBGeometry2D, LBGeometry3D
 from sailfish.geo_block import Subdomain2D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidShanChen, LBBinaryFluidFreeEnergy
-from sailfish.lb_single import LBForcedSim
 from sailfish import io
 from regtest.blocks import util
 
@@ -82,7 +81,7 @@ class SCTestDomain3D(Subdomain3D):
         pass
 
 
-class SCTestSim2D(LBBinaryFluidShanChen, LBForcedSim):
+class SCTestSim2D(LBBinaryFluidShanChen):
     subdomain = SCTestDomain2D
 
     @classmethod
@@ -102,7 +101,7 @@ class SCTestSim2D(LBBinaryFluidShanChen, LBForcedSim):
             'max_iters': MAX_ITERS_2D,
             'every': 500})
 
-class SCTestSim3D(LBBinaryFluidShanChen, LBForcedSim):
+class SCTestSim3D(LBBinaryFluidShanChen):
     subdomain = SCTestDomain3D
 
     @classmethod
@@ -199,7 +198,7 @@ class FETestDomain3D(Subdomain3D):
         pass
 
 
-class FETestSim2D(LBBinaryFluidFreeEnergy, LBForcedSim):
+class FETestSim2D(LBBinaryFluidFreeEnergy):
     subdomain = FETestDomain2D
 
     @classmethod
@@ -224,7 +223,7 @@ class FETestSim2D(LBBinaryFluidFreeEnergy, LBForcedSim):
             'every': 500})
 
 
-class FETestSim3D(LBBinaryFluidFreeEnergy, LBForcedSim):
+class FETestSim3D(LBBinaryFluidFreeEnergy):
     subdomain = FETestDomain3D
 
     @classmethod

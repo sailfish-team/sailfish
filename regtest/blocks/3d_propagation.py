@@ -11,7 +11,7 @@ from sailfish import io
 from sailfish.geo import LBGeometry3D
 from sailfish.geo_block import SubdomainSpec3D, Subdomain3D
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFluidSim, LBForcedSim
+from sailfish.lb_single import LBFluidSim
 from sailfish.sym import D3Q19
 from regtest.blocks import util
 
@@ -51,7 +51,7 @@ periodic_x = False
 vi = lambda x, y, z: D3Q19.vec_idx([x, y, z])
 
 
-class SimulationTest(LBFluidSim, LBForcedSim):
+class SimulationTest(LBFluidSim):
     subdomain = BlockTest
 
     @classmethod
@@ -196,7 +196,7 @@ class TwoBlockPropagationTest(unittest.TestCase):
 
 #############################################################################
 
-class PeriodicSimulationTest(LBFluidSim, LBForcedSim):
+class PeriodicSimulationTest(LBFluidSim):
     subdomain = BlockTest
 
     @classmethod
@@ -327,7 +327,7 @@ class SingleBlockGeoTest(LBGeometry3D):
     def blocks(self, n=None):
         return [SubdomainSpec3D((0,0,0), (64, 62, 66))]
 
-class SingleBlockPeriodicSimulationTest(LBFluidSim, LBForcedSim):
+class SingleBlockPeriodicSimulationTest(LBFluidSim):
     subdomain = BlockTest
 
     @classmethod
