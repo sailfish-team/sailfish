@@ -43,35 +43,7 @@ class BoolSimulation(LBFluidSim, LBForcedSim):
         if not config.geometry:
             return
 
-        wall_map = np.logical_not(np.load(config.geometry))
-        orig_shape = wall_map.shape
-        shape = list(wall_map.shape)
-
-        # Add walls around the whole simulation domain.
-        shape[0] += 2
-        shape[1] += 2
-        shape[2] += 2
-
-        # Perform funny gymnastics to extend the array to the new shape.  numpy's
-        # resize can only be used on the 1st axis if the position of the data in
-        # the array is not to be changed.
-        wall_map = np.resize(wall_map, (shape[0], orig_shape[1], orig_shape[2]))
-        wall_map = np.rollaxis(wall_map, 1, 0)
-        wall_map = np.resize(wall_map, (shape[1], shape[0], orig_shape[2]))
-        wall_map = np.rollaxis(wall_map, 0, 2)
-        wall_map = np.rollaxis(wall_map, 2, 0)
-        wall_map = np.resize(wall_map, (shape[2], shape[0], shape[1]))
-        wall_map = np.rollaxis(wall_map, 0, 3)
-
-        wall_map[:,:,-2:] = True
-        wall_map[:,-2:,:] = True
-        wall_map[-2:,:,:] = True
-
-        # Make sure the walls are _around_ the simulation domain.
-        wall_map = np.roll(wall_map, 1, 0)
-        wall_map = np.roll(wall_map, 1, 1)
-        wall_map = np.roll(wall_map, 1, 2)
-
+        wall_map = np.load(config.geometry)
         config.lat_nz, config.lat_ny, config.lat_nx = wall_map.shape
         config._wall_map = wall_map
 
