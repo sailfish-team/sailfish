@@ -7,15 +7,18 @@ import unittest
 
 import numpy as np
 
-from examples.lbm_cylinder_multi import CylinderSimulation, CylinderGeometry
+from examples.cylinder import CylinderSimulation, CylinderGeometry
+from sailfish import io
 from sailfish.controller import LBSimulationController
 from regtest.blocks import util
+from utils.merge_subdomains import merge_subdomains
 
 tmpdir = tempfile.mkdtemp()
 block_size = 64
 blocks = 2
 vertical = False
 output = ''
+MAX_ITERS = 100
 
 class SimulationTest(CylinderSimulation):
     @classmethod
@@ -25,7 +28,7 @@ class SimulationTest(CylinderSimulation):
         defaults['block_size'] = block_size
         defaults['blocks'] = blocks
         defaults['vertical'] = vertical
-        defaults['max_iters'] = 100
+        defaults['max_iters'] = MAX_ITERS
         defaults['quiet'] = True
         defaults['output'] = output
         defaults['cuda_cache'] = False
@@ -37,18 +40,17 @@ class TestInterblockPropagation(unittest.TestCase):
         global blocks, vertical, output
         output = os.path.join(tmpdir, 'href')
         blocks = 1
-        ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run(ignore_cmdline=True)
-        cls.href = np.load('%s_blk0_100.npz' % output)
+        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
+        cls.digits = io.filename_iter_digits(MAX_ITERS)
+        cls.href = np.load(io.filename(output, cls.digits, 0, MAX_ITERS))
         cls.hrho = cls.href['rho']
         cls.hvx  = cls.href['v'][0]
         cls.hvy  = cls.href['v'][1]
 
         output = os.path.join(tmpdir, 'vref')
         vertical = True
-        ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run(ignore_cmdline=True)
-        cls.vref = np.load('%s_blk0_100.npz' % output)
+        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
+        cls.vref = np.load(io.filename(output, cls.digits, 0, MAX_ITERS))
         cls.vrho = cls.vref['rho']
         cls.vvx  = cls.vref['v'][0]
         cls.vvy  = cls.vref['v'][1]
@@ -58,14 +60,12 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'horiz_2block')
         blocks = 2
         vertical = False
-        ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run(ignore_cmdline=True)
-        testdata0 = np.load('%s_blk0_100.npz' % output)
-        testdata1 = np.load('%s_blk1_100.npz' % output)
+        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
 
-        rho = np.hstack([testdata0['rho'], testdata1['rho']])
-        vx = np.hstack([testdata0['v'][0], testdata1['v'][0]])
-        vy = np.hstack([testdata0['v'][1], testdata1['v'][1]])
+        merged = merge_subdomains(output, self.digits, MAX_ITERS, save=False)
+        rho = merged['rho']
+        vx  = merged['v'][0]
+        vy  = merged['v'][1]
 
         np.testing.assert_array_almost_equal(rho, self.hrho)
         np.testing.assert_array_almost_equal(vx, self.hvx)
@@ -76,15 +76,12 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'horiz_3block')
         blocks = 3
         vertical = False
-        ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run(ignore_cmdline=True)
-        testdata0 = np.load('%s_blk0_100.npz' % output)
-        testdata1 = np.load('%s_blk1_100.npz' % output)
-        testdata2 = np.load('%s_blk2_100.npz' % output)
+        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
 
-        rho = np.hstack([testdata0['rho'], testdata1['rho'], testdata2['rho']])
-        vx = np.hstack([testdata0['v'][0], testdata1['v'][0], testdata2['v'][0]])
-        vy = np.hstack([testdata0['v'][1], testdata1['v'][1], testdata2['v'][1]])
+        merged = merge_subdomains(output, self.digits, MAX_ITERS, save=False)
+        rho = merged['rho']
+        vx  = merged['v'][0]
+        vy  = merged['v'][1]
 
         np.testing.assert_array_almost_equal(rho, self.hrho)
         np.testing.assert_array_almost_equal(vx, self.hvx)
@@ -95,14 +92,12 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'vert_2block')
         blocks = 2
         vertical = True
-        ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run(ignore_cmdline=True)
-        testdata0 = np.load('%s_blk0_100.npz' % output)
-        testdata1 = np.load('%s_blk1_100.npz' % output)
+        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
 
-        rho = np.vstack([testdata0['rho'], testdata1['rho']])
-        vx = np.vstack([testdata0['v'][0], testdata1['v'][0]])
-        vy = np.vstack([testdata0['v'][1], testdata1['v'][1]])
+        merged = merge_subdomains(output, self.digits, MAX_ITERS, save=False)
+        rho = merged['rho']
+        vx  = merged['v'][0]
+        vy  = merged['v'][1]
 
         np.testing.assert_array_almost_equal(rho, self.vrho)
         np.testing.assert_array_almost_equal(vx, self.vvx)
@@ -113,15 +108,12 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'vert_3block')
         blocks = 3
         vertical = True
-        ctrl = LBSimulationController(SimulationTest, CylinderGeometry)
-        ctrl.run(ignore_cmdline=True)
-        testdata0 = np.load('%s_blk0_100.npz' % output)
-        testdata1 = np.load('%s_blk1_100.npz' % output)
-        testdata2 = np.load('%s_blk2_100.npz' % output)
+        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
 
-        rho = np.vstack([testdata0['rho'], testdata1['rho'], testdata2['rho']])
-        vx = np.vstack([testdata0['v'][0], testdata1['v'][0], testdata2['v'][0]])
-        vy = np.vstack([testdata0['v'][1], testdata1['v'][1], testdata2['v'][1]])
+        merged = merge_subdomains(output, self.digits, MAX_ITERS, save=False)
+        rho = merged['rho']
+        vx  = merged['v'][0]
+        vy  = merged['v'][1]
 
         np.testing.assert_array_almost_equal(rho, self.vrho)
         np.testing.assert_array_almost_equal(vx, self.vvx)

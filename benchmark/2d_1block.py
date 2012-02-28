@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
 
-from examples.lbm_ldc_multi import LDCSim
+from examples.ldc_2d import LDCSim
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry2D
 

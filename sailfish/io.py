@@ -17,12 +17,14 @@ class VisConfig(Structure):
                 type(ctypes.create_string_buffer(MAX_NAME_SIZE)))]
 
 class LBOutput(object):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, config, block_id, *args, **kwargs):
         self._scalar_fields = {}
         self._vector_fields = {}
 
         # Additional scalar fields used for visualization.
         self._visualization_fields = {}
+        self.basename = config.output
+        self.block_id = block_id
 
     def register_field(self, field, name, visualization=False):
         if visualization:
@@ -34,6 +36,9 @@ class LBOutput(object):
                 self._scalar_fields[name] = field
 
     def save(self, i):
+        pass
+
+    def dump_dists(self, i):
         pass
 
 
@@ -102,71 +107,25 @@ class VisualizationWrapper(LBOutput):
             self._geo_buffer[0:self.nodes] = np.ravel(self.block.runner.visualization_map())
 
 
-# TODO: Correctly process vector and scalar fields in these clases.
-class HDF5FlatOutput(LBOutput):
-    """Saves simulation data in a HDF5 file."""
-    format_name = 'h5flat'
-
-    def __init__(self, fname, sim):
-        LBOutput.__init__(self)
-
-        # FIXME: Port this class.
-        raise NotImplementedError('This class has not been ported yet.')
-
-        self.sim = sim
-        import tables
-        self.h5file = tables.openFile(fname, mode='w')
-        self.h5grp = self.h5file.createGroup('/', 'results', 'simulation results')
-        self.h5file.setNodeAttr(self.h5grp, 'viscosity', sim.options.visc)
-        self.h5file.setNodeAttr(self.h5grp, 'sample_rate', sim.options.every)
-        self.h5file.setNodeAttr(self.h5grp, 'model', sim.lbm_model)
-
-    def save(self, i):
-        h5t = self.h5file.createGroup(self.h5grp, 'iter%d' % i, 'iteration %d' % i)
-        self.h5file.createArray(h5t, 'v', np.dstack(self.sim.velocity), 'velocity')
-        self.h5file.createArray(h5t, 'rho', self.sim.rho, 'density')
-
-
-class HDF5NestedOutput(HDF5FlatOutput):
-    """Saves simulation data in a HDF5 file."""
-    format_name = 'h5nested'
-
-    def __init__(self, fname, sim):
-        # FIXME: Port this class.
-        raise NotImplementedError('This class has not been ported yet.')
-
-        super(HDF5NestedOutput, self).__init__(fname, sim)
-        import tables
-        desc = {
-            'iter': tables.Float32Col(pos=0),
-            'vx': tables.Float32Col(pos=1, shape=sim.vx.shape),
-            'vy': tables.Float32Col(pos=2, shape=sim.vy.shape),
-            'rho': tables.Float32Col(pos=4, shape=sim.rho.shape)
-        }
-
-        if sim.grid.dim == 3:
-            desc['vz'] = tables.Float32Col(pos=2, shape=sim.vz.shape)
-
-        self.h5tbl = self.h5file.createTable(self.h5grp, 'results', desc, 'results')
-
-    def save(self, i):
-        record = self.h5tbl.row
-        record['iter'] = i
-        record['vx'] = self.sim.vx
-        record['vy'] = self.sim.vy
-        if self.sim.grid.dim == 3:
-            record['vz'] = self.sim.vz
-        record['rho'] = self.sim.rho
-        record.append()
-        self.h5tbl.flush()
-
-
-def _get_fname_digits(max_iters=0):
+def filename_iter_digits(max_iters=0):
+    """Returns the number of digits used to represent the iteration in the filename"""
     if max_iters:
         return str(int(math.log10(max_iters)) + 1)
     else:
         return str(7)
 
+def filename(base, digits, subdomain_id, it, suffix='.npz'):
+    return ('{0}.{1}.{2:0' + str(digits) + 'd}{3}').format(base, subdomain_id,
+            it, suffix)
+
+def merged_filename(base, digits, it, suffix='.npz'):
+    return ('{0}.{1:0' + str(digits) + 'd}{2}').format(base, it, suffix)
+
+def dists_filename(base, digits, subdomain_id, it, suffix='.npy'):
+    return filename(base + '_dists', digits, subdomain_id, it, suffix=suffix)
+
+def subdomains_filename(base):
+    return base + '.subdomains'
 
 class VTKOutput(LBOutput):
     """Saves simulation data in VTK files."""
@@ -175,7 +134,7 @@ class VTKOutput(LBOutput):
     def __init__(self, config):
         LBOutput.__init__(self)
         self.fname = config.output
-        self.digits = _get_fname_digits(config.max_iters)
+        self.digits = filename_iter_digits(config.max_iters)
 
     def save(self, i):
         # FIXME: Port this class.
@@ -220,39 +179,44 @@ class NPYOutput(LBOutput):
     format_name = 'npy'
 
     def __init__(self, config, block_id):
-        LBOutput.__init__(self)
-        self.digits = _get_fname_digits(config.max_iters)
-        self.fname = '%s_blk%s_' % (config.output, block_id)
+        LBOutput.__init__(self, config, block_id)
+        self.digits = filename_iter_digits(config.max_iters)
 
     def save(self, i):
-        fname = ('%s%0' + self.digits + 'd') % (self.fname, i)
+        fname = filename(self.basename, self.digits, self.block_id, i, suffix='')
         data = {}
         data.update(self._scalar_fields)
         data.update(self._vector_fields)
         np.savez(fname, **data)
 
     def dump_dists(self, dists, i):
-        fname = ('%sdist_dump%0' + self.digits + 'd') % (self.fname, i)
+        fname = dists_filename(self.basename, self.digits, self.block_id, i)
         np.save(fname, dists)
 
+
 class MatlabOutput(LBOutput):
-    """Ssves simulation data as Matlab .mat files."""
+    """Saves simulation data as Matlab .mat files."""
     format_name = 'mat'
 
     def __init__(self, config, block_id):
-        LBOutput.__init__(self)
-        self.digits = _get_fname_digits(config.max_iters)
-        self.fname = '%s_blk%s_' % (config.output, block_id)
+        LBOutput.__init__(self, config, block_id)
+        self.digits = filename_iter_digits(config.max_iters)
 
     def save(self, i):
         import scipy.io
-        fname = ('%s%0' + self.digits + 'd.mat') % (self.fname, i)
+        fname = filename(self.basename, self.digits, self.block_id, i, suffix='')
         data = {}
         data.update(self._scalar_fields)
         data.update(self._vector_fields)
         scipy.io.savemat(fname, data)
 
-_OUTPUTS = [NPYOutput, HDF5FlatOutput, HDF5NestedOutput, VTKOutput, MatlabOutput]
+    def dump_dists(self, dists, i):
+        import scipy.io
+        fname = dists_filename(self.basename, self.digits, self.block_id, i)
+        scipy.io.savemat(dists)
+
+
+_OUTPUTS = [NPYOutput, VTKOutput, MatlabOutput]
 
 format_name_to_cls = {}
 for output_class in _OUTPUTS:

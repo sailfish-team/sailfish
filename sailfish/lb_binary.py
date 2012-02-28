@@ -4,13 +4,11 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 import numpy as np
 from sailfish import block_runner, sym, util
 from sailfish.lb_base import LBSim, ScalarField, VectorField
-from sailfish.lb_single import LBForcedSim
-
-BinaryKernels = namedtuple('BinaryKernels', 'distributions macro')
+from sailfish.lb_single import LBForcedSim, MacroKernels
 
 
 class LBBinaryFluidBase(LBSim):
@@ -99,7 +97,7 @@ class LBBinaryFluidBase(LBSim):
                         runner.get_kernel('ApplyMacroPeriodicBoundaryConditions',
                             [runner.gpu_field(field_pair.buffer), np.uint32(i)], 'Pi'))
 
-        ret = BinaryKernels(macro=macro_kernels, distributions=dist_kernels)
+        ret = MacroKernels(macro=macro_kernels, distributions=dist_kernels)
         return ret
 
     def get_compute_kernels(self, runner, full_output, bulk):
@@ -331,7 +329,7 @@ class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
 
         group.add_argument('--visc', type=float, default=1.0, help='numerical viscosity')
         group.add_argument('--G', type=float, default=1.0,
-                help='Shan-Chen interaction strenght constant')
+                help='Shan-Chen interaction strength constant')
         group.add_argument('--sc_potential', type=str,
                 choices=sym.SHAN_CHEN_POTENTIALS, default='linear',
                 help='Shan-Chen pseudopotential function to use')
