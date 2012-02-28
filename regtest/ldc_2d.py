@@ -17,11 +17,14 @@ import os
 import shutil
 import tempfile
 
-from examples.lbm_ldc_multi import LDCGeometry, LDCBlock, LDCSim
+from examples.lbm_ldc_multi import LDCBlock, LDCSim
 from sailfish.controller import LBSimulationController
+from sailfish.geo import LBGeometry2D
+from sailfish.geo_block import SubdomainSpec2D
 
 tmpdir = tempfile.mkdtemp()
 
+BLOCKS = 1
 LAT_NX = 512
 LAT_NY = 512
 output = ''
@@ -31,6 +34,24 @@ MAX_ITERS = 500000
 max_iters = [500000, 1000000, 2000000, 3000000, 4000000, 4500000, 4500000, 5500000, 5500000, 6000000]
 reynolds = [1000, 2500, 5000, 7500, 10000, 12500, 15000, 17500, 20000, 21000]
 name = 'ldc2d'
+
+
+class TestLDCGeometry(LBGeometry2D):
+
+    def blocks(self, n=None):
+        blocks = []
+        bps = self.config.blocks
+        yq = self.gy / bps
+        yd = self.gy % bps
+
+        for k in range(0, bps):
+            ysize = yq
+            if k == bps - 1:
+                ysize += yd
+            blocks.append(SubdomainSpec2D((0, k * yq), 
+                                          (self.gx, ysize)))
+        return blocks
+
 
 
 class TestLDCSim(LDCSim):  
@@ -52,8 +73,11 @@ class TestLDCSim(LDCSim):
         config.every = config.max_iters - 1
 	
         # Protection in the event of max_iters changes from the command line.
-        global MAX_ITERS
+        global MAX_ITERS, BLOCKS, LAT_NX, LAT_NY
         MAX_ITERS = config.max_iters
+        BLOCKS = config.blocks
+        LAT_NX = config.lat_nx
+        LAT_NY = config.lat_ny
 
     @classmethod
     def add_options(cls, group, dim):
@@ -65,21 +89,29 @@ def save_output(basepath):
     name_digits = str(int(math.log10(MAX_ITERS)) + 1)
     opt = ('%s_blk0_%0' + name_digits+ 'd' + '.npz') % (os.path.join(tmpdir, 'result'), MAX_ITERS - 1)
     href = np.load(opt)
-
     hrho = href['rho']
-    lat_ny, lat_nx = hrho.shape
 
     vx = href['v'][0]
     vy = href['v'][1]
 
-    nxh = lat_nx / 2
-    nyh = lat_ny / 2
+    for i in range(BLOCKS-1):
+        opt = ('%s_blk%s_' + '%0' + name_digits + 'd'+'.npz') % (tmpdir+
+					"/result", str(i+1), MAX_ITERS-1)
+        print opt
+        href = np.load(opt)
+        hrho_p = href['rho']     
+        vx_p = href['v'][0]
+        vy_p = href['v'][1]
+        vx = np.vstack([vx, vx_p])
+        vy = np.vstack([vy, vy_p])
+    nxh = LAT_NX / 2
+    nyh = LAT_NY / 2
 
     res_vx = (vx[:, nxh] + vx[:, nxh-1]) / 2 / LDCBlock.max_v
     res_vy = (vy[nyh, :] + vy[nyh-1, :]) / 2 / LDCBlock.max_v
     
-    plt.plot(res_vx, np.linspace(-1.0, 1.0, lat_ny), label='Sailfish')
-    plt.plot(np.linspace(-1.0, 1.0, lat_nx), res_vy, label='Sailfish')
+    plt.plot(res_vx, np.linspace(-1.0, 1.0, LAT_NY), label='Sailfish')
+    plt.plot(np.linspace(-1.0, 1.0, LAT_NX), res_vy, label='Sailfish')
 
     np.savetxt(os.path.join(basepath, 'vx.dat'), res_vx)
     np.savetxt(os.path.join(basepath, 'vy.dat'), res_vy)
@@ -94,7 +126,7 @@ def run_test(name, i):
     if not os.path.exists(basepath):
         os.makedirs(basepath)
     
-    ctrl = LBSimulationController(TestLDCSim, LDCGeometry)  
+    ctrl = LBSimulationController(TestLDCSim, TestLDCGeometry)  
     ctrl.run()
     horiz = np.loadtxt('ldc_golden/vx2d', skiprows=4)
     vert = np.loadtxt('ldc_golden/vy2d', skiprows=4)

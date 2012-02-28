@@ -11,18 +11,6 @@ class LDCGeometry(LBGeometry3D):
     def blocks(self, n=None):
         blocks = []
         bps = int(self.config.blocks**(1.0/3))
-        # Special case.
-        if self.config.blocks == 3:
-            h0 = self.gz / 3
-            #h0 = self.gz / 12
-            #h1 = h0 * 3
-	    # h2 = h0 * 6
-            h3 = self.gz - 2 * h0 
-
-            blocks.append(SubdomainSpec3D((0, 0, 0), (self.gx, self.gy, h0)))
-            blocks.append(SubdomainSpec3D((0, 0, h0), (self.gx, self.gy, h0)))
-            blocks.append(SubdomainSpec3D((0, 0, 2 * h0), (self.gx, self.gy, h3)))
-            return blocks
 
         if bps**3 != self.config.blocks:
             print ('Only configurations with '
@@ -39,15 +27,15 @@ class LDCGeometry(LBGeometry3D):
 
         for i in range(0, bps):
             xsize = xq
-            if i == bps:
+            if i == bps - 1:
                 xsize += xd
             for j in range(0, bps):
                 ysize = yq
-                if j == bps:
+                if j == bps - 1:
                     ysize += yd
                 for k in range(0, bps):
                     zsize = zq
-                    if k == bps:
+                    if k == bps - 1:
                         zsize += zd
                     blocks.append(SubdomainSpec3D((i * xq, j * yq, k * zq),
                                 (xsize, ysize, zsize)))
