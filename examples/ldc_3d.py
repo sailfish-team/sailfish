@@ -27,15 +27,15 @@ class LDCGeometry(LBGeometry3D):
 
         for i in range(0, bps):
             xsize = xq
-            if i == bps:
+            if i == bps - 1:
                 xsize += xd
             for j in range(0, bps):
                 ysize = yq
-                if j == bps:
+                if j == bps - 1:
                     ysize += yd
                 for k in range(0, bps):
                     zsize = zq
-                    if k == bps:
+                    if k == bps - 1:
                         zsize += zd
                     blocks.append(SubdomainSpec3D((i * xq, j * yq, k * zq),
                                 (xsize, ysize, zsize)))
