@@ -15,12 +15,17 @@ import os
 import shutil
 import tempfile
 
-from examples.ldc_2d import LDCGeometry, LDCBlock, LDCSim
+from examples.ldc_2d import LDCBlock, LDCSim
 from sailfish.controller import LBSimulationController
+from sailfish.geo import LBGeometry2D
+from sailfish.geo_block import SubdomainSpec2D
 from sailfish import io
+
+from utils.merge_subdomains import merge_subdomains
 
 tmpdir = tempfile.mkdtemp()
 
+BLOCKS = 1
 LAT_NX = 512
 LAT_NY = 512
 output = ''
@@ -30,6 +35,23 @@ MAX_ITERS = 500000
 max_iters = [500000, 1000000, 2000000, 3000000, 4000000, 4500000, 4500000, 5500000, 5500000, 6000000]
 reynolds = [1000, 2500, 5000, 7500, 10000, 12500, 15000, 17500, 20000, 21000]
 name = 'ldc2d'
+
+
+class TestLDCGeometry(LBGeometry2D):
+
+    def blocks(self, n=None):
+        blocks = []
+        bps = self.config.blocks
+        yq = self.gy / bps
+        yd = self.gy % bps
+
+        for k in range(0, bps):
+            ysize = yq
+            if k == bps - 1:
+                ysize += yd
+            blocks.append(SubdomainSpec2D((0, k * yq),
+                                          (self.gx, ysize)))
+        return blocks
 
 
 class TestLDCSim(LDCSim):
@@ -51,8 +73,10 @@ class TestLDCSim(LDCSim):
         config.every = config.max_iters
 
         # Protection in the event of max_iters changes from the command line.
-        global MAX_ITERS
+        global MAX_ITERS, BLOCKS
         MAX_ITERS = config.max_iters
+        BLOCKS = config.blocks
+
 
     @classmethod
     def add_options(cls, group, dim):
@@ -61,14 +85,14 @@ class TestLDCSim(LDCSim):
 
 
 def save_output(basepath):
-    res = np.load(io.filename(os.path.join(tmpdir, 'result'),
-        io.filename_iter_digits(MAX_ITERS), 0, MAX_ITERS))
+    merged = merge_subdomains(os.path.join(tmpdir, 'result'),
+            io.filename_iter_digits(MAX_ITERS), MAX_ITERS, save=False)
 
-    rho = res['rho']
+    rho = merged['rho']
     lat_ny, lat_nx = rho.shape
 
-    vx = res['v'][0]
-    vy = res['v'][1]
+    vx = merged['v'][0]
+    vy = merged['v'][1]
 
     nxh = lat_nx / 2
     nyh = lat_ny / 2
@@ -92,7 +116,7 @@ def run_test(name, i):
     if not os.path.exists(basepath):
         os.makedirs(basepath)
 
-    ctrl = LBSimulationController(TestLDCSim, LDCGeometry)
+    ctrl = LBSimulationController(TestLDCSim, TestLDCGeometry)
     ctrl.run()
     horiz = np.loadtxt('ldc_golden/vx2d', skiprows=4)
     vert = np.loadtxt('ldc_golden/vy2d', skiprows=4)

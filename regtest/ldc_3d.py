@@ -9,18 +9,40 @@ import os
 import shutil
 import tempfile
 
-from examples.ldc_3d import LDCGeometry, LDCBlock, LDCSim
+from examples.ldc_3d import LDCBlock, LDCSim
 from sailfish import io
 from sailfish.controller import LBSimulationController
+from sailfish.geo import LBGeometry3D
+from sailfish.geo_block import SubdomainSpec3D
+
+from utils.merge_subdomains import merge_subdomains
 
 tmpdir = tempfile.mkdtemp()
-MAX_ITERS = 50000
-LAT_NX = 128
-LAT_NY = 128
-LAT_NZ = 128
+MAX_ITERS = 100000
+LAT_NX = 256
+LAT_NY = 256
+LAT_NZ = 256
+BLOCKS = 1
 output = ''
 
 name = 'ldc3d'
+
+
+class TestLDCGeometry(LBGeometry3D):
+
+    def blocks(self, n=None):
+        blocks = []
+        bps = self.config.blocks
+        zq = self.gz / bps
+        zd = self.gz % bps
+
+        for k in range(0, bps):
+            zsize = zq
+            if k == bps - 1:
+                zsize += zd
+            blocks.append(SubdomainSpec3D((0, 0, k * zq),
+                                          (self.gx, self.gy, zsize)))
+        return blocks
 
 
 class TestLDCSim(LDCSim):
@@ -42,8 +64,9 @@ class TestLDCSim(LDCSim):
         config.every = config.max_iters
 
         # Protection in the event of max_iters changes from the command line.
-        global MAX_ITERS
+        global MAX_ITERS, BLOCKS
         MAX_ITERS = config.max_iters
+        BLOCKS = config.blocks
 
     @classmethod
     def add_options(cls, group, dim):
@@ -52,28 +75,28 @@ class TestLDCSim(LDCSim):
 
 
 def save_output(basepath):
-    res = np.load(io.filename(os.path.join(tmpdir, 'result'),
-        io.filename_iter_digits(MAX_ITERS), 0, MAX_ITERS))
+    merged = merge_subdomains(os.path.join(tmpdir, 'result'),
+                    io.filename_iter_digits(MAX_ITERS), MAX_ITERS, save=False)
 
-    rho = res['rho']
+    rho = merged['rho']
     lat_nz, lat_ny, lat_nx = rho.shape
 
-    vx = res['v'][0]
-    vy = res['v'][1]
-    vz = res['v'][2]
+    vx = merged['v'][0]
+    vy = merged['v'][1]
+    vz = merged['v'][2]
 
-    nxh = lat_nx/2
-    nyh = lat_ny/2
-    nzh = lat_nz/2
+    nxh = lat_nx / 2
+    nyh = lat_ny / 2
+    nzh = lat_nz / 2
 
     res_vx = (vx[:, nyh, nxh] + vx[:, nyh-1, nxh-1]) / 2 / LDCBlock.max_v
     res_vz = (vz[nzh, nyh, :] + vz[nzh-1, nyh-1, :]) / 2 / LDCBlock.max_v
 
-    plt.plot(res_vx, np.linspace(-1.0, 1.0, lat_nz), label='Sailfish')
-    plt.plot(np.linspace(-1.0, 1.0, lat_nx), res_vz, label='Sailfish')
-
     np.savetxt(os.path.join(basepath, 're400_vx.dat'), res_vx)
     np.savetxt(os.path.join(basepath, 're400_vz.dat'), res_vz)
+
+    plt.plot(res_vx, np.linspace(-1.0, 1.0, lat_nz), label='Sailfish')
+    plt.plot(np.linspace(-1.0, 1.0, lat_nx), res_vz, label='Sailfish')
 
 
 def run_test(name):
@@ -81,7 +104,7 @@ def run_test(name):
     if not os.path.exists(basepath):
         os.makedirs(basepath)
 
-    ctrl = LBSimulationController(TestLDCSim, LDCGeometry)
+    ctrl = LBSimulationController(TestLDCSim, TestLDCGeometry)
     ctrl.run()
     horiz = np.loadtxt('ldc_golden/re400_horiz', skiprows=1)
     vert = np.loadtxt('ldc_golden/re400_vert', skiprows=1)
