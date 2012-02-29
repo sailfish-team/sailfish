@@ -551,9 +551,14 @@ def accel_vector(grid, grid_num):
     return ea
 
 def free_energy_external_force(sim, grid_num=0):
+    """Creates expressions for the external body force term in the free-energy model.
+
+    This implements the external force as in Eq. 2.13 from Halim Kusumaatmaja's PhD
+    thesis ("Lattice Boltzmann Studies of Wetting and Spreading on Patterned Surfaces").
+    """
     grid = sim.grid
-    # TODO: verify is this needs to be an accel or force vector;
-    # add references
+    # TODO: rename this; it's actually a force vector, not an acceleration
+    # vector
     ea = accel_vector(grid, grid_num)
     ret = []
     sum_ = 0
@@ -568,10 +573,7 @@ def free_energy_external_force(sim, grid_num=0):
         rho = S.phi
 
     for i, ei in enumerate(grid.basis[1:]):
-#        t = S.wi[i] * (ea.dot(ei) * (1 + 3 * ei.dot(grid.v)) - ea.dot(grid.v)) * (1 - 1 / (2 * tau0))
-        t = S.wi[i] * (ea.dot(ei) + Rational(3,2) * (ei.dot(grid.v) * ei.dot(ea) * 2 - Rational(1,3) * ea.dot(grid.v) *
-            2))
-        #* (1 - 1 / (2 * tau0))
+        t = S.wi[i] * (ea.dot(ei) * (1 + 3 * ei.dot(grid.v)) - ea.dot(grid.v))
         sum_ += t
         ret.append((t, grid.idx_name[i+1]))
 
@@ -623,13 +625,7 @@ def bgk_external_force_pref(grid_num=0):
 
     # FIXME
     rho = getattr(S, 'g%sm0' % grid_num)
-
-    if grid_num == 0:
-        rho = 'rho'
-    else:
-        rho = 'phi'
-
-    return '%s * (3.0f - 3.0f/(2.0f * tau%s))' % (rho, grid_num)
+    return '(3.0f - 3.0f/(2.0f * tau%s))' % grid_num
 
 def bb_swap_pairs(grid):
     """Get a set of indices which have to be swapped for a full bounce-back."""
