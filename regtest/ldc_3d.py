@@ -9,21 +9,19 @@ import os
 import shutil
 import tempfile
 
-<<<<<<< HEAD
-from examples.lbm_ldc_multi_3d import LDCBlock, LDCSim
-=======
-from examples.ldc_3d import LDCGeometry, LDCBlock, LDCSim
+from examples.ldc_3d import LDCBlock, LDCSim
 from sailfish import io
->>>>>>> upstream/multigpu
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry3D
 from sailfish.geo_block import SubdomainSpec3D
 
+from utils.merge_subdomains import merge_subdomains
+
 tmpdir = tempfile.mkdtemp()
-MAX_ITERS = 100
-LAT_NX = 164
-LAT_NY = 164
-LAT_NZ = 164
+MAX_ITERS = 100000
+LAT_NX = 256
+LAT_NY = 256
+LAT_NZ = 256
 BLOCKS = 1
 output = ''
 
@@ -66,13 +64,9 @@ class TestLDCSim(LDCSim):
         config.every = config.max_iters
 
         # Protection in the event of max_iters changes from the command line.
-        global MAX_ITERS, BLOCKS, LAT_NX, LAT_NY, LAT_NZ
+        global MAX_ITERS, BLOCKS
         MAX_ITERS = config.max_iters
         BLOCKS = config.blocks
-        LAT_NX = config.lat_nx
-        LAT_NY = config.lat_ny
-        LAT_NZ = config.lat_nz
-
 
     @classmethod
     def add_options(cls, group, dim):
@@ -81,40 +75,22 @@ class TestLDCSim(LDCSim):
 
 
 def save_output(basepath):
-<<<<<<< HEAD
-    name_digits = str(int(math.log10(MAX_ITERS)) + 1)
-    opt = ('%s_blk0_%0' + name_digits+ 'd'+'.npz') % (tmpdir+"/result", MAX_ITERS-1)
-    href = np.load(opt)
-    hrho = href['rho']     
-    vx = href['v'][0]
-    vy = href['v'][1]
-    vz = href['v'][2]
-=======
     res = np.load(io.filename(os.path.join(tmpdir, 'result'),
         io.filename_iter_digits(MAX_ITERS), 0, MAX_ITERS))
 
-    rho = res['rho']
+    merged = merge_subdomains(os.path.join(tmpdir, 'result'), 
+                    io.filename_iter_digits(MAX_ITERS), MAX_ITERS, save=False)
+    
+    rho = merged['rho']
     lat_nz, lat_ny, lat_nx = rho.shape
 
-    vx = res['v'][0]
-    vy = res['v'][1]
-    vz = res['v'][2]
->>>>>>> upstream/multigpu
-
-    for i in range(BLOCKS-1):
-        opt = ('%s_blk%s_' + '%0' + name_digits + 'd'+'.npz') % (tmpdir+"/result", str(i+1), MAX_ITERS-1)
-        href = np.load(opt)
-        hrho_p = href['rho']     
-        vx_p = href['v'][0]
-        vy_p = href['v'][1]
-        vz_p = href['v'][2]
-        vx = np.vstack([vx, vx_p])
-        vy = np.vstack([vy, vy_p])
-        vz = np.vstack([vz, vz_p])
-   
-    nxh = LAT_NX / 2
-    nyh = LAT_NY / 2
-    nzh = LAT_NZ / 2
+    vx = merged['v'][0]
+    vy = merged['v'][1]
+    vz = merged['v'][2]
+     
+    nxh = lat_nx / 2
+    nyh = lat_ny / 2
+    nzh = lat_nz / 2
 
     res_vx = (vx[:, nyh, nxh] + vx[:, nyh-1, nxh-1]) / 2 / LDCBlock.max_v
     res_vz = (vz[nzh, nyh, :] + vz[nzh-1, nyh-1, :]) / 2 / LDCBlock.max_v
@@ -122,10 +98,8 @@ def save_output(basepath):
     np.savetxt(os.path.join(basepath, 're400_vx.dat'), res_vx)
     np.savetxt(os.path.join(basepath, 're400_vz.dat'), res_vz)
 
-    plt.plot(res_vx, np.linspace(-1.0, 1.0, LAT_NZ), label='Sailfish')
-    plt.plot(np.linspace(-1.0, 1.0, LAT_NX), res_vz, label='Sailfish')
-
-
+    plt.plot(res_vx, np.linspace(-1.0, 1.0, lat_nz), label='Sailfish')
+    plt.plot(np.linspace(-1.0, 1.0, lat_nx), res_vz, label='Sailfish')
 
 
 def run_test(name):
@@ -133,7 +107,7 @@ def run_test(name):
     if not os.path.exists(basepath):
         os.makedirs(basepath)
 
-    ctrl = LBSimulationController(TestLDCSim, LDCGeometry)
+    ctrl = LBSimulationController(TestLDCSim, TestLDCGeometry)
     ctrl.run()
     horiz = np.loadtxt('ldc_golden/re400_horiz', skiprows=1)
     vert = np.loadtxt('ldc_golden/re400_vert', skiprows=1)

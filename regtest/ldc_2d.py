@@ -15,16 +15,13 @@ import os
 import shutil
 import tempfile
 
-<<<<<<< HEAD
-from examples.lbm_ldc_multi import LDCBlock, LDCSim
+from examples.ldc_2d import LDCBlock, LDCSim
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import SubdomainSpec2D
-=======
-from examples.ldc_2d import LDCGeometry, LDCBlock, LDCSim
-from sailfish.controller import LBSimulationController
 from sailfish import io
->>>>>>> upstream/multigpu
+
+from utils.merge_subdomains import merge_subdomains
 
 tmpdir = tempfile.mkdtemp()
 
@@ -40,7 +37,6 @@ reynolds = [1000, 2500, 5000, 7500, 10000, 12500, 15000, 17500, 20000, 21000]
 name = 'ldc2d'
 
 
-<<<<<<< HEAD
 class TestLDCGeometry(LBGeometry2D):
 
     def blocks(self, n=None):
@@ -58,11 +54,7 @@ class TestLDCGeometry(LBGeometry2D):
         return blocks
 
 
-
 class TestLDCSim(LDCSim):  
-=======
-class TestLDCSim(LDCSim):
->>>>>>> upstream/multigpu
 
     @classmethod
     def update_defaults(cls, defaults):
@@ -81,11 +73,10 @@ class TestLDCSim(LDCSim):
         config.every = config.max_iters
 
         # Protection in the event of max_iters changes from the command line.
-        global MAX_ITERS, BLOCKS, LAT_NX, LAT_NY
+        global MAX_ITERS, BLOCKS
         MAX_ITERS = config.max_iters
         BLOCKS = config.blocks
-        LAT_NX = config.lat_nx
-        LAT_NY = config.lat_ny
+
 
     @classmethod
     def add_options(cls, group, dim):
@@ -94,46 +85,36 @@ class TestLDCSim(LDCSim):
 
 
 def save_output(basepath):
-<<<<<<< HEAD
-    name_digits = str(int(math.log10(MAX_ITERS)) + 1)
-    opt = ('%s_blk0_%0' + name_digits+ 'd' + '.npz') % (os.path.join(tmpdir, 'result'), MAX_ITERS - 1)
-    href = np.load(opt)
-    hrho = href['rho']
-=======
     res = np.load(io.filename(os.path.join(tmpdir, 'result'),
         io.filename_iter_digits(MAX_ITERS), 0, MAX_ITERS))
+    
+    merged = merge_subdomains(os.path.join(tmpdir, 'result'), 
+                    io.filename_iter_digits(MAX_ITERS), MAX_ITERS, save=False)
 
-    rho = res['rho']
+    rho = merged['rho']
     lat_ny, lat_nx = rho.shape
->>>>>>> upstream/multigpu
 
-    vx = res['v'][0]
-    vy = res['v'][1]
+    vx = merged['v'][0]
+    vy = merged['v'][1]
 
-    for i in range(BLOCKS-1):
-        opt = ('%s_blk%s_' + '%0' + name_digits + 'd'+'.npz') % (tmpdir+
-					"/result", str(i+1), MAX_ITERS-1)
-        print opt
-        href = np.load(opt)
-        hrho_p = href['rho']     
-        vx_p = href['v'][0]
-        vy_p = href['v'][1]
-        vx = np.vstack([vx, vx_p])
-        vy = np.vstack([vy, vy_p])
-    nxh = LAT_NX / 2
-    nyh = LAT_NY / 2
+    #for i in range(BLOCKS-1):
+    #    opt = ('%s_blk%s_' + '%0' + name_digits + 'd'+'.npz') % (tmpdir+
+	#				"/result", str(i+1), MAX_ITERS-1)
+     #   print opt
+     #   href = np.load(opt)
+     #   hrho_p = href['rho']     
+     #   vx_p = href['v'][0]
+     #   vy_p = href['v'][1]
+      #  vx = np.vstack([vx, vx_p])
+     #   vy = np.vstack([vy, vy_p])
+    nxh = lat_nx / 2
+    nyh = lat_ny / 2
 
     res_vx = (vx[:, nxh] + vx[:, nxh-1]) / 2 / LDCBlock.max_v
     res_vy = (vy[nyh, :] + vy[nyh-1, :]) / 2 / LDCBlock.max_v
-<<<<<<< HEAD
-    
-    plt.plot(res_vx, np.linspace(-1.0, 1.0, LAT_NY), label='Sailfish')
-    plt.plot(np.linspace(-1.0, 1.0, LAT_NX), res_vy, label='Sailfish')
-=======
 
     plt.plot(res_vx, np.linspace(-1.0, 1.0, lat_ny), label='Sailfish')
     plt.plot(np.linspace(-1.0, 1.0, lat_nx), res_vy, label='Sailfish')
->>>>>>> upstream/multigpu
 
     np.savetxt(os.path.join(basepath, 'vx.dat'), res_vx)
     np.savetxt(os.path.join(basepath, 'vy.dat'), res_vy)
@@ -147,13 +128,8 @@ def run_test(name, i):
     basepath = os.path.join('results', name, 're%s' % RE)
     if not os.path.exists(basepath):
         os.makedirs(basepath)
-<<<<<<< HEAD
-    
-    ctrl = LBSimulationController(TestLDCSim, TestLDCGeometry)  
-=======
 
-    ctrl = LBSimulationController(TestLDCSim, LDCGeometry)
->>>>>>> upstream/multigpu
+    ctrl = LBSimulationController(TestLDCSim, TestLDCGeometry)  
     ctrl.run()
     horiz = np.loadtxt('ldc_golden/vx2d', skiprows=4)
     vert = np.loadtxt('ldc_golden/vy2d', skiprows=4)
@@ -176,6 +152,6 @@ def run_test(name, i):
     plt.show()
 
 
-for i in range(10):
+for i in range(1):
     run_test(name, i)
 shutil.rmtree(tmpdir)
