@@ -7,10 +7,11 @@ import unittest
 
 import numpy as np
 
+from sailfish import io
 from sailfish.geo import LBGeometry3D
 from sailfish.geo_block import SubdomainSpec3D, Subdomain3D
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFluidSim, LBForcedSim
+from sailfish.lb_single import LBFluidSim
 from sailfish.sym import D3Q19
 from regtest.blocks import util
 
@@ -50,7 +51,7 @@ periodic_x = False
 vi = lambda x, y, z: D3Q19.vec_idx([x, y, z])
 
 
-class SimulationTest(LBFluidSim, LBForcedSim):
+class SimulationTest(LBFluidSim):
     subdomain = BlockTest
 
     @classmethod
@@ -166,8 +167,9 @@ class TwoBlockPropagationTest(unittest.TestCase):
         ctrl = LBSimulationController(HorizTest, TwoBlocksXConnGeoTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
-        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
         self._verify(b0, b1, HorizTest)
 
     def test_vert_spread(self):
@@ -176,8 +178,9 @@ class TwoBlockPropagationTest(unittest.TestCase):
         ctrl = LBSimulationController(VertTest, TwoBlocksYConnGeoTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
-        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
         self._verify(b0, b1, VertTest)
 
     def test_depth_spread(self):
@@ -186,13 +189,14 @@ class TwoBlockPropagationTest(unittest.TestCase):
         ctrl = LBSimulationController(DepthTest, TwoBlocksZConnGeoTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'test_out_blk0_dist_dump1.npy'))
-        b1 = np.load(os.path.join(tmpdir, 'test_out_blk1_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
         self._verify(b0, b1, DepthTest)
 
 #############################################################################
 
-class PeriodicSimulationTest(LBFluidSim, LBForcedSim):
+class PeriodicSimulationTest(LBFluidSim):
     subdomain = BlockTest
 
     @classmethod
@@ -248,8 +252,9 @@ class PeriodicPropagationTest(unittest.TestCase):
         ctrl = LBSimulationController(PeriodicSimulationTest, TwoBlocksXConnGeoTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'per_horiz_out_blk0_dist_dump1.npy'))
-        b1 = np.load(os.path.join(tmpdir, 'per_horiz_out_blk1_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'per_horiz_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
 
         ae = np.testing.assert_equal
 
@@ -300,8 +305,9 @@ class PartialPeriodicPropagationTest(unittest.TestCase):
         ctrl = LBSimulationController(PartialPeriodicSimulationTest,
                 TwoBlocksXConnGeoTest).run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'per_horiz_out_blk0_dist_dump1.npy'))
-        b1 = np.load(os.path.join(tmpdir, 'per_horiz_out_blk1_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'per_horiz_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
 
         ae = np.testing.assert_equal
         ae(b1[vi(1, 1, 0), 32, 1, 1], np.float32(0.11))
@@ -321,7 +327,7 @@ class SingleBlockGeoTest(LBGeometry3D):
     def blocks(self, n=None):
         return [SubdomainSpec3D((0,0,0), (64, 62, 66))]
 
-class SingleBlockPeriodicSimulationTest(LBFluidSim, LBForcedSim):
+class SingleBlockPeriodicSimulationTest(LBFluidSim):
     subdomain = BlockTest
 
     @classmethod
@@ -386,7 +392,8 @@ class SingleBlockPeriodicTest(unittest.TestCase):
                 SingleBlockGeoTest)
         ctrl.run(ignore_cmdline=True)
 
-        b0 = np.load(os.path.join(tmpdir, 'per_single_out_blk0_dist_dump1.npy'))
+        output = os.path.join(tmpdir, 'per_single_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
         ae = np.testing.assert_equal
 
         ae(b0[vi(-1, 0, 0), 32, 32, 64], np.float32(0.11))

@@ -3,6 +3,7 @@
 %>
 
 <%namespace file="utils.mako" import="get_field_loc,get_field_off"/>
+<%namespace file="code_common.mako" import="cex"/>
 
 <%def name="sc_calculate_accel()">
 ##
@@ -27,9 +28,9 @@
 			// Self-interaction of a single component.
 			%else:
 				%if dim == 2:
-					shan_chen_accel_self(gi, gg${dists[0]}m0, ${dists[0]}, ${coupling_const}, sca${dists[0]}, gx, gy);
+					shan_chen_accel_self(gi, gg${dists[0]}m0, ${coupling_const}, sca${dists[0]}, gx, gy);
 				%else:
-					shan_chen_accel_self(gi, gg${dists[0]}m0, ${dists[0]}, ${coupling_const}, sca${dists[0]}, gx, gy, gz);
+					shan_chen_accel_self(gi, gg${dists[0]}m0, ${coupling_const}, sca${dists[0]}, gx, gy, gz);
 				%endif
 			%endif
 		%endfor
@@ -64,7 +65,7 @@
 ${device_func} inline float sc_ppot(${global_ptr} float *field, int gi)
 {
 	float lfield = field[gi];
-	return ${sym.SHAN_CHEN_POTENTIALS[sc_potential]('lfield')};
+	return ${cex(sym.SHAN_CHEN_POTENTIALS[sc_potential]('lfield'))};
 }
 
 // Calculates the Shan-Chen force between a single fluid component (self-interaction).

@@ -13,6 +13,7 @@ using namespace cvmlcpp;
 using namespace std;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 // Outputs VTK 3.0 UNSTRUCTURED_GRID.
 void outputVTK(Matrix<char, 3u> &voxels, const char* filename, float length)
@@ -44,6 +45,8 @@ void outputVTK(Matrix<char, 3u> &voxels, const char* filename, float length)
 // TODO: use the 'pad' option in voxelize to generate an additional layer of
 // nodes outside of the object being voxelizer
 //
+=======
+>>>>>>> upstream/multigpu
 // TODO: tranform this program into a Python module so that STL geometry can
 // be used to directly initialize a simulation
 //
@@ -55,24 +58,31 @@ int main(int argc, char **argv)
 	Matrix<char, 3u> voxels;
 	Geometry<float> geometry;
 
-	double resolution = 0.0003;
+	double voxel_size = 1.0 / 200.0;;
 
 	if (argc < 2) {
-		cerr << "You need to specify an STL file to voxelize." << endl;
+		cerr << "Usage: ./voxelizer <STL file> [voxel_size]" << endl;
 		return -1;
 	}
 
 	if (argc >= 3) {
-		resolution = atof(argv[2]);
+		voxel_size = atof(argv[2]);
 	}
 
 	readSTL(geometry, argv[1]);
 
-	voxelize(geometry, voxels, resolution);
-	std::cout << voxels.size() << std::endl;
+	geometry.scaleTo(1.0);
+	std::cout << "Bounding box: "
+	       << geometry.max(0) - geometry.min(0) << " "
+	       << geometry.max(1) - geometry.min(1) << " "
+	       << geometry.max(2) - geometry.min(2) << std::endl;
+
+	voxelize(geometry, voxels, voxel_size, 1 /* pad */, (char)0 /* inside */, (char)1 /*outside */);
+	std::cout << "Total nodes: " << voxels.size() << std::endl;
 
 	const std::size_t *ext = voxels.extents();
-	std::cout << ext[0] << " " << ext[1] << " " << ext[2] << std::endl;
+	std::cout << "Lattice size: " << ext[0] << " " << ext[1]
+		<< " " << ext[2] << std::endl;
 
 	std::ofstream out("output.npy");
 	out << "\x93NUMPY\x01";
@@ -92,8 +102,6 @@ int main(int argc, char **argv)
 	}
 	buf[len+i] = 0x0;
 	dlen -= 10;
-
-	std::cout << dlen << std::endl;
 
 	out.write((char*)&dlen, 2);
 	out << buf;

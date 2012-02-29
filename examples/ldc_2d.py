@@ -68,7 +68,7 @@ class LDCBlock(Subdomain2D):
         sim.vx[hy == self.gy-1] = self.max_v
 
 
-class LDCSim(LBFluidSim, LBForcedSim):
+class LDCSim(LBFluidSim):
     subdomain = LDCBlock
 
     @classmethod
@@ -80,7 +80,6 @@ class LDCSim(LBFluidSim, LBForcedSim):
     @classmethod
     def add_options(cls, group, dim):
         LBFluidSim.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
 
         group.add_argument('--blocks', type=int, default=1, help='number of blocks to use')
 

@@ -1,31 +1,31 @@
 #!/usr/bin/python -u
 
+"""Phase separation in the single fluid Shan-Chen model.
+
+This test runs a phase separation simulation with multiple values of the
+Shan-Chen coupling constant and verifies that spontaneous spinodal
+decomposition takes place around G = 4.0.
+"""
+
+import argparse
 import os
-import sys
-import numpy
-import math
+import shutil
+import tempfile
+
 import matplotlib
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
+import numpy as np
 
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
 
-from sailfish import geo
-from sailfish import sym
+from examples.sc_phase_separation import SCSim
+from sailfish.geo import LBGeometry2D
+from sailfish.controller import LBSimulationController
 
-MAX_ITERS = 100000
 POINTS = 26 * 3 + 1
 
-defaults = {
-        'batch': True,
-        'quiet': True,
-        'verbose': False,
-        'every': 1000,
-    }
 
 def run_test(name, precision):
-    xvec = []
     minvec = []
     maxvec = []
     ordvec = []
@@ -34,25 +34,33 @@ def run_test(name, precision):
     if not os.path.exists(basepath):
         os.makedirs(basepath)
 
+    xvec = np.linspace(3, 5.6, num=POINTS)
     f = open(os.path.join(basepath, '%s.dat' % precision), 'w')
+    output = os.path.join(tmpdir, 'phase_sep')
 
-    for g in numpy.linspace(3, 5.6, num=POINTS):
+    for g in xvec:
+        print ' {0}'.format(g),
+        defaults = {
+                'quiet': True,
+                'verbose': False,
+                'every': 1000,
+                'max_iters': 100000,
+                'output': output,
+                'G': g,
+            }
 
-        print '%f ' % g,
+        LBSimulationController(SCSim, LBGeometry2D,
+                default_config=defaults).run(ignore_cmdline=True)
 
-        xvec.append(g)
+        data = np.load('{0}_blk0_{1}.npz'.format(output, 100000))
+        rho = data['rho']
+        avg = np.average(rho)
+        order = np.sqrt(np.average(np.square(rho - avg))) / avg
 
-        defaults['G'] = g
-        defaults['max_iters'] = MAX_ITERS
-
-        sim = SCSim(GeoSC, defaults)
-        sim.run()
-
-        minvec.append(sim._stats[0])
-        maxvec.append(sim._stats[1])
-        ordvec.append(sim._stats[2])
-
-        print >>f, g, sim._stats[0], sim._stats[1], sim._stats[2]
+        minvec.append(np.min(rho))
+        maxvec.append(np.max(rho))
+        ordvec.append(order)
+        print >>f, g, minvec[-1], maxvec[-1], ordvec[-1]
 
     print
 
@@ -73,9 +81,11 @@ def run_test(name, precision):
     plt.legend(loc='upper left')
     plt.savefig(os.path.join(basepath, '%s.pdf' % precision), format='pdf')
 
-parser = OptionParser()
-parser.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
-(options, args) = parser.parse_args()
 
-from examples.sc_phase_separation import SCSim, GeoSC
-run_test('sc_phase_separation', options.precision)
+parser = argparse.ArgumentParser()
+parser.add_argument('--precision', type=str, default='single',
+        choices=['single', 'double'])
+args, remaining = parser.parse_known_args()
+tmpdir = tempfile.mkdtemp()
+run_test('sc_phase_separation', args.precision)
+shutil.rmtree(tmpdir)

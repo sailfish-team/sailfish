@@ -1,10 +1,10 @@
 Running simulations
 ===================
 
-In this section, we show how to create a simple Lattice-Boltzmann simulation 
+In this section, we show how to create a simple Lattice-Boltzmann simulation
 using Sailfish.
 To keep things simple, we stick to two dimensions and use the lid-driven cavity
-example, which is one of the standard test cases in computational fluid 
+example, which is one of the standard test cases in computational fluid
 dynamics.
 
 The program outline
@@ -17,28 +17,28 @@ and :mod:`geo` Sailfish modules::
 
 The :mod:`controller` module contains a class which will drive our simulation
 described in the :class:`LDCSim` class based on :mod:`lb_single` module.
-The :mod:`geo_block` module contains classes used to describe the geometry of the 
+The :mod:`geo_block` module contains classes used to describe the geometry of the
 simulation and is used to define the boundary and initial conditions. The last
 module :mod:`geo` determines the decompositon of the simulation area into subdomains.
-    
+
 Each single fluid Sailfish simulation is represented by a class derived
-from :class:`lb_single.LBFluidSim` and :class:`lb_single.LBForcedSim`. 
+from :class:`lb_single.LBFluidSim`.
 In the simplest case, we just have to define a subdomain class::
-	
-    class LDCSim(LBFluidSim, LBForcedSim):
-	subdomain = LDCBlock
+
+    class LDCSim(LBFluidSim):
+        subdomain = LDCBlock
 
 :class:`LDCBlock` is a required class, derived from :class:`Subdomain2D`
 or :class:`Subdomain3D` from the :mod:`geo_block` module, depending on the
-dimensionality of the problem at hand. In our present case, we will use the 
-former one. This class represents the geometry of the simulation. 
+dimensionality of the problem at hand. In our present case, we will use the
+former one. This class represents the geometry of the simulation.
 
 In :class:`LDCSim` class we can define the default parameter values and
 additional command line arguments. To change the default parameters we have to
 create the classmethod ``update_defaults`` where we update the ``defaults``
 dictionary with the proper values of selected parameters. In our case we have to
 change the size along the X axis (``lat_nx``) and the size along the Y axis
-(``lat_ny``). This method is called before the class is instantiated.
+(``lat_ny``). This method is called before the class is instantiated::
 
     @classmethod
     def update_defaults(cls, defaults):
@@ -58,12 +58,11 @@ methods in superclasses. After that we can add our options::
     @classmethod
     def add_options(cls, group, dim):
         LBFluidSim.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
         group.add_argument('--blocks', type=int, default=1, help='number of blocks to use')
 
-Class :class:`LDCBlock` describes the simulation geometry and inherits from 
+Class :class:`LDCBlock` describes the simulation geometry and inherits from
 :class:`Subdomain2D`. The derived geometry class needs to define at least the
-following two methods: ``bondary_conditions`` and ``initial_conditions``. 
+following two methods: ``bondary_conditions`` and ``initial_conditions``.
 
 ``boundary_conditions`` is used to set the type of each node in the simulation
 domain. The function takes two arguments: ``hx`` and ``hy``, which are NumPy
@@ -74,17 +73,17 @@ known when the geometry class is instantiated and can be accessed via its
 attributes ``gx`` (size along the X axis) and ``gy`` (size along the Y axis).
 
 By default, the whole domain is initialized as fluid nodes. To define the
-geometry, we need to redefine some of the nodes using the 
+geometry, we need to redefine some of the nodes using the
 :const:`geo_block.Subdomain.NODE_WALL`, :const:`geo_block.Subdomain.NODE_VELOCITY`
-or :const:`geo_block.Subdomain.NODE_PRESSURE` class constants. 
+or :const:`geo_block.Subdomain.NODE_PRESSURE` class constants.
 :const:`geo_block.Subdomain.NODE_WALL` represents a no-slip condition at a
-stationary domain boundary. :const:`geo_block.Subdomain.NODE_VELOCITY` and 
+stationary domain boundary. :const:`geo_block.Subdomain.NODE_VELOCITY` and
 :const:`geo_block.Subdomain.NODE_PRESSURE` represent a boundary condition with
 specified velocity or pressure, respectively. To redefine the nodes, we will use
 the ``set_node(location, type, data)`` function. Here, ``location`` is a NumPy
-Boolean array. As for the remaining arguments of ``set_node``, ``type`` is one 
+Boolean array. As for the remaining arguments of ``set_node``, ``type`` is one
 of the class constants discussed above, and data is an optional argument used to
-specify the imposed velocity or pressure. 
+specify the imposed velocity or pressure.
 
 In the lid-driven cavity (LDC) geometry, we consider a rectangular box, open at
 the top where the fluid flows horizontally with some predefined velocity. We
@@ -101,26 +100,26 @@ therefore write our function as follows::
 Now that we have the geometry out of the way, we can deal with the initial
 conditions. This is done in the ``initial_conditions`` function, which is
 responsible for setting the initial particle distributions in all nodes in the
-simulation domain. The function takes three arguments: ``hx``, ``hy`` and 
+simulation domain. The function takes three arguments: ``hx``, ``hy`` and
 ``sim``. ``Sim`` is the reference to simulation object.
 
 The way of specifying initial conditions is to provide the values of macroscopic
-variables (density, velocity) everywhere in the simulation domain, and let the 
+variables (density, velocity) everywhere in the simulation domain, and let the
 GPU calculate the equilibrium distributions.
 
-In our LDC geometry, we set the velocity of the fluid everywhere to be 0 (this 
-is the default value so we do not have to specify this explicitly), except for 
+In our LDC geometry, we set the velocity of the fluid everywhere to be 0 (this
+is the default value so we do not have to specify this explicitly), except for
 the first row at the top, where we set the fluid to have ``max_v`` velocity
 in the horizontal direction. It is important to always use an index expression
-when assigning to sim.rho or vx, etc. 
+when assigning to sim.rho or vx, etc.
 
     def initial_conditions(self, sim, hx, hy):
         sim.rho[:] = 1.0
         sim.vx[hy == self.gy-1] = self.max_v
 
 At this point, we are almost good to go. The only remaining thing to do is to
-instantiate the :class:`LBSimulationController` class from the :mod:'controller' 
-module with two parameters: :class:`LDCSim` and :class:`LBGeometry2D` classes. The 
+instantiate the :class:`LBSimulationController` class from the :mod:'controller'
+module with two parameters: :class:`LDCSim` and :class:`LBGeometry2D` classes. The
 :class:`LBGeometry2D` class comes from the :mod:`geo` module. When we want to
 create more specific decomposition of the domain into subdomains we can create a
 class derived from that one. Now we only have to run the simulation::
@@ -140,8 +139,8 @@ selected ones is automatically removed).  The generated code is then compiled on
 fly by the :mod:`pyopencl` or :mod:`pycuda` modules into a binary which is executed on the GPU.
 
 The template for the compute unit source is contained in the ``.mako`` files in the ``templates``
-directory of the :mod:`sailfish` module.  It is written in a mix of Python, Mako and CUDA C.  
-Parts of the code that end up in GPU functions are also generated by the :mod:`sym` module.  
+directory of the :mod:`sailfish` module.  It is written in a mix of Python, Mako and CUDA C.
+Parts of the code that end up in GPU functions are also generated by the :mod:`sym` module.
 This module contains functions which return SymPy expressions, which are then converted to C code.
 The use of :mod:`sympy` makes it possible to write large parts of the code in a grid-independent form, which
 is then automatically expanded when the GPU code is generated.

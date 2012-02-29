@@ -3,14 +3,18 @@
 import numpy as np
 import matplotlib
 
-import math
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
 import os
 import shutil
 import tempfile
 
+<<<<<<< HEAD
 from examples.lbm_ldc_multi_3d import LDCBlock, LDCSim
+=======
+from examples.ldc_3d import LDCGeometry, LDCBlock, LDCSim
+from sailfish import io
+>>>>>>> upstream/multigpu
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry3D
 from sailfish.geo_block import SubdomainSpec3D
@@ -59,7 +63,7 @@ class TestLDCSim(LDCSim):
     @classmethod
     def modify_config(cls, config):
         config.visc = (config.lat_nx-2) * LDCBlock.max_v / config.re
-        config.every = config.max_iters - 1
+        config.every = config.max_iters
 
         # Protection in the event of max_iters changes from the command line.
         global MAX_ITERS, BLOCKS, LAT_NX, LAT_NY, LAT_NZ
@@ -77,6 +81,7 @@ class TestLDCSim(LDCSim):
 
 
 def save_output(basepath):
+<<<<<<< HEAD
     name_digits = str(int(math.log10(MAX_ITERS)) + 1)
     opt = ('%s_blk0_%0' + name_digits+ 'd'+'.npz') % (tmpdir+"/result", MAX_ITERS-1)
     href = np.load(opt)
@@ -84,6 +89,17 @@ def save_output(basepath):
     vx = href['v'][0]
     vy = href['v'][1]
     vz = href['v'][2]
+=======
+    res = np.load(io.filename(os.path.join(tmpdir, 'result'),
+        io.filename_iter_digits(MAX_ITERS), 0, MAX_ITERS))
+
+    rho = res['rho']
+    lat_nz, lat_ny, lat_nx = rho.shape
+
+    vx = res['v'][0]
+    vy = res['v'][1]
+    vz = res['v'][2]
+>>>>>>> upstream/multigpu
 
     for i in range(BLOCKS-1):
         opt = ('%s_blk%s_' + '%0' + name_digits + 'd'+'.npz') % (tmpdir+"/result", str(i+1), MAX_ITERS-1)

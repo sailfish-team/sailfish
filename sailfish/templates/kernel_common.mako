@@ -296,16 +296,6 @@
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 
-%if precision == 'double':
-${device_func} inline double get_img_field(texture<int2, 2> t, int x, int y)
-{
-	int2 v = tex2D(t, x, y);
-	return __hiloint2double(v.y, v.x);
-}
-%else:
-#define get_img_field(t, x, y) tex2D(t, x, y)
-%endif
-
 ${opencl_compat.body()}
 <%include file="geo_helpers.mako"/>
 ${boundary.body()}

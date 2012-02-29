@@ -1,26 +1,30 @@
-#!/usr/bin/python 
+#!/usr/bin/python
 
-"""Compares Sailfish results for the 2D lid driven cavity test case with 
-numerical results from the literature. Numerical solutions of 2-D steady 
+"""Compares Sailfish results for the 2D lid driven cavity test case with
+numerical results from the literature. Numerical solutions of 2-D steady
 incompressible driven cavity ow at high Reynolds numbers E. Erturk; T. C. Corke
-and C. Gokcol with numerical calculation of Navier-Stokes equations;  
+and C. Gokcol with numerical calculation of Navier-Stokes equations;
 grid size: 601X601 """
 
 import numpy as np
 import matplotlib
 
-import math
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
-from optparse import OptionParser
 import os
 import shutil
 import tempfile
 
+<<<<<<< HEAD
 from examples.lbm_ldc_multi import LDCBlock, LDCSim
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry2D
 from sailfish.geo_block import SubdomainSpec2D
+=======
+from examples.ldc_2d import LDCGeometry, LDCBlock, LDCSim
+from sailfish.controller import LBSimulationController
+from sailfish import io
+>>>>>>> upstream/multigpu
 
 tmpdir = tempfile.mkdtemp()
 
@@ -36,6 +40,7 @@ reynolds = [1000, 2500, 5000, 7500, 10000, 12500, 15000, 17500, 20000, 21000]
 name = 'ldc2d'
 
 
+<<<<<<< HEAD
 class TestLDCGeometry(LBGeometry2D):
 
     def blocks(self, n=None):
@@ -55,6 +60,9 @@ class TestLDCGeometry(LBGeometry2D):
 
 
 class TestLDCSim(LDCSim):  
+=======
+class TestLDCSim(LDCSim):
+>>>>>>> upstream/multigpu
 
     @classmethod
     def update_defaults(cls, defaults):
@@ -64,14 +72,14 @@ class TestLDCSim(LDCSim):
             'max_iters': MAX_ITERS,
             'lat_nx': LAT_NX,
             'lat_ny': LAT_NY,
-            'output': os.path.join(tmpdir, 'result')})        
-	
+            'output': os.path.join(tmpdir, 'result')})
+
     @classmethod
     def modify_config(cls, config):
         print config.re
         config.visc = (config.lat_nx - 2) * LDCBlock.max_v / config.re
-        config.every = config.max_iters - 1
-	
+        config.every = config.max_iters
+
         # Protection in the event of max_iters changes from the command line.
         global MAX_ITERS, BLOCKS, LAT_NX, LAT_NY
         MAX_ITERS = config.max_iters
@@ -86,13 +94,21 @@ class TestLDCSim(LDCSim):
 
 
 def save_output(basepath):
+<<<<<<< HEAD
     name_digits = str(int(math.log10(MAX_ITERS)) + 1)
     opt = ('%s_blk0_%0' + name_digits+ 'd' + '.npz') % (os.path.join(tmpdir, 'result'), MAX_ITERS - 1)
     href = np.load(opt)
     hrho = href['rho']
+=======
+    res = np.load(io.filename(os.path.join(tmpdir, 'result'),
+        io.filename_iter_digits(MAX_ITERS), 0, MAX_ITERS))
 
-    vx = href['v'][0]
-    vy = href['v'][1]
+    rho = res['rho']
+    lat_ny, lat_nx = rho.shape
+>>>>>>> upstream/multigpu
+
+    vx = res['v'][0]
+    vy = res['v'][1]
 
     for i in range(BLOCKS-1):
         opt = ('%s_blk%s_' + '%0' + name_digits + 'd'+'.npz') % (tmpdir+
@@ -109,28 +125,39 @@ def save_output(basepath):
 
     res_vx = (vx[:, nxh] + vx[:, nxh-1]) / 2 / LDCBlock.max_v
     res_vy = (vy[nyh, :] + vy[nyh-1, :]) / 2 / LDCBlock.max_v
+<<<<<<< HEAD
     
     plt.plot(res_vx, np.linspace(-1.0, 1.0, LAT_NY), label='Sailfish')
     plt.plot(np.linspace(-1.0, 1.0, LAT_NX), res_vy, label='Sailfish')
+=======
+
+    plt.plot(res_vx, np.linspace(-1.0, 1.0, lat_ny), label='Sailfish')
+    plt.plot(np.linspace(-1.0, 1.0, lat_nx), res_vy, label='Sailfish')
+>>>>>>> upstream/multigpu
 
     np.savetxt(os.path.join(basepath, 'vx.dat'), res_vx)
     np.savetxt(os.path.join(basepath, 'vy.dat'), res_vy)
 
-		
-def run_test(name, i):   
-    global RE 
+
+def run_test(name, i):
+    global RE
     RE = reynolds[i]
     global MAX_ITERS
     MAX_ITERS = max_iters[i]
     basepath = os.path.join('results', name, 're%s' % RE)
     if not os.path.exists(basepath):
         os.makedirs(basepath)
+<<<<<<< HEAD
     
     ctrl = LBSimulationController(TestLDCSim, TestLDCGeometry)  
+=======
+
+    ctrl = LBSimulationController(TestLDCSim, LDCGeometry)
+>>>>>>> upstream/multigpu
     ctrl.run()
     horiz = np.loadtxt('ldc_golden/vx2d', skiprows=4)
     vert = np.loadtxt('ldc_golden/vy2d', skiprows=4)
-    
+
     plt.plot(horiz[:, 0] * 2 - 1, horiz[:, i+1], label='Paper')
     plt.plot(vert[:, i+1], 2 * (vert[:, 0] - 0.5), label='Paper')
     save_output(basepath)
@@ -143,12 +170,12 @@ def run_test(name, i):
     plt.title('Lid Driven Cavity, Re = %s' % RE)
     print os.path.join(basepath, 'results.pdf')
     plt.savefig(os.path.join(basepath, 'results.pdf'), format='pdf')
-	
+
     plt.clf()
     plt.cla()
     plt.show()
-    
- 
+
+
 for i in range(10):
     run_test(name, i)
 shutil.rmtree(tmpdir)

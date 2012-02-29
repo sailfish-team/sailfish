@@ -4,7 +4,7 @@ import numpy as np
 from sailfish.geo import LBGeometry3D
 from sailfish.geo_block import SubdomainSpec3D, Subdomain3D
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFluidSim, LBForcedSim
+from sailfish.lb_single import LBFluidSim
 
 
 class LDCGeometry(LBGeometry3D):
@@ -61,7 +61,7 @@ class LDCBlock(Subdomain3D):
         sim.vx[hz == self.gz-1] = self.max_v
 
 
-class LDCSim(LBFluidSim, LBForcedSim):
+class LDCSim(LBFluidSim):
     subdomain = LDCBlock
 
     @classmethod
@@ -75,7 +75,6 @@ class LDCSim(LBFluidSim, LBForcedSim):
     @classmethod
     def add_options(cls, group, dim):
         LBFluidSim.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
 
         group.add_argument('--blocks', type=int, default=1, help='number of blocks to use')
 

@@ -21,6 +21,7 @@ except ImportError:
 from sympy.printing.ccode import CCodePrinter
 from sympy.printing.precedence import precedence
 import re
+from mako.runtime import Undefined
 
 TargetDist = namedtuple('TargetDist', 'var idx')
 
@@ -1011,6 +1012,8 @@ class KernelCodePrinter(CCodePrinter):
     def _print_Function(self, expr):
         if expr.func.__name__ == 'log':
             return 'logf(%s)' % self.stringify(expr.args, ', ')
+        elif expr.func.__name__ == 'exp':
+            return 'expf(%s)' % self.stringify(expr.args, ', ')
         else:
             return super(KernelCodePrinter, self)._print_Function(expr)
 
@@ -1081,6 +1084,8 @@ def needs_coupling_accel(i, force_couplings):
     :param i: grid ID
     :param force_couplings: see fluid_accel()
     """
+    if type(force_couplings) is Undefined:
+        return False
     return (i in
         reduce(lambda x, y: operator.add(x, [y[0], y[1]]), force_couplings.keys(), []))
 
@@ -1091,6 +1096,9 @@ def needs_accel(i, forces, force_couplings):
     :param forces: see fluid_accel()
     :param force_couplings: see fluid_accel()
     """
+    if type(forces) is Undefined:
+        return False
+
     return (i in forces) or needs_coupling_accel(i, force_couplings)
 
 def fluid_accel(sim, i, axis, forces, force_couplings):
@@ -1103,7 +1111,7 @@ def fluid_accel(sim, i, axis, forces, force_couplings):
     :param force_couplings: dict mapping pairs of grid IDs to the name of a
         Shan-Chen coupling constant
     """
-    if needs_accel(i, forces, force_couplings):
+    if forces is not Undefined and needs_accel(i, forces, force_couplings):
         ea = accel_vector(sim.grid, i)
         return ea[axis]
     else:
