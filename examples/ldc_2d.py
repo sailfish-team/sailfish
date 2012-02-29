@@ -36,13 +36,15 @@ class LDCGeometry(LBGeometry2D):
 
         for i in range(0, bps):
             xsize = xq
-            if i == bps:
+            if i == bps - 1:
                 xsize += xdiff
+		print "A jednak:"
 
             for j in range(0, bps):
                 ysize = yq
-                if j == bps:
+                if j == bps - 1:
                     ysize += ydiff
+		    print "A jednak:"
 
                 blocks.append(SubdomainSpec2D((i * xq, j * yq), (xsize, ysize)))
 

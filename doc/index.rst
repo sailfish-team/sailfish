@@ -19,7 +19,7 @@ To illustrate how easy it is to create simulations using the Sailfish package,
 here is a simple example code to simulate fluid flow in a lid-driven cavity::
 
     import numpy as np
-    from sailfish import geo, lbm
+    from sailfish import geo, lb_single
 
     class LBMGeoLDC(geo.LBMGeo2D):
         max_v = 0.1
@@ -32,14 +32,14 @@ here is a simple example code to simulate fluid flow in a lid-driven cavity::
             self.set_geo(hy == self.lat_ny-1, self.NODE_VELOCITY, (self.max_v, 0.0))
             self.set_geo(wall_map, self.NODE_WALL)
 
-        def init_dist(self, dist):
+        def init_fields(self, dist):
             hy, hx = np.mgrid[0:self.lat_ny, 0:self.lat_nx]
 
             self.sim.ic_fields = True
             self.sim.rho[:] = 1.0
             self.sim.vx[hy == self.lat_ny-1] = self.max_v
 
-    class LDCSim(lbm.FluidLBMSim):
+    class LDCSim(lb_single.FluidLBMSim):
         pass
 
     if __name__ == '__main__':

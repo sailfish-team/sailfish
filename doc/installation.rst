@@ -7,7 +7,7 @@ installed on the host system.  These are as follows (minimal required versions a
 
 General requirements:
 
-* numpy-1.3.0
+* numpy-1.6.0
 * sympy-0.6.5
 * mako-0.2.5
 * execnet-1.0.9
@@ -20,7 +20,7 @@ General requirements:
 
 Visualization (optional):
 
-* pygame (for 2D/3D)
+* pygame, scipy (for 2D/3D)
 * mayavi (for 3D)
 
 Data output (optional):
@@ -57,37 +57,52 @@ To install the required packages on a Gentoo system::
 You can also replace ``pycuda`` with ``pyopencl`` if you wish to use the OpenCL backend
 in Sailfish.
 
+CUDA 4.0 requires GCC 4.4 or older.  If you are using GCC 4.5+ as the main compiler on
+your system, you can still run Sailfish simulations without changing any global settings
+by adding::
+
+  --cuda-nvcc-opts="-ccbin /usr/x86_64-pc-linux-gnu/gcc-bin/4.4.6/"
+
+when calling the simulation (replace 4.4.6 with the actual version of the GCC installed
+on your system and use ``i686`` instead of ``x86_64`` if you are on a 32-bit machine).
+
 Ubuntu installation instructions
 --------------------------------
 
+These instructions assume that you want to use the CUDA backend.  Before installing following them,
+please make sure the NVIDIA CUDA Toolkit is installed in ``/usr/local/cuda`` (default location) and
+that ``nvcc`` is in your ``$PATH``.  You can get the necessary files at http://nvidia.com/cuda.
+
 To install the required packages on an Ubuntu system::
 
-  apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-tables python-scipy python-mako python-decorator
-  apt-get install git-core python-setuptools libboost-dev
-  git clone git://github.com/sympy/sympy
-  git clone http://git.tiker.net/trees/pytools.git
+  apt-get install gcc-4.4 g++-4.4 python-pygame mayavi2 python-matplotlib python-numpy python-tables python-scipy python-sympy
+  apt-get install python-mako python-decorator python-pytools  build-essential python-dev python-setuptools libboost-python-dev libboost-thread-dev
+  apt-get install git-core
   git clone http://git.tiker.net/trees/pycuda.git
-  cd pytools
-  python setup.py build
-  python setup.py install
-  cd ../sympy
-  python setup.py build
-  python setup.py install
-  cd ../pycuda
-  /configure.py --boost-python-libname=boost_python-mt-py26 --boost-thread-libname=boost_thread-mt --cuda-root=/usr/local/cuda
-  python setup.py build
+  cd pycuda
+  git submodule init
+  git submodule update
+  ./configure.py --cuda-root=/usr/local/cuda --cudadrv-lib-dir=/usr/local/cuda/lib64 --boost-inc-dir=/usr/include --boost-lib-dir=/usr/lib --boost-python-libname=boost_python-mt --boost-thread-libname=boost_thread-mt
+  make -j4
   python setup.py install
 
-There are currently no (recent enough) packages for SymPy and PyCUDA/PyOpenCL available for
+For 32-bit systems please change ``/usr/local/cuda/lib64`` to ``/usr/local/cuda/lib``.
+
+There are currently no packages for PyCUDA/PyOpenCL available for
 Ubuntu, so these have to be installed manually from a checked-out upstream code repository of
-these projects or a snapshot tarball.
+these projects or a snapshot tarball (as illustrated above for PyCUDA).  If this method does not
+work for you, please refer to http://wiki.tiker.net/PyCuda/Installation/Linux/Ubuntu for further
+instructions about installing PyCUDA on Ubuntu.
 
 Please also note that the NumPy version provided in Ubuntu releases older than Karmic is not
 recent enough for Sailfish.
 
-The example listed above assumes that you want to use the CUDA backend.  Before installing pycuda,
-please make sure the NVIDIA CUDA Toolkit is installed in ``/usr/local/cuda``.  You can get the
-necessary files at http://nvidia.com/cuda.
+When running Sailfish simulations, you can use::
+
+  --cuda-nvcc-opts="--compiler-bindir=/usr/bin/gcc-4.4"
+
+to avoid compatibility problems with the CUDA compiler, which as of CUDA 4.0 only supports GCC 4.4 and older.
+
 
 Mac OS X installation instructions (Mac Ports)
 ----------------------------------------------
