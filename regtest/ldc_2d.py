@@ -152,6 +152,6 @@ def run_test(name, i):
     plt.show()
 
 
-for i in range(1):
+for i in range(10):
     run_test(name, i)
 shutil.rmtree(tmpdir)
