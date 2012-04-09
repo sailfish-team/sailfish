@@ -553,7 +553,7 @@ def accel_vector(grid, grid_num):
 
 def free_energy_external_force(sim, grid_num=0):
     grid = sim.grid
-    # TODO: verify is this needs to be an accel or force vector;
+    # TODO: verify if this needs to be an accel or force vector;
     # add references
     ea = accel_vector(grid, grid_num)
     ret = []
@@ -608,21 +608,17 @@ def bgk_external_force(grid, grid_num=0):
     """
     pref = Symbol('pref')
 
-    # FIXME: this is misguiding, as it is actually a force vector, not an accel
-    # vector
     ea = accel_vector(grid, grid_num)
     ret = []
 
     for i, ei in enumerate(grid.basis):
-        t = pref * grid.weights[i] * poly_factorize( (ei - grid.v + ei.dot(grid.v)*ei*3).dot(ea))
+        t = pref * grid.weights[i] * poly_factorize((ei - grid.v + ei.dot(grid.v)*ei*3).dot(ea))
         ret.append((t, grid.idx_name[i]))
 
     return ret
 
 def bgk_external_force_pref(grid_num=0):
     # FIXME: This includes a factor of c_s^2.
-
-    # FIXME
     rho = getattr(S, 'g%sm0' % grid_num)
 
     if grid_num == 0:
@@ -630,7 +626,9 @@ def bgk_external_force_pref(grid_num=0):
     else:
         rho = 'phi'
 
-    return '%s * (3.0f - 3.0f/(2.0f * tau%s))' % (rho, grid_num)
+    # This includes a density factor as the device code always computes
+    # accelerations, not forces.
+    return '%s * 3.0f * (1.0f - 1.0f/(2.0f * tau%s))' % (rho, grid_num)
 
 def bb_swap_pairs(grid):
     """Get a set of indices which have to be swapped for a full bounce-back."""
