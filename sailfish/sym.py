@@ -558,8 +558,8 @@ def free_energy_external_force(sim, grid_num=0):
     thesis ("Lattice Boltzmann Studies of Wetting and Spreading on Patterned Surfaces").
     """
     grid = sim.grid
-    # TODO: rename this; it's actually a force vector, not an acceleration
-    # vector
+    # TODO: verify if this needs to be an accel or force vector;
+    # add references
     ea = accel_vector(grid, grid_num)
     ret = []
     sum_ = 0

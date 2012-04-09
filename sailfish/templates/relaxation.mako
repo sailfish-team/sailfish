@@ -24,13 +24,13 @@
 
 <%def name="body_force(accel=True, need_vars_declaration=True, grid_id=None)">
 	%if forces is not UNDEFINED:
-		%if accel:
-			// Body force acceleration.
-		%else:
-			// Body force.
-		%endif
 		%for i in range(0, len(grids)):
-			%if (grid_id is None or grid_id == i) and sym.needs_accel(i, forces, force_couplings):
+			%if (grid_id is None or grid_id == i) and sym.needs_accel(i, forces, {}):
+				%if accel:
+					// Body force acceleration.
+				%else:
+					// Body force.
+				%endif
 				%if not sym.needs_coupling_accel(i, force_couplings):
 					%if need_vars_declaration:
 						float ea${i}[${dim}];
@@ -39,8 +39,12 @@
 						ea${i}[${j}] = ${cex(sym.body_force_accel(i, j, forces, accel=accel), vectors=True)};
 					%endfor
 				%else:
+					## If the current grid has a Shan-Chen force acting on it, the acceleration vector
+					## is already externally defined in the Shan-Chen code.
 					%for j in range(0, dim):
-						ea${i}[${j}] += ${cex(sym.body_force_accel(i, j, forces, accel=accel), vectors=True)};
+						%if i in forces:
+							ea${i}[${j}] += ${cex(sym.body_force_accel(i, j, forces, accel=accel), vectors=True)};
+						%endif
 					%endfor
 				%endif
 			%endif

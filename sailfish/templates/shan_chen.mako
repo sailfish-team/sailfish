@@ -15,8 +15,7 @@
 
 	if (!isWallNode(type)) {
 		%for dists, coupling_const in force_couplings.iteritems():
-
-			// Interaction between two components.
+			// Interaction force between two components.
 			%if dists[0] != dists[1]:
 				%if dim == 2:
 					shan_chen_force(gi, gg${dists[0]}m0, gg${dists[1]}m0,
@@ -25,12 +24,12 @@
 					shan_chen_force(gi, gg${dists[0]}m0, gg${dists[1]}m0,
 						${coupling_const}, sca${dists[0]}, sca${dists[1]}, gx, gy, gz);
 				%endif
-			// Self-interaction of a single component.
+			// Self-interaction force of a single component.
 			%else:
 				%if dim == 2:
-					shan_chen_accel_self(gi, gg${dists[0]}m0, ${coupling_const}, sca${dists[0]}, gx, gy);
+					shan_chen_force_self(gi, gg${dists[0]}m0, ${coupling_const}, sca${dists[0]}, gx, gy);
 				%else:
-					shan_chen_accel_self(gi, gg${dists[0]}m0, ${coupling_const}, sca${dists[0]}, gx, gy, gz);
+					shan_chen_force_self(gi, gg${dists[0]}m0, ${coupling_const}, sca${dists[0]}, gx, gy, gz);
 				%endif
 			%endif
 		%endfor
@@ -70,7 +69,7 @@ ${device_func} inline float sc_ppot(${global_ptr} float *field, int gi)
 
 // Calculates the Shan-Chen force between a single fluid component (self-interaction).
 // The form of the interaction is the same as that of a force between two components (see below).
-${device_func} inline void shan_chen_accel_self(int i, ${global_ptr} float *f1,
+${device_func} inline void shan_chen_force_self(int i, ${global_ptr} float *f1,
 		float cc, float *a1, int x, int y
 %if dim == 3:
 	, int z
