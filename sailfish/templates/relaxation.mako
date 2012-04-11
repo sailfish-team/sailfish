@@ -23,13 +23,13 @@
 </%def>
 
 <%def name="body_force(accel=True, need_vars_declaration=True, grid_id=None)">
-	%if accel:
-		// Body force acceleration.
-	%else:
-		// Body force.
-	%endif
 	%for i in range(0, len(grids)):
 		%if (grid_id is None or grid_id == i) and sym.needs_accel(i, forces, force_couplings):
+			%if accel:
+				// Body force acceleration.
+			%else:
+				// Body force.
+			%endif
 			%if not sym.needs_coupling_accel(i, force_couplings):
 				%if need_vars_declaration:
 					float ea${i}[${dim}];
@@ -60,7 +60,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 		${mrt} = ${val};
 	%endfor
 
-	${body_force()}
+	${body_force(accel=True)}
 	${fluid_momentum(0)}
 
 	#define mx fm.mx
@@ -145,7 +145,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 	%endfor
 
 	float v0[${dim}];
-	${body_force()}
+	${body_force(accel=True)}
 
 	%if simtype == 'free-energy':
 		float tau0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) / 2.0f;
@@ -157,7 +157,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 	%endif
 
 	%for i, eq in enumerate(bgk_equilibrium):
-		${fluid_velocity(i, True)};
+		${fluid_velocity(i, equilibrium=True)};
 
 		%for feq, idx in eq:
 			feq${i}.${idx} = ${cex(feq, vectors=True)};
@@ -278,8 +278,9 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 
 		## Is there a force acting on the current grid?
 		%if sym.needs_accel(i, forces, force_couplings):
+			// Body force implementation follows Guo's method, eqs. 19 and 20 from
+			// 10.1103/PhysRevE.65.046308.
 			${fluid_velocity(i)};
-			${body_force(accel=False, need_vars_declaration=False, grid_id=i)}
 
 			%if simtype == 'shan-chen':
 			{
@@ -302,8 +303,6 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			%endif
 		%endif
 	%endfor
-
-	${body_force(need_vars_declaration=False)}
 
 	// FIXME: This should be moved to postcollision boundary conditions.
 	%if bc_pressure == 'guo':
