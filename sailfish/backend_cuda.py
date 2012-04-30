@@ -28,7 +28,7 @@ def _expand_grid(grid):
     if len(grid) == 1:
         return (grid[0], 1)
     else:
-        return grid
+        return tuple(grid)
 
 def _set_txt_format(dsc, strides):
     # float
@@ -213,7 +213,7 @@ class CUDABackend(object):
                 nvcc=self.options.cuda_nvcc, keep=self.options.cuda_keep_temp,
                 cache_dir=cache) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
 
-    def get_kernel(self, prog, name, block, args, args_format, shared=None):
+    def get_kernel(self, prog, name, block, args, args_format, shared=0):
         kern = prog.get_function(name)
         kern.prepare(args_format)
         setattr(kern, 'args', args)
