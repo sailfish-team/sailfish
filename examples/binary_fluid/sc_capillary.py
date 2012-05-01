@@ -5,7 +5,7 @@ import numpy as np
 
 from sailfish import sym
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import Subdomain2D
+from sailfish.geo_block import Subdomain2D, NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidShanChen
 from sailfish.lb_single import LBForcedSim
@@ -31,7 +31,7 @@ class CapillaryDomain(Subdomain2D):
                     (self.gy - hy) < rem_y - (np.abs((hx - self.gx/2)) - chan_len/2)
                 )] = True
 
-        self.set_node(geometry, self.NODE_WALL)
+        self.set_node(geometry, NTFullBBWall)
 
     def initial_conditions(self, sim, hx, hy):
         drop_diam = 30 * self.gy / 200.0
