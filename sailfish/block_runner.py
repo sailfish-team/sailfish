@@ -743,10 +743,13 @@ class BlockRunner(object):
 
 
     def _init_compute(self):
-        self.config.logger.debug("Initializing compute unit.")
+        self.config.logger.debug("Initializing compute unit...")
         code = self._get_compute_code()
+        self.config.logger.debug("... compute code prepared.")
         self.module = self.backend.build(code)
+        self.config.logger.debug("... compute code compiled.")
         self._init_streams()
+        self.config.logger.debug("... done.")
 
     def _init_streams(self):
         self._data_stream = self.backend.make_stream()
@@ -1182,6 +1185,7 @@ class BlockRunner(object):
                 self._sim.iteration))
 
     def need_quit(self):
+        # The quit event is used by the visualization interface.
         if self._quit_event.is_set():
             self.config.logger.info("Simulation termination requested.")
             return True
@@ -1208,7 +1212,7 @@ class BlockRunner(object):
                 self._fields_to_host()
 
             if (self.config.max_iters > 0 and self._sim.iteration >=
-                    self.config.max_iters):
+                    self.config.max_iters) or self.need_quit():
                 break
 
             self._data_stream.synchronize()

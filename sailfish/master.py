@@ -21,13 +21,21 @@ import zmq
 from sailfish import block_runner, util, io
 from sailfish.connector import ZMQBlockConnector, ZMQRemoteBlockConnector
 
-def _start_block_runner(block, config, sim, backend_class, gpu_id, output,
+def _start_block_runner(block, config, sim, num_subdomains,
+        backend_class, gpu_id, output,
         quit_event, master_addr, timing_info_to_master):
+    """
+    Args:
+    :param num_subdomains: number of subdomains handled by this machine
+    """
     config.logger.debug('BlockRunner starting with PID {0}'.format(os.getpid()))
     # Make sure each block has its own temporary directory.  This is
     # particularly important with Numpy 1.3.0, where there is a race
     # condition when saving npz files.
-    tempfile.tempdir = tempfile.mkdtemp()
+    # With only one block, use the default to take advantage of pycuda
+    # caching..
+    if num_subdomains > 1:
+        tempfile.tempdir = tempfile.mkdtemp()
     # We instantiate the backend class here (instead of in the machine
     # master), so that the backend object is created within the
     # context of the new process.
@@ -211,7 +219,7 @@ class LBMachineMaster(object):
         # Start the visualizatione engine.
         vis_class = util.get_visualization_engines().next()
 
-        # Event to singal that the visualization process should be terminated.
+        # Event to signal that the visualization process should be terminated.
         self._vis_quit_event = Event()
         self._vis_process = Process(
                 target=lambda: vis_class(
@@ -263,7 +271,7 @@ class LBMachineMaster(object):
             sockets.append(sock)
             p = Process(target=_start_block_runner,
                         name='Block/{0}'.format(block.id),
-                        args=(block, self.config, sim,
+                        args=(block, self.config, sim, len(self.blocks),
                               backend_cls, block2gpu[block.id],
                               output, self._quit_event, master_addr,
                               self._channel is not None))

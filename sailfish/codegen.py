@@ -6,6 +6,7 @@ __license__ = 'LGPL3'
 
 import os
 import sys
+import tempfile
 from mako.lookup import TemplateLookup
 
 def _convert_to_double(src):
@@ -77,8 +78,8 @@ class BlockCodeGenerator(object):
         if self.config.use_mako_cache:
             import pwd
             lookup = TemplateLookup(directories=sys.path,
-                    module_directory='/tmp/sailfish_modules-%s' %
-                            pwd.getpwuid(os.getuid())[0])
+                    module_directory='{0}/sailfish_modules-{1}'.format(
+                        tempfile.gettempdir(), pwd.getpwuid(os.getuid())[0]))
         else:
             lookup = TemplateLookup(directories=sys.path)
 

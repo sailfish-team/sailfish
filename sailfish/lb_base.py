@@ -50,6 +50,10 @@ class LBSim(object):
         returns the grid with the highest connectivity."""
         raise NotImplementedError("grid() should be defined in a subclass")
 
+    @property
+    def dim(self):
+        return self.grid.dim
+
     def update_context(self, ctx):
         """Updates the context dicitionary containing variables used for
         code generation."""

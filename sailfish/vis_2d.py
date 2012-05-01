@@ -11,7 +11,7 @@ import time
 import numpy as np
 import pygame
 
-from sailfish import lb_base, vis, geo_block
+from sailfish import lb_base, vis, geo_block, util
 
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
@@ -164,9 +164,6 @@ class Fluid2DVis(vis.FluidVis):
         self._draw_type = 1
         self._vistype = self.VIS_LINEAR
         self._cmap = [None, 'std', 'rb']
-        self._cmap_scale_lock = False
-        self._convolve = False
-        self._emboss = False
         self._font = pygame.font.SysFont(_font_name(), 14)
         self._impart_velocity = False
         self._mouse_pos = 0,0
@@ -225,8 +222,8 @@ class Fluid2DVis(vis.FluidVis):
         geo_map.reshape(width * height)[:] = block.vis_geo_buffer[:]
 
         geo_map = np.rot90(geo_map, 3)
-
-        tg_buffer[geo_map == geo_block.Subdomain.NODE_WALL] = self._color_wall
+        dry_types = geo_map.dtype.type(geo_block.get_dry_node_type_ids())
+        tg_buffer[util.in_anyd(geo_map, dry_types)] = self._color_wall
 
     def _draw_field(self, srf, width, height, block):
         a = pygame.surfarray.pixels3d(srf)
@@ -249,7 +246,6 @@ class Fluid2DVis(vis.FluidVis):
         a[:] = vis_field[:]
 
         self._draw_geometry(a, width, height, block)
-        # TODO(michalj): Add support for embossing.
 
         # Unlock the surface and put the picture on screen.
         del a
@@ -293,24 +289,18 @@ class Fluid2DVis(vis.FluidVis):
                     new_block %= len(self._blocks)
                     self._vis_config.block = new_block
                     self.resize()
-                elif event.key == pygame.K_LEFTBRACKET:
-                    n = len(self.field.vals)
-                    idx = cmaps[n].keys().index(self._cmap[n]) - 1
-                    idx %= len(cmaps[n].keys())
-                    self._cmap[n] = cmaps[n].keys()[idx]
-                elif event.key == pygame.K_RIGHTBRACKET:
-                    n = len(self.field.vals)
-                    idx = cmaps[n].keys().index(self._cmap[n]) + 1
-                    idx %= len(cmaps[n].keys())
-                    self._cmap[n] = cmaps[n].keys()[idx]
-                elif event.key == pygame.K_m:
-                    self._cmap_scale_lock = not self._cmap_scale_lock
-                elif event.key == pygame.K_v:
-                    self._velocity = not self._velocity
-                elif event.key == pygame.K_c:
-                    self._convolve = not self._convolve
-                elif event.key == pygame.K_e:
-                    self._emboss = not self._emboss
+#                elif event.key == pygame.K_LEFTBRACKET:
+#                    n = len(self.field.vals)
+#                    idx = cmaps[n].keys().index(self._cmap[n]) - 1
+#                    idx %= len(cmaps[n].keys())
+#                    self._cmap[n] = cmaps[n].keys()[idx]
+#                elif event.key == pygame.K_RIGHTBRACKET:
+#                    n = len(self.field.vals)
+#                    idx = cmaps[n].keys().index(self._cmap[n]) + 1
+#                    idx %= len(cmaps[n].keys())
+#                    self._cmap[n] = cmaps[n].keys()[idx]
+#                elif event.key == pygame.K_v:
+#                    self._velocity = not self._velocity
                 elif event.key == pygame.K_q:
                     self._sim_quit_event.set()
                 elif event.key == pygame.K_s:
@@ -329,15 +319,11 @@ class Fluid2DVis(vis.FluidVis):
                     print 'Saved %s.' % fname
                 elif event.key == pygame.K_i:
                     self._show_info = not self._show_info
-                elif event.key == pygame.K_COMMA:
-                    self._cmap_scale[self._visfield] = self._cmap_scale[self._visfield] / 1.1
-                elif event.key == pygame.K_PERIOD:
-                    self._cmap_scale[self._visfield] = self._cmap_scale[self._visfield] * 1.1
-                elif event.key == pygame.K_LCTRL:
-                    self._impart_velocity = True
-            elif event.type == pygame.KEYUP:
-                if event.key == pygame.K_LCTRL:
-                    self._impart_velocity = False
+#                elif event.key == pygame.K_LCTRL:
+#                    self._impart_velocity = True
+#            elif event.type == pygame.KEYUP:
+#                if event.key == pygame.K_LCTRL:
+#                    self._impart_velocity = False
 
             self._process_misc_event(event)
 
