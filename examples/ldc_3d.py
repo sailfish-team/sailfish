@@ -73,9 +73,9 @@ class LDCSim(LBFluidSim):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
-            'lat_nx': 128,
-            'lat_ny': 128,
-            'lat_nz': 128,
+            'lat_nx': 64,
+            'lat_ny': 64,
+            'lat_nz': 64,
             'grid': 'D3Q19'})
 
     @classmethod
