@@ -27,12 +27,12 @@ regtest3d_double:
 	python -u regtest/poiseuille.py --dim=3 --grid=D3Q19 --precision=double --bc=fullbb
 	python -u regtest/poiseuille.py --dim=3 --grid=D3Q19 --model=mrt --precision=double --bc=fullbb
 
-regtest3d_drag:
-	python -u regtest/drag_coefficient.py --grid=D3Q13 --model=mrt
-	python -u regtest/drag_coefficient.py --grid=D3Q15 --model=bgk
-	python -u regtest/drag_coefficient.py --grid=D3Q15 --model=mrt
-	python -u regtest/drag_coefficient.py --grid=D3Q19 --model=bgk
-	python -u regtest/drag_coefficient.py --grid=D3Q19 --model=mrt
+#regtest3d_drag:
+#	python -u regtest/drag_coefficient.py --grid=D3Q13 --model=mrt
+#	python -u regtest/drag_coefficient.py --grid=D3Q15 --model=bgk
+#	python -u regtest/drag_coefficient.py --grid=D3Q15 --model=mrt
+#	python -u regtest/drag_coefficient.py --grid=D3Q19 --model=bgk
+#	python -u regtest/drag_coefficient.py --grid=D3Q19 --model=mrt
 
 regtest_ldc:
 	python -u regtest/ldc_3d.py
