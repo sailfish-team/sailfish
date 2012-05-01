@@ -5,4 +5,3 @@ Regression tests results
 
    regtest-poiseuille2d
    regtest-poiseuille3d
-   regtest-drag_coefficient

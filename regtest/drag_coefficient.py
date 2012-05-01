@@ -1,5 +1,7 @@
 #!/usr/bin/python -u
 
+raise NotImplementedError('This regression test has not been ported yet.')
+
 import os
 import sys
 import numpy
