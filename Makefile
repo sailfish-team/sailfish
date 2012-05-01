@@ -1,5 +1,5 @@
 
-.PHONY: clean regtest2d_single regtest2d_double regtest3d_single regtest3d_double regtest regtest_small_block presubmit
+.PHONY: clean regtest2d_single regtest2d_double regtest3d_single regtest3d_double regtest regtest_small_block presubmit test_examples
 
 regtest2d_single:
 	python -u regtest/poiseuille.py --dim=2
@@ -52,6 +52,9 @@ test:
 	python tests/sym.py
 	python tests/util.py
 
+test_examples:
+	@bash tests/run_examples.sh
+
 regtest:
 	python regtest/blocks/2d_propagation.py
 	python regtest/blocks/2d_ldc.py
@@ -71,7 +74,7 @@ regtest_small_block:
 	python regtest/blocks/binary_pbc.py --block_size=16
 	python regtest/blocks/2d_binary.py --block_size=16
 
-presubmit: test regtest regtest_small_block
+presubmit: test regtest regtest_small_block test_examples
 
 clean:
 	rm -f sailfish/*.pyc

@@ -39,8 +39,8 @@ class SphereSimulation(LBFluidSim, LBForcedSim):
     def update_defaults(cls, defaults):
         defaults.update({
             'lat_nx': 128,
-            'lat_ny': 128,
-            'lat_nz': 128,
+            'lat_ny': 64,
+            'lat_nz': 64,
             'visc': 0.01,
             'grid': 'D3Q19'})
 
