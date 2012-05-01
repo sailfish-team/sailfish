@@ -114,20 +114,20 @@ class EqualSubdomainsGeometry3D(LBGeometry3D):
         if self.config.conn_axis == 'x':
             sx = self.gx / s
             rx = self.gx % s
-            return [SubdomainSpec2D((i * sx, 0, 0),
+            return [SubdomainSpec3D((i * sx, 0, 0),
                     (sx if i < s - 1 else rx + sx, self.gy, self.gz))
                     for i in range(0, s)]
         elif self.config.conn_axis == 'y':
             sy = self.gy / s
             ry = self.gy % s
 
-            return [SubdomainSpec2D((0, i * sy, 0),
+            return [SubdomainSpec3D((0, i * sy, 0),
                     (self.gx, sy if i < s - 1 else ry + sy, self.gz))
                     for i in range(0, s)]
         else:
             sz = self.gz / s
             rz = self.gz % s
 
-            return [SubdomainSpec2D((0, 0, i * sz),
+            return [SubdomainSpec3D((0, 0, i * sz),
                     (self.gx, self.gy, sz if i < s - 1 else rz + sz))
                     for i in range(0, s)]
