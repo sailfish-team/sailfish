@@ -2,8 +2,6 @@
     from sailfish import sym
 %>
 
-extern int printf (__const char *__restrict __format, ...);
-
 %if 'gravity' in context.keys():
 	${const_var} float gravity = ${gravity}f;
 %endif

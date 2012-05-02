@@ -277,6 +277,10 @@
 
 #define DT 1.0f
 
+%if backend == 'cuda':
+extern int printf (__const char *__restrict __format, ...);
+%endif
+
 %for name, val in constants.iteritems():
 	${const_var} float ${name} = ${val}f;
 %endfor

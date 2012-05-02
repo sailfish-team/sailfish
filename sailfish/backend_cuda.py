@@ -121,48 +121,6 @@ class CUDABackend(object):
         transfers."""
         return cuda.pagelocked_zeros(shape, dtype=dtype)
 
-    def nonlocal_field(self, prog, cl_buf, num, shape, strides):
-        if len(shape) == 3:
-            dsc = cuda.ArrayDescriptor()
-            dsc.width = strides[0] / strides[2]
-            dsc.height = shape[-3]
-            _set_txt_format(dsc, strides)
-
-            txt = prog.get_texref('img_f%d' % num)
-            txt.set_address_2d(cl_buf, dsc, strides[-3])
-
-            # It turns out that using 3D textures doesn't really make
-            # much sense if it requires copying data around.  We therefore
-            # access the 3D fields via a 2D texture, which still provides
-            # some caching, while not requiring a separate copy of the
-            # data.
-            #
-            # dsc = cuda.ArrayDescriptor3D()
-            # dsc.depth, dsc.height, dsc.width = shape
-            # dsc.format = cuda.array_format.FLOAT
-            # dsc.num_channels = 1
-            # ary = cuda.Array(dsc)
-
-            # copy = cuda.Memcpy3D()
-            # copy.set_src_device(cl_buf)
-            # copy.set_dst_array(ary)
-            # copy.width_in_bytes = copy.src_pitch = strides[-2]
-            # copy.src_height = copy.height = dsc.height
-            # copy.depth = dsc.depth
-
-            # txt = prog.get_texref('img_f%d' % num)
-            # txt.set_array(ary)
-            # self._tex_to_memcpy[txt] = copy
-        else:
-            # 2D texture.
-            dsc = cuda.ArrayDescriptor()
-            dsc.width = shape[-1]
-            dsc.height = shape[-2]
-            _set_txt_format(dsc, strides)
-            txt = prog.get_texref('img_f%d' % num)
-            txt.set_address_2d(cl_buf, dsc, strides[-2])
-        return txt
-
     def to_buf(self, cl_buf, source=None):
         if source is None:
             if cl_buf in self.buffers:
