@@ -38,8 +38,8 @@ def span_to_direction(span):
     return 0
 
 
-def get_backends():
-    for backend in ['cuda', 'opencl']:
+def get_backends(backends=['cuda', 'opencl']):
+    for backend in backends:
         try:
             module = 'sailfish.backend_{0}'.format(backend)
             __import__('sailfish', fromlist=['backend_{0}'.format(backend)])

@@ -251,7 +251,7 @@ class LBMachineMaster(object):
         ipc_files = self._init_connectors()
         output_initializer = self._init_visualization_and_io(sim)
         try:
-            backend_cls = util.get_backends().next()
+            backend_cls = util.get_backends(self.config.backends.split(',')).next()
         except StopIteration:
             self.config.logger.error('Failed to initialize compute backend.'
                     ' Make sure pycuda/pyopencl is installed.')
