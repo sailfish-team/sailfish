@@ -234,10 +234,10 @@ class Fluid2DVis(vis.FluidVis):
         tmp.reshape(width * height)[:] = block.vis_buffer[:]
 
         v_max = np.max(tmp)
-        v_min = 0.0
+        v_min = np.min(tmp)
 
         tmp[:] = (tmp - v_min) / (v_max - v_min)
-        tmp[tmp > 1.0]  = 1.0
+        tmp[tmp > 1.0] = 1.0
         tmp = np.abs(tmp)
         tmp = np.rot90(tmp, 3)
 
