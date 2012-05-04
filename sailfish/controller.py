@@ -245,6 +245,14 @@ class LBSimulationController(object):
     """Controls the execution of a LB simulation."""
 
     def __init__(self, lb_class, lb_geo=None, default_config=None):
+        """
+        Args:
+        :param lb_class: class describing the simulation, derived from LBSim
+        :param lb_geo: class describing the global geometry in terms of
+                SubdomainSpec, derived from LBGeometry
+        :param default_config: dictionary mapping command line option names
+                to their new default values
+        """
         self._config_parser = config.LBConfigParser()
         self._lb_class = lb_class
 
