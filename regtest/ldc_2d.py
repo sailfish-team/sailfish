@@ -2,9 +2,9 @@
 
 """Compares Sailfish results for the 2D lid driven cavity test case with
 numerical results from the literature. Numerical solutions of 2-D steady
-incompressible driven cavity ow at high Reynolds numbers E. Erturk; T. C. Corke
+incompressible driven cavity flow at high Reynolds numbers E. Erturk; T. C. Corke
 and C. Gokcol with numerical calculation of Navier-Stokes equations;
-grid size: 601X601 """
+grid size: 601x601."""
 
 import numpy as np
 import matplotlib

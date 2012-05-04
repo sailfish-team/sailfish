@@ -60,15 +60,16 @@ class PoiseuilleSubdomain(Subdomain2D):
         else:
             # Start with correct velocity profile.
             if self.config.horizontal:
-                sim.vx[:] = self._velocity_profile(hy)
+                sim.vx[:] = self.velocity_profile(self.config, hy)
             else:
-                sim.vy[:] = self._velocity_profile(hx)
+                sim.vy[:] = self.velocity_profile(self.config, hx)
 
-    def _velocity_profile(self, hi):
-        width = self.channel_width(self.config)
-        h = self.wall_bc.location
+    @classmethod
+    def velocity_profile(cls, config, hi):
+        width = cls.channel_width(config)
+        h = cls.wall_bc.location
 
-        return (4.0 * self.max_v / width**2 * (hi + h) * (width - hi - h))
+        return (4.0 * cls.max_v / width**2 * (hi + h) * (width - hi - h))
 
     @classmethod
     def channel_width(cls, config):

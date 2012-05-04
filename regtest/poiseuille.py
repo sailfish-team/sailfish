@@ -1,162 +1,103 @@
 #!/usr/bin/python -u
 
 import os
-import sys
-import numpy
-import math
+import shutil
+import tempfile
+
+import numpy as np
 import matplotlib
-import optparse
-from optparse import OptionGroup, OptionParser, OptionValueError
 
 matplotlib.use('cairo')
 import matplotlib.pyplot as plt
 
-from sailfish import geo
-from sailfish import sym
+from sailfish.controller import LBSimulationController
+from examples import poiseuille
+from examples import poiseuille_3d
+from sailfish import io
 
-MAX_ITERS = 10000
+
 POINTS = 30
 
-defaults = {
-        'stationary': True,
-        'batch': True,
-        'quiet': True,
-        'verbose': False,
-        'lat_nx': 64,
-        'lat_ny': 64,
-    }
 
-def run_test(bc, drive, precision, model, grid, name):
-    xvec = []
-    yvec = []
-    basepath = os.path.join('regtest/results', name, grid, model, drive, precision)
-    profpath = os.path.join(basepath, 'profiles')
+class TestPoiseuille2D(poiseuille.PoiseuilleSim):
+    @classmethod
+    def update_defaults(cls, defaults):
+        poiseuille.PoiseuilleSim.update_defaults(defaults)
+        defaults.update({
+            'stationary': True,
+            'horizontal': True,
+            'every': 100,
+            'quiet': True,
+            # Use an odd number of nodes here so that the largest
+            # velocity is attained exactly at a node.
+            'lat_nx': 127,
+            'lat_ny': 128})
 
-    if not os.path.exists(profpath):
-        os.makedirs(profpath)
 
-    f = open(os.path.join(basepath, '%s.dat' % bc), 'w')
+def run_test_2d():
+    xvec = np.logspace(-3, -1, num=POINTS)
+    yvec = np.zeros(POINTS, dtype=np.float64)
+    tmpdir = tempfile.mkdtemp()
 
-    defaults['grid'] = grid
-    defaults['model'] = model
-    defaults['drive'] = drive
-    if drive == 'pressure':
-        defaults['bc_pressure'] = bc
-    else:
-        defaults['bc_wall'] = bc
-    defaults['precision'] = precision
+    summary_path = 'regtest/results/poiseuille/summary.png'
+    profile_path = 'regtest/results/poiseuille'
 
-    print '* Testing "%s" for visc' % bc,
-    i = 0
-
-    for visc in numpy.logspace(-3, -1, num=POINTS):
+    for i, visc in enumerate(xvec):
         print '%f ' % visc,
 
-        iters = int(1000 / visc)
-        xvec.append(visc)
+        max_iters = int(100 / visc)
+        base_path = os.path.join(tmpdir, 'visc{0}'.format(i))
 
+        defaults = {}
         defaults['visc'] = visc
-        defaults['max_iters'] = iters
+        defaults['max_iters'] = max_iters
+        defaults['output'] = base_path
 
-        sim = LTestPoiSim([], defaults)
-        sim.run()
+        ctrl = LBSimulationController(TestPoiseuille2D, default_config=defaults)
+        ctrl.run()
 
-        yvec.append(sim.result)
+        digits = io.filename_iter_digits(max_iters)
 
-        prof_sim = sim.get_profile()
-        prof_th = sim.geo.get_velocity_profile(fluid_only=True)
+        final_iter = 100 * (max_iters / 100)
+        fname = io.filename(base_path, digits, 0, final_iter)
+        res = np.load(fname)
 
-        print >>f, visc, sim.result
+        vx = res['v'][0]
+        nyw = vx.shape[1] / 2
+        hy = np.mgrid[0:vx.shape[0]]
+
+        profile_sim = vx[:,nyw]
+        profile_th = TestPoiseuille2D.subdomain.velocity_profile(ctrl.config, hy)
+
+        yvec[i] = np.max(profile_sim) / np.max(profile_th) - 1.0
 
         plt.gca().yaxis.grid(True)
         plt.gca().xaxis.grid(True)
         plt.gca().xaxis.grid(True, which='minor')
         plt.gca().yaxis.grid(True, which='minor')
-        plt.gca().set_xbound(0, len(prof_sim)-1)
-
-        f2 = open(os.path.join(profpath, '%s-profile%d.dat' % (bc, i)), 'w')
-        for j in range(0, len(prof_sim)):
-            print >>f2, prof_sim[j], prof_th[j]
-        f2.close()
-
-        plt.clf()
-        plt.plot(prof_th - prof_sim, 'bo-')
-        plt.title('visc = %f' % xvec[i])
-        plt.savefig(os.path.join(profpath, '%s-profile%d.pdf' % (bc, i)), format='pdf')
+        plt.plot(profile_th[1:-1] - profile_sim[1:-1], 'b.-')
+        plt.gca().set_xbound(0, len(profile_sim)-2)
+        plt.title('theoretical - simulation; visc = %f' % visc)
+        plt.savefig(os.path.join(profile_path, 'profile{0:02d}.png'.format(i)),
+                format='png')
 
         plt.clf()
         plt.cla()
 
-        i += 1
-
-    print
-
-    f.close()
-
     plt.clf()
     plt.cla()
 
-    plt.semilogx(xvec, yvec, 'bo-')
+    plt.semilogx(xvec, yvec * 100, 'b.-')
     plt.gca().yaxis.grid(True)
     plt.gca().yaxis.grid(True, which='minor')
     plt.gca().xaxis.grid(True)
     plt.gca().xaxis.grid(True, which='minor')
-    plt.ylabel('max velocity / theoretical max velocity - 1')
+    plt.ylabel('max velocity / theoretical max velocity - 1 [%]')
     plt.xlabel('viscosity')
-    plt.savefig(os.path.join(basepath, '%s.pdf' % bc), format='pdf')
+    plt.savefig(summary_path, format='png')
 
-parser = OptionParser()
-parser.add_option('--precision', dest='precision', help='precision (single, double)', type='choice', choices=['single', 'double'], default='single')
-parser.add_option('--drive', dest='drive', help='drive', type='choice', choices=['force', 'pressure'], default='force')
-parser.add_option('--model', dest='model', help='model', type='choice', choices=['mrt', 'bgk'], default='bgk')
-parser.add_option('--grid', dest='grid', help='grid', type='string', default='')
-parser.add_option('--dim', dest='dim', help='dimensionality', type='choice', choices=['2','3'], default='2')
-parser.add_option('--bc', dest='bc', help='boundary conditions to test (comma separated', type='string', default='')
-(options, args) = parser.parse_args()
+    shutil.rmtree(tmpdir)
 
-if options.dim == '2':
-    from examples.lbm_poiseuille import LPoiSim, LBMGeoPoiseuille
-    name = 'poiseuille'
-else:
-    from examples.lbm_poiseuille_3d import LPoiSim, LBMGeoPoiseuille
-    defaults['along_y'] = True
-    defaults['along_z'] = False
-    defaults['along_x'] = False
-    defaults['lat_nz'] = 64
-    name = 'poiseuille3d'
 
-if options.grid:
-    grid = options.grid
-else:
-    if options.dim == '2':
-        grid = 'D2Q9'
-    else:
-        grid = 'D3Q13'
-
-if options.drive == 'force':
-    geo_type = geo.LBMGeo.NODE_WALL
-else:
-    geo_type = geo.LBMGeo.NODE_PRESSURE
-
-if options.bc:
-    bcs = filter(lambda x: geo_type in geo.get_bc(x).supported_types, options.bc.split(','))
-else:
-    bcs = [x.name for x in geo.SUPPORTED_BCS if geo_type in x.supported_types]
-
-class LTestPoiSim(LPoiSim):
-    def __init__(self, args, defaults):
-        super(LTestPoiSim, self).__init__(LBMGeoPoiseuille, args, defaults)
-        self.clear_hooks()
-        self.add_iter_hook(self.options.max_iters-1, self.save_output)
-
-    def save_output(self):
-#       self.result = (numpy.max(self.vy[16,1:self.geo.lat_nx-1]) / max(self.geo.get_velocity_profile())) - 1.0
-        self.res_maxv = numpy.max(self.geo.mask_array_by_fluid(self.vy))
-        self.th_maxv = max(self.geo.get_velocity_profile())
-
-        self.result = self.res_maxv / self.th_maxv - 1.0
-
-print 'Running tests for %s, %s' % (options.precision, options.drive)
-
-for bc in bcs:
-    run_test(bc, options.drive, options.precision, options.model, grid, name)
+if __name__ == '__main__':
+    run_test_2d()
