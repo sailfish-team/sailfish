@@ -687,7 +687,7 @@ class Subdomain(object):
 
         self._verify_params(where, node_type)
         self._type_map[where] = node_type.id
-        key = hash((node_type.id, frozenset(node_type.params)))
+        key = hash((node_type.id, frozenset(node_type.params.items())))
         assert np.all(self._param_map[where] == 0),\
                 "Overriding previously set nodes is not allowed."
         self._param_map[where] = key

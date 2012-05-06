@@ -174,8 +174,8 @@ class GeoEncoderConst(GeoEncoder):
             'nt_type_mask': (1 << self._bits_type) - 1,
             'nt_param_shift': self._bits_param,
             'nt_dir_other': 0,  # used to indicate non-primary direction
-                                 # in orientation processing code
-            'nt_params': self._geo_params
+                                # in orientation processing code
+            'node_params': self._geo_params
         })
 
     def _encode_node(self, orientation, param, node_type):
