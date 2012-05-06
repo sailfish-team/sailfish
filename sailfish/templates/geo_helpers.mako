@@ -1,3 +1,7 @@
+<%
+	import sailfish.node_type as nt
+%>
+
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
 
 typedef struct Dist {
@@ -25,59 +29,57 @@ ${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int idx
 	%endfor
 }
 
-${device_func} inline bool isUnusedNode(unsigned int type) {
-	return type == ${nt_id_unused};
-}
+// Functions for checking whether a node is of a given specific type.
+%for nt_class in node_types:
+	${device_func} inline bool is${nt_class.__name__}(unsigned int type) {
+		return type == ${type_id_remap[nt_class.id]};
+	}
+%endfor
 
-${device_func} inline bool isFluidNode(unsigned int type) {
-	return type == ${nt_id_fluid};
+%if (nt.NTEquilibriumVelocity in node_types) or (nt.NTEquilibriumDensity in node_types):
+${device_func} inline bool is_NTEquilibriumNode(unsigned int type) {
+	return (false
+	%if nt.NTEquilibriumVelocity in node_types:
+		|| isNTEquilibriumVelocity(type)
+	%endif
+	%if nt.NTEquilibriumDensity in node_types:
+		|| isNTEquilibriumDensity(type)
+	%endif
+	);
 }
+%endif
 
-${device_func} inline bool isSlipNode(unsigned int type) {
-	return type == ${nt_id_slip};
-}
-
-${device_func} inline bool isWallNode(unsigned int type) {
-	return type == ${nt_id_wall};
-}
-
-${device_func} inline bool isFluidOrWallNode(unsigned int type) {
-	return type <= ${nt_id_wall};
-}
-
-// This assumes we're dealing with a wall node.
-${device_func} inline bool isVelocityNode(unsigned int type) {
-	return type == ${nt_id_velocity};
-}
-
-${device_func} inline bool isPressureNode(unsigned int type) {
-	return (type >= ${nt_id_pressure});
-}
-
-${device_func} inline bool isVelocityOrPressureNode(unsigned int type) {
-	return isVelocityNode(type) || isPressureNode(type);
-}
-
-${device_func} inline bool isGhostNode(unsigned int type) {
-	return (type == ${nt_id_ghost});
+// Returns true is the node does not require any special processing
+// to calculate macroscopic fields.
+${device_func} inline bool NTUsesStandardMacro(unsigned int type) {
+	return (false
+		%for nt_class in node_types:
+			%if nt_class.standard_macro:
+				|| is${nt_class.__name__}(type)
+			%endif
+		%endfor
+	);
 }
 
 // Wet nodes are nodes that undergo a standard collision procedure.
 ${device_func} inline bool isWetNode(unsigned int type) {
-	return (
-		%if bc_wall_.wet_node:
-			isFluidOrWallNode(type)
-		%else:
-			isFluidNode(type)
-		%endif
+	return (false
+		%for nt_class in node_types:
+			%if nt_class.wet_node:
+				|| is${nt_class.__name__}(type)
+			%endif
+		%endfor
+	);
+}
 
-		%if bc_velocity_.wet_node:
-			|| isVelocityNode(type)
-		%endif
-
-		%if bc_pressure_.wet_node:
-			|| isPressureNode(type)
-		%endif
+// Wet nodes are nodes that undergo a standard collision procedure.
+${device_func} inline bool isExcludedNode(unsigned int type) {
+	return (false
+		%for nt_class in node_types:
+			%if nt_class.excluded:
+				|| is${nt_class.__name__}(type)
+			%endif
+		%endfor
 	);
 }
 
@@ -89,7 +91,7 @@ ${device_func} inline unsigned int decodeNodeOrientation(unsigned int nodetype) 
 	return nodetype >> ${nt_misc_shift + nt_param_shift};
 }
 
-${device_func} inline unsigned int decodeNodeParam(unsigned int nodetype) {
+${device_func} inline unsigned int decodeNodeParamIdx(unsigned int nodetype) {
 	return (nodetype >> ${nt_misc_shift}) & ${(1 << nt_param_shift)-1};
 }
 

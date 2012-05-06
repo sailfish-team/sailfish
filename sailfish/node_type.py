@@ -12,25 +12,52 @@ class LBNodeType(object):
     wet_node = False
     location = 0.0
 
+    # If True, the node does not participate in the simulation.
+    excluded = False
+
+    # If True, the node does not require any special processing to calculate
+    # macroscopic fluid quantities.  Typical examples of nodes requiring
+    # special treatment are edge and corner nodes where not all mass fractions
+    # are known.
+    standard_macro = False
+
     def __init__(self, **params):
         self.params = params
 
+
+class _NTFluid(LBNodeType):
+    """Fluid node."""
+    wet_node = True
+    standard_macro = True
+    id = 0
+
+
 class _NTGhost(LBNodeType):
     """Ghost node."""
-    pass
+    excluded = True
+
 
 class _NTUnused(LBNodeType):
     """Unused node."""
+    excluded = True
+
 
 class NTHalfBBWall(LBNodeType):
     """Half-way bounce-back (no-slip) node."""
     wet_node = True
+    standard_macro = True
+
 
 class NTFullBBWall(LBNodeType):
     """Full-way bounce-back (no-slip) node."""
+    # XXX: location
+    standard_macro = True
+
 
 class NTSlip(LBNodeType):
     """Full-slip node."""
+    standard_macro = True
+
 
 class NTEquilibriumVelocity(LBNodeType):
     """Velocity boundary condition using the equilibrium distribution."""
@@ -38,17 +65,33 @@ class NTEquilibriumVelocity(LBNodeType):
     def __init__(self, velocity):
         self.params = {'velocity': velocity}
 
+
 class NTEquilibriumDensity(LBNodeType):
     """Density boundary condition using the equilibrium distribution."""
+
+    def __init__(self, density):
+        self.params = {'density': density}
+
 
 class NTZouHeVelocity(LBNodeType):
     """Zou-he velocity."""
 
+    def __init__(self, velocity):
+        self.params = {'velocity': velocity}
+
+
 class NTZouHeDensity(LBNodeType):
     """Zou-He density."""
 
+    def __init__(self, density):
+        self.params = {'density': density}
+
+
 class NTGuoDensity(LBNodeType):
     """Guo density."""
+
+    def __init__(self, density):
+        self.params = {'density': density}
 
 
 def __init_node_type_list():
@@ -61,7 +104,8 @@ def __init_node_type_list():
         try:
             if obj != LBNodeType and issubclass(obj, LBNodeType):
                 ret.append(obj)
-                obj.id = len(ret)
+                if obj.id is None:
+                    obj.id = len(ret)
         except TypeError:
             pass
 

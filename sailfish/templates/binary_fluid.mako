@@ -1,5 +1,6 @@
 <%!
     from sailfish import sym
+    import sailfish.node_type as nt
     import sympy
 %>
 
@@ -138,23 +139,30 @@ ${kernel} void PrepareMacroFields(
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isUnusedNode(type) || isGhostNode(type))
+	if (isExcludedNode(type))
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);
 
-	%if simtype == 'shan-chen' and not bc_wall_.wet_node:
-		// Do not update the macroscopic fields for wall nodes which do not
+	%if simtype == 'shan-chen':
+		// Do not update the macroscopic fields for nodes which do not
 		// represent any fluid.
-		if (isWallNode(type))
+		if (!isWetNode(type)) {
 			return;
+		}
 	%endif
 
-	%if bc_pressure == 'guo':
-		// Do not not update the fields for pressure nodes, where by definition
-		// they are constant.
-		if (isPressureNode(type))
+	// Do not not update the fields for pressure nodes, where by definition
+	// they are constant.
+	%if nt.NTGuoDensity in node_types:
+		if (isNTGuoDensity(type)) {
 			return;
+		}
+	%endif
+	%if nt.NTEquilibriumDensity in node_types:
+		if (isNTEquilibriumDensity(type)) {
+			return;
+		}
 	%endif
 
 	Dist fi;
@@ -173,64 +181,67 @@ ${kernel} void PrepareMacroFields(
 			ophi[gi] = out;
 		}
 
-		%if bc_wall != None:
+		// Assume neutral wetting for all walls by adjusting the phase gradient
+		// near the wall.
+		//
+		// This wetting boundary condition implementation is as in option 2 in
+		// Halim Kusumaatmaja's PhD thesis, p.18.
+
+		## Symbols used on the schematics below:
+		##
+		## W: wall node (current node, pointed to by 'gi')
+		## F: fluid node
+		## |: actual location of the wall
+		## .: space between fluid nodes
+		## x: node from which data is read
+		## y: node to which data is being written
+		##
+		## The schematics assume a bc_wall_grad_order of 2.
+		%if nt.NTFullBBWall in node_types:
 			int helper_idx = gi;
-			// Assume neutral wetting for all walls by adjusting the phase gradient
-			// near the wall.
-			//
-			// This wetting boundary condition implementation is as in option 2 in
-			// Halim Kusumaatmaja's PhD thesis, p.18.
-			if (isWallNode(type)) {
+			## Full BB: F . F | W
+			##          x ----> y
+			if (isNTFullBBWall(type)) {
 				switch (orientation) {
 					%for dir in grid.dir2vecidx.keys():
-						## Symbols used on the schematics below:
-						##
-						## W: wall node (current node, pointed to by 'gi')
-						## F: fluid node
-						## |: actual location of the wall
-						## .: space between fluid nodes
-						## x: node from which data is read
-						## y: node to which data is being written
-						##
-						## The schematics assume a bc_wall_grad_order of 2.
 						case ${dir}: {
-							## Full BB: F . F | W
-							##          x ----> y
-							%if bc_wall == 'fullbb':
-								%if dim == 3:
-									helper_idx += ${rel_offset(*(bc_wall_grad_order*grid.dir_to_vec(dir)))};
-								%else:
-									## rel_offset() needs a 3-vector, so make the z-coordinate 0
-									helper_idx += ${rel_offset(*(list(bc_wall_grad_order*grid.dir_to_vec(dir)) + [0]))};
-								%endif
-							## Full BB: F . W | U
-							##          x ----> y
-							%elif bc_wall == 'halfbb' and bc_wall_grad_order == 1:
-								%if dim == 3:
-									helper_idx -= ${rel_offset(*(grid.dir_to_vec(dir)))};
-								%else:
-									helper_idx -= ${rel_offset(*(list(grid.dir_to_vec(dir)) + [0]))};
-								%endif
+							%if dim == 3:
+								helper_idx += ${rel_offset(*(bc_wall_grad_order*grid.dir_to_vec(dir)))};
 							%else:
-								WETTING_BOUNDARY_CONDITIONS_UNSUPPORTED_FOR_${bc_wall}_AND_GRAD_ORDER_${bc_wall_grad_order}
+								## rel_offset() needs a 3-vector, so make the z-coordinate 0
+								helper_idx += ${rel_offset(*(list(bc_wall_grad_order*grid.dir_to_vec(dir)) + [0]))};
 							%endif
-							break;
 						}
 					%endfor
 				}
-
-				%if bc_wall == 'halfbb':
-					ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-				%elif bc_wall == 'fullbb':
-					getDist(&fi, dist2_in, helper_idx);
-					get0thMoment(&fi, type, orientation, &out);
-					ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-				%else:
-					__UNIMPLEMENTED__
-				%endif
+				getDist(&fi, dist2_in, helper_idx);
+				get0thMoment(&fi, type, orientation, &out);
+				ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+			}
+		%endif  ## NTFullBBWall
+		%if nt.NTHalfBBWall in node_types:
+			%if bc_wall_grad_order != 1:
+				__ONLY_FIRST_ORDER_GRADIENTS_ARE_SUPPORTED_FOR_HALF_BB_WETTING_WALLS__
+			%endif
+			int helper_idx = gi;
+			## Half-way  BB: F . W | U
+			##               x ----> y
+			if (isNTHalfBBWall(type)) {
+				switch (orientation) {
+					%for dir in grid.dir2vecidx.keys():
+						case ${dir}: {
+							%if dim == 3:
+								helper_idx -= ${rel_offset(*(grid.dir_to_vec(dir)))};
+							%else:
+								helper_idx -= ${rel_offset(*(list(grid.dir_to_vec(dir)) + [0]))};
+							%endif
+						}
+					%endfor
+				}
+				ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
 			}
 		%endif
-	%else:
+	%else:	## shan-chen
 		getDist(&fi, dist2_in, gi);
 		get0thMoment(&fi, type, orientation, &out);
 		ophi[gi] = out;
@@ -262,14 +273,14 @@ ${kernel} void CollideAndPropagate(
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isUnusedNode(type) || isGhostNode(type))
+	if (isExcludedNode(type))
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);
 
-	%if bc_pressure == 'guo':
+	%if nt.NTGuoDensity in node_types:
 		int orig_gi = gi;
-		if (isPressureNode(type)) {
+		if (isNTGuoDensity(type)) {
 			switch (orientation) {
 				%for dir_ in grid.dir2vecidx.keys():
 					case (${dir_}): {
@@ -310,8 +321,8 @@ ${kernel} void CollideAndPropagate(
 	getDist(&d0, dist1_in, gi);
 	getDist(&d1, dist2_in, gi);
 
-	%if bc_pressure == 'guo':
-		if (isPressureNode(type)) {
+	%if nt.NTGuoDensity in node_types:
+		if (isNTGuoDensity(type)) {
 			gi = orig_gi;
 		}
 	%endif
@@ -341,8 +352,8 @@ ${kernel} void CollideAndPropagate(
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist1_out);
 	postcollisionBoundaryConditions(&d1, ncode, type, orientation, &g1m0, v, gi, dist2_out);
 
-	%if bc_pressure == 'guo':
-		if (isPressureNode(type)) {
+	%if nt.NTGuoDensity in node_types:
+		if (isNTGuoDensity(type)) {
 			switch (orientation) {
 				%for dir_ in grid.dir2vecidx.keys():
 					case (${dir_}): {
@@ -361,8 +372,8 @@ ${kernel} void CollideAndPropagate(
 
 	// Only save the macroscopic quantities if requested to do so.
 	if (options & OPTION_SAVE_MACRO_FIELDS) {
-		%if simtype == 'shan-chen' and not bc_wall_.wet_node:
-			if (!isWallNode(type))
+		%if simtype == 'shan-chen':
+			if (isWetNode(type))
 		%endif
 		{
 			ovx[gi] = v[0];

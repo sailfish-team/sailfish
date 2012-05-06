@@ -39,8 +39,6 @@ ${kernel_common.body(bgk_args_decl)}
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 <%namespace file="propagation.mako" import="*"/>
 
-<%include file="tracers.mako"/>
-
 <%def name="init_dist_with_eq()">
 	%for local_var in bgk_equilibrium_vars:
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
@@ -85,7 +83,7 @@ ${kernel} void PrepareMacroFields(
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isUnusedNode(type) || isGhostNode(type))
+	if (isExcludedNode(type))
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);
@@ -121,7 +119,7 @@ ${kernel} void CollideAndPropagate(
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isUnusedNode(type) || isGhostNode(type))
+	if (isExcludedNode(type))
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);

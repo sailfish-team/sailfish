@@ -54,7 +54,7 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 	int orientation = decodeNodeOrientation(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isUnusedNode(type)) {
+	if (is_NTUnused(type)) {
 		return;
 	}
 
