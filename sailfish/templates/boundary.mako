@@ -40,10 +40,6 @@
 	%endif
 </%def>
 
-<%def name="get_boundary_pressure(node_param, rho)">
-	${rho} = node_params[${node_param}] * 3.0f;
-</%def>
-
 <%def name="fill_missing_distributions()">
 	switch (orientation) {
 		%for i in range(1, grid.dim*2+1):
