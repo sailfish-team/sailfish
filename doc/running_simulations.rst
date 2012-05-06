@@ -15,7 +15,7 @@ Sailfish modules::
 
     import numpy as np
     from sailfish.geo_block import Subdomain2D
-    from sailfish.geo_block import NTFullBBWall, NTEquilibriumVelocity
+    from sailfish.node_type import NTFullBBWall, NTEquilibriumVelocity
     from sailfish.controller import LBSimulationController
     from sailfish.lb_single import LBFluidSim
 
@@ -78,7 +78,7 @@ attributes ``gx`` (size along the X axis) and ``gy`` (size along the Y axis).
 
 By default, the whole domain is initialized as fluid nodes. To define the
 geometry, we need to redefine some of the nodes using the
-:class:`geo_block.NTFullBBWall` or :class:`geo_block.NTEquilibriumVelocity`
+:class:`node_type.NTFullBBWall` or :class:`node_type.NTEquilibriumVelocity`
 classes to set a no-slip condition or enfore a constant fluid velocity, respectively.
 
 To redefine the nodes, we will use the ``set_node(location, node_type)`` function.
