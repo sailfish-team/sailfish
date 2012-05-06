@@ -5,7 +5,7 @@ raise NotImplementedError("This visualization backend has not been ported yet.")
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
-__license__ = 'GPL3'
+__license__ = 'LGPL3'
 
 import math
 import os

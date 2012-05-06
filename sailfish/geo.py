@@ -2,7 +2,7 @@
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
-__license__ = 'GPL3'
+__license__ = 'LGPL3'
 
 
 from sailfish.geo_block import SubdomainSpec2D, SubdomainSpec3D
