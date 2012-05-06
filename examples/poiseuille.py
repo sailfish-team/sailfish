@@ -3,7 +3,7 @@
 import numpy as np
 
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import Subdomain2D, NTFullBBWall, NTEquilibriumDensity
+from sailfish.geo_block import Subdomain2D, NTFullBBWall, NTHalfBBWall, NTEquilibriumDensity
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
 
@@ -105,12 +105,16 @@ class PoiseuilleSim(LBFluidSim, LBForcedSim):
                 help='start with the correct velocity profile in the whole domain')
         group.add_argument('--drive', type=str, default='force',
                 choices=['force', 'pressure'])
+        group.add_argument('--wall', type=str, choices=['fullbb', 'halfbb'])
 
     @classmethod
     def modify_config(cls, config):
         if config.drive == 'force':
             config.periodic_x = config.horizontal
             config.periodic_y = not config.horizontal
+
+        if config.wall == 'halfbb':
+            cls.subdomain.wall_bc = NTHalfBBWall
 
     def __init__(self, config):
         super(PoiseuilleSim, self).__init__(config)
