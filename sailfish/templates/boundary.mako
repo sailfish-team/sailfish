@@ -1,5 +1,6 @@
 <%!
     from sailfish import sym
+    import sailfish.node_type as nt
 %>
 
 <%namespace file="code_common.mako" import="*"/>
@@ -21,6 +22,8 @@
 		break;
 </%def>
 
+## TODO(michalj): Have generic function for retrieving vectors and densities as
+## parameters.
 <%def name="get_boundary_velocity(node_param, mx, my, mz, rho=0, moments=False)">
 	%if moments:
 		${mx} = node_params[${node_param} * ${dim}] * ${rho};
@@ -110,7 +113,7 @@ ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 	compute_1st_div_0th(fi, v, *rho);
 }
 
-%if bc_wall == 'zouhe' or bc_velocity == 'zouhe' or bc_pressure == 'zouhe':
+%if nt.NTZouHeVelocity in node_types or nt.NTZouHeDensity in node_types:
 ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v0)
 {
 	// Bounce-back of the non-equilibrium parts.
@@ -148,7 +151,7 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v0)
 		%endfor
 	}
 }
-%endif
+%endif  ## ZouHe
 
 ## TODO integrate it via mako with the function below
 
@@ -157,41 +160,54 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 	compute_0th_moment(fi, out);
 }
 
+// Common code for the equilibrium and Zou-He density boundary conditions.
+<%def name="_macro_density_bc_common()">
+	int node_param_idx = decodeNodeParamIdx(ncode);
+	${fill_missing_distributions()}
+	*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
+	float par_rho = node_params[node_param_idx];
+
+	switch (orientation) {
+		%for i in range(1, grid.dim*2+1):
+			case ${i}: {
+				%for d in range(0, grid.dim):
+					v0[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, missing_dir=i, par_rho='par_rho'), pointers=True)};
+				%endfor
+				break;
+			 }
+		%endfor
+	}
+</%def>
+
 //
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
 //
-${device_func} inline void getMacro(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
+${device_func} inline void getMacro(
+		Dist *fi, int ncode, int node_type, int orientation, float *rho,
+		float *v0)
 {
-	if (isFluidOrWallNode(node_type) || isSlipNode(node_type) || orientation == ${nt_dir_other}) {
+	if (NTUsesStandardMacro(node_type) || orientation == ${nt_dir_other}) {
 		compute_macro_quant(fi, rho, v0);
-		if (isWallNode(node_type)) {
-			%if bc_wall_.location == 0.0 and bc_wall_.wet_node:
+		%if nt.NTHalfBBWall in node_types:
+			if (isNTHalfBBWall(node_type)) {
 				v0[0] = 0.0f;
 				v0[1] = 0.0f;
 				%if dim == 3:
 					v0[2] = 0.0f;
 				%endif
-			%endif
-
-			%if bc_wall == 'zouhe':
-				zouhe_bb(fi, orientation, rho, v0);
-			%endif
-		}
-	} else if (isVelocityNode(node_type)) {
-		%if bc_velocity == 'zouhe':
-			int node_param = decodeNodeParam(ncode);
-			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			${get_boundary_velocity('node_param', 'v0[0]', 'v0[1]', 'v0[2]')}
-			zouhe_bb(fi, orientation, rho, v0);
-		// We're dealing with a boundary node, for which some of the distributions
-		// might be meaningless.  Fill them with the values of the opposite
-		// distributions.
-		%elif bc_velocity == 'equilibrium':
-			int node_param = decodeNodeParam(ncode);
+			}
+		%endif
+	}
+	%if nt.NTEquilibriumVelocity in node_types:
+		else if (isNTEquilibriumVelocity(node_type)) {
+			int node_param_idx = decodeNodeParamIdx(ncode);
+			// We're dealing with a boundary node, for which some of the distributions
+			// might be meaningless.  Fill them with the values of the opposite
+			// distributions.
 			${fill_missing_distributions()}
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			${get_boundary_velocity('node_param', 'v0[0]', 'v0[1]', 'v0[2]')}
+			${get_boundary_velocity('node_param_idx', 'v0[0]', 'v0[1]', 'v0[2]')}
 
 			switch (orientation) {
 				%for i in range(1, grid.dim*2+1):
@@ -200,45 +216,40 @@ ${device_func} inline void getMacro(Dist *fi, int ncode, int node_type, int orie
 						break;
 				%endfor
 			}
-		%else:
-			compute_macro_quant(fi, rho, v0);
-		%endif
-	} else if (isPressureNode(node_type)) {
-		%if bc_pressure == 'zouhe' or bc_pressure == 'equilibrium':
-			int node_param = decodeNodeParam(ncode);
-			${fill_missing_distributions()}
+		}
+	%endif
+	%if nt.NTZouHeVelocity in node_types:
+		else if (isNTZouHeVelocity(node_type)) {
+			int node_param_idx = decodeNodeParamIdx(ncode);
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			float par_rho;
-			${get_boundary_pressure('node_param', 'par_rho')}
-
-			switch (orientation) {
-				%for i in range(1, grid.dim*2+1):
-					case ${i}: {
-						%for d in range(0, grid.dim):
-							v0[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, missing_dir=i, par_rho='par_rho'), pointers=True)};
-						%endfor
-						break;
-					 }
-				%endfor
-			}
-
-			%if bc_pressure == 'zouhe':
-				zouhe_bb(fi, orientation, &par_rho, v0);
-				compute_macro_quant(fi, rho, v0);
-			%endif
-			*rho = par_rho;
-		%else:
+			${get_boundary_velocity('node_param_idx', 'v0[0]', 'v0[1]', 'v0[2]')}
+			zouhe_bb(fi, orientation, rho, v0);
+		}
+	%endif
+	%if nt.NTZouHeDensity in node_types:
+		else if (isNTZouHeDensity(node_type)) {
+			${_macro_density_bc_common()}
+			zouhe_bb(fi, orientation, &par_rho, v0);
 			compute_macro_quant(fi, rho, v0);
-		%endif
-	}
+			*rho = par_rho;
+		}
+	%endif
+	%if nt.NTEquilibriumDensity in node_types:
+		else if (isNTEquilibriumDensity(node_type)) {
+			${_macro_density_bc_common()}
+			*rho = par_rho;
+		}
+	%endif
 }
 
 // TODO: Check whether it is more efficient to actually recompute
 // node_type and orientation instead of passing them as variables.
-${device_func} inline void postcollisionBoundaryConditions(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0, int gi, ${global_ptr} float *dist_out)
+${device_func} inline void postcollisionBoundaryConditions(
+		Dist *fi, int ncode, int node_type, int orientation,
+		float *rho, float *v0, int gi, ${global_ptr} float *dist_out)
 {
-	%if bc_wall == 'halfbb':
-		if (isWallNode(node_type)) {
+	%if nt.NTHalfBBWall in node_types:
+		if (isNTHalfBBWall(node_type)) {
 			switch (orientation) {
 			%for i in range(1, grid.dim*2+1):
 				case ${i}: {
@@ -255,33 +266,19 @@ ${device_func} inline void postcollisionBoundaryConditions(Dist *fi, int ncode, 
 
 ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
 {
-	%if bc_wall == 'fullbb':
-		if (isWallNode(node_type)) {
+	%if nt.NTFullBBWall in node_types:
+		if (isNTFullBBWall(node_type)) {
 			bounce_back(fi);
 		}
 	%endif
 
-	%if bc_velocity == 'fullbb':
-		if (isVelocityNode(node_type)) {
-			bounce_back(fi);
-			int node_param = decodeNodeParam(ncode);
-			${get_boundary_velocity('node_param', 'v0[0]', 'v0[1]', 'v0[2]')}
-			%for i, ve in enumerate(grid.basis):
-				fi->${grid.idx_name[i]} += ${cex(
-					sim.S.rho0 * 2 * grid.weights[i] * grid.v.dot(ve) / grid.cssq, pointers=True)};
-			%endfor
-			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-		}
-	%endif
-
-	%if bc_velocity == 'equilibrium' or bc_pressure == 'equilibrium':
+	%if (nt.NTEquilibriumVelocity in node_types) or (nt.NTEquilibriumDensity in node_types):
+		## Additional variables required for the evaluation of the
+		## equilibrium distribution function.
 		%for local_var in bgk_equilibrium_vars:
 			float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
 		%endfor
-	%endif
-
-	%if bc_velocity == 'equilibrium':
-		if (isVelocityNode(node_type)) {
+		if (is_NTEquilibriumNode(node_type)) {
 			%for eq in bgk_equilibrium:
 				%for feq, idx in eq:
 					fi->${idx} = ${cex(feq, pointers=True)};
@@ -289,20 +286,11 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, i
 			%endfor
 		}
 	%endif
-
-	%if bc_pressure == 'equilibrium':
-		if (isPressureNode(node_type)) {
-			%for eq in bgk_equilibrium:
-				%for feq, idx in eq:
-					fi->${idx} = ${cex(feq, pointers=True)};
-				%endfor
-			%endfor
-		}
-	%endif
-
-	## Slip bounce-back boundary conditions are not supported in D3Q13.
-	%if bc_slip == 'slipbb' and (grid.dim != 3 or grid.Q != 13):
-		if (isSlipNode(node_type)) {
+	%if nt.NTSlip in node_types:
+		%if grid.dim == 3 and grid.Q == 13:
+			__SLIP_BOUNDARY_CONDITION_UNSUPPORTED_IN_D3Q13__
+		%endif
+		if (isNTSlip(node_type)) {
 			float t;
 			switch (orientation) {
 			%for i in range(1, grid.dim*2+1):

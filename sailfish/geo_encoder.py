@@ -7,8 +7,8 @@ __license__ = 'LGPL3'
 from collections import defaultdict
 import numpy as np
 
-
-from sailfish import node_type, util
+from sailfish import util
+import sailfish.node_type as nt
 
 def bit_len(num):
     """Returns the minimal number of bits necesary to encode `num`."""
@@ -27,7 +27,7 @@ class GeoEncoder(object):
     scheme."""
     def __init__(self, subdomain):
         # Maps LBNodeType.id to an internal ID used for encoding purposes.
-        self._type_id_remap = {}
+        self._type_id_remap = {0: 0}  # fluid nodes are not remapped
         self.subdomain = subdomain
 
     def encode(self):
@@ -55,6 +55,8 @@ class GeoEncoderConst(GeoEncoder):
     def __init__(self, subdomain):
         GeoEncoder.__init__(self, subdomain)
 
+        # Set of all used node types, passed down to the Mako engine.
+        self._node_types = set([nt._NTFluid])
         self._bits_type = 0
         self._bits_param = 0
         self._type_map = None
@@ -69,11 +71,13 @@ class GeoEncoderConst(GeoEncoder):
           param_map: array whose entries are keys in param_dict
           param_dict: maps entries from param_map to LBNodeType objects
         """
-        uniq_types = np.unique(type_map)
+        uniq_types = list(np.unique(type_map))
+        for nt_id in uniq_types:
+            self._node_types.add(nt._NODE_TYPES[nt_id])
 
         # Initialize the node ID map used for remapping.
         for i, node_type in enumerate(uniq_types):
-            self._type_id_remap[node_type] = i
+            self._type_id_remap[node_type] = i + 1
 
         self._bits_type = bit_len(len(uniq_types))
         self._type_map = type_map
@@ -129,8 +133,8 @@ class GeoEncoderConst(GeoEncoder):
         orientation = np.zeros_like(self._type_map)
         cnt = np.zeros_like(self._type_map)
 
-        dry_types = self._type_map.dtype.type(node_type.get_dry_node_type_ids())
-        wet_types = self._type_map.dtype.type(node_type.get_wet_node_type_ids())
+        dry_types = self._type_map.dtype.type(nt.get_dry_node_type_ids())
+        wet_types = self._type_map.dtype.type(nt.get_wet_node_type_ids())
 
         for i, vec in enumerate(self.subdomain.grid.basis):
             l = len(list(vec)) - 1
@@ -163,13 +167,9 @@ class GeoEncoderConst(GeoEncoder):
     # XXX: Support different types of BCs here.
     def update_context(self, ctx):
         ctx.update({
+            'node_types': self._node_types,
+            'type_id_remap': self._type_id_remap,
             'nt_id_fluid': self._type_id(0),
-            'nt_id_wall': self._type_id(node_type.NTFullBBWall.id),
-            'nt_id_slip': self._type_id(node_type.NTSlip.id),
-            'nt_id_unused': self._type_id(node_type._NTUnused.id),
-            'nt_id_velocity': self._type_id(node_type.NTEquilibriumVelocity.id),
-            'nt_id_pressure': self._type_id(node_type.NTEquilibriumDensity.id),
-            'nt_id_ghost': self._type_id(node_type._NTGhost.id),
             'nt_misc_shift': self._bits_type,
             'nt_type_mask': (1 << self._bits_type) - 1,
             'nt_param_shift': self._bits_param,

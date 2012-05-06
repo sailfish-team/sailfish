@@ -18,22 +18,26 @@ class PoiseuilleSubdomain(Subdomain2D):
     def _set_pressure_bc(self, hx, hy):
         """Adds pressure boundary conditions at the ends of the pipe."""
         pressure_bc = NTEquilibriumDensity
+        land = np.logical_and
+
         if self.config.horizontal:
             pressure = (self.max_v * (8.0 * self.config.visc) /
                 (self.channel_width(self.config)**2) * self.gx)
 
-            self.set_node(hx == 0, pressure_bc(1.0 + pressure/2.0))
-            self.set_node(hx == self.gx - 1, pressure_bc(1.0 - pressure/2.0))
+            not_wall = land(hy > 0, hy < self.gy - 1)
+            self.set_node(land(not_wall, hx == 0), pressure_bc(1.0 + pressure/2.0))
+            self.set_node(land(not_wall, hx == self.gx - 1), pressure_bc(1.0 - pressure/2.0))
         else:
             pressure = (self.max_v * (8.0 * self.config.visc) /
                 (self.channel_width(self.config)**2) * self.gy)
 
-            self.set_node(hy == 0, pressure_bc(1.0 + pressure/2.0))
-            self.set_node(hy == self.gy - 1, pressure_bc(1.0 - pressure/2.0))
+            not_wall = land(hx > 0, hx < self.gx - 1)
+            self.set_node(land(not_wall, hy == 0), pressure_bc(1.0 + pressure/2.0))
+            self.set_node(land(not_wall, hy == self.gy - 1), pressure_bc(1.0 - pressure/2.0))
 
     def boundary_conditions(self, hx, hy):
         if self.config.drive == 'pressure':
-            self._set_pressure_bc(self, hx, hy)
+            self._set_pressure_bc(hx, hy)
 
         # Set walls.
         if self.config.horizontal:

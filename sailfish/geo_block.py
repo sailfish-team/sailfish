@@ -717,27 +717,7 @@ class Subdomain(object):
 
     def update_context(self, ctx):
         assert self._encoder is not None
-
         self._encoder.update_context(ctx)
-
-        # FIXME(michalj)
-        if nt.NTEquilibriumVelocity.id in self._seen_types:
-            bc_velocity = 'equilibrium'
-        else:
-            bc_velocity = None
-
-        if nt.NTFullBBWall.id in self._seen_types:
-            bc_wall = 'fullbb'
-        else:
-            bc_wall = None
-
-        ctx.update({
-                'bc_wall': bc_wall,
-                'bc_velocity': bc_velocity,
-                'bc_wall_': nt.NTFullBBWall,
-                'bc_velocity_': nt.NTEquilibriumVelocity,
-                'bc_pressure_': nt.NTEquilibriumDensity,
-                })
 
     def encoded_map(self):
         if not self._type_map_encoded:
