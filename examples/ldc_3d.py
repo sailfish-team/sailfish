@@ -3,7 +3,7 @@
 import numpy as np
 from sailfish.geo import LBGeometry3D
 from sailfish.geo_block import SubdomainSpec3D, Subdomain3D
-from sailfish.geo_block import NTFullBBWall, NTEquilibriumVelocity
+from sailfish.node_type import NTFullBBWall, NTEquilibriumVelocity
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
 

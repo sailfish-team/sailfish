@@ -9,6 +9,7 @@ import inspect
 import operator
 import numpy as np
 from sailfish import sym, util
+import sailfish.node_type as nt
 
 def span_area(span):
     area = 1
@@ -679,10 +680,10 @@ class Subdomain(object):
         """
         assert not self._type_map_encoded
         if inspect.isclass(node_type):
-            assert issubclass(node_type, LBNodeType)
+            assert issubclass(node_type, nt.LBNodeType)
             node_type = node_type()
         else:
-            assert isinstance(node_type, LBNodeType)
+            assert isinstance(node_type, nt.LBNodeType)
 
         self._verify_params(where, node_type)
         self._type_map[where] = node_type.id
@@ -720,12 +721,12 @@ class Subdomain(object):
         self._encoder.update_context(ctx)
 
         # FIXME(michalj)
-        if NTEquilibriumVelocity.id in self._seen_types:
+        if nt.NTEquilibriumVelocity.id in self._seen_types:
             bc_velocity = 'equilibrium'
         else:
             bc_velocity = None
 
-        if NTFullBBWall.id in self._seen_types:
+        if nt.NTFullBBWall.id in self._seen_types:
             bc_wall = 'fullbb'
         else:
             bc_wall = None
@@ -733,9 +734,9 @@ class Subdomain(object):
         ctx.update({
                 'bc_wall': bc_wall,
                 'bc_velocity': bc_velocity,
-                'bc_wall_': NTFullBBWall,
-                'bc_velocity_': NTEquilibriumVelocity,
-                'bc_pressure_': NTEquilibriumDensity,
+                'bc_wall_': nt.NTFullBBWall,
+                'bc_velocity_': nt.NTEquilibriumVelocity,
+                'bc_pressure_': nt.NTEquilibriumDensity,
                 })
 
     def encoded_map(self):
@@ -765,13 +766,13 @@ class Subdomain2D(Subdomain):
         es = self.block.envelope_size
         if not es:
             return
-        self._type_map.base[0:es, :] = _NTGhost.id
-        self._type_map.base[:, 0:es] = _NTGhost.id
-        self._type_map.base[es + self.block.ny:, :] = _NTGhost.id
-        self._type_map.base[:, es + self.block.nx:] = _NTGhost.id
+        self._type_map.base[0:es, :] = nt._NTGhost.id
+        self._type_map.base[:, 0:es] = nt._NTGhost.id
+        self._type_map.base[es + self.block.ny:, :] = nt._NTGhost.id
+        self._type_map.base[:, es + self.block.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
-        dry_types = self._type_map.dtype.type(get_dry_node_type_ids())
+        dry_types = self._type_map.dtype.type(nt.get_dry_node_type_ids())
 
         # Find nodes which are walls themselves and are completely surrounded by
         # walls.  These nodes are marked as unused, as they do not contribute to
@@ -782,7 +783,7 @@ class Subdomain2D(Subdomain):
             a = np.roll(a, int(-vec[1]), axis=0)
             cnt[util.in_anyd(a, dry_types)] += 1
 
-        self._type_map.base[(cnt == self.grid.Q)] = _NTUnused.id
+        self._type_map.base[(cnt == self.grid.Q)] = nt._NTUnused.id
 
 
 class Subdomain3D(Subdomain):
@@ -802,15 +803,15 @@ class Subdomain3D(Subdomain):
         es = self.block.envelope_size
         if not es:
             return
-        self._type_map.base[0:es, :, :] = _NTGhost.id
-        self._type_map.base[:, 0:es, :] = _NTGhost.id
-        self._type_map.base[:, :, 0:es] = _NTGhost.id
-        self._type_map.base[es + self.block.nz:, :, :] = _NTGhost.id
-        self._type_map.base[:, es + self.block.ny:, :] = _NTGhost.id
-        self._type_map.base[:, :, es + self.block.nx:] = _NTGhost.id
+        self._type_map.base[0:es, :, :] = nt._NTGhost.id
+        self._type_map.base[:, 0:es, :] = nt._NTGhost.id
+        self._type_map.base[:, :, 0:es] = nt._NTGhost.id
+        self._type_map.base[es + self.block.nz:, :, :] = nt._NTGhost.id
+        self._type_map.base[:, es + self.block.ny:, :] = nt._NTGhost.id
+        self._type_map.base[:, :, es + self.block.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
-        dry_types = self._type_map.dtype.type(get_dry_node_type_ids())
+        dry_types = self._type_map.dtype.type(nt.get_dry_node_type_ids())
 
         # Find nodes which are walls themselves and are completely surrounded by
         # walls.  These nodes are marked as unused, as they do not contribute to
@@ -822,80 +823,6 @@ class Subdomain3D(Subdomain):
             a = np.roll(a, int(-vec[2]), axis=0)
             cnt[util.in_anyd(a, dry_types)] += 1
 
-        self._type_map.base[(cnt == self.grid.Q)] = _NTUnused.id
+        self._type_map.base[(cnt == self.grid.Q)] = nt._NTUnused.id
 
 
-# Node type classes.  Use this to define boundary conditions.
-class LBNodeType(object):
-    # Initialized when module is loaded.
-    id = None
-    wet_node = False
-    location = 0.0
-
-    def __init__(self, **params):
-        self.params = params
-
-class _NTGhost(LBNodeType):
-    """Ghost node."""
-    pass
-
-class _NTUnused(LBNodeType):
-    """Unused node."""
-
-class NTHalfBBWall(LBNodeType):
-    """Half-way bounce-back (no-slip) node."""
-    wet_node = True
-    pass
-
-class NTFullBBWall(LBNodeType):
-    """Full-way bounce-back (no-slip) node."""
-    pass
-
-class NTSlip(LBNodeType):
-    """Full-slip node."""
-    pass
-
-class NTEquilibriumVelocity(LBNodeType):
-    """Velocity boundary condition using the equilibrium distribution."""
-
-    def __init__(self, velocity):
-        self.params = {'velocity': velocity}
-
-class NTEquilibriumDensity(LBNodeType):
-    """Density boundary condition using the equilibrium distribution."""
-
-class NTZouHeVelocity(LBNodeType):
-    """Zou-he velocity."""
-
-class NTZouHeDensity(LBNodeType):
-    """Zou-He density."""
-
-class NTGuoDensity(LBNodeType):
-    """Guo density."""
-
-
-def __init_node_type_list():
-    """Assigns IDs to classes descendant from LBNodeType."""
-    ret = []
-    import sys
-    curr_module = sys.modules[__name__]
-    for symbol in dir(curr_module):
-        obj = getattr(curr_module, symbol)
-        try:
-            if obj != LBNodeType and issubclass(obj, LBNodeType):
-                ret.append(obj)
-                obj.id = len(ret)
-        except TypeError:
-            pass
-
-    return dict([(node_type.id, node_type) for node_type in ret])
-
-def get_wet_node_type_ids():
-    return [id for id, nt in _NODE_TYPES.iteritems() if nt.wet_node]
-
-def get_dry_node_type_ids():
-    return [id for id, nt in _NODE_TYPES.iteritems() if not nt.wet_node]
-
-
-# Maps node type IDs to their classes.
-_NODE_TYPES = __init_node_type_list()

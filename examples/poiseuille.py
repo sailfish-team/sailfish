@@ -3,7 +3,8 @@
 import numpy as np
 
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import Subdomain2D, NTFullBBWall, NTHalfBBWall, NTEquilibriumDensity
+from sailfish.geo_block import Subdomain2D
+from sailfish.node_type import NTFullBBWall, NTHalfBBWall, NTEquilibriumDensity
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
 

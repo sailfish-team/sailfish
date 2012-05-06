@@ -8,7 +8,7 @@ from collections import defaultdict
 import numpy as np
 
 
-from sailfish import geo_block, util
+from sailfish import node_type, util
 
 def bit_len(num):
     """Returns the minimal number of bits necesary to encode `num`."""
@@ -129,8 +129,8 @@ class GeoEncoderConst(GeoEncoder):
         orientation = np.zeros_like(self._type_map)
         cnt = np.zeros_like(self._type_map)
 
-        dry_types = self._type_map.dtype.type(geo_block.get_dry_node_type_ids())
-        wet_types = self._type_map.dtype.type(geo_block.get_wet_node_type_ids())
+        dry_types = self._type_map.dtype.type(node_type.get_dry_node_type_ids())
+        wet_types = self._type_map.dtype.type(node_type.get_wet_node_type_ids())
 
         for i, vec in enumerate(self.subdomain.grid.basis):
             l = len(list(vec)) - 1
@@ -164,12 +164,12 @@ class GeoEncoderConst(GeoEncoder):
     def update_context(self, ctx):
         ctx.update({
             'geo_fluid': self._type_id(0),
-            'geo_wall': self._type_id(geo_block.NTFullBBWall.id),
-            'geo_slip': self._type_id(geo_block.NTSlip.id),
-            'geo_unused': self._type_id(geo_block._NTUnused.id),
-            'geo_velocity': self._type_id(geo_block.NTEquilibriumVelocity.id),
-            'geo_pressure': self._type_id(geo_block.NTEquilibriumDensity.id),
-            'geo_ghost': self._type_id(geo_block._NTGhost.id),
+            'geo_wall': self._type_id(node_type.NTFullBBWall.id),
+            'geo_slip': self._type_id(node_type.NTSlip.id),
+            'geo_unused': self._type_id(node_type._NTUnused.id),
+            'geo_velocity': self._type_id(node_type.NTEquilibriumVelocity.id),
+            'geo_pressure': self._type_id(node_type.NTEquilibriumDensity.id),
+            'geo_ghost': self._type_id(node_type._NTGhost.id),
             'geo_misc_shift': self._bits_type,
             'geo_type_mask': (1 << self._bits_type) - 1,
             'geo_param_shift': self._bits_param,
