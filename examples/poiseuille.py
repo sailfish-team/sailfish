@@ -25,15 +25,15 @@ class PoiseuilleSubdomain(Subdomain2D):
                 (self.channel_width(self.config)**2) * self.gx)
 
             not_wall = land(hy > 0, hy < self.gy - 1)
-            self.set_node(land(not_wall, hx == 0), pressure_bc(1.0 + pressure/2.0))
-            self.set_node(land(not_wall, hx == self.gx - 1), pressure_bc(1.0 - pressure/2.0))
+            self.set_node(land(not_wall, hx == 0), pressure_bc(1.0 + 3.0 * pressure/2.0))
+            self.set_node(land(not_wall, hx == self.gx - 1), pressure_bc(1.0 - 3.0 * pressure/2.0))
         else:
             pressure = (self.max_v * (8.0 * self.config.visc) /
                 (self.channel_width(self.config)**2) * self.gy)
 
             not_wall = land(hx > 0, hx < self.gx - 1)
-            self.set_node(land(not_wall, hy == 0), pressure_bc(1.0 + pressure/2.0))
-            self.set_node(land(not_wall, hy == self.gy - 1), pressure_bc(1.0 - pressure/2.0))
+            self.set_node(land(not_wall, hy == 0), pressure_bc(1.0 + 3 * pressure/2.0))
+            self.set_node(land(not_wall, hy == self.gy - 1), pressure_bc(1.0 - 3 * pressure/2.0))
 
     def boundary_conditions(self, hx, hy):
         if self.config.drive == 'pressure':
