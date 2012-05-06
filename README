@@ -3,7 +3,10 @@
 Sailfish is an Open Source project.  Its code is licensed under the terms of
 the LGPL v3.
 
-The source code is hosted in a git repository at https://github.com/sailfish-team/sailfish
+The source code is hosted in a git repository at:
+  
+   https://github.com/sailfish-team/sailfish
+
 To get a recent copy, run:
 
  $ git clone https://github.com/sailfish-team/sailfish sailfish-cfd
