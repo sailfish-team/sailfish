@@ -20,7 +20,7 @@ here is a simple example code to simulate fluid flow in a lid-driven cavity::
 
     import numpy as np
     from sailfish.geo_block import Subdomain2D
-    from sailfish.geo_block import NTFullBBWall, NTEquilibriumVelocity
+    from sailfish.node_type import NTFullBBWall, NTEquilibriumVelocity
     from sailfish.controller import LBSimulationController
     from sailfish.lb_single import LBFluidSim
 
