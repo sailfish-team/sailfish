@@ -23,22 +23,22 @@
 
 <%def name="get_boundary_velocity(node_param, mx, my, mz, rho=0, moments=False)">
 	%if moments:
-		${mx} = geo_params[${node_param} * ${dim}] * ${rho};
-		${my} = geo_params[${node_param} * ${dim} + 1] * ${rho};
+		${mx} = node_params[${node_param} * ${dim}] * ${rho};
+		${my} = node_params[${node_param} * ${dim} + 1] * ${rho};
 		%if dim == 3:
-			${mz} = geo_params[${node_param} * ${dim} + 2] * ${rho};
+			${mz} = node_params[${node_param} * ${dim} + 2] * ${rho};
 		%endif
 	%else:
-		${mx} = geo_params[${node_param} * ${dim}];
-		${my} = geo_params[${node_param} * ${dim} + 1];
+		${mx} = node_params[${node_param} * ${dim}];
+		${my} = node_params[${node_param} * ${dim} + 1];
 		%if dim == 3:
-			${mz} = geo_params[${node_param} * ${dim} + 2];
+			${mz} = node_params[${node_param} * ${dim} + 2];
 		%endif
 	%endif
 </%def>
 
 <%def name="get_boundary_pressure(node_param, rho)">
-	${rho} = geo_params[${node_param}] * 3.0f;
+	${rho} = node_params[${node_param}] * 3.0f;
 </%def>
 
 <%def name="fill_missing_distributions()">
@@ -118,7 +118,7 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v0)
 		%for i in range(1, grid.dim*2+1):
 			${noneq_bb(i)}
 		%endfor
-		case ${geo_dir_other}:
+		case ${nt_dir_other}:
 			bounce_back(fi);
 			return;
 	}
@@ -163,7 +163,7 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 //
 ${device_func} inline void getMacro(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
 {
-	if (isFluidOrWallNode(node_type) || isSlipNode(node_type) || orientation == ${geo_dir_other}) {
+	if (isFluidOrWallNode(node_type) || isSlipNode(node_type) || orientation == ${nt_dir_other}) {
 		compute_macro_quant(fi, rho, v0);
 		if (isWallNode(node_type)) {
 			%if bc_wall_.location == 0.0 and bc_wall_.wet_node:

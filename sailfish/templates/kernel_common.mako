@@ -271,7 +271,6 @@
 
 #define BLOCK_SIZE ${block_size}
 #define DIST_SIZE ${dist_size}
-#define GEO_FLUID ${geo_fluid}
 #define OPTION_SAVE_MACRO_FIELDS 1
 #define OPTION_BULK 2
 
@@ -285,15 +284,15 @@ extern int printf (__const char *__restrict __format, ...);
 	${const_var} float ${name} = ${val}f;
 %endfor
 
-%if geo_params:
+%if node_params:
 	// Additional geometry parameters (velocities, pressures, etc)
-	${const_var} float geo_params[${len(geo_params)}] = {
-	%for param in geo_params:
+	${const_var} float node_params[${len(node_params)}] = {
+	%for param in node_params:
 		${param}f,
 	%endfor
 	};
 %else:
-	${const_var} float geo_params[1] = {0};
+	${const_var} float node_params[1] = {0};
 %endif
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
