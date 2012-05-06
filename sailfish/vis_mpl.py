@@ -48,6 +48,7 @@ class Fluid2DVis(vis.FluidVis):
         buffer = np.zeros((height, width))
         buffer.ravel()[:] = block.vis_buffer[:]
 
+        self.ax.set_title('Iteration: {0}'.format(curr_iter))
         self.plot.set_data(buffer)
         self.plot.set_clim(np.min(buffer), np.max(buffer))
         self.fig.canvas.draw_idle()
@@ -67,5 +68,6 @@ class Fluid2DVis(vis.FluidVis):
         import wx
         wx.EVT_IDLE(wx.GetApp(), self.update)
         plt.show()
+        self._sim_quit_event.set()
 
 engine=Fluid2DVis
