@@ -2,7 +2,7 @@
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
-__license__ = 'GPL3'
+__license__ = 'LGPL3'
 
 class Field(object):
     def __init__(self, name, values, negative=False, ranges=None):
@@ -17,6 +17,7 @@ class Field(object):
 
         if ranges is not None and len(ranges) != len(values):
             raise ValueError('A range has to be specified for every component of the field.')
+
 
 class FluidVis(object):
     name = 'replace_this_in_derivative_classes'
