@@ -11,7 +11,7 @@ import time
 import numpy as np
 import pygame
 
-from sailfish import lb_base, vis, geo_block, util
+from sailfish import lb_base, node_type, util, vis
 
 pygame.init()
 pygame.surfarray.use_arraytype('numpy')
@@ -222,7 +222,7 @@ class Fluid2DVis(vis.FluidVis):
         geo_map.reshape(width * height)[:] = block.vis_geo_buffer[:]
 
         geo_map = np.rot90(geo_map, 3)
-        dry_types = geo_map.dtype.type(geo_block.get_dry_node_type_ids())
+        dry_types = geo_map.dtype.type(node_type.get_dry_node_type_ids())
         tg_buffer[util.in_anyd(geo_map, dry_types)] = self._color_wall
 
     def _draw_field(self, srf, width, height, block):
