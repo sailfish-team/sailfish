@@ -163,19 +163,19 @@ class GeoEncoderConst(GeoEncoder):
     # XXX: Support different types of BCs here.
     def update_context(self, ctx):
         ctx.update({
-            'geo_fluid': self._type_id(0),
-            'geo_wall': self._type_id(node_type.NTFullBBWall.id),
-            'geo_slip': self._type_id(node_type.NTSlip.id),
-            'geo_unused': self._type_id(node_type._NTUnused.id),
-            'geo_velocity': self._type_id(node_type.NTEquilibriumVelocity.id),
-            'geo_pressure': self._type_id(node_type.NTEquilibriumDensity.id),
-            'geo_ghost': self._type_id(node_type._NTGhost.id),
-            'geo_misc_shift': self._bits_type,
-            'geo_type_mask': (1 << self._bits_type) - 1,
-            'geo_param_shift': self._bits_param,
-            'geo_dir_other': 0,  # used to indicate non-primary direction
+            'nt_id_fluid': self._type_id(0),
+            'nt_id_wall': self._type_id(node_type.NTFullBBWall.id),
+            'nt_id_slip': self._type_id(node_type.NTSlip.id),
+            'nt_id_unused': self._type_id(node_type._NTUnused.id),
+            'nt_id_velocity': self._type_id(node_type.NTEquilibriumVelocity.id),
+            'nt_id_pressure': self._type_id(node_type.NTEquilibriumDensity.id),
+            'nt_id_ghost': self._type_id(node_type._NTGhost.id),
+            'nt_misc_shift': self._bits_type,
+            'nt_type_mask': (1 << self._bits_type) - 1,
+            'nt_param_shift': self._bits_param,
+            'nt_dir_other': 0,  # used to indicate non-primary direction
                                  # in orientation processing code
-            'geo_params': self._geo_params
+            'nt_params': self._geo_params
         })
 
     def _encode_node(self, orientation, param, node_type):

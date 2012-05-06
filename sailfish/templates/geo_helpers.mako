@@ -26,32 +26,32 @@ ${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int idx
 }
 
 ${device_func} inline bool isUnusedNode(unsigned int type) {
-	return type == ${geo_unused};
+	return type == ${nt_id_unused};
 }
 
 ${device_func} inline bool isFluidNode(unsigned int type) {
-	return type == ${geo_fluid};
+	return type == ${nt_id_fluid};
 }
 
 ${device_func} inline bool isSlipNode(unsigned int type) {
-	return type == ${geo_slip};
+	return type == ${nt_id_slip};
 }
 
 ${device_func} inline bool isWallNode(unsigned int type) {
-	return type == ${geo_wall};
+	return type == ${nt_id_wall};
 }
 
 ${device_func} inline bool isFluidOrWallNode(unsigned int type) {
-	return type <= ${geo_wall};
+	return type <= ${nt_id_wall};
 }
 
 // This assumes we're dealing with a wall node.
 ${device_func} inline bool isVelocityNode(unsigned int type) {
-	return type == ${geo_velocity};
+	return type == ${nt_id_velocity};
 }
 
 ${device_func} inline bool isPressureNode(unsigned int type) {
-	return (type >= ${geo_pressure});
+	return (type >= ${nt_id_pressure});
 }
 
 ${device_func} inline bool isVelocityOrPressureNode(unsigned int type) {
@@ -59,7 +59,7 @@ ${device_func} inline bool isVelocityOrPressureNode(unsigned int type) {
 }
 
 ${device_func} inline bool isGhostNode(unsigned int type) {
-	return (type == ${geo_ghost});
+	return (type == ${nt_id_ghost});
 }
 
 // Wet nodes are nodes that undergo a standard collision procedure.
@@ -82,15 +82,15 @@ ${device_func} inline bool isWetNode(unsigned int type) {
 }
 
 ${device_func} inline unsigned int decodeNodeType(unsigned int nodetype) {
-	return nodetype & ${geo_type_mask};
+	return nodetype & ${nt_type_mask};
 }
 
 ${device_func} inline unsigned int decodeNodeOrientation(unsigned int nodetype) {
-	return nodetype >> ${geo_misc_shift + geo_param_shift};
+	return nodetype >> ${nt_misc_shift + nt_param_shift};
 }
 
 ${device_func} inline unsigned int decodeNodeParam(unsigned int nodetype) {
-	return (nodetype >> ${geo_misc_shift}) & ${(1 << geo_param_shift)-1};
+	return (nodetype >> ${nt_misc_shift}) & ${(1 << nt_param_shift)-1};
 }
 
 %if dim == 2:
