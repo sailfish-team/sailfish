@@ -42,7 +42,7 @@ class Fluid2DVis(vis.FluidVis):
             return
 
         # XXX
-        self._vis_config.field = 0
+        self._vis_config.field = 1
         width, height = self.size
         block = self._blocks[self._vis_config.block]
         buffer = np.zeros((height, width))
@@ -63,7 +63,7 @@ class Fluid2DVis(vis.FluidVis):
         self.ax = self.fig.add_subplot(111)
         width, height = self.size
         buffer = np.zeros((height, width))
-        self.plot = self.ax.imshow(buffer)
+        self.plot = self.ax.imshow(buffer, origin='lower')
         self.fig.colorbar(self.plot)
         import wx
         wx.EVT_IDLE(wx.GetApp(), self.update)
