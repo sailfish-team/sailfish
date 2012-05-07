@@ -634,7 +634,8 @@ class Subdomain(object):
         self._type_vis_map = np.zeros(list(reversed(block.size)),
                 dtype=np.uint8)
         self._type_map_encoded = False
-        self._param_map = np.zeros_like(self._type_map, dtype=np.int_)
+        self._param_map = block.runner.make_scalar_field(dtype=np.int_,
+                register=False)
         self._params = {}
         self._encoder = None
         self._seen_types = set([0])
@@ -709,7 +710,7 @@ class Subdomain(object):
         from sailfish import geo_encoder
         self._encoder = geo_encoder.GeoEncoderConst(self)
         self._encoder.prepare_encode(self._type_map.base,
-                self._param_map, self._params)
+                self._param_map.base, self._params)
 
     def init_fields(self, sim):
         mgrid = self._get_mgrid()
