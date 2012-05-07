@@ -22,23 +22,13 @@
 		break;
 </%def>
 
-## TODO(michalj): Have generic function for retrieving vectors and densities as
-## parameters.
-<%def name="get_boundary_velocity(node_param, mx, my, mz, rho=0, moments=False)">
-	%if moments:
-		${mx} = node_params[${node_param} * ${dim}] * ${rho};
-		${my} = node_params[${node_param} * ${dim} + 1] * ${rho};
-		%if dim == 3:
-			${mz} = node_params[${node_param} * ${dim} + 2] * ${rho};
-		%endif
-	%else:
-		${mx} = node_params[${node_param} * ${dim}];
-		${my} = node_params[${node_param} * ${dim} + 1];
-		%if dim == 3:
-			${mz} = node_params[${node_param} * ${dim} + 2];
-		%endif
+${device_func} inline void node_param_get_vector(const int idx, float *out) {
+	out[0] = node_params[idx];
+	out[1] = node_params[idx + 1];
+	%if dim == 3:
+		out[2] = node_params[idx + 2];
 	%endif
-</%def>
+}
 
 <%def name="fill_missing_distributions()">
 	switch (orientation) {
@@ -203,7 +193,7 @@ ${device_func} inline void getMacro(
 			// distributions.
 			${fill_missing_distributions()}
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			${get_boundary_velocity('node_param_idx', 'v0[0]', 'v0[1]', 'v0[2]')}
+			node_param_get_vector(node_param_idx, v0);
 
 			switch (orientation) {
 				%for i in range(1, grid.dim*2+1):
@@ -218,7 +208,7 @@ ${device_func} inline void getMacro(
 		else if (isNTZouHeVelocity(node_type)) {
 			int node_param_idx = decodeNodeParamIdx(ncode);
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			${get_boundary_velocity('node_param_idx', 'v0[0]', 'v0[1]', 'v0[2]')}
+			node_param_get_vector(node_param_idx, v0);
 			zouhe_bb(fi, orientation, rho, v0);
 		}
 	%endif
