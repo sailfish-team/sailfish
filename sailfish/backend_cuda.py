@@ -68,8 +68,6 @@ class CUDABackend(object):
                      ' devices', action='store_true', default=False)
         group.add_argument('--cuda_cache', type=bool, default=True,
                 help='if True, use the pycuda compiler cache.')
-        group.add_argument('--block_size', type=int, default=64,
-                help='size of the block of threads on the compute device')
         return 1
 
     def __init__(self, options, gpu_id):

@@ -45,6 +45,10 @@ def _hsv_to_rgb(a):
 
     return np.choose(i, choices)
 
+def symmetric(f):
+    f.symmetric = True
+    return f
+
 def _cmap_hsv(drw):
     drw = drw.reshape((drw.shape[0], drw.shape[1], 1)) * np.float32([1.0, 1.0, 1.0])
     drw[:,:,2] = 1.0
@@ -55,6 +59,7 @@ def _cmap_hsv(drw):
 def _cmap_std(drw):
     return (drw.reshape((drw.shape[0], drw.shape[1], 1)) * 255.0).astype(np.uint8) * np.uint8([1,1,0])
 
+@symmetric
 def _cmap_2col(drw):
     drw = ((drw*(drw>0).astype(int)).reshape((drw.shape[0], drw.shape[1], 1)) * np.uint8([255, 0, 0])
         - ( drw*(drw<0).astype(int)).reshape((drw.shape[0], drw.shape[1], 1)) * np.uint8([0, 0, 255]))
@@ -169,7 +174,6 @@ class Fluid2DVis(vis.FluidVis):
         self._mouse_pos = 0,0
         self._mouse_vel = 0,0
 
-        self._reset()
         self.resize()
 
         pygame.key.set_repeat(100,50)
@@ -189,9 +193,6 @@ class Fluid2DVis(vis.FluidVis):
         width = int(width * self.config.scr_scale)
         height = int(height * self.config.scr_scale)
         self.set_mode(width, height)
-
-    def _reset(self):
-        self._cmap_scale = [1.0] * self.num_fields
 
     @property
     def size(self):
@@ -236,13 +237,19 @@ class Fluid2DVis(vis.FluidVis):
         v_max = np.max(tmp)
         v_min = np.min(tmp)
 
-        tmp[:] = (tmp - v_min) / (v_max - v_min)
-        tmp[tmp > 1.0] = 1.0
-        tmp = np.abs(tmp)
+        cmap = cmaps[1][self._cmap[1]]
+        if hasattr(cmap, 'symmetric'):
+            v_absmax = max(v_max, abs(v_min))
+            tmp[:] /= v_absmax
+        else:
+            tmp[:] = (tmp - v_min) / (v_max - v_min)
+            tmp[tmp > 1.0] = 1.0
+            tmp = np.abs(tmp)
+
         tmp = np.rot90(tmp, 3)
 
         # TODO(michalj): Add support for multi-component fields.
-        vis_field = cmaps[1]['rgb1'](tmp)
+        vis_field = cmaps[1][self._cmap[1]](tmp)
         a[:] = vis_field[:]
 
         self._draw_geometry(a, width, height, block)
@@ -277,28 +284,30 @@ class Fluid2DVis(vis.FluidVis):
                     new_field = self._vis_config.field + 1
                     new_field %= self._vis_config.fields
                     self._vis_config.field = new_field
-                # Previous block.
+                # Previous subdomain.
                 elif event.key == pygame.K_j:
                     new_block = self._vis_config.block - 1
                     new_block %= len(self._blocks)
                     self._vis_config.block = new_block
                     self.resize()
-                # Next block.
+                # Next subdomain.
                 elif event.key == pygame.K_k:
                     new_block = self._vis_config.block + 1
                     new_block %= len(self._blocks)
                     self._vis_config.block = new_block
                     self.resize()
-#                elif event.key == pygame.K_LEFTBRACKET:
-#                    n = len(self.field.vals)
-#                    idx = cmaps[n].keys().index(self._cmap[n]) - 1
-#                    idx %= len(cmaps[n].keys())
-#                    self._cmap[n] = cmaps[n].keys()[idx]
-#                elif event.key == pygame.K_RIGHTBRACKET:
-#                    n = len(self.field.vals)
-#                    idx = cmaps[n].keys().index(self._cmap[n]) + 1
-#                    idx %= len(cmaps[n].keys())
-#                    self._cmap[n] = cmaps[n].keys()[idx]
+                elif event.key == pygame.K_LEFTBRACKET:
+                    #n = len(self.field.vals)
+                    n = 1
+                    idx = cmaps[n].keys().index(self._cmap[n]) - 1
+                    idx %= len(cmaps[n].keys())
+                    self._cmap[n] = cmaps[n].keys()[idx]
+                elif event.key == pygame.K_RIGHTBRACKET:
+                    #n = len(self.field.vals)
+                    n = 1
+                    idx = cmaps[n].keys().index(self._cmap[n]) + 1
+                    idx %= len(cmaps[n].keys())
+                    self._cmap[n] = cmaps[n].keys()[idx]
 #                elif event.key == pygame.K_v:
 #                    self._velocity = not self._velocity
                 elif event.key == pygame.K_q:
@@ -355,7 +364,6 @@ class Fluid2DVis(vis.FluidVis):
 
 
     def run(self):
-        self._reset()
         t_prev = time.time()
         avg_mlups = 0.0
         mlups = 0.0

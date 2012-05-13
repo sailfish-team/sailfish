@@ -7,6 +7,7 @@ __license__ = 'LGPL3'
 import math
 import numpy as np
 import operator
+import os
 import ctypes
 from ctypes import Structure, c_uint16, c_int32, c_uint8, c_bool
 
@@ -126,6 +127,11 @@ def dists_filename(base, digits, subdomain_id, it, suffix='.npy'):
 
 def subdomains_filename(base):
     return base + '.subdomains'
+
+def source_filename(filename, subdomain_id):
+    base, ext = os.path.splitext(filename)
+    return '{0}.{1}.{2}'.format(base, subdomain_id, ext)
+
 
 class VTKOutput(LBOutput):
     """Saves simulation data in VTK files."""

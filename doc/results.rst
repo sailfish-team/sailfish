@@ -55,14 +55,9 @@ keys are defined:
 ``=``  next scalar field
 ``[``  previous color map
 ``]``  next color map
+``j``  previous subdomain
+``k``  next subdomain
 ``i``  toggle visibility of text info about the state of the simulation (MLUPS, iteration etc.)
-``v``  toggle visualization of the velocity vector field
-``t``  toggle visualization of the fluid tracer particles
-``c``  toggle convolution of the visualization with a Gaussian kernel (this has a smoothing effect)
-``e``  apply the emboss filter to the visualization (useful to monitor sound waves)
-``r``  reset the simulation geometry (this clears any obstacles added interactively)
 ``q``  quit the simulation
 ``s``  take a screenshot
-``,``  decrease the max value used in the color map
-``.``  increase the max value used in the color map
 =====  ============================================================================================
