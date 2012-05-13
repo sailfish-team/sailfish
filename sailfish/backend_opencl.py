@@ -47,6 +47,12 @@ class OpenCLBackend(object):
         self.default_queue = cl.CommandQueue(self.ctx)
         self.buffers = {}
         self.arrays = {}
+        self._iteration_kernels = []
+
+    def set_iteration(self, it):
+        self._iteration = it
+        for kernel in self._iteration_kernels:
+            kernel.set_arg(kernel.num_args - 1, it)
 
     def alloc_buf(self, size=None, like=None, wrap_in_array=True):
         mf = cl.mem_flags
@@ -124,11 +130,21 @@ class OpenCLBackend(object):
         preamble = '#pragma OPENCL EXTENSION cl_khr_fp64: enable\n'
         return cl.Program(self.ctx, preamble + source).build() #'-cl-single-precision-constant -cl-fast-relaxed-math')
 
-    def get_kernel(self, prog, name, block, args, args_format, shared=0):
+    def get_kernel(self, prog, name, block, args, args_format, shared=0,
+            needs_iteration=False):
+        """
+        :param needs_iteration: if True, the kernel needs access to the current iteration
+            number, which will be provided to it as the last argument
+        """
         kern = getattr(prog, name)
+        if needs_iteration:
+            args.append(0)
+            self._iteration_kernels.append(kern)
+
         for i, arg in enumerate(args):
             kern.set_arg(i, arg)
         setattr(kern, 'block', block)
+        setattr(kern, 'num_args', len(args))
         return kern
 
     def run_kernel(self, kernel, grid_size, stream=None):

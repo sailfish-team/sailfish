@@ -807,6 +807,9 @@ class BlockRunner(object):
         self._step_bulk(output_req)
         self._sim.iteration += 1
         self._send_dists()
+        # Run this at a point after the compute step is fully scheduled for execution
+        # on the GPU and where it doesn't unnecessarily delay othe operations.
+        self.backend.set_iteration(self._sim.iteration)
         self._recv_dists()
         self._profile.record_gpu_start(TimeProfile.DISTRIB, self._data_stream)
         for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
@@ -1558,6 +1561,8 @@ class NNBlockRunner(BlockRunner):
         self._send_dists()
         if self.need_quit():
             return False
+
+        self.backend.set_iteration(self._sim.iteration)
 
         self._recv_dists()
         record_gpu_start(TimeProfile.DISTRIB, str_data)

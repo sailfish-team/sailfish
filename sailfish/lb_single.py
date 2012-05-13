@@ -171,9 +171,9 @@ class LBFluidSim(LBSim):
 
         kernels = []
         kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args1, 'P'*(len(args1)-1)+'i'))
+                'CollideAndPropagate', args1, 'P'*(len(args1)-1) + 'i'))
         kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args2, 'P'*(len(args2)-1)+'i'))
+                'CollideAndPropagate', args2, 'P'*(len(args2)-1) + 'i'))
         return kernels
 
     def get_pbc_kernels(self, runner):
