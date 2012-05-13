@@ -98,11 +98,11 @@ The easiest way to install all the Sailfish prerequisites on Mac OS X is to use 
 project and the PyOpenCL backend in Sailfish.  Follow the instructions at http://www.macports.org/,
 and then run::
 
-  port install py26-sympy py26-pyopencl py26-game py26-mako py26-scipy
+  port install py-sympy py-pyopencl py-game py-mako py-scipy
 
 To run the Sailfish examples, remember to use the correct Python interpreter (i.e. the one
-installed via Mac Ports).  For instance:
+installed via MacPorts).  For instance:
 
-  python2.6 ./lbm_ldc.py --scr_depth=24
+  python2.7 ./ldc_2d.py --mode=visualization --vis=pygame --scr_depth=24
 
 Note that for the pygame visualization, you may need to specify the --scr_depth option.
