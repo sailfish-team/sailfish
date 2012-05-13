@@ -71,10 +71,10 @@ class LBForcedSim(LBSim):
     def add_force_coupling(self, grid_a, grid_b, const_name):
         """Adds a Shan-Chen type coupling between two lattices.
 
-        grid_a: numerical ID of the first lattice
-        grid_b: numerical ID of the second lattice
-        const_name: name of the global variable containing the value of the
-            coupling constant
+        :param grid_a: numerical ID of the first lattice
+        :param grid_b: numerical ID of the second lattice
+        :param const_name: name of the global variable containing the value of the
+                coupling constant
         """
         self._force_couplings[(grid_a, grid_b)] = const_name
 
@@ -144,11 +144,10 @@ class LBFluidSim(LBSim):
 
     def get_compute_kernels(self, runner, full_output, bulk):
         """
-        Args:
-            runner: BlockRunner object
-            full_output: if True, returns kernels that prepare fields for
+        :param runner: BlockRunner object
+        :param full_output: if True, returns kernels that prepare fields for
                 visualization or saving into a file
-            bulk: if True, returns kernels that process the bulk domain,
+        :param bulk: if True, returns kernels that process the bulk domain,
                 otherwise returns kernels that process the subdomain boundary
         """
         gpu_rho = runner.gpu_field(self.rho)

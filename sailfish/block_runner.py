@@ -206,14 +206,14 @@ class BlockRunner(object):
     regions -- boundary and bulk.  The nodes in the bulk region are those
     that do not send information to any nodes in other subdomains.  The
     boundary region includes all the remaining nodes, including the ghost
-    node envelope used for data storage only.
+    node envelope used for data storage only.::
 
-    calc stream                    data stream
-    -----------------------------------------------
-    boundary sim. step    --->     collect data
-    bulk sim. step                 ...
-                                   distribute data
-                       <- sync ->
+        calc stream                    data stream
+        -----------------------------------------------
+        boundary sim. step    --->     collect data
+        bulk sim. step                 ...
+                                       distribute data
+                           <- sync ->
 
     An arrow above symbolizes a dependency between the two streams.
     """
@@ -1239,30 +1239,30 @@ class NNBlockRunner(BlockRunner):
 
     This is a specialization of the BlockRunner class for models which
     require access to macroscopic fields from the nearest neighbor nodes.
-    It changes the steps executed on the GPU as follows:
+    It changes the steps executed on the GPU as follows::
 
-    calc stream                    data stream
-    -------------------------------------------------------
-    boundary macro fields    --->  collect macro data
-    bulk macro fields              ...
-    boundary sim. step       <---  distribute macro data
-                             --->  collect distrib. data
-    bulk sim. step                 ...
-                                   distribute distrib. data
-                       <- sync ->
+        calc stream                    data stream
+        -------------------------------------------------------
+        boundary macro fields    --->  collect macro data
+        bulk macro fields              ...
+        boundary sim. step       <---  distribute macro data
+                                 --->  collect distrib. data
+        bulk sim. step                 ...
+                                       distribute distrib. data
+                           <- sync ->
 
-    TODO(michalj): Try the alternative scheme:
+        TODO(michalj): Try the alternative scheme:
 
-    calc stream                    data stream
-    -------------------------------------------------------
-    boundary macro fields    --->  collect macro data
-    bulk macro fields              ...
-    bulk sim. step
-    boundary sim. step       <---  distribute macro data
-                             --->  collect distrib. data
-                                   ...
-                                   distribute distrib. data
-                       <- sync ->
+        calc stream                    data stream
+        -------------------------------------------------------
+        boundary macro fields    --->  collect macro data
+        bulk macro fields              ...
+        bulk sim. step
+        boundary sim. step       <---  distribute macro data
+                                 --->  collect distrib. data
+                                       ...
+                                       distribute distrib. data
+                           <- sync ->
 
 
     An arrow above symbolizes a dependency between the two streams.
