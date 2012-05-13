@@ -13,9 +13,6 @@ import pygame
 
 from sailfish import lb_base, node_type, util, vis
 
-pygame.init()
-pygame.surfarray.use_arraytype('numpy')
-
 def _font_name():
     import platform
     if platform.system() == 'Windows':
@@ -146,6 +143,9 @@ class Fluid2DVis(vis.FluidVis):
         group.add_argument('--scr_depth', help='screen color depth', type=int, default=0)
 
     def __init__(self, config, blocks, quit_event, sim_quit_event, vis_config):
+        pygame.init()
+        pygame.surfarray.use_arraytype('numpy')
+
         super(Fluid2DVis, self).__init__()
         self.config = config
         self.config.logger.info("Initializating pygame 2D vis. engine.")
