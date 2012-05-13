@@ -3,10 +3,8 @@ About
 
 Development team
 ----------------
-The Sailfish project is developed by the following people:
-
-1) Michał Januszewski: project leader
-2) Marcin Kostur (University of Silesia): visualization, testing, physics consultation.
+The Sailfish project was started by Michal Januszewski and is currently developed by a group
+of contributors.  See the git commit logs for a full list of authors.
 
 How to help?
 ------------
@@ -20,7 +18,7 @@ How to help?
 * Don't know what to start with?  Not a problem!  Have a look at the tasks in our
   `TODO list`__.
 
-__ http://gitorious.org/sailfish/sailfish/blobs/master/TODO
+__ https://raw.github.com/sailfish-team/sailfish/master/TODO
 
 
 Note that you don't need to be a physicist or engineer to be able to provide useful help.

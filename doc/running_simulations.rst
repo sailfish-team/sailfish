@@ -1,7 +1,7 @@
 Running simulations
 ===================
 
-In this section, we show how to create a simple Lattice-Boltzmann simulation
+In this section, we show how to create a simple lattice Boltzmann simulation
 using Sailfish.
 To keep things simple, we stick to two dimensions and use the lid-driven cavity
 example, which is one of the standard test cases in computational fluid
@@ -19,11 +19,9 @@ Sailfish modules::
     from sailfish.controller import LBSimulationController
     from sailfish.lb_single import LBFluidSim
 
-The :mod:`controller` module contains a class which will drive our simulation
-described in the :class:`LDCSim` class based on :mod:`lb_single` module.
+The :mod:`controller` module contains a class which will drive our simulation.
 The :mod:`geo_block` module contains classes used to describe the geometry of the
-simulation and is used to define the boundary and initial conditions. The last
-module :mod:`geo` determines the decompositon of the simulation area into subdomains.
+simulation and is used to define the boundary and initial conditions.
 
 Each single fluid Sailfish simulation is represented by a class derived
 from :class:`lb_single.LBFluidSim`.
@@ -32,15 +30,15 @@ In the simplest case, we just have to define a subdomain class::
     class LDCSim(LBFluidSim):
         subdomain = LDCBlock
 
-:class:`LDCBlock` is a required class, derived from :class:`Subdomain2D`
-or :class:`Subdomain3D` from the :mod:`geo_block` module, depending on the
+:class:`LDCBlock` is a required class, derived from :class:`geo_block.Subdomain2D`
+or :class:`geo_blockSubdomain3D`, depending on the
 dimensionality of the problem at hand. In our present case, we will use the
 former one. This class represents the geometry of the simulation.
 
-In :class:`LDCSim` class we can define the default parameter values and
+In :class:`LDCSim` we can define the default parameter values and
 additional command line arguments. To change the default parameters we have to
-create the classmethod ``update_defaults`` where we update the ``defaults``
-dictionary with the proper values of selected parameters. In our case we have to
+create the class method ``update_defaults`` where we update the ``defaults``
+dictionary with the desired values of selected parameters. In our case we have to
 change the size along the X axis (``lat_nx``) and the size along the Y axis
 (``lat_ny``). This method is called before the class is instantiated::
 
@@ -50,9 +48,9 @@ change the size along the X axis (``lat_nx``) and the size along the Y axis
             'lat_nx': 256,
             'lat_ny': 256})
 
-To add additional command line arguments we will create the classmethod
+To add additional command line arguments we will create the class method
 ``add_options``. This method takes two arguments. ``group`` is a group of settings
-connected with running the simulation, ``dim`` is the dimension of simulation
+connected with running the simulation, and ``dim`` is the dimension of the simulation
 domain. This method, like ``update_defaults``, is called before the class is
 instantiated. When the simulation is running, the command line arguments are
 parsed and their settings are stored in ``self.config`` (using the standard
@@ -64,7 +62,7 @@ methods in superclasses. After that we can add our options::
         LBFluidSim.add_options(group, dim)
         group.add_argument('--blocks', type=int, default=1, help='number of blocks to use')
 
-Class :class:`LDCBlock` describes the simulation geometry and inherits from
+:class:`LDCBlock` describes the simulation geometry and inherits from
 :class:`Subdomain2D`. The derived geometry class needs to define at least the
 following two methods: ``bondary_conditions`` and ``initial_conditions``.
 
@@ -110,16 +108,14 @@ that the velocity and wall nodes do not overlap.  This is intentional as
 redefining node types is not allowed in Sailfish.
 
 Now that we have the geometry out of the way, we can deal with the initial
-conditions. This is done in the ``initial_conditions`` function, which is
-responsible for setting the initial particle distributions in all nodes in the
-simulation domain. The function takes three arguments: ``hx``, ``hy`` and
-``sim``. ``sim`` is a reference to the simulation object.
+conditions. This is done in the ``initial_conditions`` function, which takes
+three arguments: ``hx``, ``hy`` and ``sim``, where ``sim`` is the simulation object.
 
 The way of specifying initial conditions is to provide the values of macroscopic
 variables (density, velocity) everywhere in the simulation domain, and let the
-GPU calculate the equilibrium distributions.
+GPU calculate the particle distributions using the equilibrium function.
 
-In our LDC geometry, we set the velocity of the fluid everywhere to be 0 (this
+In our LDC geometry, we set the velocity of the fluid to be 0 everywhere (this
 is the default value so we do not have to specify this explicitly), except for
 the first row at the top, where we set the fluid to have ``max_v`` velocity
 in the horizontal direction. It is important to always use an index expression
@@ -138,7 +134,7 @@ providing :class:`LDCSim` as an argument.  Now we only have to run the simulatio
 
 How it works behind the scenes
 ------------------------------
-When the :func:`controller.LBSimulationController.run`` method is called, Sailfish
+When the :func:`controller.LBSimulationController.run` method is called, Sailfish
 instantiates a controller object, which is responsible for setting up and managing
 the simulation.  All this normally happens "behind the scenes" so that you probably
 do not need to worry about the details (check out the :ref:`internals` section

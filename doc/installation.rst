@@ -8,7 +8,7 @@ installed on the host system.  These are as follows (minimal required versions a
 General requirements:
 
 * numpy-1.6.0
-* sympy-0.6.5
+* sympy-0.7.0
 * mako-0.2.5
 * execnet-1.0.9
 * Python zeromq-2.1.10
@@ -20,14 +20,14 @@ General requirements:
 
 Visualization (optional):
 
-* pygame, scipy (for 2D/3D)
-* mayavi (for 3D)
+* pygame
+* matplotlib
 
 Data output (optional):
 
 * tvtk (VTK output)
 
-Tests:
+Regression tests:
 
 * matplotlib
 
@@ -39,20 +39,20 @@ Downloading Sailfish
 We currently do not provide snapshot tarballs of the code, so you will need to get Sailfish
 directly from its git repository::
 
-  git clone git://gitorious.org/sailfish/sailfish.git
+  git clone git://github.com/sailfish-team/sailfish.git
 
 Sailfish milestones and releases are appropriately tagged in the repository.  We try to
 make sure the code is always in a working state, but if you find the most recent checkout
 to be somehow broken, you might want to rewind to one of the tagged releases, e.g.::
 
-  git checkout v0.1-alpha1
+  git checkout v0.2
 
 Gentoo installation instructions
 --------------------------------
 
 To install the required packages on a Gentoo system::
 
-  emerge numpy scipy pytables mayavi matplotlib mako pygame pycuda sympy dev-util/git
+  emerge numpy scipy matplotlib mako pygame pycuda sympy dev-util/git
 
 You can also replace ``pycuda`` with ``pyopencl`` if you wish to use the OpenCL backend
 in Sailfish.
@@ -75,8 +75,9 @@ that ``nvcc`` is in your ``$PATH``.  You can get the necessary files at http://n
 
 To install the required packages on an Ubuntu system::
 
-  apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-scipy python-mako python-sympy python-decorator
-  apt-get install git-core python-setuptools libboost-dev python-execnet python-zmq libboost-python-dev libboost-thread-dev
+  apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-scipy python-sympy python-zmq python-execnet
+  apt-get install python-mako python-decorator python-pytools build-essential python-dev python-setuptools libboost-dev libboost-python-dev libboost-thread-dev
+  apt-get install git-core
   git clone http://git.tiker.net/trees/pycuda.git
   cd pycuda
   git submodule init

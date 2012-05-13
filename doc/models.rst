@@ -59,8 +59,7 @@ Boundary conditions
 -------------------
 
 Sailfish supports a number of local boundary conditions (non-local boundary conditions are
-currently not supported).  Each of the implemented boundary condition types can be available
-for a specific kind(s) of boundary conditions (no-slip (wall), velocity, pressure) and dimensions.
+currently not supported).  Check the :mod:`node_type` module for a full and up-to-date list.
 
 Full-way bounce-back
 ^^^^^^^^^^^^^^^^^^^^
@@ -100,11 +99,11 @@ at the boundary nodes are replaced.
 Equilibrium
 ^^^^^^^^^^^
 This boundary condition algorithm works by imposing the BGK equilibrium distributions for
-a node.  It currently works for all types of boundary conditions in two dimensions only.
+a node, and can be used to set the velocity or density of a node.
 
 Zou-He
 ^^^^^^
-This algorithm is based upon the idea of the reflection of the off-equilibrium distributions.
-It currently works for all types of boundary conditions in two dimensions only.
+This algorithm is based upon the idea of the reflection of the off-equilibrium distributions,
+and can be used to set the velocity or density of a node.
 
 
