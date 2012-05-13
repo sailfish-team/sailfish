@@ -89,9 +89,15 @@ class CUDABackend(object):
         # To keep track of allocated memory.
         self._total_memory_bytes = 0
 
+        self._iteration_kernels = []
+
     @property
     def total_memory(self):
         return self._device.total_memory()
+
+    def set_iteration(self, it):
+        for kernel in self._iteration_kernels:
+            kernel.args[-1] = it
 
     def alloc_buf(self, size=None, like=None, wrap_in_array=False):
         if like is not None:
@@ -171,12 +177,24 @@ class CUDABackend(object):
                 nvcc=self.options.cuda_nvcc, keep=self.options.cuda_keep_temp,
                 cache_dir=cache) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
 
-    def get_kernel(self, prog, name, block, args, args_format, shared=0):
+    def get_kernel(self, prog, name, block, args, args_format, shared=0,
+            needs_iteration=False):
+        """
+        :param needs_iteration: if True, the kernel needs access to the current iteration
+            number, which will be provided to it as the last argument
+        """
         kern = prog.get_function(name)
+
+        if needs_iteration:
+            args_format += 'i'
+            args.append(0)
+            self._iteration_kernels.append(kern)
+
         kern.prepare(args_format)
         setattr(kern, 'args', args)
         setattr(kern, 'block_shape', _expand_block(block))
         setattr(kern, 'shared_size', shared)
+        setattr(kern, 'needs_iteration', needs_iteration)
 
         if self.options.cuda_kernel_stats and name not in self._kern_stats:
             self._kern_stats.add(name)

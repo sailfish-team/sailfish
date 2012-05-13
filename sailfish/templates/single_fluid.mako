@@ -102,8 +102,7 @@ ${kernel} void CollideAndPropagate(
 	${global_ptr} float *dist_out,
 	${global_ptr} float *gg0m0,
 	${kernel_args_1st_moment('ov')}
-	int options
-	)
+	int options)
 {
 	${local_indices_split()}
 
