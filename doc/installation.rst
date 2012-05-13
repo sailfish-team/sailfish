@@ -107,15 +107,15 @@ to avoid compatibility problems with the CUDA compiler, which as of CUDA 4.0 onl
 Mac OS X installation instructions (Mac Ports)
 ----------------------------------------------
 
-The easiest way to install all the Sailfish prerequisites on Mac OS X is to use the Mac Ports
+The easiest way to install all the Sailfish prerequisites on Mac OS X is to use the MacPorts
 project and the PyOpenCL backend in Sailfish.  Follow the instructions at http://www.macports.org/,
 and then run::
 
-  port install py-sympy py-pyopencl py-game py-mako py-scipy
+  port install py-sympy py-pyopencl py-game py-mako py-scipy py-zmq
 
 To run the Sailfish examples, remember to use the correct Python interpreter (i.e. the one
 installed via MacPorts).  For instance:
 
-  python2.7 ./ldc_2d.py --mode=visualization --vis=pygame --scr_depth=24
+  python2.7 ./ldc_2d.py --mode=visualization --visualize=pygame --scr_depth=24
 
 Note that for the pygame visualization, you may need to specify the --scr_depth option.

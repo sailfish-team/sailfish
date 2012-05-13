@@ -20,10 +20,6 @@ class OpenCLBackend(object):
                 dest='opencl_interactive',
                 help='select the OpenCL device in an interactive manner',
                 action='store_true', default=False)
-        group.add_argument('--opencl-block-size', type=int,
-                help='size of the block of threads on the compute '
-                     'device; use 0 to set block size to an '
-                     'automatically selected value', default=0)
         return 1
 
     def __init__(self, options, gpu_id):
@@ -52,7 +48,7 @@ class OpenCLBackend(object):
     def set_iteration(self, it):
         self._iteration = it
         for kernel in self._iteration_kernels:
-            kernel.set_arg(kernel.num_args - 1, it)
+            kernel.set_arg(kernel.numargs - 1, it)
 
     def alloc_buf(self, size=None, like=None, wrap_in_array=True):
         mf = cl.mem_flags
@@ -144,7 +140,7 @@ class OpenCLBackend(object):
         for i, arg in enumerate(args):
             kern.set_arg(i, arg)
         setattr(kern, 'block', block)
-        setattr(kern, 'num_args', len(args))
+        setattr(kern, 'numargs', len(args))
         return kern
 
     def run_kernel(self, kernel, grid_size, stream=None):
