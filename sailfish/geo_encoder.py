@@ -66,10 +66,9 @@ class GeoEncoderConst(GeoEncoder):
 
     def prepare_encode(self, type_map, param_map, param_dict):
         """
-        Args:
-          type_map: uint32 array of NodeType.ids
-          param_map: array whose entries are keys in param_dict
-          param_dict: maps entries from param_map to LBNodeType objects
+        :param type_map: uint32 array of NodeType.ids
+        :param param_map: array whose entries are keys in param_dict
+        :param param_dict: maps entries from param_map to LBNodeType objects
         """
         uniq_types = list(np.unique(type_map))
         for nt_id in uniq_types:

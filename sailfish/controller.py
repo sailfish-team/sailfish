@@ -246,7 +246,6 @@ class LBSimulationController(object):
 
     def __init__(self, lb_class, lb_geo=None, default_config=None):
         """
-        Args:
         :param lb_class: class describing the simulation, derived from LBSim
         :param lb_geo: class describing the global geometry in terms of
                 SubdomainSpec, derived from LBGeometry

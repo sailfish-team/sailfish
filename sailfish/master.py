@@ -25,7 +25,6 @@ def _start_block_runner(block, config, sim, num_subdomains,
         backend_class, gpu_id, output,
         quit_event, master_addr, timing_info_to_master):
     """
-    Args:
     :param num_subdomains: number of subdomains handled by this machine
     """
     config.logger.debug('BlockRunner starting with PID {0}'.format(os.getpid()))
@@ -65,7 +64,6 @@ class LBMachineMaster(object):
     def __init__(self, config, blocks, lb_class, subdomain_addr_map=None,
             channel=None, iface=None):
         """
-        Args:
         :param config: LBConfig object
         :param blocks: list of SubdomainSpec objects assigned to this machine
         :param lb_class: simulation class descendant from LBSim

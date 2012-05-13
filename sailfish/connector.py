@@ -116,7 +116,7 @@ class ZMQRemoteBlockConnector(ZMQBlockConnector):
     def __init__(self, addr, receiver=False):
         """
         :param addr: if receiver == False, addr is tcp://<interface> or
-            tcp://*, otherwise it is tcp://<remote_node_ip_or_name>
+            tcp://\*, otherwise it is tcp://<remote_node_ip_or_name>
         :param receiver: if True, use connect on the socket, otherwise bind
             it to a random port.
         """

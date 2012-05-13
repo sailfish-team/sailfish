@@ -248,23 +248,23 @@ class LBConnection(object):
         """
         In 3D, the order of all slices always follows the natural ordering: x, y, z
 
-        dists: indices of distributions to be transferred
-        src_slice: slice in the full buffer of the source block,
-        dst_low: position of the buffer in the non-ghost coordinate system of
+        :param dists: indices of distributions to be transferred
+        :param src_slice: slice in the full buffer of the source block,
+        :param dst_low: position of the buffer in the non-ghost coordinate system of
             the dest block
-        dst_slice: slice in the non-ghost buffer of the dest block, to which
+        :param dst_slice: slice in the non-ghost buffer of the dest block, to which
             full dists can be written
-        dst_full_buf_slice: slice in the transfer buffer selecting nodes with
+        :param dst_full_buf_slice: slice in the transfer buffer selecting nodes with
             all dists; by definition: size(dst_full_buf_slice) == size(dst_slice)
-        dst_partial_map: dict mapping distribution indices to lists of positions
+        :param dst_partial_map: dict mapping distribution indices to lists of positions
             in the transfer buffer
-        src_macro_slice: slice in a real scalar buffer (including ghost nodes)
+        :param src_macro_slice: slice in a real scalar buffer (including ghost nodes)
             selecting nodes from which field data is to be transferred to the
             target subdomain
-        dst_macro_slice: slice in a real scalar buffer (including ghost nodes)
+        :param dst_macro_slice: slice in a real scalar buffer (including ghost nodes)
             selecting nodes to which field data is to be written when received
             from the target subdomain
-        src_id: ID of the source block
+        :param src_id: ID of the source block
         """
         self.dists = dists
         self.src_slice = src_slice
@@ -620,8 +620,7 @@ class Subdomain(object):
 
     def __init__(self, grid_shape, block, grid, *args, **kwargs):
         """
-        Args:
-          grid: grid object specifying the connectivity of the lattice
+        :param grid: grid object specifying the connectivity of the lattice
         """
         self.block = block
         self.grid_shape = grid_shape
