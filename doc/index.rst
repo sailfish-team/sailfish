@@ -76,7 +76,6 @@ Contents
    performance
    internals
    testcases
-   regtest
    api
    about
 

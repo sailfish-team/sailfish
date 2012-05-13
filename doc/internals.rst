@@ -37,7 +37,7 @@ via a child class of :class:`LBGeometry` (or its specializations
   :attr:`LBGeometry2D.gy`, and :attr:`LBGeometry3D.gz` attributes
 
 :func:`LBGeometry.blocks` returns a list of :class:`SubdomainSpec` objects.
-This makes it possible build a refined, hierarchical grid (to be implemented;
+This makes it possible to build a refined, hierarchical grid (to be implemented;
 by increasing node density in some subdomains) and to define a sparse domain
 (by returning objects covering only a part of the global coordinate system).
 
