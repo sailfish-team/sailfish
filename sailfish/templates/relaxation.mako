@@ -257,7 +257,56 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 }
 %endif  ## model == mrt && simtype == 'free-energy'
 
-% if model == 'bgk':
+%if model == 'elbm':
+<%include file="entropic.mako"/>
+
+${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0)
+{
+	%for i in range(0, len(grids)):
+		Dist feq${i};
+	%endfor
+
+	<%
+		if grid is sym.D3Q15:
+			elbm_eq, elbm_eq_vars = sym.elbm_d3q15_equilibrium(grid)
+		else:
+			elbm_eq, elbm_eq_vars = sym.elbm_equilibrium(grid)
+	%>
+
+	float v0[${dim}];
+	${body_force()}
+
+	${fluid_velocity(0, True)};
+
+	%for local_var in elbm_eq_vars:
+		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
+	%endfor
+
+	%for i, eq in enumerate(elbm_eq):
+		%for feq, idx in eq:
+			feq${i}.${idx} = ${cex(feq, vectors=True)};
+		%endfor
+	%endfor
+
+	float alpha;
+
+	if (SmallEquilibriumDeviation(d0, &feq0)) {
+		alpha = EstimateAlphaSeries(d0, &feq0);
+	} else {
+		alpha = EstimateAlphaFromEntropy(d0, &feq0);
+	}
+
+	alpha *= 1.0f / (2.0f * tau0 + 1.0f);
+
+	%for idx in grid.idx_name:
+		d0->${idx} += alpha * (feq0.${idx} - d0->${idx});
+	%endfor
+
+	${fluid_velocity(0, save=True)}
+}
+%endif  ## model == elbm
+
+%if model == 'bgk':
 //
 // Performs the relaxation step in the BGK model given the density rho,
 // the velocity v and the distribution fi.
@@ -360,6 +409,8 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 	&d${i},
 %endfor
 	type);
+	%elif model == 'elbm':
+		ELBM_relaxate(${bgk_args()}, &d0);
 	%else:
 		MS_relaxate(&d0, type, v);
 	%endif
