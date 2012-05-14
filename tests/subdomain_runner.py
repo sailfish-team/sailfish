@@ -112,7 +112,7 @@ class NNBlockRunnerTest(unittest.TestCase):
         # Establish connection between the two blocks.
         self.assertTrue(b1.connect(b2, grid=D2Q9))
 
-        cpair = b1.get_connection(*b1.connecting_blocks()[0])
+        cpair = b1.get_connection(*b1.connecting_subdomains()[0])
         size1 = cpair.src.elements
         size2 = cpair.dst.elements
         c1, c2 = ZMQSubdomainConnector.make_ipc_pair(ctypes.c_float, (size1, size2), (b1.id, b2.id))

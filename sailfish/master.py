@@ -19,7 +19,7 @@ from multiprocessing import Process, Array, Event, Value
 import zmq
 
 from sailfish import subdomain_runner, util, io
-from sailfish.connector import ZMQSubdomainConnector, ZMQRemoteBlockConnector
+from sailfish.connector import ZMQSubdomainConnector, ZMQRemoteSubdomainConnector
 
 def _start_subdomain_runner(subdomain, config, sim, num_subdomains,
         backend_class, gpu_id, output,

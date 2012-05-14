@@ -45,7 +45,7 @@ Internals
    :members:
 
 ``subdomain_runner``
-^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 .. automodule:: subdomain_runner
    :members:
 

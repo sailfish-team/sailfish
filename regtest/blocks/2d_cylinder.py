@@ -26,7 +26,7 @@ class SimulationTest(CylinderSimulation):
         global block_size, blocks, vertical, output
         CylinderSimulation.update_defaults(defaults)
         defaults['block_size'] = block_size
-        defaults['blocks'] = blocks
+        defaults['subdomains'] = blocks
         defaults['vertical'] = vertical
         defaults['max_iters'] = MAX_ITERS
         defaults['quiet'] = True

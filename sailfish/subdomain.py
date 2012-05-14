@@ -425,7 +425,7 @@ class SubdomainSpec(object):
                 ret.append(pair)
         return ret
 
-    def connecting_blocks(self):
+    def connecting_subdomains(self):
         """Returns a list of pairs: (face, block ID) representing connections
         to different blocks."""
         ids = set([])
