@@ -52,6 +52,9 @@ class DxQy(object):
         # The D3Q13 grid only supports MRT.
         elif model == 'bgk':
             return (cls.Q != 13 or cls.dim != 3)
+        elif model == 'elbm':
+            return ((cls.Q == 9 and cls.dim == 2) or
+                    (cls.Q == 15 and cls.dim == 3))
         else:
             return True
 
@@ -245,6 +248,8 @@ class D3Q15(DxQy):
 
     mrt_collision = [0.0, 1.6, 1.2, 0.0, 1.6, 0.0, 1.6, 0.0, 1.6,
                 -1, -1, -1, -1, -1, 1.2]
+
+    entropic_weights = weights
 
     @classmethod
     def _init_mrt_basis(cls):
@@ -508,6 +513,123 @@ def bgk_equilibrium(grid, rho=None, rho0=None):
         out.append((t, grid.idx_name[i]))
 
     return ([out], [])
+
+
+def elbm_equilibrium(grid, rho=None):
+    """
+    Form of the equilibrium defined in Europhys. Lett., 63 (6) pp. 798-804
+    (2003).
+    """
+    prefactor = Symbol('prefactor')
+    coeff1 = Symbol('coeff1')
+    coeff2 = Symbol('coeff2')
+
+    if rho is None:
+        rho = S.rho
+
+    out = []
+    lvars = []
+
+    sqrt = sympy.sqrt
+    v_scaled = grid.v / sqrt(grid.cssq)
+    tmp = S.rho
+    coeffs = []
+    for v_comp in v_scaled:
+        tmp *= (2 - sqrt(1 + v_comp**2))
+        coeffs.append((2 / sqrt(3) * v_comp + sqrt(1 + v_comp**2)) /
+                (1 - v_comp / sqrt(3)))
+
+    lvars.append(Eq(prefactor, tmp))
+    lvars.append(Eq(coeff1, coeffs[0]))
+    lvars.append(Eq(coeff2, coeffs[1]))
+    cfs = [coeff1, coeff2]
+
+    for i, ei in enumerate(grid.basis):
+        t = prefactor * grid.entropic_weights[i]
+        for j, comp in enumerate(ei):
+            t *= cfs[j]**(comp / (sqrt(3) * sqrt(grid.cssq)))
+        out.append((t, grid.idx_name[i]))
+
+    return ([out], lvars)
+
+
+def elbm_d3q15_equilibrium(grid, rho=None):
+    """
+    Form of equilibrium defined in PRL 97, 010201 (2006).
+    """
+    if rho is None:
+        rho = S.rho
+
+    prefactor = Symbol('prefactor')
+    coeff1 = Symbol('coeff1')
+    coeff2 = Symbol('coeff2')
+    coeff3 = Symbol('coeff3')
+    vsq = Symbol('vsq')
+    vx, vy, vz = grid.v
+
+    lvars = []
+    lvars.append(Eq(vsq, grid.v.dot(grid.v)))
+    lvars.append(Eq(prefactor, poly_factorize(
+        rho * (1 - 3 * vsq / 2 + 9 * vsq**2 / 8 +
+        Rational(27, 16) * (-vsq**3 + 2 * (vy**2 + vz**2) *
+            (vsq * vx**2 + vy**2 * vz**2) +
+            20 * vx**2 * vy**2 * vz**2) +
+        81 * vsq**4 / 128 +
+        Rational(81, 32) * (vx**8 + vy**8 + vz**8
+            - 36 * vx**2 * vy**2 * vz**2 * vsq
+            - vx**4 * vy**4
+            - vy**4 * vz**4
+            - vx**4 * vz**4)))))
+
+    cfs = [coeff1, coeff2, coeff3]
+
+    for i, coeff in enumerate(cfs):
+        tmp = (1 + 3 * grid.v[i] + 9 * grid.v[i]**2 / 2 +
+            9 * grid.v[i]**3 / 2 + 27 * grid.v[i]**4 / 8)
+
+        # Cyclic permutation.
+        x = i
+        y = (i + 1) % 3
+        z = (i + 2) % 3
+
+        tmp += Rational(27, 8) * (grid.v[x]**5
+                - 4 * grid.v[x] * grid.v[y]**2 * grid.v[z]**2)
+        tmp += Rational(81, 16) * (grid.v[x]**6
+                - 8 * grid.v[x]**2 * grid.v[y]**2 * grid.v[z]**2)
+        tmp += Rational(81, 16) * (grid.v[x]**7
+                - 10 * grid.v[x]**3 * grid.v[y]**2 * grid.v[z]**2
+                + 2 * grid.v[x] * grid.v[y]**2 * grid.v[z]**2 * vsq)
+        tmp += Rational(243, 128) * (grid.v[x]**8
+                + 16 * grid.v[x]**2 * grid.v[y]**2 * grid.v[z]**2
+                * (grid.v[y]**2 + grid.v[z]**2))
+
+        lvars.append(Eq(coeff, poly_factorize(tmp)))
+
+    out = []
+    for i, ei in enumerate(grid.basis):
+        t = prefactor * grid.entropic_weights[i]
+        for j, comp in enumerate(ei):
+            t *= cfs[j]**comp
+        out.append((t, grid.idx_name[i]))
+
+    return ([out], lvars)
+
+
+def alpha_series():
+    a1 = Symbol('a1')
+    a2 = Symbol('a2')
+    a3 = Symbol('a3')
+    a4 = Symbol('a4')
+
+    alpha = poly_factorize(2
+            - 4 * a2 / a1
+            + 16 * a2**2 / a1**2
+            - 8 * a3 / a1
+            + 80 * a2 * a3 / a1**2
+            - 80 * a2**3 / a1
+            - 16 * a4 / a1)
+
+    return alpha
 
 def lambdify_equilibrium(sim):
     """Get a lambdified version of the equilibrium distribution.
@@ -996,18 +1118,18 @@ def make_float(t):
     return re.sub(r'((^|[^a-zA-Z])[0-9]+\.[0-9]*(e(\+|-)[0-9]*)?)', r'\1f', str(t))
 
 def int2float(t):
-    return re.sub(r'([0-9]+)([^\.])', r'\1.0\2', str(t))
+    return re.sub(r'([0-9]+) ', r'\1.0 ', str(t))
 
 class KernelCodePrinter(CCodePrinter):
 
     def _print_Pow(self, expr):
         PREC = precedence(expr)
         if expr.exp is NegativeOne:
-            return '1.0/%s' % (self.parenthesize(expr.base, PREC))
+            return '(1.0/%s)' % (self.parenthesize(expr.base, PREC))
         # For the kernel code, it's better to calculate the power
         # here explicitly by multiplication.
         elif expr.exp == 2:
-            return '%s*%s' % (self.parenthesize(expr.base, PREC),
+            return '(%s*%s)' % (self.parenthesize(expr.base, PREC),
                               self.parenthesize(expr.base, PREC))
         else:
             return int2float('powf(%s,%s)' % (self.parenthesize(expr.base, PREC),
@@ -1180,6 +1302,11 @@ def _prepare_grids():
     This approach saves the programmer's time and automatically ensures correctness
     of the computed values."""
 
+    D1Q3_entropic_weights = {
+            -1: Rational(1,6),
+            0:  Rational(2,3),
+            1:  Rational(1,6)}
+
     for grid in KNOWN_GRIDS:
         if len(grid.basis) != len(grid.weights):
             raise TypeError('Grid %s is ill-defined: not all BGK weights have been specified.' % grid.__name__)
@@ -1207,6 +1334,13 @@ def _prepare_grids():
         grid.vecidx2dir = {}
         dir = 1
 
+        # Weights used by the entropic LB model are calculated automatically
+        # from the D1Q3 weights unless specified explicitly in the grid class
+        # definition.
+        needs_entropic_weights = not hasattr(grid, 'entropic_weights')
+        if needs_entropic_weights:
+            grid.entropic_weights = []
+
         for k, ei in enumerate(grid.basis):
             # Compute direction names.
             name = 'f'
@@ -1232,6 +1366,12 @@ def _prepare_grids():
                 grid.dir2vecidx[dir] = k
                 grid.vecidx2dir[k] = dir
                 dir += 1
+
+            if needs_entropic_weights:
+                ent_weight = 1
+                for comp in ei:
+                    ent_weight *= D1Q3_entropic_weights[int(comp)]
+                grid.entropic_weights.append(ent_weight)
 
         # If MRT is supported for the current grid, compute the transformation
         # matrix from the velocity space to moment space.  The procedure is as

@@ -93,7 +93,7 @@ class LBFluidSim(LBSim):
                 action='store_true', default=False,
                 help='use the incompressible model of Luo and He')
         group.add_argument('--model', help='LB model to use',
-                type=str, choices=['bgk', 'mrt'],
+                type=str, choices=['bgk', 'mrt', 'elbm'],
                 default='bgk')
         group.add_argument('--subgrid', default='none', type=str,
                 choices=['none', 'les-smagorinsky'],
@@ -123,12 +123,18 @@ class LBFluidSim(LBSim):
 
     def update_context(self, ctx):
         super(LBFluidSim, self).update_context(ctx)
-        ctx['tau'] = sym.relaxation_time(self.config.visc)
+        if self.config.model == 'elbm':
+            ctx['tau'] = self.config.visc / self.grid.cssq
+        else:
+            ctx['tau'] = sym.relaxation_time(self.config.visc)
         ctx['visc'] = self.config.visc
         ctx['model'] = self.config.model
         ctx['simtype'] = 'lbm'
         ctx['bgk_equilibrium'] = self.equilibrium
         ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
+        ctx['subgrid'] = self.config.subgrid
+        ctx['smagorinsky_const'] = self.config.smagorinsky_const
+        ctx['entropy_tolerance'] = 1e-7 if self.config.precision == 'single' else 1e-16
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
@@ -267,7 +273,6 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
         super(LBSingleFluidShanChen, self).update_context(ctx)
         ctx['simtype'] = 'shan-chen'
         ctx['sc_potential'] = self.config.sc_potential
-        ctx['tau'] = sym.relaxation_time(self.config.visc)
         ctx['visc'] = self.config.visc
 
     def get_pbc_kernels(self, runner):
