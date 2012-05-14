@@ -74,7 +74,7 @@ register usage and can be turned off by the ``--cuda-fermi-highprec`` option.
 Block size
 ^^^^^^^^^^
 Fermi devices have more multiprocessors than GPUs of the previous generation. The multiprocessors
-can also handle more threads, and have better scheduling capabilities (which make it possible
+can also handle more threads, and have better scheduling capabilities (which makes it possible
 for the GPU to execute several different kernels simultaneously).
 
 To fully take advantage of the available computational power, a larger block size will usually

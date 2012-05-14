@@ -7,7 +7,7 @@ __license__ = 'LGPLv3'
 from collections import defaultdict, namedtuple
 import numpy as np
 
-from sailfish import block_runner, sym, util
+from sailfish import subdomain_runner, sym, util
 from sailfish.lb_base import LBSim, ScalarField, VectorField
 
 
@@ -53,7 +53,7 @@ class LBForcedSim(LBSim):
         ctx['force_couplings'] = self._force_couplings
         ctx['force_for_eq'] = self._force_term_for_eq
 
-    def use_force_for_equlibrium(self, force_grid, target_grid):
+    def use_force_for_equilibrium(self, force_grid, target_grid):
         """Makes it possible to use acceleration from force_grid when calculating
         velocity for the equlibrium of target_grid.
 
@@ -71,10 +71,10 @@ class LBForcedSim(LBSim):
     def add_force_coupling(self, grid_a, grid_b, const_name):
         """Adds a Shan-Chen type coupling between two lattices.
 
-        grid_a: numerical ID of the first lattice
-        grid_b: numerical ID of the second lattice
-        const_name: name of the global variable containing the value of the
-            coupling constant
+        :param grid_a: numerical ID of the first lattice
+        :param grid_b: numerical ID of the second lattice
+        :param const_name: name of the global variable containing the value of the
+                coupling constant
         """
         self._force_couplings[(grid_a, grid_b)] = const_name
 
@@ -144,11 +144,10 @@ class LBFluidSim(LBSim):
 
     def get_compute_kernels(self, runner, full_output, bulk):
         """
-        Args:
-            runner: BlockRunner object
-            full_output: if True, returns kernels that prepare fields for
+        :param runner: BlockRunner object
+        :param full_output: if True, returns kernels that prepare fields for
                 visualization or saving into a file
-            bulk: if True, returns kernels that process the bulk domain,
+        :param bulk: if True, returns kernels that process the bulk domain,
                 otherwise returns kernels that process the subdomain boundary
         """
         gpu_rho = runner.gpu_field(self.rho)
@@ -171,9 +170,9 @@ class LBFluidSim(LBSim):
 
         kernels = []
         kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args1, 'P'*(len(args1)-1)+'i'))
+                'CollideAndPropagate', args1, 'P'*(len(args1)-1) + 'i'))
         kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args2, 'P'*(len(args2)-1)+'i'))
+                'CollideAndPropagate', args2, 'P'*(len(args2)-1) + 'i'))
         return kernels
 
     def get_pbc_kernels(self, runner):
@@ -240,7 +239,7 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
     """Single-phase Shan-Chen model."""
 
     nonlocality = 1
-    subdomain_runner = block_runner.NNBlockRunner
+    subdomain_runner = subdomain_runner.NNBlockRunner
 
     def __init__(self, config):
         super(LBSingleFluidShanChen, self).__init__(config)

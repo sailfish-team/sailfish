@@ -1,3 +1,5 @@
+.. _internals:
+
 Sailfish internals
 ==================
 
@@ -29,13 +31,13 @@ cuboid exist) and subdivided into smaller units (subdomains).  This is accomplis
 via a child class of :class:`LBGeometry` (or its specializations
 :class:`LBGeometry2D`, :class:`LBGeometry3D`).  This class:
 
-* specifies domain decomposition into subdomains (:func:`LBGeometry.blocks`)
+* specifies domain decomposition into subdomains (:func:`LBGeometry.subdomain`)
 * defines options specific to the global simulation geometry
 * provides access to the global domain size via the :attr:`LBGeometry2D.gx`,
   :attr:`LBGeometry2D.gy`, and :attr:`LBGeometry3D.gz` attributes
 
-:func:`LBGeometry.blocks` returns a list of :class:`SubdomainSpec` objects.
-This makes it possible build a refined, hierarchical grid (to be implemented;
+:func:`LBGeometry.subdomain` returns a list of :class:`SubdomainSpec` objects.
+This makes it possible to build a refined, hierarchical grid (to be implemented;
 by increasing node density in some subdomains) and to define a sparse domain
 (by returning objects covering only a part of the global coordinate system).
 

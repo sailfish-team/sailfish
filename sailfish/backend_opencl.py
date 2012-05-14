@@ -4,6 +4,7 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+import operator
 import os
 import pyopencl as cl
 import pyopencl.array as clarray
@@ -19,13 +20,13 @@ class OpenCLBackend(object):
                 dest='opencl_interactive',
                 help='select the OpenCL device in an interactive manner',
                 action='store_true', default=False)
-        group.add_argument('--opencl-block-size', type=int,
-                help='size of the block of threads on the compute '
-                     'device; use 0 to set block size to an '
-                     'automatically selected value', default=0)
         return 1
 
-    def __init__(self, options):
+    def __init__(self, options, gpu_id):
+        """Initializes the OpenCL backend.
+
+        :param gpu_id: number of the GPU to use
+        """
         if options.opencl_interactive:
             self.ctx = cl.create_some_context(True)
         else:
@@ -36,15 +37,18 @@ class OpenCLBackend(object):
 
             platform = cl.get_platforms()[platform_num]
             devices = platform.get_devices(device_type=cl.device_type.GPU)
-
-            if 'OPENCL_DEVICE' in os.environ:
-                device = int(os.environ['OPENCL_DEVICE'])
-                devices = [devices[device]]
+            devices = [devices[gpu_id]]
             self.ctx = cl.Context(devices=devices, properties=[(cl.context_properties.PLATFORM, platform)])
 
-        self.queue = cl.CommandQueue(self.ctx)
+        self.default_queue = cl.CommandQueue(self.ctx)
         self.buffers = {}
         self.arrays = {}
+        self._iteration_kernels = []
+
+    def set_iteration(self, it):
+        self._iteration = it
+        for kernel in self._iteration_kernels:
+            kernel.set_arg(kernel.numargs - 1, it)
 
     def alloc_buf(self, size=None, like=None, wrap_in_array=True):
         mf = cl.mem_flags
@@ -64,47 +68,87 @@ class OpenCLBackend(object):
 
         return buf
 
+    def alloc_async_host_buf(self, shape, dtype):
+        """Allocates a buffer that can be used for asynchronous data
+        transfers."""
+        mf = cl.mem_flags
+        # OpenCL does not offer direct control over how memory is allocated,
+        # but ALLOC_HOST_PTR is supposed to prefer pinned memory.
+        if type(shape) is tuple or type(shape) is list:
+            size = reduce(operator.mul, shape)
+        else:
+            size = shape
+        host_buf = cl.Buffer(self.ctx, mf.READ_WRITE | mf.ALLOC_HOST_PTR,
+                size=size * dtype().nbytes)
+        return host_buf.get_host_array(shape, dtype)
+
     def to_buf(self, cl_buf, source=None):
         if source is None:
             if cl_buf in self.buffers:
-                cl.enqueue_write_buffer(self.queue, cl_buf, self.buffers[cl_buf])
+                cl.enqueue_write_buffer(self.default_queue, cl_buf,
+                        self.buffers[cl_buf]).wait()
             else:
                 raise ValueError('Unknown compute buffer and source not specified.')
         else:
             if source.base is not None:
-                cl.enqueue_write_buffer(self.queue, cl_buf, source.base)
+                cl.enqueue_write_buffer(self.default_queue, cl_buf,
+                        source.base).wait()
             else:
-                cl.enqueue_write_buffer(self.queue, cl_buf, source)
+                cl.enqueue_write_buffer(self.default_queue, cl_buf,
+                        source).wait()
 
     def from_buf(self, cl_buf, target=None):
         if target is None:
             if cl_buf in self.buffers:
-                cl.enqueue_read_buffer(self.queue, cl_buf, self.buffers[cl_buf])
+                cl.enqueue_read_buffer(self.default_queue, cl_buf,
+                        self.buffers[cl_buf]).wait()
             else:
                 raise ValueError('Unknown compute buffer and target not specified.')
         else:
             if target.base is not None:
-                cl.enqueue_read_buffer(self.queue, cl_buf, target.base)
+                cl.enqueue_read_buffer(self.default_queue, cl_buf,
+                        target.base).wait()
             else:
-                cl.enqueue_read_buffer(self.queue, cl_buf, target)
+                cl.enqueue_read_buffer(self.default_queue, cl_buf,
+                        target).wait()
+
+    def to_buf_async(self, cl_buf, stream=None):
+        queue = stream.queue if stream is not None else self.default_queue
+        cl.enqueue_write_buffer(queue, cl_buf, self.buffers[cl_buf],
+                is_blocking=False)
+
+    def from_buf_async(self, cl_buf, stream=None):
+        queue = stream.queue if stream is not None else self.default_queue
+        cl.enqueue_read_buffer(queue, cl_buf, self.buffers[cl_buf],
+                is_blocking=False)
 
     def build(self, source):
         preamble = '#pragma OPENCL EXTENSION cl_khr_fp64: enable\n'
         return cl.Program(self.ctx, preamble + source).build() #'-cl-single-precision-constant -cl-fast-relaxed-math')
 
-    def get_kernel(self, prog, name, block, args, args_format, shared=0, fields=[]):
+    def get_kernel(self, prog, name, block, args, args_format, shared=0,
+            needs_iteration=False):
+        """
+        :param needs_iteration: if True, the kernel needs access to the current iteration
+            number, which will be provided to it as the last argument
+        """
         kern = getattr(prog, name)
+        if needs_iteration:
+            args.append(0)
+            self._iteration_kernels.append(kern)
+
         for i, arg in enumerate(args):
             kern.set_arg(i, arg)
         setattr(kern, 'block', block)
+        setattr(kern, 'numargs', len(args))
         return kern
 
-    def run_kernel(self, kernel, grid, *args):
+    def run_kernel(self, kernel, grid_size, stream=None):
         global_size = []
-        for i, dim in enumerate(grid):
+        for i, dim in enumerate(grid_size):
             global_size.append(dim * kernel.block[i])
 
-        cl.enqueue_nd_range_kernel(self.queue, kernel, global_size, kernel.block[0:len(global_size)])
+        cl.enqueue_nd_range_kernel(self.default_queue, kernel, global_size, kernel.block[0:len(global_size)])
 
     def get_reduction_kernel(self, reduce_expr, map_expr, neutral, *args):
         """Generate and return reduction kernel; see PyOpenCL documentation
@@ -131,7 +175,14 @@ class OpenCLBackend(object):
         return lambda : kernel(*arrays).get()
 
     def sync(self):
-        self.queue.finish()
+        self.default_queue.finish()
+
+    def make_stream(self):
+        return StreamWrapper(cl.CommandQueue(self.ctx,
+            properties=cl.command_queue_properties.PROFILING_ENABLE))
+
+    def make_event(self, stream, timing=False):
+        return EventWrapper(cl.enqueue_marker(stream.queue))
 
     def get_defines(self):
         return {
@@ -142,5 +193,25 @@ class OpenCLBackend(object):
             'device_func': '',
             'const_var': '__constant',
         }
+
+
+class EventWrapper(object):
+    def __init__(self, event):
+        self.event = event
+
+    def time_since(self, other):
+        return 0
+        #return self.event.profile.end - other.event.profile.start
+
+
+class StreamWrapper(object):
+    def __init__(self, cmd_queue):
+        self.queue = cmd_queue
+
+    def wait_for_event(self, event):
+        cl.enqueue_wait_for_events(self.queue, [event.event])
+
+    def synchronize(self):
+        self.queue.finish()
 
 backend=OpenCLBackend

@@ -6,12 +6,12 @@ import numpy as np
 import zmq
 
 from sailfish.config import LBConfig
-from sailfish.connector import ZMQBlockConnector
+from sailfish.connector import ZMQSubdomainConnector
 from sailfish.lb_base import LBSim
 from sailfish.lb_binary import LBBinaryFluidShanChen
 from sailfish.backend_dummy import DummyBackend
-from sailfish.block_runner import BlockRunner, NNBlockRunner
-from sailfish.geo_block import SubdomainSpec2D, SubdomainSpec3D, SubdomainPair
+from sailfish.subdomain_runner import BlockRunner, NNBlockRunner
+from sailfish.subdomain import SubdomainSpec2D, SubdomainSpec3D, SubdomainPair
 from sailfish.io import LBOutput
 from sailfish.sym import D2Q9
 
@@ -40,19 +40,19 @@ class BasicFunctionalityTest(unittest.TestCase):
         self.sim = LBSim(config)
         self.backend = DummyBackend()
 
-    def get_block_runner(self, block):
+    def get_subdomain_runner(self, block):
         return BlockRunner(self.sim, block, output=None,
                 backend=self.backend, quit_event=None)
 
     def test_block_connection(self):
         block = SubdomainSpec2D(self.location, self.size)
-        runner = self.get_block_runner(block)
+        runner = self.get_subdomain_runner(block)
         self.assertEqual(block.runner, runner)
 
     def test_strides_and_size_2d(self):
         block = SubdomainSpec2D(self.location, self.size)
         block.set_actual_size(0)
-        runner = self.get_block_runner(block)
+        runner = self.get_subdomain_runner(block)
         runner._init_shape()
 
         # Last dimension is rounded up to a multiple of block_size
@@ -67,7 +67,7 @@ class BasicFunctionalityTest(unittest.TestCase):
     def test_strides_and_size_3d(self):
         block = SubdomainSpec3D(self.location_3d, self.size_3d)
         block.set_actual_size(0)
-        runner = self.get_block_runner(block)
+        runner = self.get_subdomain_runner(block)
         runner._init_shape()
 
         # Last dimension is rounded up to a multiple of block_size
@@ -112,10 +112,10 @@ class NNBlockRunnerTest(unittest.TestCase):
         # Establish connection between the two blocks.
         self.assertTrue(b1.connect(b2, grid=D2Q9))
 
-        cpair = b1.get_connection(*b1.connecting_blocks()[0])
+        cpair = b1.get_connection(*b1.connecting_subdomains()[0])
         size1 = cpair.src.elements
         size2 = cpair.dst.elements
-        c1, c2 = ZMQBlockConnector.make_ipc_pair(ctypes.c_float, (size1, size2), (b1.id, b2.id))
+        c1, c2 = ZMQSubdomainConnector.make_ipc_pair(ctypes.c_float, (size1, size2), (b1.id, b2.id))
         b1.add_connector(b2.id, c1)
         b2.add_connector(b1.id, c2)
 

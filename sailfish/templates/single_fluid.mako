@@ -2,8 +2,6 @@
     from sailfish import sym
 %>
 
-extern int printf (__const char *__restrict __format, ...);
-
 %if 'gravity' in context.keys():
 	${const_var} float gravity = ${gravity}f;
 %endif
@@ -40,8 +38,6 @@ ${kernel_common.body(bgk_args_decl)}
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 <%namespace file="propagation.mako" import="*"/>
-
-<%include file="tracers.mako"/>
 
 <%def name="init_dist_with_eq()">
 	%for local_var in bgk_equilibrium_vars:
@@ -87,7 +83,7 @@ ${kernel} void PrepareMacroFields(
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isUnusedNode(type) || isGhostNode(type))
+	if (isExcludedNode(type))
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);
@@ -106,8 +102,7 @@ ${kernel} void CollideAndPropagate(
 	${global_ptr} float *dist_out,
 	${global_ptr} float *gg0m0,
 	${kernel_args_1st_moment('ov')}
-	int options
-	)
+	int options)
 {
 	${local_indices_split()}
 
@@ -123,7 +118,7 @@ ${kernel} void CollideAndPropagate(
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isUnusedNode(type) || isGhostNode(type))
+	if (isExcludedNode(type))
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);

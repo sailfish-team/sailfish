@@ -2,9 +2,9 @@
 
 """Compares Sailfish results for the 2D lid driven cavity test case with
 numerical results from the literature. Numerical solutions of 2-D steady
-incompressible driven cavity ow at high Reynolds numbers E. Erturk; T. C. Corke
+incompressible driven cavity flow at high Reynolds numbers E. Erturk; T. C. Corke
 and C. Gokcol with numerical calculation of Navier-Stokes equations;
-grid size: 601X601 """
+grid size: 601x601."""
 
 import numpy as np
 import matplotlib
@@ -18,7 +18,7 @@ import tempfile
 from examples.ldc_2d import LDCBlock, LDCSim
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import SubdomainSpec2D
+from sailfish.subdomain import SubdomainSpec2D
 from sailfish import io
 
 from utils.merge_subdomains import merge_subdomains
@@ -39,7 +39,7 @@ name = 'ldc2d'
 
 class TestLDCGeometry(LBGeometry2D):
 
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         blocks = []
         bps = self.config.blocks
         yq = self.gy / bps

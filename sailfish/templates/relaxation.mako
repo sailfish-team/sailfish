@@ -1,10 +1,10 @@
 <%!
-    from sailfish import sym
+  from sailfish import sym
+  import sailfish.node_type as nt
 %>
 
 <%page args="bgk_args_decl"/>
 <%namespace file="code_common.mako" import="*"/>
-<%namespace file="boundary.mako" import="get_boundary_pressure"/>
 
 <%def name="fluid_momentum(igrid)">
 	%if igrid in force_for_eq and equilibrium:
@@ -81,8 +81,8 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 	%endfor
 
 	// Relexate the non-conserved moments,
-	%if bc_velocity == 'equilibrium':
-		if (isVelocityNode(node_type)) {
+	%if nt.NTEquilibriumVelocity in node_types:
+		if (isNTEquilibriumVelocity(node_type)) {
 			%for i, coll in enumerate(grid.mrt_collision):
 				%if coll != 0:
 					fm.${grid.mrt_names[i]} = feq.${grid.mrt_names[i]};
@@ -91,8 +91,8 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 		}
 	%endif
 
-	%if bc_pressure == 'equilibrium':
-		if (isPressureNode(node_type)) {
+	%if nt.NTEquilibriumDensity in node_types:
+		if (isNTEquilibriumDensity(node_type)) {
 			%for i, coll in enumerate(grid.mrt_collision):
 				%if coll != 0:
 					fm.${grid.mrt_names[i]} = feq.${grid.mrt_names[i]};
@@ -275,7 +275,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			d${i}->${idx} += (feq${i}.${idx} - d${i}->${idx}) / tau${i};
 		%endfor
 
-		%if bc_pressure == 'guo':
+		%if nt.NTGuoDensity in node_types:
 			// The total form of the postcollision boundary node distribution value
 			// with the Guo boundary conditions is as follows:
 			//
@@ -287,7 +287,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			// correction for node O is added as a postcollision boundary condition.
 			//
 			// The code below takes care of the -f_eq(B) of the formula.
-			if (isPressureNode(node_type)) {
+			if (isNTGuoDensity(node_type)) {
 				%for idx in grid.idx_name:
 					d${i}->${idx} -= feq${i}.${idx};
 				%endfor
@@ -323,11 +323,10 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 	%endfor
 
 	// FIXME: This should be moved to postcollision boundary conditions.
-	%if bc_pressure == 'guo':
-		if (isPressureNode(node_type)) {
-			int node_param = decodeNodeParam(ncode);
-			float par_rho;
-			${get_boundary_pressure('node_param', 'par_rho')}
+	%if nt.NTGuoDensity in node_types:
+		if (isNTGuoDensity(node_type)) {
+			int node_param_idx = decodeNodeParamIdx(ncode);
+			float par_rho = node_params[node_param_idx];
 			float par_phi = 1.0f;
 
 			%for local_var in bgk_equilibrium_vars:

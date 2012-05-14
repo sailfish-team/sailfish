@@ -9,7 +9,7 @@ import numpy as np
 
 from sailfish import io
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import SubdomainSpec2D, Subdomain2D
+from sailfish.subdomain import SubdomainSpec2D, Subdomain2D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
 from sailfish.sym import D2Q9
@@ -21,7 +21,7 @@ from regtest.blocks import util
 #  b0  b2
 #
 class GeometryTest(LBGeometry2D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         blocks = []
         q = 128
         for i in range(0, 2):
@@ -31,7 +31,7 @@ class GeometryTest(LBGeometry2D):
         return blocks
 
 class DoubleBlockGeometryTest(LBGeometry2D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         blocks = []
         q = 128
         blocks.append(SubdomainSpec2D((0, 0), (q, 2*q)))
@@ -39,7 +39,7 @@ class DoubleBlockGeometryTest(LBGeometry2D):
         return blocks
 
 class ThreeBlocksGeometryTest(LBGeometry2D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         blocks = []
         q = 128
         blocks.append(SubdomainSpec2D((0, 0), (q, q)))

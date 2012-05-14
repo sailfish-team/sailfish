@@ -13,7 +13,7 @@
 		float sca${x}[${dim}];
 	%endfor
 
-	if (!isWallNode(type)) {
+	if (isWetNode(type)) {
 		%for dists, coupling_const in force_couplings.iteritems():
 			// Interaction force between two components.
 			%if dists[0] != dists[1]:

@@ -14,7 +14,7 @@ value is a path to a cluster definition file.  If the path is relative, the cont
 will look for it in the current working directory as well as in the ``.sailfish``
 directory in the user's home.
 
-Optionally, the ``cluster_sync``
+Optionally, the ``--cluster_sync``
 argument can also be specified to automatically sync files from the controller to
 the nodes.  A common value to use here is ``$PWD:.``, which means "sync the contents
 of the current directory (``$PWD``) to the working directory on every node (``.``)".
@@ -23,7 +23,7 @@ Cluster definition files
 ^^^^^^^^^^^^^^^^^^^^^^^^
 A cluster definition file is a Python script that contains a global ``nodes`` list
 of :class:`MachineSpec` instances.  Each :class:`MachineSpec` defines a cluster node.
-Here is sample file defining two nodes::
+Here is a sample file defining two nodes::
 
     from sailfish.config import MachineSpec
 
@@ -104,7 +104,7 @@ PBS job script (``$HOME/sailfish-test.pbs``)::
     
     . $HOME/sailfish-init.sh
     python ./examples/lbm_cylinder_multi.py --lat_nx=2046 --lat_ny=30000 --block_size=256 --mode=benchmark --vertical \
-            --every=500 --max_iters=2000 --blocks=2 --log=/mnt/lustre/scratch/people/myuser/test.log --verbose
+            --every=500 --max_iters=2000 --subdomains=2 --log=/mnt/lustre/scratch/people/myuser/test.log --verbose
 
 Once you have both scripts in place and a Sailfish installation in ``$HOME/mysailfish``, you can submit the job
 by running::
@@ -128,7 +128,7 @@ How it works behind the scenes
 
 If the ``--cluster_pbs`` option is set to true (default) and the ``$PBS_GPUFILE``
 environment variable is set, Sailfish will assume it is running on a PBS cluster.
-A cluster specification will be dynamically built using the contents of the
+A cluster specification will be dynamically built using the contents of
 ``$PBS_GPUFILE``.  For each machine listed in this file, ``pbsdsh`` will be used
 to execute ``--cluster_pbs_initscript`` (``sailfish-init.sh`` in the previous
 section), followed by ``python sailfish/socketserver.py`` (with a random port).

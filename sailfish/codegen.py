@@ -6,7 +6,10 @@ __license__ = 'LGPL3'
 
 import os
 import sys
+import tempfile
 from mako.lookup import TemplateLookup
+
+import sailfish.io
 
 def _convert_to_double(src):
     """Converts all single-precision floating point literals to double
@@ -53,6 +56,8 @@ class BlockCodeGenerator(object):
                 help='cache the generated Mako templates in '
                      '/tmp/sailfish_modules-$USER', action='store_true',
                 default=False)
+        group.add_argument('--block_size', type=int, default=64,
+                help='size of the block of threads on the compute device')
 
     def __init__(self, simulation):
         self._sim = simulation
@@ -61,11 +66,13 @@ class BlockCodeGenerator(object):
     def config(self):
         return self._sim.config
 
-    def get_code(self, block_runner):
+    def get_code(self, subdomain_runner):
         if self.config.use_src:
+            source_fn = sailfish.io.source_filename(self.config.use_src,
+                    subdomain_runner._block_id)
             self.config.logger.debug(
-                    "Using code from '{0}'.".format(self.config.use_src))
-            with open(self.config.use_src, 'r') as f:
+                    "Using code from '{0}'.".format(source_fn))
+            with open(source_fn, 'r') as f:
                 src = f.read()
             return src
 
@@ -77,24 +84,24 @@ class BlockCodeGenerator(object):
         if self.config.use_mako_cache:
             import pwd
             lookup = TemplateLookup(directories=sys.path,
-                    module_directory='/tmp/sailfish_modules-%s' %
-                            pwd.getpwuid(os.getuid())[0])
+                    module_directory='{0}/sailfish_modules-{1}'.format(
+                        tempfile.gettempdir(), pwd.getpwuid(os.getuid())[0]))
         else:
             lookup = TemplateLookup(directories=sys.path)
 
         code_tmpl = lookup.get_template(os.path.join('sailfish/templates',
                                         self._sim.kernel_file))
-        ctx = self._build_context(block_runner)
+        ctx = self._build_context(subdomain_runner)
         src = code_tmpl.render(**ctx)
 
         if self.is_double_precision():
             src = _convert_to_double(src)
 
         if self.config.save_src:
-            self.save_code(src, '{0}/blk{1}_{2}'.format(
-                    os.path.dirname(self.config.save_src),
-                    block_runner._block.id, os.path.basename(self.config.save_src)),
-                           self.config.format_src)
+            self.save_code(src,
+                    sailfish.io.source_filename(self.config.save_src,
+                        subdomain_runner._block_id),
+                    self.config.format_src)
 
         return src
 
@@ -108,28 +115,12 @@ class BlockCodeGenerator(object):
     def is_double_precision(self):
         return self.config.precision == 'double'
 
-    def _build_context(self, block_runnner):
+    def _build_context(self, subdomain_runner):
         ctx = {}
         ctx['block_size'] = self.config.block_size
         ctx['propagation_sentinels'] = True
 
         self._sim.update_context(ctx)
-        block_runnner.update_context(ctx)
+        subdomain_runner.update_context(ctx)
 
         return ctx
-
-#        ctx['backend'] = self.options.backend
-#        ctx['dist_size'] = self.get_dist_size()
-#        ctx['grid'] = self.grid
-#        ctx['sim'] = self
-#        ctx['bgk_equilibrium'] = self.equilibrium
-#        ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
-#        ctx['grids'] = [self.grid]
-#
-#        ctx['forces'] = self.forces
-#        ctx['force_couplings'] = self._force_couplings
-#        ctx['force_for_eq'] = self._force_term_for_eq
-#
-#        # TODO: Find a more general way of specifying whether sentinels are
-#        # necessary.
-#        ctx['propagation_sentinels'] = (self.options.bc_wall == 'halfbb')

@@ -10,10 +10,10 @@ import tempfile
 import numpy as np
 from multiprocessing import Array, Event
 
-# Note: this connector is currently slower than ZMQBlockConnector using
+# Note: this connector is currently slower than ZMQSubdomainConnector using
 # IPC.
-class MPBlockConnector(object):
-    """Handles directed data exchange between two blocks using the
+class MPSubdomainConnector(object):
+    """Handles directed data exchange between two subdomains using the
     multiprocessing module."""
 
     def __init__(self, send_array, recv_array, send_ev, recv_ev, conf_ev,
@@ -59,12 +59,12 @@ class MPBlockConnector(object):
         ev3.set()
         ev4.set()
 
-        return (MPBlockConnector(array1, array2, ev1, ev2, ev3, ev4),
-                MPBlockConnector(array2, array1, ev2, ev1, ev4, ev3))
+        return (MPSubdomainConnector(array1, array2, ev1, ev2, ev3, ev4),
+                MPSubdomainConnector(array2, array1, ev2, ev1, ev4, ev3))
 
 
-class ZMQBlockConnector(object):
-    """Handles directed data exchange between two blocks using 0MQ."""
+class ZMQSubdomainConnector(object):
+    """Handles directed data exchange between two subdomains using 0MQ."""
 
     def __init__(self, addr, receiver=False):
         """
@@ -107,22 +107,22 @@ class ZMQBlockConnector(object):
     def make_ipc_pair(self, ctype, sizes, ids):
         addr = 'ipc://%s/sailfish-master-%d_%d-%d' % (tempfile.gettempdir(),
                 os.getpid(), ids[0], ids[1])
-        return (ZMQBlockConnector(addr, False), ZMQBlockConnector(addr, True))
+        return (ZMQSubdomainConnector(addr, False), ZMQSubdomainConnector(addr, True))
 
 
-class ZMQRemoteBlockConnector(ZMQBlockConnector):
-    """Handles directed data exchange between two blocks on two different hosts."""
+class ZMQRemoteSubdomainConnector(ZMQSubdomainConnector):
+    """Handles directed data exchange between two subdomains on two different hosts."""
 
     def __init__(self, addr, receiver=False):
         """
         :param addr: if receiver == False, addr is tcp://<interface> or
-            tcp://*, otherwise it is tcp://<remote_node_ip_or_name>
+            tcp://\*, otherwise it is tcp://<remote_node_ip_or_name>
         :param receiver: if True, use connect on the socket, otherwise bind
             it to a random port.
         """
         # Import to check if the module is available and fail early if not.
         import netifaces
-        ZMQBlockConnector.__init__(self, addr, receiver)
+        ZMQSubdomainConnector.__init__(self, addr, receiver)
 
     def is_ready(self):
         return self.port != None or not self._receiver

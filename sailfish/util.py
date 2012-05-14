@@ -9,6 +9,8 @@ import random
 import socket
 import sys
 
+import numpy as np
+
 from sailfish import config
 from sailfish import sym
 
@@ -36,8 +38,8 @@ def span_to_direction(span):
     return 0
 
 
-def get_backends():
-    for backend in ['cuda', 'opencl']:
+def get_backends(backends=['cuda', 'opencl']):
+    for backend in backends:
         try:
             module = 'sailfish.backend_{0}'.format(backend)
             __import__('sailfish', fromlist=['backend_{0}'.format(backend)])
@@ -46,7 +48,7 @@ def get_backends():
             pass
 
 def get_visualization_engines():
-    for engine in ['2d']:
+    for engine in ['2d', 'mpl']:
         try:
             module = 'sailfish.vis_{0}'.format(engine)
             __import__('sailfish', fromlist=['vis_{0}'.format(engine)])
@@ -107,4 +109,12 @@ def reverse_pairs(iterable, subitems=1):
 
         for i in x:
             yield i
+
+def in_anyd(arr1, arr2):
+    """Wrapper around np.in1d which returns an array with the same shape as arr1"""
+    return np.in1d(arr1, arr2).reshape(arr1.shape)
+
+
+def is_number(param):
+    return type(param) is float or type(param) is int or isinstance(param, np.number)
 

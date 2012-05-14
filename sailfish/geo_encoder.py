@@ -2,11 +2,13 @@
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
-__license__ = 'GPL3'
+__license__ = 'LGPL3'
 
 from collections import defaultdict
 import numpy as np
 
+from sailfish import util
+import sailfish.node_type as nt
 
 def bit_len(num):
     """Returns the minimal number of bits necesary to encode `num`."""
@@ -24,7 +26,8 @@ class GeoEncoder(object):
     This is an abstract class.  Its implementations provide a specific encoding
     scheme."""
     def __init__(self, subdomain):
-        self._type_id_map = {}
+        # Maps LBNodeType.id to an internal ID used for encoding purposes.
+        self._type_id_remap = {0: 0}  # fluid nodes are not remapped
         self.subdomain = subdomain
 
     def encode(self):
@@ -34,8 +37,8 @@ class GeoEncoder(object):
         raise NotImplementedError("update_context() should be implemented in a subclass")
 
     def _type_id(self, node_type):
-        if node_type in self._type_id_map:
-            return self._type_id_map[node_type]
+        if node_type in self._type_id_remap:
+            return self._type_id_remap[node_type]
         else:
             # Does not end with 0xff to make sure the compiler will not complain
             # that x < <val> always evaluates true.
@@ -43,68 +46,94 @@ class GeoEncoder(object):
 
 
 class GeoEncoderConst(GeoEncoder):
-    """Encodes information about the type, optional parameters and orientation
-    of a node into a single uint32.  Optional parameters such as velocities,
-    densities, etc. are stored in const memory."""
+    """Encodes node type and parameters into a single uint32.
+
+    Optional parameters such as velocities, densities, etc. are stored in
+    const memory and the packed value in the uint32 only contains an index
+    inside a const memory array."""
 
     def __init__(self, subdomain):
         GeoEncoder.__init__(self, subdomain)
 
+        # Set of all used node types, passed down to the Mako engine.
+        self._node_types = set([nt._NTFluid])
         self._bits_type = 0
         self._bits_param = 0
         self._type_map = None
         self._param_map = None
         self._geo_params = []
-        # TODO: Generalize this.
-        self._num_velocities = 0
         self.config = subdomain.block.runner.config
 
     def prepare_encode(self, type_map, param_map, param_dict):
         """
-        Args:
-          type_map: uint32 array representing node type information
+        :param type_map: uint32 array of NodeType.ids
+        :param param_map: array whose entries are keys in param_dict
+        :param param_dict: maps entries from param_map to LBNodeType objects
         """
-        uniq_types = np.unique(type_map)
+        uniq_types = list(np.unique(type_map))
+        for nt_id in uniq_types:
+            self._node_types.add(nt._NODE_TYPES[nt_id])
 
+        # Initialize the node ID map used for remapping.
         for i, node_type in enumerate(uniq_types):
-            self._type_id_map[node_type] = i
+            self._type_id_remap[node_type] = i + 1
 
-        self._bits_type = bit_len(uniq_types.size)
+        self._bits_type = bit_len(len(uniq_types))
         self._type_map = type_map
         self._param_map = param_map
+        self._param_dict = param_dict
+        self._encoded_param_map = np.zeros_like(self._type_map)
 
-        # Group parameters by type.
-        type_dict = defaultdict(list)
-        for param_hash, (node_type, val) in param_dict.iteritems():
-            type_dict[node_type].append((param_hash, val))
+        param_to_idx = dict()  # Maps entries in seen_params to ids.
+        seen_params = set()
+        param_items = 0
 
-        max_len = 0
-        for node_type, values in type_dict.iteritems():
-            l = len(values)
-            if node_type == self.subdomain.NODE_VELOCITY:
-                self._num_velocities = l
-            max_len = max(max_len, l)
-        self._bits_param = bit_len(max_len)
+        # Refer to subdomain.Subdomain._verify_params for a list of allowed
+        # ways of encoding nodes.
+        for node_key, node_type in param_dict.iteritems():
+            for param in node_type.params.itervalues():
+                if util.is_number(param):
+                    if param in seen_params:
+                        idx = param_to_idx[param]
+                    else:
+                        seen_params.add(param)
+                        self._geo_params.append(param)
+                        idx = param_items
+                        param_to_idx[param] = idx
+                        param_items += 1
+                elif type(param) is tuple:
+                    if param in seen_params:
+                        idx = param_to_idx[param]
+                    else:
+                        seen_params.add(param)
+                        self._geo_params.extend(param)
+                        idx = param_items
+                        param_to_idx[param] = idx
+                        param_items += len(param)
+                else:
+                    assert False
+                    # FIXME: This needs to work with record arrays.
+                    uniques = np.unique(param)
+                    for value in uniques:
+                        if value not in seen_params:
+                            seen_params.add(value)
+                            self._geo_params.extend(param)
+                            param_items += len(param)
 
-        # TODO(michalj): Generalize this to other node types.
-        for param_hash, val in type_dict[self.subdomain.NODE_VELOCITY]:
-            self._geo_params.extend(val)
-        for param_hash, val in type_dict[self.subdomain.NODE_PRESSURE]:
-            self._geo_params.append(val)
+                self._encoded_param_map[param_map == node_key] = idx
 
-        self._type_dict = type_dict
+                # TODO(kasiaj): Add support for sympy expressions.
+
+        self._bits_param = bit_len(param_items)
 
     def encode(self):
         assert self._type_map is not None
 
-        # TODO: optimize this using numpy's built-in routines
-        param = np.zeros_like(self._type_map)
-        for node_type, values in self._type_dict.iteritems():
-            for i, (hash_value, _) in enumerate(values):
-                param[self._param_map == hash_value] = i
-
         orientation = np.zeros_like(self._type_map)
         cnt = np.zeros_like(self._type_map)
+
+        dry_types = self._type_map.dtype.type(nt.get_dry_node_type_ids())
+        wet_types = self._type_map.dtype.type(nt.get_wet_node_type_ids())
 
         for i, vec in enumerate(self.subdomain.grid.basis):
             l = len(list(vec)) - 1
@@ -112,46 +141,40 @@ class GeoEncoderConst(GeoEncoder):
             for j, shift in enumerate(vec):
                 shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
 
-            cnt[(shifted_map == self.subdomain.NODE_WALL)] += 1
+            cnt[util.in_anyd(shifted_map, dry_types)] += 1
             # FIXME: we're currently only processing the primary directions
             # here
             if vec.dot(vec) == 1:
-                idx = np.logical_and(self._type_map != self.subdomain.NODE_FLUID,
-                        shifted_map == self.subdomain.NODE_FLUID)
+                idx = np.logical_and(
+                        util.in_anyd(self._type_map, dry_types),
+                        util.in_anyd(shifted_map, wet_types))
                 orientation[idx] = self.subdomain.grid.vec_to_dir(list(vec))
 
-            # Mark any nodes completely surrounded by walls as unused.
-            self._type_map[(cnt == self.subdomain.grid.Q)] = self.subdomain.NODE_UNUSED
-
         # Remap type IDs.
-        max_type_code = max(self._type_id_map.keys())
-        type_choice_map = np.zeros(max_type_code+1, dtype=np.uint32)
-        for orig_code, new_code in self._type_id_map.iteritems():
+        max_type_code = max(self._type_id_remap.keys())
+        type_choice_map = np.zeros(max_type_code + 1, dtype=np.uint32)
+        for orig_code, new_code in self._type_id_remap.iteritems():
             type_choice_map[orig_code] = new_code
 
-        self._type_map[:] = self._encode_node(orientation, param,
+        self._type_map[:] = self._encode_node(orientation,
+                self._encoded_param_map,
                 np.choose(np.int32(self._type_map), type_choice_map))
 
         # Drop the reference to the map array.
         self._type_map = None
 
+    # XXX: Support different types of BCs here.
     def update_context(self, ctx):
         ctx.update({
-            'geo_fluid': self._type_id(self.subdomain.NODE_FLUID),
-            'geo_wall': self._type_id(self.subdomain.NODE_WALL),
-            'geo_slip': self._type_id(self.subdomain.NODE_SLIP),
-            'geo_unused': self._type_id(self.subdomain.NODE_UNUSED),
-            'geo_velocity': self._type_id(self.subdomain.NODE_VELOCITY),
-            'geo_pressure': self._type_id(self.subdomain.NODE_PRESSURE),
-            'geo_boundary': self._type_id(self.subdomain.NODE_BOUNDARY),
-            'geo_ghost': self._type_id(self.subdomain.NODE_GHOST),
-            'geo_misc_shift': self._bits_type,
-            'geo_type_mask': (1 << self._bits_type) - 1,
-            'geo_param_shift': self._bits_param,
-            'geo_obj_shift': 0,
-            'geo_dir_other': 0,
-            'geo_num_velocities': self._num_velocities,
-            'geo_params': self._geo_params
+            'node_types': self._node_types,
+            'type_id_remap': self._type_id_remap,
+            'nt_id_fluid': self._type_id(0),
+            'nt_misc_shift': self._bits_type,
+            'nt_type_mask': (1 << self._bits_type) - 1,
+            'nt_param_shift': self._bits_param,
+            'nt_dir_other': 0,  # used to indicate non-primary direction
+                                # in orientation processing code
+            'node_params': self._geo_params
         })
 
     def _encode_node(self, orientation, param, node_type):

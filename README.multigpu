@@ -1,5 +1,0 @@
-This is a development branch with support for multi-GPU simulations.
-Once all LB models have been ported, this branch will replace the current
-main branch.
-
-If you want to help, please e-mail sailfish-cfd@googlegroups.com.

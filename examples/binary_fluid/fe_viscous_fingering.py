@@ -3,7 +3,8 @@
 import numpy as np
 
 from sailfish.geo import LBGeometry3D
-from sailfish.geo_block import Subdomain3D
+from sailfish.subdomain import Subdomain3D
+from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidFreeEnergy
 from sailfish.lb_single import LBForcedSim
@@ -11,24 +12,24 @@ from sailfish.lb_single import LBForcedSim
 
 class FingeringDomain(Subdomain3D):
     def initial_conditions(self, sim, hx, hy, hz):
-        a = 100.0 - 8.0 * np.cos(2.0 * np.pi * hy / self.gy)
-        b = 200.0 - 8.0 * np.cos(2.0 * np.pi * hy / self.gy)
+        a = 50.0 - 8.0 * np.cos(2.0 * np.pi * hy / self.gy)
+        b = 100.0 - 8.0 * np.cos(2.0 * np.pi * hy / self.gy)
 
         sim.rho[:] = 1.0
         sim.phi[:] = 1.0
         sim.phi[np.logical_or(hx <= a, hx >= b)] = -1.0
 
     def boundary_conditions(self, hx, hy, hz):
-        self.set_geo(np.logical_or(hz == 0, hz == self.gz - 1), self.NODE_WALL)
+        self.set_node(np.logical_or(hz == 0, hz == self.gz - 1), NTFullBBWall)
 
 
 class FingeringFESim(LBBinaryFluidFreeEnergy, LBForcedSim):
     subdomain = FingeringDomain
 
     @classmethod
-    def update_default(cls, defaults):
+    def update_defaults(cls, defaults):
         defaults.update({
-            'lat_nx': 640,
+            'lat_nx': 320,
             'lat_ny': 101,
             'lat_nz': 37,
             'grid': 'D3Q19',
@@ -38,7 +39,6 @@ class FingeringFESim(LBBinaryFluidFreeEnergy, LBForcedSim):
             'kappa': 9.18e-5,
             'Gamma': 25.0,
             'A': 1.41e-4,
-            'lambda_': 0.0,
             'model': 'mrt',
             'periodic_x': True,
             'periodic_y': True,

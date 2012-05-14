@@ -11,14 +11,14 @@ the ``sailfish`` module can be imported::
 
     export PYTHONPATH=$PWD:$PYTHONPATH
     cd examples
-    python lbm_ldc.py
+    python ldc_2d.py
 
 2D examples
 -----------
 
 Lid-driven cavity
 ^^^^^^^^^^^^^^^^^
-The code for this example is located in ``examples/lbm_ldc.py``.
+The code for this example is located in ``examples/ldc_2d.py``.
 
 This is a standard computational fluid dynamics test problem.  The simulation domain is a
 square, with no-slip boundary conditions on three walls and a velocity boundary condition
@@ -35,7 +35,7 @@ tracer particles.  The red lines depict the velocity field.
 
 Poiseuille flow
 ^^^^^^^^^^^^^^^
-The code for this example is located in ``examples/lbm_poiseuille.py``.
+The code for this example is located in ``examples/poiseuille.py``.
 
 The fluid flows in a 2D pipe and a no-slip boundary condition is imposed at the pipe walls.  The flow
 is driven either by a global body force (``--drive=force``, default) or by a pressure gradient
@@ -52,7 +52,7 @@ see :doc:`regtest-poiseuille2d` for results.
 
 Flow around a cylinder
 ^^^^^^^^^^^^^^^^^^^^^^
-The code for this example is located in ``examples/lbm_cylinder.py``.
+The code for this example is located in ``examples/cylinder.py``.
 
 The classes in this example are derived from the ones used in the Poiseuille test, so the
 geometry and available command line options are exactly as described in the previous
@@ -71,7 +71,7 @@ Von Kármán vortex street.  The image illustrates vorticity visualized in the `
 
 Poiseuille flow
 ^^^^^^^^^^^^^^^
-The code for this example is located in ``examples/lbm_poiseuille_3d.py``.
+The code for this example is located in ``examples/poiseuille_3d.py``.
 
 This example is like the 2D Poiseuille flow, but the pipe is now a proper cylinder with a
 circular cross section.  The flow can currently only be driven by a global body force.
@@ -84,9 +84,9 @@ see :doc:`regtest-poiseuille3d` for results.
 
 Flow around a sphere
 ^^^^^^^^^^^^^^^^^^^^
-The code for this example is located in ``examples/lbm_sphere_3d.py`` and ``examples/lbm_sphere_force_3d.py``.
+The code for this example is located in ``examples/sphere_3d.py``.
 
-This example comes in two variants.  The first one is a direct counterpart of the flow around
+This example is a direct counterpart of the flow around
 a cylinder example in 2D.  The classes are derived from the 3D Poiseuille example, the
 only difference being the spherical obstacle placed on the axis of the pipe.  The obstacle
 is formed by no-slip nodes.
@@ -94,17 +94,3 @@ is formed by no-slip nodes.
 .. image:: img/sphere3d.png
 
 The image illustrates the velocity field of the fluid.  The red tubes depict streamlines.
-
-In the second and more useful variant, the flow is driven by velocity boundary conditions
-at the inlet and walls of the pipe.  This corresponds to the physical problem of a moving
-sphere in a pipe with stationary fluid, as seen from the frame of reference comoving with
-the sphere.
-
-This example is interesting, because it makes it possible to calculate the drag force
-exerted on the sphere by the fluid.  The value of the drag coefficient can then be compared
-with an approximate theoretical prediction or with experimental data.  In order to see the
-computed drag coefficient, run the example in the batch mode with verbose output (``./lbm_sphere_force_3d.py --batch -v``).
-You can also select different Reynolds numbers using the ``--re=N`` command line option.
-
-This example is also used as a part of the automated regression test in ``regtest/drag_coefficient.py``,
-see :doc:`regtest-drag_coefficient` for results.

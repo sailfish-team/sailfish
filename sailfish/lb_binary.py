@@ -6,7 +6,7 @@ __license__ = 'LGPL3'
 
 from collections import defaultdict
 import numpy as np
-from sailfish import block_runner, sym, util
+from sailfish import subdomain_runner, sym, util
 from sailfish.lb_base import LBSim, ScalarField, VectorField
 from sailfish.lb_single import LBForcedSim, MacroKernels
 
@@ -14,7 +14,7 @@ from sailfish.lb_single import LBForcedSim, MacroKernels
 class LBBinaryFluidBase(LBSim):
     """Base class for binary fluid simulations."""
 
-    subdomain_runner = block_runner.NNBlockRunner
+    subdomain_runner = subdomain_runner.NNBlockRunner
     kernel_file = 'binary_fluid.mako'
     nonlocality = 1
 

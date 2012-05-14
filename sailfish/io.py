@@ -7,6 +7,7 @@ __license__ = 'LGPL3'
 import math
 import numpy as np
 import operator
+import os
 import ctypes
 from ctypes import Structure, c_uint16, c_int32, c_uint8, c_bool
 
@@ -17,14 +18,14 @@ class VisConfig(Structure):
                 type(ctypes.create_string_buffer(MAX_NAME_SIZE)))]
 
 class LBOutput(object):
-    def __init__(self, config, block_id, *args, **kwargs):
+    def __init__(self, config, subdomain_id, *args, **kwargs):
         self._scalar_fields = {}
         self._vector_fields = {}
 
         # Additional scalar fields used for visualization.
         self._visualization_fields = {}
         self.basename = config.output
-        self.block_id = block_id
+        self.subdomain_id = subdomain_id
 
     def register_field(self, field, name, visualization=False):
         if visualization:
@@ -127,70 +128,80 @@ def dists_filename(base, digits, subdomain_id, it, suffix='.npy'):
 def subdomains_filename(base):
     return base + '.subdomains'
 
+def source_filename(filename, subdomain_id):
+    base, ext = os.path.splitext(filename)
+    return '{0}.{1}.{2}'.format(base, subdomain_id, ext)
+
+
 class VTKOutput(LBOutput):
     """Saves simulation data in VTK files."""
     format_name = 'vtk'
 
-    def __init__(self, config):
-        LBOutput.__init__(self)
-        self.fname = config.output
+    def __init__(self, config, subdomain_id):
+        LBOutput.__init__(self, config, subdomain_id)
         self.digits = filename_iter_digits(config.max_iters)
 
     def save(self, i):
-        # FIXME: Port this class.
-        raise NotImplementedError('This class has not been ported yet.')
-
-        from enthought.tvtk.api import tvtk
+        os.environ['ETS_TOOLKIT'] = 'null'
+        from tvtk.api import tvtk
         idata = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
 
-        fields = self._scalar_fields.keys() + self._vector_fields.keys()
-        ffld = fields[0]
-        fields = fields[1:]
-
-        idata.point_data.scalars = self.sim.output_fields[ffld].flatten()
-        idata.point_data.scalars.name = ffld
-
-        for fld in fields:
-            tmp = idata.point_data.add_array(self.sim.output_fields[fld].flatten())
-            idata.point_data.get_array(tmp).name = fld
+        first = True
+        sample_field = None
+        for name, field in self._scalar_fields.iteritems():
+            if first:
+                idata.point_data.scalars = field.flatten()
+                idata.point_data.scalars.name = name
+                first = False
+                sample_field = field
+            else:
+                t = idata.point_data.add_array(field.flatten())
+                idata.point_data.get_array(t).name = name
 
         idata.update()
+        dim = len(sample_field.shape)
 
-        for k, v in self.sim.output_vectors.iteritems():
-            if self.sim.gridata.dim == 3:
-                tmp = idata.point_data.add_array(np.c_[v[0].flatten(),
-                                                 v[1].flatten(), v[2].flatten()])
+        for name, field in self._vector_fields.iteritems():
+            if dim == 3:
+                tmp = idata.point_data.add_array(np.c_[field[0].flatten(),
+                                                 field[1].flatten(), field[2].flatten()])
             else:
-                tmp = idata.point_data.add_array(np.c_[v[0].flatten(),
-                                                 v[1].flatten(), np.zeros_like(v[0].flatten())])
-            idata.point_data.get_array(tmp).name = k
+                tmp = idata.point_data.add_array(np.c_[field[0].flatten(),
+                                                 field[1].flatten(),
+                                                 np.zeros_like(field[0].flatten())])
+            idata.point_data.get_array(tmp).name = name
 
-        if self.sim.grid.dim == 3:
-            idata.dimensions = list(reversed(self.sim.output_fields[ffld].shape))
+        if dim == 3:
+            idata.dimensions = list(reversed(sample_field.shape))
         else:
-            idata.dimensions = list(reversed(self.sim.output_fields[ffld].shape)) + [1]
-        w = tvtk.XMLPImageDataWriter(input=idata,
-                                     file_name=('%s%0' + self.digits + 'd.xml') % (self.fname, i))
+            idata.dimensions = list(reversed(sample_field.shape)) + [1]
+
+        fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='.vti')
+        w = tvtk.XMLImageDataWriter(input=idata, file_name=fname)
         w.write()
+
+    # TODO: Implement this function.
+    def dump_dists(self, dists, i):
+        pass
 
 
 class NPYOutput(LBOutput):
     """Saves simulation data as np arrays."""
     format_name = 'npy'
 
-    def __init__(self, config, block_id):
-        LBOutput.__init__(self, config, block_id)
+    def __init__(self, config, subdomain_id):
+        LBOutput.__init__(self, config, subdomain_id)
         self.digits = filename_iter_digits(config.max_iters)
 
     def save(self, i):
-        fname = filename(self.basename, self.digits, self.block_id, i, suffix='')
+        fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='')
         data = {}
         data.update(self._scalar_fields)
         data.update(self._vector_fields)
         np.savez(fname, **data)
 
     def dump_dists(self, dists, i):
-        fname = dists_filename(self.basename, self.digits, self.block_id, i)
+        fname = dists_filename(self.basename, self.digits, self.subdomain_id, i)
         np.save(fname, dists)
 
 
@@ -198,13 +209,13 @@ class MatlabOutput(LBOutput):
     """Saves simulation data as Matlab .mat files."""
     format_name = 'mat'
 
-    def __init__(self, config, block_id):
-        LBOutput.__init__(self, config, block_id)
+    def __init__(self, config, subdomain_id):
+        LBOutput.__init__(self, config, subdomain_id)
         self.digits = filename_iter_digits(config.max_iters)
 
     def save(self, i):
         import scipy.io
-        fname = filename(self.basename, self.digits, self.block_id, i, suffix='')
+        fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='')
         data = {}
         data.update(self._scalar_fields)
         data.update(self._vector_fields)
@@ -212,7 +223,7 @@ class MatlabOutput(LBOutput):
 
     def dump_dists(self, dists, i):
         import scipy.io
-        fname = dists_filename(self.basename, self.digits, self.block_id, i)
+        fname = dists_filename(self.basename, self.digits, self.subdomain_id, i)
         scipy.io.savemat(dists)
 
 

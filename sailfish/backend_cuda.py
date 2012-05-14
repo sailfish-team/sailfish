@@ -28,7 +28,7 @@ def _expand_grid(grid):
     if len(grid) == 1:
         return (grid[0], 1)
     else:
-        return grid
+        return tuple(grid)
 
 def _set_txt_format(dsc, strides):
     # float
@@ -68,8 +68,6 @@ class CUDABackend(object):
                      ' devices', action='store_true', default=False)
         group.add_argument('--cuda_cache', type=bool, default=True,
                 help='if True, use the pycuda compiler cache.')
-        group.add_argument('--block_size', type=int, default=64,
-                help='size of the block of threads on the compute device')
         return 1
 
     def __init__(self, options, gpu_id):
@@ -89,9 +87,15 @@ class CUDABackend(object):
         # To keep track of allocated memory.
         self._total_memory_bytes = 0
 
+        self._iteration_kernels = []
+
     @property
     def total_memory(self):
         return self._device.total_memory()
+
+    def set_iteration(self, it):
+        for kernel in self._iteration_kernels:
+            kernel.args[-1] = it
 
     def alloc_buf(self, size=None, like=None, wrap_in_array=False):
         if like is not None:
@@ -120,48 +124,6 @@ class CUDABackend(object):
         """Allocates a buffer that can be used for asynchronous data
         transfers."""
         return cuda.pagelocked_zeros(shape, dtype=dtype)
-
-    def nonlocal_field(self, prog, cl_buf, num, shape, strides):
-        if len(shape) == 3:
-            dsc = cuda.ArrayDescriptor()
-            dsc.width = strides[0] / strides[2]
-            dsc.height = shape[-3]
-            _set_txt_format(dsc, strides)
-
-            txt = prog.get_texref('img_f%d' % num)
-            txt.set_address_2d(cl_buf, dsc, strides[-3])
-
-            # It turns out that using 3D textures doesn't really make
-            # much sense if it requires copying data around.  We therefore
-            # access the 3D fields via a 2D texture, which still provides
-            # some caching, while not requiring a separate copy of the
-            # data.
-            #
-            # dsc = cuda.ArrayDescriptor3D()
-            # dsc.depth, dsc.height, dsc.width = shape
-            # dsc.format = cuda.array_format.FLOAT
-            # dsc.num_channels = 1
-            # ary = cuda.Array(dsc)
-
-            # copy = cuda.Memcpy3D()
-            # copy.set_src_device(cl_buf)
-            # copy.set_dst_array(ary)
-            # copy.width_in_bytes = copy.src_pitch = strides[-2]
-            # copy.src_height = copy.height = dsc.height
-            # copy.depth = dsc.depth
-
-            # txt = prog.get_texref('img_f%d' % num)
-            # txt.set_array(ary)
-            # self._tex_to_memcpy[txt] = copy
-        else:
-            # 2D texture.
-            dsc = cuda.ArrayDescriptor()
-            dsc.width = shape[-1]
-            dsc.height = shape[-2]
-            _set_txt_format(dsc, strides)
-            txt = prog.get_texref('img_f%d' % num)
-            txt.set_address_2d(cl_buf, dsc, strides[-2])
-        return txt
 
     def to_buf(self, cl_buf, source=None):
         if source is None:
@@ -213,11 +175,24 @@ class CUDABackend(object):
                 nvcc=self.options.cuda_nvcc, keep=self.options.cuda_keep_temp,
                 cache_dir=cache) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
 
-    def get_kernel(self, prog, name, block, args, args_format, shared=None, fields=[]):
+    def get_kernel(self, prog, name, block, args, args_format, shared=0,
+            needs_iteration=False):
+        """
+        :param needs_iteration: if True, the kernel needs access to the current iteration
+            number, which will be provided to it as the last argument
+        """
         kern = prog.get_function(name)
-        kern.prepare(args_format, shared, texrefs=[x for x in fields if x is not None])
+
+        if needs_iteration:
+            args_format += 'i'
+            args.append(0)
+            self._iteration_kernels.append(kern)
+
+        kern.prepare(args_format)
         setattr(kern, 'args', args)
         setattr(kern, 'block_shape', _expand_block(block))
+        setattr(kern, 'shared_size', shared)
+        setattr(kern, 'needs_iteration', needs_iteration)
 
         if self.options.cuda_kernel_stats and name not in self._kern_stats:
             self._kern_stats.add(name)
@@ -231,7 +206,7 @@ class CUDABackend(object):
 
     def run_kernel(self, kernel, grid_size, stream=None):
         kernel.prepared_async_call(_expand_grid(grid_size), kernel.block_shape,
-                stream, *kernel.args)
+                stream, *kernel.args, shared_size=kernel.shared_size)
 
     def get_reduction_kernel(self, reduce_expr, map_expr, neutral, *args):
         """Generate and return reduction kernel; see PyCUDA documentation

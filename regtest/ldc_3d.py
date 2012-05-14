@@ -13,7 +13,7 @@ from examples.ldc_3d import LDCBlock, LDCSim
 from sailfish import io
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry3D
-from sailfish.geo_block import SubdomainSpec3D
+from sailfish.subdomain import SubdomainSpec3D
 
 from utils.merge_subdomains import merge_subdomains
 
@@ -30,7 +30,7 @@ name = 'ldc3d'
 
 class TestLDCGeometry(LBGeometry3D):
 
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         blocks = []
         bps = self.config.blocks
         zq = self.gz / bps

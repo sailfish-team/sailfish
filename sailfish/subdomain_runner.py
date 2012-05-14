@@ -206,14 +206,14 @@ class BlockRunner(object):
     regions -- boundary and bulk.  The nodes in the bulk region are those
     that do not send information to any nodes in other subdomains.  The
     boundary region includes all the remaining nodes, including the ghost
-    node envelope used for data storage only.
+    node envelope used for data storage only.::
 
-    calc stream                    data stream
-    -----------------------------------------------
-    boundary sim. step    --->     collect data
-    bulk sim. step                 ...
-                                   distribute data
-                       <- sync ->
+        calc stream                    data stream
+        -----------------------------------------------
+        boundary sim. step    --->     collect data
+        bulk sim. step                 ...
+                                       distribute data
+                           <- sync ->
 
     An arrow above symbolizes a dependency between the two streams.
     """
@@ -697,7 +697,7 @@ class BlockRunner(object):
         # typically contain just 1 element, unless periodic boundary conditions
         # are used.
         self._block_to_connbuf = defaultdict(list)
-        for face, block_id in self._block.connecting_blocks():
+        for face, block_id in self._block.connecting_subdomains():
             cpairs = self._block.get_connections(face, block_id)
             for cpair in cpairs:
                 coll_idx = self._get_src_slice_indices(face, cpair)
@@ -743,10 +743,13 @@ class BlockRunner(object):
 
 
     def _init_compute(self):
-        self.config.logger.debug("Initializing compute unit.")
+        self.config.logger.debug("Initializing compute unit...")
         code = self._get_compute_code()
+        self.config.logger.debug("... compute code prepared.")
         self.module = self.backend.build(code)
+        self.config.logger.debug("... compute code compiled.")
         self._init_streams()
+        self.config.logger.debug("... done.")
 
     def _init_streams(self):
         self._data_stream = self.backend.make_stream()
@@ -804,6 +807,9 @@ class BlockRunner(object):
         self._step_bulk(output_req)
         self._sim.iteration += 1
         self._send_dists()
+        # Run this at a point after the compute step is fully scheduled for execution
+        # on the GPU and where it doesn't unnecessarily delay othe operations.
+        self.backend.set_iteration(self._sim.iteration)
         self._recv_dists()
         self._profile.record_gpu_start(TimeProfile.DISTRIB, self._data_stream)
         for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
@@ -1182,6 +1188,7 @@ class BlockRunner(object):
                 self._sim.iteration))
 
     def need_quit(self):
+        # The quit event is used by the visualization interface.
         if self._quit_event.is_set():
             self.config.logger.info("Simulation termination requested.")
             return True
@@ -1208,7 +1215,7 @@ class BlockRunner(object):
                 self._fields_to_host()
 
             if (self.config.max_iters > 0 and self._sim.iteration >=
-                    self.config.max_iters):
+                    self.config.max_iters) or self.need_quit():
                 break
 
             self._data_stream.synchronize()
@@ -1232,30 +1239,30 @@ class NNBlockRunner(BlockRunner):
 
     This is a specialization of the BlockRunner class for models which
     require access to macroscopic fields from the nearest neighbor nodes.
-    It changes the steps executed on the GPU as follows:
+    It changes the steps executed on the GPU as follows::
 
-    calc stream                    data stream
-    -------------------------------------------------------
-    boundary macro fields    --->  collect macro data
-    bulk macro fields              ...
-    boundary sim. step       <---  distribute macro data
-                             --->  collect distrib. data
-    bulk sim. step                 ...
-                                   distribute distrib. data
-                       <- sync ->
+        calc stream                    data stream
+        -------------------------------------------------------
+        boundary macro fields    --->  collect macro data
+        bulk macro fields              ...
+        boundary sim. step       <---  distribute macro data
+                                 --->  collect distrib. data
+        bulk sim. step                 ...
+                                       distribute distrib. data
+                           <- sync ->
 
-    TODO(michalj): Try the alternative scheme:
+        TODO(michalj): Try the alternative scheme:
 
-    calc stream                    data stream
-    -------------------------------------------------------
-    boundary macro fields    --->  collect macro data
-    bulk macro fields              ...
-    bulk sim. step
-    boundary sim. step       <---  distribute macro data
-                             --->  collect distrib. data
-                                   ...
-                                   distribute distrib. data
-                       <- sync ->
+        calc stream                    data stream
+        -------------------------------------------------------
+        boundary macro fields    --->  collect macro data
+        bulk macro fields              ...
+        bulk sim. step
+        boundary sim. step       <---  distribute macro data
+                                 --->  collect distrib. data
+                                       ...
+                                       distribute distrib. data
+                           <- sync ->
 
 
     An arrow above symbolizes a dependency between the two streams.
@@ -1331,7 +1338,7 @@ class NNBlockRunner(BlockRunner):
         self._block_to_macrobuf = defaultdict(list)
         self._num_nn_fields = sum((1 for fpair in self._sim._scalar_fields if
             fpair.abstract.need_nn))
-        for face, block_id in self._block.connecting_blocks():
+        for face, block_id in self._block.connecting_subdomains():
             cpairs = self._block.get_connections(face, block_id)
             for cpair in cpairs:
                 coll_idx = GPUBuffer(self._get_src_macro_indices(face, cpair), self.backend)
@@ -1554,6 +1561,8 @@ class NNBlockRunner(BlockRunner):
         self._send_dists()
         if self.need_quit():
             return False
+
+        self.backend.set_iteration(self._sim.iteration)
 
         self._recv_dists()
         record_gpu_start(TimeProfile.DISTRIB, str_data)

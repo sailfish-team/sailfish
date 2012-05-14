@@ -4,7 +4,8 @@ import numpy as np
 
 from sailfish import sym
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import Subdomain2D
+from sailfish.subdomain import Subdomain2D
+from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidShanChen
 from sailfish.lb_single import LBForcedSim
@@ -12,7 +13,7 @@ from sailfish.lb_single import LBForcedSim
 class RayleighTaylorDomain(Subdomain2D):
     def boundary_conditions(self, hx, hy):
         self.set_node(np.logical_or(hy == 0, hy == self.gy - 1),
-                self.NODE_WALL)
+                NTFullBBWall)
 
     def initial_conditions(self, sim, hx, hy):
         sim.rho[:] = np.random.rand(*sim.rho.shape) / 100.0
