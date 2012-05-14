@@ -697,7 +697,7 @@ class BlockRunner(object):
         # typically contain just 1 element, unless periodic boundary conditions
         # are used.
         self._block_to_connbuf = defaultdict(list)
-        for face, block_id in self._block.connecting_blocks():
+        for face, block_id in self._block.connecting_subdomains():
             cpairs = self._block.get_connections(face, block_id)
             for cpair in cpairs:
                 coll_idx = self._get_src_slice_indices(face, cpair)
@@ -1338,7 +1338,7 @@ class NNBlockRunner(BlockRunner):
         self._block_to_macrobuf = defaultdict(list)
         self._num_nn_fields = sum((1 for fpair in self._sim._scalar_fields if
             fpair.abstract.need_nn))
-        for face, block_id in self._block.connecting_blocks():
+        for face, block_id in self._block.connecting_subdomains():
             cpairs = self._block.get_connections(face, block_id)
             for cpair in cpairs:
                 coll_idx = GPUBuffer(self._get_src_macro_indices(face, cpair), self.backend)
