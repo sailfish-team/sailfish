@@ -7,17 +7,19 @@
 <%namespace file="code_common.mako" import="*"/>
 
 <%def name="fluid_momentum(igrid)">
-	%if igrid in force_for_eq and equilibrium:
-		fm.mx += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 0, forces, force_couplings), vectors=True)};
-		fm.my += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 1, forces, force_couplings), vectors=True)};
-		%if dim == 3:
-			fm.mz += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 2, forces, force_couplings), vectors=True)};
-		%endif
-	%else:
-		fm.mx += ${cex(0.5 * sym.fluid_accel(sim, igrid, 0, forces, force_couplings), vectors=True)};
-		fm.my += ${cex(0.5 * sym.fluid_accel(sim, igrid, 1, forces, force_couplings), vectors=True)};
-		%if dim == 3:
-			fm.mz += ${cex(0.5 * sym.fluid_accel(sim, igrid, 2, forces, force_couplings), vectors=True)};
+	%if forces is not UNDEFINED:
+		%if igrid in force_for_eq and equilibrium:
+			fm.mx += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 0, forces, force_couplings), vectors=True)};
+			fm.my += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 1, forces, force_couplings), vectors=True)};
+			%if dim == 3:
+				fm.mz += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 2, forces, force_couplings), vectors=True)};
+			%endif
+		%else:
+			fm.mx += ${cex(0.5 * sym.fluid_accel(sim, igrid, 0, forces, force_couplings), vectors=True)};
+			fm.my += ${cex(0.5 * sym.fluid_accel(sim, igrid, 1, forces, force_couplings), vectors=True)};
+			%if dim == 3:
+				fm.mz += ${cex(0.5 * sym.fluid_accel(sim, igrid, 2, forces, force_couplings), vectors=True)};
+			%endif
 		%endif
 	%endif
 </%def>
