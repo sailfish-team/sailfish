@@ -3,7 +3,7 @@
 import numpy as np
 
 from sailfish.geo import LBGeometry3D
-from sailfish.geo_block import Subdomain3D
+from sailfish.subdomain import Subdomain3D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidFreeEnergy

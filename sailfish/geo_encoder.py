@@ -88,7 +88,7 @@ class GeoEncoderConst(GeoEncoder):
         seen_params = set()
         param_items = 0
 
-        # Refer to geo_block.Subdomain._verify_params for a list of allowed
+        # Refer to subdomain.Subdomain._verify_params for a list of allowed
         # ways of encoding nodes.
         for node_key, node_type in param_dict.iteritems():
             for param in node_type.params.itervalues():

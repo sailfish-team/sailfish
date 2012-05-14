@@ -12,7 +12,7 @@ from examples.binary_fluid.sc_separation_2d import SeparationSCSim, SeparationDo
 from sailfish import io
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import SubdomainSpec2D
+from sailfish.subdomain import SubdomainSpec2D
 from regtest.blocks import util
 
 MAX_ITERS = 10
@@ -83,7 +83,7 @@ class FESimulationTest(SeparationFESim):
 
 
 class Geometry4Blocks(LBGeometry2D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         y1 = self.gy / 2
         y2 = self.gy - y1
         x1 = self.gx / 2
@@ -95,7 +95,7 @@ class Geometry4Blocks(LBGeometry2D):
                 SubdomainSpec2D((x1, y1), (x2, y2))]
 
 class Geometry2BlocksHoriz(LBGeometry2D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         x1 = self.gx / 2
         x2 = self.gx - x1
 
@@ -104,7 +104,7 @@ class Geometry2BlocksHoriz(LBGeometry2D):
 
 
 class Geometry2BlocksVertical(LBGeometry2D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         y1 = self.gy / 2
         y2 = self.gy - y1
 

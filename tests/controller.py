@@ -2,7 +2,7 @@ import unittest
 
 from sailfish.config import MachineSpec
 from sailfish import controller
-from sailfish.geo_block import SubdomainSpec2D
+from sailfish.subdomain import SubdomainSpec2D
 
 class TestSubdomainDistribution(unittest.TestCase):
     def test_1_1_mapping(self):

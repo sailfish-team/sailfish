@@ -10,17 +10,17 @@ dynamics.
 The program outline
 -------------------
 In order to build a Sailfish simulation, we create a new Python script. In this
-script, we need to import the :mod:`lb_single`, :mod:`controller`, :mod:`geo_block`
+script, we need to import the :mod:`lb_single`, :mod:`controller`, :mod:`subdomain`
 Sailfish modules::
 
     import numpy as np
-    from sailfish.geo_block import Subdomain2D
+    from sailfish.subdomain import Subdomain2D
     from sailfish.node_type import NTFullBBWall, NTEquilibriumVelocity
     from sailfish.controller import LBSimulationController
     from sailfish.lb_single import LBFluidSim
 
 The :mod:`controller` module contains a class which will drive our simulation.
-The :mod:`geo_block` module contains classes used to describe the geometry of the
+The :mod:`subdomain` module contains classes used to describe the geometry of the
 simulation and is used to define the boundary and initial conditions.
 
 Each single fluid Sailfish simulation is represented by a class derived
@@ -30,8 +30,8 @@ In the simplest case, we just have to define a subdomain class::
     class LDCSim(LBFluidSim):
         subdomain = LDCBlock
 
-:class:`LDCBlock` is a required class, derived from :class:`geo_block.Subdomain2D`
-or :class:`geo_blockSubdomain3D`, depending on the
+:class:`LDCBlock` is a required class, derived from :class:`subdomain.Subdomain2D`
+or :class:`subdomainSubdomain3D`, depending on the
 dimensionality of the problem at hand. In our present case, we will use the
 former one. This class represents the geometry of the simulation.
 
@@ -60,7 +60,7 @@ methods in superclasses. After that we can add our options::
     @classmethod
     def add_options(cls, group, dim):
         LBFluidSim.add_options(group, dim)
-        group.add_argument('--blocks', type=int, default=1, help='number of blocks to use')
+        group.add_argument('--subdomains', type=int, default=1, help='number of subdomains to use')
 
 :class:`LDCBlock` describes the simulation geometry and inherits from
 :class:`Subdomain2D`. The derived geometry class needs to define at least the

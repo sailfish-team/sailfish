@@ -4,12 +4,12 @@ import numpy as np
 from examples.ldc_2d import LDCSim
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import SubdomainSpec2D
+from sailfish.subdomain import SubdomainSpec2D
 
 import util
 
 class BenchmarkXConnGeometry(LBGeometry2D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         w = self.gx / 2
         blocks = [SubdomainSpec2D((0, 0), (w, self.gy)),
                   SubdomainSpec2D((w, 0), (w, self.gy))]
@@ -17,7 +17,7 @@ class BenchmarkXConnGeometry(LBGeometry2D):
 
 
 class BenchmarkYConnGeometry(LBGeometry2D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         h = self.gy / 2
         blocks = [SubdomainSpec2D((0, 0), (self.gx, h)),
                   SubdomainSpec2D((0, h), (self.gx, h))]

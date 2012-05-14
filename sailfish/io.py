@@ -18,14 +18,14 @@ class VisConfig(Structure):
                 type(ctypes.create_string_buffer(MAX_NAME_SIZE)))]
 
 class LBOutput(object):
-    def __init__(self, config, block_id, *args, **kwargs):
+    def __init__(self, config, subdomain_id, *args, **kwargs):
         self._scalar_fields = {}
         self._vector_fields = {}
 
         # Additional scalar fields used for visualization.
         self._visualization_fields = {}
         self.basename = config.output
-        self.block_id = block_id
+        self.subdomain_id = subdomain_id
 
     def register_field(self, field, name, visualization=False):
         if visualization:
@@ -184,19 +184,19 @@ class NPYOutput(LBOutput):
     """Saves simulation data as np arrays."""
     format_name = 'npy'
 
-    def __init__(self, config, block_id):
-        LBOutput.__init__(self, config, block_id)
+    def __init__(self, config, subdomain_id):
+        LBOutput.__init__(self, config, subdomain_id)
         self.digits = filename_iter_digits(config.max_iters)
 
     def save(self, i):
-        fname = filename(self.basename, self.digits, self.block_id, i, suffix='')
+        fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='')
         data = {}
         data.update(self._scalar_fields)
         data.update(self._vector_fields)
         np.savez(fname, **data)
 
     def dump_dists(self, dists, i):
-        fname = dists_filename(self.basename, self.digits, self.block_id, i)
+        fname = dists_filename(self.basename, self.digits, self.subdomain_id, i)
         np.save(fname, dists)
 
 
@@ -204,13 +204,13 @@ class MatlabOutput(LBOutput):
     """Saves simulation data as Matlab .mat files."""
     format_name = 'mat'
 
-    def __init__(self, config, block_id):
-        LBOutput.__init__(self, config, block_id)
+    def __init__(self, config, subdomain_id):
+        LBOutput.__init__(self, config, subdomain_id)
         self.digits = filename_iter_digits(config.max_iters)
 
     def save(self, i):
         import scipy.io
-        fname = filename(self.basename, self.digits, self.block_id, i, suffix='')
+        fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='')
         data = {}
         data.update(self._scalar_fields)
         data.update(self._vector_fields)
@@ -218,7 +218,7 @@ class MatlabOutput(LBOutput):
 
     def dump_dists(self, dists, i):
         import scipy.io
-        fname = dists_filename(self.basename, self.digits, self.block_id, i)
+        fname = dists_filename(self.basename, self.digits, self.subdomain_id, i)
         scipy.io.savemat(dists)
 
 

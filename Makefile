@@ -46,8 +46,8 @@ perf_block_plots:
 	python perftest/make_block_plots.py perftest perftest/results/single/GeForce_GTX_285/blocksize
 
 test:
-	python tests/block_runner.py
-	python tests/geo_block.py
+	python tests/subdomain_runner.py
+	python tests/subdomain.py
 	python tests/sim.py
 	python tests/sym.py
 	python tests/util.py

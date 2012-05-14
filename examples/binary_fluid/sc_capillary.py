@@ -5,7 +5,7 @@ import numpy as np
 
 from sailfish import sym
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import Subdomain2D
+from sailfish.subdomain import Subdomain2D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidShanChen

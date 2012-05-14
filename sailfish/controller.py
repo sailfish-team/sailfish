@@ -26,12 +26,12 @@ import execnet
 import zmq
 from sailfish import codegen, config, io, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
-from sailfish.geo_block import SubdomainSpec3D, SubdomainPair
+from sailfish.subdomain import SubdomainSpec3D, SubdomainPair
 
-def _start_machine_master(config, blocks, lb_class):
+def _start_machine_master(config, subdomains, lb_class):
     """Starts a machine master process locally."""
     from sailfish.master import LBMachineMaster
-    master = LBMachineMaster(config, blocks, lb_class)
+    master = LBMachineMaster(config, subdomains, lb_class)
     master.run()
 
 
@@ -106,22 +106,22 @@ class GeometryError(Exception):
 class LBGeometryProcessor(object):
     """Transforms a set of SubdomainSpecs into a another set covering the same
     physical domain, but optimized for execution on the available hardware.
-    Initializes logical connections between the blocks based on their
+    Initializes logical connections between the subdomains based on their
     location."""
 
-    def __init__(self, blocks, dim, geo):
+    def __init__(self, subdomains, dim, geo):
         """
-        :param blocks: list of SubdomainSpec objects
+        :param subdomains: list of SubdomainSpec objects
         """
-        self.blocks = blocks
+        self.subdomains = subdomains
         self.dim = dim
         self.geo = geo
 
     def _annotate(self):
-        # Assign IDs to blocks.  The block ID corresponds to its position
-        # in the internal blocks list.
-        for i, block in enumerate(self.blocks):
-            block.id = i
+        # Assign IDs to subdomains.  The subdomain ID corresponds to its position
+        # in the internal subdomains list.
+        for i, subdomain in enumerate(self.subdomains):
+            subdomain.id = i
 
     def _add_pair(self, pair):
         for i, coord in enumerate(pair.virtual.location):
@@ -133,8 +133,8 @@ class LBGeometryProcessor(object):
         # a list of SubdomainPairs
         self._coord_map_list = [defaultdict(list), defaultdict(list),
                 defaultdict(list)]
-        for block in self.blocks:
-            self._add_pair(SubdomainPair(block, block))
+        for subdomain in self.subdomains:
+            self._add_pair(SubdomainPair(subdomain, subdomain))
 
         periodicity = [config.periodic_x, config.periodic_y]
         if self.dim == 3:
@@ -190,7 +190,7 @@ class LBGeometryProcessor(object):
 
                 done.add(b.id)
 
-    def _connect_blocks(self, config):
+    def _connect_subdomains(self, config):
         self._init_lower_coord_map(config)
         connected = set()
 
@@ -217,28 +217,28 @@ class LBGeometryProcessor(object):
                 continue
 
             for real, virtual in self._coord_map_list[axis][0]:
-                # If the block spans a whole axis of the domain, mark it
+                # If the subdomain spans a whole axis of the domain, mark it
                 # as locally periodic.
                 if real.end_location[axis] == self.geo.gsize[axis]:
                     real.enable_local_periodicity(axis)
 
         for axis in range(self.dim):
-            for block in sorted(self.blocks, key=lambda x: x.location[axis]):
-                higher_coord = block.end_location[axis]
+            for subdomain in sorted(self.subdomains, key=lambda x: x.location[axis]):
+                higher_coord = subdomain.end_location[axis]
                 if higher_coord not in self._coord_map_list[axis]:
                     continue
                 for neighbor_candidate in \
                         self._coord_map_list[axis][higher_coord]:
-                    try_connect(block, neighbor_candidate)
+                    try_connect(subdomain, neighbor_candidate)
 
-        # Ensure every block is connected to at least one other block.
-        if len(self.blocks) > 1 and len(connected) != len(self.blocks):
+        # Ensure every subdomain is connected to at least one other subdomain.
+        if len(self.subdomains) > 1 and len(connected) != len(self.subdomains):
             raise GeometryError()
 
     def transform(self, config):
         self._annotate()
-        self._connect_blocks(config)
-        return self.blocks
+        self._connect_subdomains(config)
+        return self.subdomains
 
 
 class LBSimulationController(object):
@@ -357,8 +357,8 @@ class LBSimulationController(object):
         """Dimensionality of the simulation: 2 or 3."""
         return self._lb_class.subdomain.dim
 
-    def _init_block_envelope(self, sim, blocks):
-        """Sets the size of the ghost node envelope for all blocks."""
+    def _init_subdomain_envelope(self, sim, subdomains):
+        """Sets the size of the ghost node envelope for all subdomains."""
         envelope_size = sim.nonlocality
         for vec in sim.grid.basis:
             for comp in vec:
@@ -367,8 +367,8 @@ class LBSimulationController(object):
         # Get rid of any Sympy wrapper objects.
         envelope_size = int(envelope_size)
 
-        for block in blocks:
-            block.set_actual_size(envelope_size)
+        for subdomain in subdomains:
+            subdomain.set_actual_size(envelope_size)
 
     def _start_cluster_simulation(self, subdomains, cluster=None):
         """Starts a simulation on a cluster of nodes."""
@@ -506,7 +506,7 @@ class LBSimulationController(object):
         else:
             self._start_local_simulation(subdomains)
 
-    def _finish_simulation(self, blocks, summary_receiver):
+    def _finish_simulation(self, subdomains, summary_receiver):
         timing_infos = []
 
         if self.config.cluster_spec or self._is_pbs_cluster():
@@ -526,8 +526,8 @@ class LBSimulationController(object):
                     handler.terminate()
         else:
             if self.config.mode == 'benchmark':
-                # Collect timing information from all blocks.
-                for i in range(len(blocks)):
+                # Collect timing information from all subdomains.
+                for i in range(len(subdomains)):
                     ti = summary_receiver.recv_pyobj()
                     summary_receiver.send('ack')
                     timing_infos.append(ti)
@@ -539,14 +539,14 @@ class LBSimulationController(object):
             mlups_comp = 0.0
 
             for ti in timing_infos:
-                block = blocks[ti.block_id]
-                mlups_total += block.num_nodes / ti.total * 1e-6
-                mlups_comp += block.num_nodes / ti.comp * 1e-6
+                subdomain = subdomains[ti.subdomain_id]
+                mlups_total += subdomain.num_nodes / ti.total * 1e-6
+                mlups_comp += subdomain.num_nodes / ti.comp * 1e-6
 
             if not self.config.quiet:
                 print ('Total MLUPS: eff:{0:.2f}  comp:{1:.2f}'.format(
                         mlups_total, mlups_comp))
-            return timing_infos, blocks
+            return timing_infos, subdomains
 
         return None, None
 
@@ -572,14 +572,14 @@ class LBSimulationController(object):
         port = summary_receiver.bind_to_random_port('tcp://127.0.0.1')
         self.config._zmq_port = port
 
-        subdomains = self.geo.blocks()
+        subdomains = self.geo.subdomains()
         assert subdomains is not None, \
-                "Make sure the subdomain list is returned in geo_class.blocks()"
+                "Make sure the subdomain list is returned in geo_class.subdomains()"
         assert len(subdomains) > 0, \
-                "Make sure at least one subdomain is returned in geo_class.blocks()"
+                "Make sure at least one subdomain is returned in geo_class.subdomains()"
 
         sim = self._lb_class(self.config)
-        self._init_block_envelope(sim, subdomains)
+        self._init_subdomain_envelope(sim, subdomains)
 
         proc = LBGeometryProcessor(subdomains, self.dim, self.geo)
         subdomains = proc.transform(self.config)
