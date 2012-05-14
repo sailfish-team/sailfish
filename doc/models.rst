@@ -5,8 +5,8 @@ The Sailfish solver currently supports the following Lattice-Boltzmann models an
 
 * single fluid
 
-  * two-dimensional: D2Q9 (BGK, MRT models)
-  * three-dimensional: D3Q13 (MRT), D3Q15, D3Q19 (BGK, MRT models)
+  * two-dimensional: D2Q9 (BGK, MRT, entropic models)
+  * three-dimensional: D3Q13 (MRT), D3Q15 (entropic), D3Q19 (BGK, MRT models)
 
 * binary fluid
 
