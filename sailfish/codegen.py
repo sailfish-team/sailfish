@@ -66,10 +66,10 @@ class BlockCodeGenerator(object):
     def config(self):
         return self._sim.config
 
-    def get_code(self, block_runner):
+    def get_code(self, subdomain_runner):
         if self.config.use_src:
             source_fn = sailfish.io.source_filename(self.config.use_src,
-                    block_runner._block_id)
+                    subdomain_runner._block_id)
             self.config.logger.debug(
                     "Using code from '{0}'.".format(source_fn))
             with open(source_fn, 'r') as f:
@@ -91,7 +91,7 @@ class BlockCodeGenerator(object):
 
         code_tmpl = lookup.get_template(os.path.join('sailfish/templates',
                                         self._sim.kernel_file))
-        ctx = self._build_context(block_runner)
+        ctx = self._build_context(subdomain_runner)
         src = code_tmpl.render(**ctx)
 
         if self.is_double_precision():
@@ -100,7 +100,7 @@ class BlockCodeGenerator(object):
         if self.config.save_src:
             self.save_code(src,
                     sailfish.io.source_filename(self.config.save_src,
-                        block_runner._block_id),
+                        subdomain_runner._block_id),
                     self.config.format_src)
 
         return src
@@ -115,12 +115,12 @@ class BlockCodeGenerator(object):
     def is_double_precision(self):
         return self.config.precision == 'double'
 
-    def _build_context(self, block_runner):
+    def _build_context(self, subdomain_runner):
         ctx = {}
         ctx['block_size'] = self.config.block_size
         ctx['propagation_sentinels'] = True
 
         self._sim.update_context(ctx)
-        block_runner.update_context(ctx)
+        subdomain_runner.update_context(ctx)
 
         return ctx

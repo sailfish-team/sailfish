@@ -11,7 +11,7 @@ import time
 
 import numpy as np
 
-from sailfish import lb_base, vis, geo_block, util
+from sailfish import lb_base, vis, subdomain, util
 
 
 class Fluid2DVis(vis.FluidVis):

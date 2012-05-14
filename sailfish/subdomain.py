@@ -1,4 +1,4 @@
-"""Intra- and inter-block geometry processing."""
+"""Intra- and inter-subdomain geometry processing."""
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'

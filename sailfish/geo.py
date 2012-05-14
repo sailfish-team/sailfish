@@ -5,7 +5,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 
-from sailfish.geo_block import SubdomainSpec2D, SubdomainSpec3D
+from sailfish.subdomain import SubdomainSpec2D, SubdomainSpec3D
 
 
 class LBGeometry(object):
@@ -33,7 +33,7 @@ class LBGeometry2D(LBGeometry):
                 help='make the lattice periodic in the Y direction',
                 action='store_true', default=False)
 
-    def blocks(self):
+    def subdomains(self):
         """Returns a 1-element list containing a single 2D block
         covering the whole domain."""
         return [SubdomainSpec2D((0, 0), (self.config.lat_nx,
@@ -56,7 +56,7 @@ class LBGeometry3D(LBGeometry):
         self.gz = config.lat_nz
         self.gsize = [self.gx, self.gy, self.gz]
 
-    def blocks(self):
+    def subdomains(self):
         """Returns a 1-element list containing a single 3D block
         covering the whole domain."""
         return [SubdomainSpec3D((0, 0, 0),
@@ -77,7 +77,7 @@ class EqualSubdomainsGeometry2D(LBGeometry2D):
                 'subdomains will be connected', type=str, default='x',
                 choices=['x', 'y'])
 
-    def blocks(self):
+    def subdomains(self):
         s = self.config.subdomains
 
         if self.config.conn_axis == 'x':
@@ -108,7 +108,7 @@ class EqualSubdomainsGeometry3D(LBGeometry3D):
                 'subdomains will be connected', type=str, default='x',
                 choices=['x', 'y', 'z'])
 
-    def blocks(self):
+    def subdomains(self):
         s = self.config.subdomains
 
         if self.config.conn_axis == 'x':

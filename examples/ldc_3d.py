@@ -2,21 +2,21 @@
 
 import numpy as np
 from sailfish.geo import LBGeometry3D
-from sailfish.geo_block import SubdomainSpec3D, Subdomain3D
+from sailfish.subdomain import SubdomainSpec3D, Subdomain3D
 from sailfish.node_type import NTFullBBWall, NTEquilibriumVelocity
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
 
 
 class LDCGeometry(LBGeometry3D):
-    def blocks(self, n=None):
-        blocks = []
-        bps = int(self.config.blocks**(1.0/3))
+    def subdomains(self, n=None):
+        subdomains = []
+        bps = int(self.config.subdomains**(1.0/3))
 
-        if bps**3 != self.config.blocks:
+        if bps**3 != self.config.subdomains:
             print ('Only configurations with '
-                    'a third power of an integer number of blocks are '
-                    'supported.  Falling back to {0} x {0} blocks.'.
+                    'a third power of an integer number of subdomains are '
+                    'supported.  Falling back to {0} x {0} subdomains.'.
                     format(bps))
 
         xq = self.gx / bps
@@ -38,9 +38,9 @@ class LDCGeometry(LBGeometry3D):
                     zsize = zq
                     if k == bps - 1:
                         zsize += zd
-                    blocks.append(SubdomainSpec3D((i * xq, j * yq, k * zq),
+                    subdomains.append(SubdomainSpec3D((i * xq, j * yq, k * zq),
                                 (xsize, ysize, zsize)))
-        return blocks
+        return subdomains
 
 
 class LDCBlock(Subdomain3D):
@@ -82,7 +82,7 @@ class LDCSim(LBFluidSim):
     def add_options(cls, group, dim):
         LBFluidSim.add_options(group, dim)
 
-        group.add_argument('--blocks', type=int, default=1, help='number of blocks to use')
+        group.add_argument('--subdomains', type=int, default=1, help='number of blocks to use')
 
 
 if __name__ == '__main__':

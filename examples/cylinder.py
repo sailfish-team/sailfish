@@ -2,31 +2,31 @@
 
 import numpy as np
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import SubdomainSpec2D, Subdomain2D
+from sailfish.subdomain import SubdomainSpec2D, Subdomain2D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim, LBForcedSim
 
 class CylinderGeometry(LBGeometry2D):
-    def blocks(self, n=None):
-        blocks = []
+    def subdomains(self, n=None):
+        subdomains = []
         if self.config.vertical:
-            q = self.gy / self.config.blocks
-            diff = self.gy % self.config.blocks
+            q = self.gy / self.config.subdomains
+            diff = self.gy % self.config.subdomains
         else:
-            q = self.gx / self.config.blocks
-            diff = self.gx % self.config.blocks
+            q = self.gx / self.config.subdomains
+            diff = self.gx % self.config.subdomains
 
-        for i in range(0, self.config.blocks):
+        for i in range(0, self.config.subdomains):
             size = q
-            if i == self.config.blocks-1:
+            if i == self.config.subdomains-1:
                 size += diff
 
             if self.config.vertical:
-                blocks.append(SubdomainSpec2D((0, i * q), (self.gx, size)))
+                subdomains.append(SubdomainSpec2D((0, i * q), (self.gx, size)))
             else:
-                blocks.append(SubdomainSpec2D((i * q, 0), (size, self.gy)))
-        return blocks
+                subdomains.append(SubdomainSpec2D((i * q, 0), (size, self.gy)))
+        return subdomains
 
 
 class CylinderBlock(Subdomain2D):
@@ -71,7 +71,7 @@ class CylinderSimulation(LBFluidSim, LBForcedSim):
         LBFluidSim.add_options(group, dim)
         LBForcedSim.add_options(group, dim)
 
-        group.add_argument('--blocks', type=int, default=1, help='number of blocks to use')
+        group.add_argument('--subdomains', type=int, default=1, help='number of blocks to use')
         group.add_argument('--vertical', action='store_true')
 
     @classmethod

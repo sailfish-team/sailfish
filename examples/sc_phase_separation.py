@@ -3,7 +3,7 @@
 import numpy as np
 
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import Subdomain2D
+from sailfish.subdomain import Subdomain2D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBSingleFluidShanChen
 

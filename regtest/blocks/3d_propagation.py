@@ -9,7 +9,7 @@ import numpy as np
 
 from sailfish import io
 from sailfish.geo import LBGeometry3D
-from sailfish.geo_block import SubdomainSpec3D, Subdomain3D
+from sailfish.subdomain import SubdomainSpec3D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
 from sailfish.sym import D3Q19
@@ -24,21 +24,21 @@ class BlockTest(Subdomain3D):
         pass
 
 class TwoBlocksXConnGeoTest(LBGeometry3D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         blocks = []
         blocks.append(SubdomainSpec3D((0, 0, 0), (64, 64, 66)))
         blocks.append(SubdomainSpec3D((64, 0, 0), (64, 64, 66)))
         return blocks
 
 class TwoBlocksYConnGeoTest(LBGeometry3D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         blocks = []
         blocks.append(SubdomainSpec3D((0, 0, 0), (64, 64, 66)))
         blocks.append(SubdomainSpec3D((0, 64, 0), (64, 64, 66)))
         return blocks
 
 class TwoBlocksZConnGeoTest(LBGeometry3D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         blocks = []
         blocks.append(SubdomainSpec3D((0, 0, 0), (64, 66, 64)))
         blocks.append(SubdomainSpec3D((0, 0, 64), (64, 66, 64)))
@@ -324,7 +324,7 @@ class PartialPeriodicPropagationTest(unittest.TestCase):
 #############################################################################
 
 class SingleBlockGeoTest(LBGeometry3D):
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         return [SubdomainSpec3D((0,0,0), (64, 62, 66))]
 
 class SingleBlockPeriodicSimulationTest(LBFluidSim):

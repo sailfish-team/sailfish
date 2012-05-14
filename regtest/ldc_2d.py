@@ -18,7 +18,7 @@ import tempfile
 from examples.ldc_2d import LDCBlock, LDCSim
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry2D
-from sailfish.geo_block import SubdomainSpec2D
+from sailfish.subdomain import SubdomainSpec2D
 from sailfish import io
 
 from utils.merge_subdomains import merge_subdomains
@@ -39,7 +39,7 @@ name = 'ldc2d'
 
 class TestLDCGeometry(LBGeometry2D):
 
-    def blocks(self, n=None):
+    def subdomains(self, n=None):
         blocks = []
         bps = self.config.blocks
         yq = self.gy / bps

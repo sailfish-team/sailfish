@@ -19,7 +19,7 @@ To illustrate how easy it is to create simulations using the Sailfish package,
 here is a simple example code to simulate fluid flow in a lid-driven cavity::
 
     import numpy as np
-    from sailfish.geo_block import Subdomain2D
+    from sailfish.subdomain import Subdomain2D
     from sailfish.node_type import NTFullBBWall, NTEquilibriumVelocity
     from sailfish.controller import LBSimulationController
     from sailfish.lb_single import LBFluidSim

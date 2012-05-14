@@ -14,7 +14,7 @@ value is a path to a cluster definition file.  If the path is relative, the cont
 will look for it in the current working directory as well as in the ``.sailfish``
 directory in the user's home.
 
-Optionally, the ``==cluster_sync``
+Optionally, the ``--cluster_sync``
 argument can also be specified to automatically sync files from the controller to
 the nodes.  A common value to use here is ``$PWD:.``, which means "sync the contents
 of the current directory (``$PWD``) to the working directory on every node (``.``)".
@@ -104,7 +104,7 @@ PBS job script (``$HOME/sailfish-test.pbs``)::
     
     . $HOME/sailfish-init.sh
     python ./examples/lbm_cylinder_multi.py --lat_nx=2046 --lat_ny=30000 --block_size=256 --mode=benchmark --vertical \
-            --every=500 --max_iters=2000 --blocks=2 --log=/mnt/lustre/scratch/people/myuser/test.log --verbose
+            --every=500 --max_iters=2000 --subdomains=2 --log=/mnt/lustre/scratch/people/myuser/test.log --verbose
 
 Once you have both scripts in place and a Sailfish installation in ``$HOME/mysailfish``, you can submit the job
 by running::

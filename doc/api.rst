@@ -25,9 +25,9 @@ Geometry
 .. automodule:: geo
    :members:
 
-``geo_block``
+``subdomain``
 ^^^^^^^^^^^^^
-.. automodule:: geo_block
+.. automodule:: subdomain
    :members:
 
 Symbolic computation
@@ -44,9 +44,9 @@ Internals
 .. automodule:: backend_cuda
    :members:
 
-``block_runner``
+``subdomain_runner``
 ^^^^^^^^^^^^^^^^
-.. automodule:: block_runner
+.. automodule:: subdomain_runner
    :members:
 
 ``codegen``

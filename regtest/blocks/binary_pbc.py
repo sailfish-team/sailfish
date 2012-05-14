@@ -13,7 +13,7 @@ import unittest
 import numpy as np
 
 from sailfish.geo import LBGeometry2D, LBGeometry3D
-from sailfish.geo_block import Subdomain2D, Subdomain3D
+from sailfish.subdomain import Subdomain2D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidShanChen, LBBinaryFluidFreeEnergy
 from sailfish import io

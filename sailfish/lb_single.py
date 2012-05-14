@@ -7,7 +7,7 @@ __license__ = 'LGPLv3'
 from collections import defaultdict, namedtuple
 import numpy as np
 
-from sailfish import block_runner, sym, util
+from sailfish import subdomain_runner, sym, util
 from sailfish.lb_base import LBSim, ScalarField, VectorField
 
 
@@ -239,7 +239,7 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
     """Single-phase Shan-Chen model."""
 
     nonlocality = 1
-    subdomain_runner = block_runner.NNBlockRunner
+    subdomain_runner = subdomain_runner.NNBlockRunner
 
     def __init__(self, config):
         super(LBSingleFluidShanChen, self).__init__(config)
