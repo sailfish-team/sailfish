@@ -15,13 +15,7 @@ from sailfish.subdomain import SubdomainSpec2D, SubdomainSpec3D, SubdomainPair
 from sailfish.io import LBOutput
 from sailfish.sym import D2Q9
 
-class DummyLogger(object):
-    def debug(*args):
-        pass
-
-class DummyEvent(object):
-    def is_set(self):
-        return False
+from dummy import *
 
 class BasicFunctionalityTest(unittest.TestCase):
     location = 0, 0

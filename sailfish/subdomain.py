@@ -327,10 +327,14 @@ class SubdomainSpec(object):
     def __init__(self, location, size, envelope_size=None, id_=None, *args, **kwargs):
         self.location = location
         self.size = size
-        # Actual size of the simulation domain, including the envelope (ghost
-        # nodes).  This is set later when the envelope size is known.
-        self.actual_size = None
-        self.envelope_size = envelope_size
+
+        if envelope_size is not None:
+            self.set_actual_size(envelope_size)
+        else:
+            # Actual size of the simulation domain, including the envelope (ghost
+            # nodes).  This is set later when the envelope size is known.
+            self.actual_size = None
+            self.envelope_size = None
         self._runner = None
         self._id = id_
         self._clear_connections()
@@ -620,12 +624,15 @@ class Subdomain(object):
 
     def __init__(self, grid_shape, block, grid, *args, **kwargs):
         """
+        :param grid_shape: size of the lattice for the subdomain, including
+                ghost nodes; X dimension is the last element in the tuple
+        :param block SubdomainSpec for this subdomain
         :param grid: grid object specifying the connectivity of the lattice
         """
-        self.block = block
+        self.spec = block
         self.grid_shape = grid_shape
         self.grid = grid
-        # The type map allocated by the block runner already includes
+        # The type map allocated by the subdomain runner already includes
         # ghost nodes, and is formatted in a way that makes it suitable
         # for copying to the compute device.  The entries in this array are
         # node type IDs.
@@ -641,7 +648,7 @@ class Subdomain(object):
 
     @property
     def config(self):
-        return self.block.runner.config
+        return self.spec.runner.config
 
     def boundary_conditions(self, *args):
         raise NotImplementedError('boundary_conditions() not defined in a child'
@@ -664,9 +671,13 @@ class Subdomain(object):
                     if not util.is_number(el):
                         raise ValueError("Tuple elements have to be numbers.")
             # Field.  If more than a single number is needed per node, this
-            # needs to be a numpy record array.
+            # needs to be a numpy record array.  Use node_util.multifield()
+            # to create this array easily.
             elif isinstance(param, np.ndarray):
-                assert param.size == np.sum(where)
+                assert param.size == np.sum(where), ("Your array needs to "
+                        "have exactly as many nodes as there are True values "
+                        "in the 'where' array.  Use node_util.multifield() to "
+                        "generate the array in an easy way.")
             # TODO(kasiaj): Add support for sympy expressions here for
             # time-dep. boundary conditions.
             else:
@@ -738,18 +749,18 @@ class Subdomain2D(Subdomain):
         Subdomain.__init__(self, grid_shape, block, *args, **kwargs)
 
     def _get_mgrid(self):
-        return reversed(np.mgrid[self.block.oy:self.block.oy + self.block.ny,
-                                 self.block.ox:self.block.ox + self.block.nx])
+        return reversed(np.mgrid[self.spec.oy:self.spec.oy + self.spec.ny,
+                                 self.spec.ox:self.spec.ox + self.spec.nx])
 
     def _define_ghosts(self):
         assert not self._type_map_encoded
-        es = self.block.envelope_size
+        es = self.spec.envelope_size
         if not es:
             return
         self._type_map.base[0:es, :] = nt._NTGhost.id
         self._type_map.base[:, 0:es] = nt._NTGhost.id
-        self._type_map.base[es + self.block.ny:, :] = nt._NTGhost.id
-        self._type_map.base[:, es + self.block.nx:] = nt._NTGhost.id
+        self._type_map.base[es + self.spec.ny:, :] = nt._NTGhost.id
+        self._type_map.base[:, es + self.spec.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
         dry_types = self._type_map.dtype.type(nt.get_dry_node_type_ids())
@@ -774,21 +785,21 @@ class Subdomain3D(Subdomain):
         Subdomain.__init__(self, grid_shape, block, *args, **kwargs)
 
     def _get_mgrid(self):
-        return reversed(np.mgrid[self.block.oz:self.block.oz + self.block.nz,
-                                 self.block.oy:self.block.oy + self.block.ny,
-                                 self.block.ox:self.block.ox + self.block.nx])
+        return reversed(np.mgrid[self.spec.oz:self.spec.oz + self.spec.nz,
+                                 self.spec.oy:self.spec.oy + self.spec.ny,
+                                 self.spec.ox:self.spec.ox + self.spec.nx])
 
     def _define_ghosts(self):
         assert not self._type_map_encoded
-        es = self.block.envelope_size
+        es = self.spec.envelope_size
         if not es:
             return
         self._type_map.base[0:es, :, :] = nt._NTGhost.id
         self._type_map.base[:, 0:es, :] = nt._NTGhost.id
         self._type_map.base[:, :, 0:es] = nt._NTGhost.id
-        self._type_map.base[es + self.block.nz:, :, :] = nt._NTGhost.id
-        self._type_map.base[:, es + self.block.ny:, :] = nt._NTGhost.id
-        self._type_map.base[:, :, es + self.block.nx:] = nt._NTGhost.id
+        self._type_map.base[es + self.spec.nz:, :, :] = nt._NTGhost.id
+        self._type_map.base[:, es + self.spec.ny:, :] = nt._NTGhost.id
+        self._type_map.base[:, :, es + self.spec.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
         dry_types = self._type_map.dtype.type(nt.get_dry_node_type_ids())
