@@ -62,7 +62,7 @@ class GeoEncoderConst(GeoEncoder):
         self._type_map = None
         self._param_map = None
         self._geo_params = []
-        self.config = subdomain.block.runner.config
+        self.config = subdomain.spec.runner.config
 
     def prepare_encode(self, type_map, param_map, param_dict):
         """
@@ -101,6 +101,7 @@ class GeoEncoderConst(GeoEncoder):
                         idx = param_items
                         param_to_idx[param] = idx
                         param_items += 1
+                    self._encoded_param_map[param_map == node_key] = idx
                 elif type(param) is tuple:
                     if param in seen_params:
                         idx = param_to_idx[param]
@@ -110,17 +111,33 @@ class GeoEncoderConst(GeoEncoder):
                         idx = param_items
                         param_to_idx[param] = idx
                         param_items += len(param)
+                    self._encoded_param_map[param_map == node_key] = idx
+                # Param is a structured numpy array.
                 else:
-                    assert False
-                    # FIXME: This needs to work with record arrays.
+                    nodes_idx = np.argwhere(param_map == node_key)
+                    v = self._encoded_param_map[param_map == node_key]
+
                     uniques = np.unique(param)
                     for value in uniques:
-                        if value not in seen_params:
+                        if value in seen_params:
+                            idx = param_to_idx[value]
+                        else:
                             seen_params.add(value)
-                            self._geo_params.extend(param)
-                            param_items += len(param)
+                            self._geo_params.extend(value)
+                            idx = param_items
+                            param_to_idx[value] = idx
+                            param_items += len(value)
 
-                self._encoded_param_map[param_map == node_key] = idx
+                        idxs = nodes_idx[param == value]
+                        if idxs.shape[1] == 3:
+                            self._encoded_param_map[idxs[:,0], idxs[:,1],
+                                    idxs[:,2]] = idx
+                        elif idxs.shape[1] == 2:
+                            self._encoded_param_map[idxs[:,0], idxs[:,1]] = idx
+                        else:
+                            assert False, 'Unsupported dimension: {0}'.format(
+                                    idxs.shape[1])
+
 
                 # TODO(kasiaj): Add support for sympy expressions.
 
@@ -163,7 +180,18 @@ class GeoEncoderConst(GeoEncoder):
         # Drop the reference to the map array.
         self._type_map = None
 
-    # XXX: Support different types of BCs here.
+    def get_param(self, location, values=1):
+        """
+        Returns 'values' float values which are pameters of the node at
+        'location'.
+
+        :param location: location of the node: x, y, [z] in the subdomain
+                coordinate system (including ghost nodes)
+        :param values: number of floating-point values to retrieve
+        """
+        idx = self._encoded_param_map[tuple(reversed(location))]
+        return self._geo_params[idx:idx+values]
+
     def update_context(self, ctx):
         ctx.update({
             'node_types': self._node_types,

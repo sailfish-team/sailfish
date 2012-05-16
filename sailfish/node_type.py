@@ -4,6 +4,8 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+import numpy as np
+
 
 # Node type classes.  Use this to define boundary conditions.
 class LBNodeType(object):
@@ -116,6 +118,38 @@ def get_wet_node_type_ids():
 
 def get_dry_node_type_ids():
     return [id for id, nt in _NODE_TYPES.iteritems() if not nt.wet_node]
+
+def multifield(values, where):
+    """Collapses a list of numpy arrays into a structured field that can be
+    used for setting boundary condition parameters at multiple nodes at the
+    same time.
+
+    :param values: iterable of ndarrays or floats
+    :param where: numpy boolean array or indexing expression to select
+            nodes from the arrays in 'values'; if you are creating the
+            fields in 'values' using mgrid expressions (with hx, hy, ...)
+            which cover the whole subdomain, 'where' should be the same
+            array you're passing to set_node
+    """
+    # TODO(michalj): Add support for automatic array extension (broadcasting).
+    shape = None
+    new_values = []
+    for val in values:
+        if isinstance(val, np.ndarray):
+            assert (shape is None) or (shape == val.shape)
+            new_values.append(val.astype(np.float64))
+            shape = val.shape
+        else:
+            new_values.append(None)
+
+    assert shape is not None
+
+    for i, (old, new) in enumerate(zip(values, new_values)):
+        if new is None:
+            new_values[i] = np.zeros(shape, dtype=np.float64)
+            new_values[i][:] = old  # broadcast to the whole array
+
+    return np.core.records.fromarrays(new_values)[where]
 
 
 # Maps node type IDs to their classes.
