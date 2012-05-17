@@ -87,6 +87,7 @@ class GeoEncoderConst(GeoEncoder):
         param_to_idx = dict()  # Maps entries in seen_params to ids.
         seen_params = set()
         param_items = 0
+        self._symbol_map = {}  # Maps param indices to sympy expressions.
 
         # Refer to subdomain.Subdomain._verify_params for a list of allowed
         # ways of encoding nodes.
@@ -113,7 +114,7 @@ class GeoEncoderConst(GeoEncoder):
                         param_items += len(param)
                     self._encoded_param_map[param_map == node_key] = idx
                 # Param is a structured numpy array.
-                else:
+                elif isinstance(param, np.ndarray):
                     nodes_idx = np.argwhere(param_map == node_key)
                     v = self._encoded_param_map[param_map == node_key]
 
@@ -138,10 +139,24 @@ class GeoEncoderConst(GeoEncoder):
                             assert False, 'Unsupported dimension: {0}'.format(
                                     idxs.shape[1])
 
+        self._non_symbolic_idxs = param_items
 
-                # TODO(kasiaj): Add support for sympy expressions.
+        # Second pass: only process symbolic expressions here.
+        for node_key, node_type in param_dict.iteritems():
+            for param in node_type.params.itervalues():
+                if isinstance(param, nt.DynamicValue):
+                    if param in seen_params:
+                        idx = param_to_idx[value]
+                    else:
+                        seen_params.add(param)
+                        idx = param_items
+                        self._symbol_map[idx] = param
+                        param_to_idx[param] = idx
+                        param_items += 1
+                    self._encoded_param_map[param_map == node_key] = idx
 
         self._bits_param = bit_len(param_items)
+
 
     def encode(self):
         assert self._type_map is not None
@@ -202,7 +217,9 @@ class GeoEncoderConst(GeoEncoder):
             'nt_param_shift': self._bits_param,
             'nt_dir_other': 0,  # used to indicate non-primary direction
                                 # in orientation processing code
-            'node_params': self._geo_params
+            'node_params': self._geo_params,
+            'symbol_idx_map': self._symbol_map,
+            'non_symbolic_idxs': self._non_symbolic_idxs,
         })
 
     def _encode_node(self, orientation, param, node_type):

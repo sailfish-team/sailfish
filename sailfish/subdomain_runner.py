@@ -344,6 +344,7 @@ class BlockRunner(object):
         ctx['dist_size'] = self._get_nodes()
         ctx['sim'] = self._sim
         ctx['block'] = self._block
+        ctx['time_dependence'] = self.config.time_dependence
 
         arr_nx = self._physical_size[-1]
         arr_ny = self._physical_size[-2]
@@ -572,7 +573,7 @@ class BlockRunner(object):
         return self._get_nodes() * grid.Q * self.float().nbytes
 
     def _get_compute_code(self):
-        return self._bcg.get_code(self)
+        return self._bcg.get_code(self, self.backend.name)
 
     def _get_global_idx(self, location, dist_num=0):
         """Returns a global index (in the distributions array).
@@ -790,16 +791,19 @@ class BlockRunner(object):
     def gpu_geo_map(self):
         return self._gpu_geo_map
 
-    def get_kernel(self, name, args, args_format, block_size=None):
+    def get_kernel(self, name, args, args_format, block_size=None,
+            needs_iteration=False):
         if block_size is None:
             block = self._kernel_block_size
         else:
             block = block_size
         return self.backend.get_kernel(self.module, name, args=args,
-                args_format=args_format, block=block)
+                args_format=args_format, block=block,
+                needs_iteration=needs_iteration)
 
-    def exec_kernel(self, name, args, args_format):
-        kernel = self.get_kernel(name, args, args_format)
+    def exec_kernel(self, name, args, args_format, needs_iteration=False):
+        kernel = self.get_kernel(name, args, args_format,
+                needs_iteration=needs_iteration)
         self.backend.run_kernel(kernel, self._kernel_grid_full)
 
     def step(self, output_req):

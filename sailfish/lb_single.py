@@ -100,6 +100,9 @@ class LBFluidSim(LBSim):
                 help='subgrid model to use')
         group.add_argument('--smagorinsky_const',
                 help='Smagorinsky constant', type=float, default=0.03)
+        group.add_argument('--dt_per_lattice_time_unit',
+                help='physical time delta corresponding to one iteration '
+                'of the simulation', type=float, default=0.00)
 
         grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == dim]
         group.add_argument('--grid', help='LB grid', type=str,
@@ -135,6 +138,7 @@ class LBFluidSim(LBSim):
         ctx['subgrid'] = self.config.subgrid
         ctx['smagorinsky_const'] = self.config.smagorinsky_const
         ctx['entropy_tolerance'] = 1e-7 if self.config.precision == 'single' else 1e-16
+        ctx['dt_per_lattice_time_unit'] = self.config.dt_per_lattice_time_unit
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
@@ -176,9 +180,11 @@ class LBFluidSim(LBSim):
 
         kernels = []
         kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args1, 'P'*(len(args1)-1) + 'i'))
+                'CollideAndPropagate', args1, 'P'*(len(args1)-1) + 'i',
+                needs_iteration=self.config.time_dependence))
         kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args2, 'P'*(len(args2)-1) + 'i'))
+                'CollideAndPropagate', args2, 'P'*(len(args2)-1) + 'i',
+                needs_iteration=self.config.time_dependence))
         return kernels
 
     def get_pbc_kernels(self, runner):
@@ -316,9 +322,11 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
 
         macro_kernels = [
             runner.get_kernel('PrepareMacroFields', macro_args1,
-                'P' * (len(macro_args1) - 1) + 'i'),
+                'P' * (len(macro_args1) - 1) + 'i',
+                needs_iteration=self.config.time_dependence))
             runner.get_kernel('PrepareMacroFields', macro_args2,
-                'P' * (len(macro_args2) - 1) + 'i')]
+                'P' * (len(macro_args2) - 1) + 'i',
+                needs_iteration=self.config.time_dependence)]
 
         sim_kernels = super(LBSingleFluidShanChen, self).get_compute_kernels(
                 runner, full_output, bulk)

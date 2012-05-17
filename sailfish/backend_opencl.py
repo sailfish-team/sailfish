@@ -10,6 +10,7 @@ import pyopencl as cl
 import pyopencl.array as clarray
 import pyopencl.reduction as reduction
 import pyopencl.tools
+import numpy as np
 
 class OpenCLBackend(object):
     name='opencl'
@@ -48,7 +49,7 @@ class OpenCLBackend(object):
     def set_iteration(self, it):
         self._iteration = it
         for kernel in self._iteration_kernels:
-            kernel.set_arg(kernel.numargs - 1, it)
+            kernel.set_arg(kernel.numargs - 1, np.uint32(it))
 
     def alloc_buf(self, size=None, like=None, wrap_in_array=True):
         mf = cl.mem_flags
@@ -134,7 +135,7 @@ class OpenCLBackend(object):
         """
         kern = getattr(prog, name)
         if needs_iteration:
-            args.append(0)
+            args.append(np.uint32(0))
             self._iteration_kernels.append(kern)
 
         for i, arg in enumerate(args):

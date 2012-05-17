@@ -6,6 +6,10 @@
 <%namespace file="code_common.mako" import="*"/>
 <%namespace file="propagation.mako" import="rel_offset,get_odist"/>
 
+${device_func} inline float get_time_from_iteration(unsigned int iteration) {
+	return iteration * ${dt_per_lattice_time_unit};
+}
+
 <%def name="noneq_bb(orientation)">
 	case ${orientation}:
 		%for arg, val in sym.noneq_bb(grid, orientation):
@@ -22,12 +26,98 @@
 		break;
 </%def>
 
-${device_func} inline void node_param_get_vector(const int idx, float *out) {
+## Provides declarations of the arguments required for functions using
+## dynamically evaluated node parameters.
+<%def name="time_dep_args_decl()">
+	%if time_dependence:
+		, unsigned int iteration_number,
+		int gx,
+		int gy
+		%if dim == 3:
+			, int gz
+		%endif
+	%endif
+</%def>
+
+
+## Provides values of the arguments required for functions using dynamically
+## evaluated node parameters.
+<%def name="time_dep_args()">
+	%if time_dependence:
+		, iteration_number, gx, gy
+		%if dim == 3:
+			, gz
+		%endif
+	%endif
+</%def>
+
+## Use to render arguments to the first call of a function using dynamically
+## evaluated node paramters.  Takes care of calculating the node's logical
+## global position.
+<%def name="time_dep_call_args()">
+	%if time_dependence:
+		, iteration_number,
+		gx + ${x_local_device_to_global_offset},
+		gy + ${y_local_device_to_global_offset}
+		%if dim == 3:
+			, gz + ${z_local_device_to_global_offset}
+		%endif
+	%endif
+</%def>
+
+%for i, expressions in symbol_idx_map.iteritems():
+	${device_func} inline void time_dep_param_${i}(float *out ${time_dep_args_decl()}) {
+		float phys_time = get_time_from_iteration(iteration_number);
+		%for j, expr in enumerate(expressions):
+			out[${j}] = ${cex(expr)};
+		%endfor
+	}
+%endfor
+
+// Returns a node parameter which is a vector (in 'out').
+${device_func} inline void node_param_get_vector(const int idx, float *out
+		${time_dep_args_decl()}) {
+	%if time_dependence:
+		if (idx >= ${non_symbolic_idxs}) {
+			switch (idx) {
+				%for key, val in symbol_idx_map.iteritems():
+					%if len(val) == dim:
+						case ${key}:
+							time_dep_param_${key}(out ${time_dep_args()});
+							return;
+					%endif
+				%endfor
+				default:
+					die();
+			}
+		}
+	%endif
 	out[0] = node_params[idx];
 	out[1] = node_params[idx + 1];
 	%if dim == 3:
 		out[2] = node_params[idx + 2];
 	%endif
+}
+
+// Returns a node parameter which is a scalar.
+${device_func} inline float node_param_get_scalar(const int idx ${time_dep_args_decl()}) {
+	%if time_dependence:
+		if (idx >= ${non_symbolic_idxs}) {
+			float out;
+			switch (idx) {
+				%for key, val in symbol_idx_map.iteritems():
+					%if len(val) == 1:
+						case ${key}:
+							time_dep_param_${key}(&out ${time_dep_args()});
+							return out;
+					%endif
+				%endfor
+				default:
+					die();
+			}
+		}
+	%endif
+	return node_params[idx];
 }
 
 <%def name="fill_missing_distributions()">
@@ -151,7 +241,7 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 	int node_param_idx = decodeNodeParamIdx(ncode);
 	${fill_missing_distributions()}
 	*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-	float par_rho = node_params[node_param_idx];
+	float par_rho = node_param_get_scalar(node_param_idx ${time_dep_args()});
 
 	switch (orientation) {
 		%for i in range(1, grid.dim*2+1):
@@ -171,7 +261,7 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 //
 ${device_func} inline void getMacro(
 		Dist *fi, int ncode, int node_type, int orientation, float *rho,
-		float *v0)
+		float *v0 ${time_dep_args_decl()})
 {
 	if (NTUsesStandardMacro(node_type) || orientation == ${nt_dir_other}) {
 		compute_macro_quant(fi, rho, v0);
@@ -193,7 +283,7 @@ ${device_func} inline void getMacro(
 			// distributions.
 			${fill_missing_distributions()}
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			node_param_get_vector(node_param_idx, v0);
+			node_param_get_vector(node_param_idx, v0 ${time_dep_args()});
 
 			switch (orientation) {
 				%for i in range(1, grid.dim*2+1):
@@ -208,7 +298,7 @@ ${device_func} inline void getMacro(
 		else if (isNTZouHeVelocity(node_type)) {
 			int node_param_idx = decodeNodeParamIdx(ncode);
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			node_param_get_vector(node_param_idx, v0);
+			node_param_get_vector(node_param_idx, v0 ${time_dep_args()});
 			zouhe_bb(fi, orientation, rho, v0);
 		}
 	%endif

@@ -75,7 +75,8 @@ ${kernel} void PrepareMacroFields(
 	${global_ptr} int *map,
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *orho,
-	int options)
+	int options
+	${iteration_number_if_required()})
 {
 	${local_indices_split()}
 
@@ -102,7 +103,8 @@ ${kernel} void CollideAndPropagate(
 	${global_ptr} float *dist_out,
 	${global_ptr} float *gg0m0,
 	${kernel_args_1st_moment('ov')}
-	int options)
+	int options
+	${iteration_number_if_required()})
 {
 	${local_indices_split()}
 
@@ -137,7 +139,7 @@ ${kernel} void CollideAndPropagate(
 	%if simtype == 'shan-chen':
 		${sc_macro_fields()}
 	%else:
-		getMacro(&d0, ncode, type, orientation, &g0m0, v);
+		getMacro(&d0, ncode, type, orientation, &g0m0, v ${time_dep_call_args()});
 	%endif
 
 	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);

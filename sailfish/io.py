@@ -130,7 +130,7 @@ def subdomains_filename(base):
 
 def source_filename(filename, subdomain_id):
     base, ext = os.path.splitext(filename)
-    return '{0}.{1}.{2}'.format(base, subdomain_id, ext)
+    return '{0}.{1}{2}'.format(base, subdomain_id, ext)
 
 
 class VTKOutput(LBOutput):

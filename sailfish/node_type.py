@@ -152,5 +152,34 @@ def multifield(values, where):
     return np.core.records.fromarrays(new_values)[where]
 
 
+class DynamicValue(object):
+    """A node parameter that is evaluated on the device.
+
+    This is typically used for time-dependent boundary conditions."""
+
+    def __init__(self, params):
+        """:param params: a single sympy expression or a list of sympy
+                expressions (for vector valued functions)
+        """
+        self.params = params
+
+    def __hash__(self):
+        return hash(self.params)
+
+    def __cmp__(self, other):
+        return cmp(self.params, other.params)
+
+    def __iter__(self):
+        if type(self.params) is tuple or type(self.params) is list:
+            return iter(self.params)
+        else:
+            return iter((self.params, ))
+
+    def __len__(self):
+        if type(self.params) is tuple or type(self.params) is list:
+            return len(self.params)
+        else:
+            return 1
+
 # Maps node type IDs to their classes.
 _NODE_TYPES = __init_node_type_list()
