@@ -157,10 +157,8 @@ class DynamicValue(object):
 
     This is typically used for time-dependent boundary conditions."""
 
-    def __init__(self, params):
-        """:param params: a single sympy expression or a list of sympy
-                expressions (for vector valued functions)
-        """
+    def __init__(self, *params):
+        """:param params: sympy expressions"""
         self.params = params
 
     def __hash__(self):

@@ -1,6 +1,116 @@
 Setting up simulations
 ======================
 
+Let's be honest with ourselves, we all love to cut and paste code to get things done.
+We agree with that and to make your life easier, below we give you a simple template
+to get you started quickly, both in 2D::
+
+    import numpy as np
+    from sailfish.controller import LBSimulationController
+    from saiflish.subdomain import Subdomain2D
+    from sailfish.lb_single import LBFluidSim  # replace this line if you need another model
+    import sailfish.node_type as nt
+
+    class MyNameHereSubdomain(Subdomain2D):
+        def boundary_conditions(self, hx, hy):
+            self.set_node(...)
+
+        def initial_conditions(self, sim, hx, hy):
+            sim.rho[:] = 1.0
+
+    class MyNameHereSim(LBFluidSim):
+        subdomain = MyNameHereSubdomain
+
+    if __name__ == '__main__':
+        ctrl = LBSimulationController(MyNameHereSim).run()
+
+and in 3D::
+
+    import numpy as np
+    from sailfish.controller import LBSimulationController
+    from saiflish.subdomain import Subdomain3D
+    from sailfish.lb_single import LBFluidSim  # replace this line if you need another model
+    import sailfish.node_type as nt
+
+    class MyNameHereSubdomain(Subdomain3D):
+        def boundary_conditions(self, hx, hy, hz):
+            self.set_node(...)
+
+        def initial_conditions(self, sim, hx, hy, hz):
+            sim.rho[:] = 1.0
+
+    class MyNameHereSim(LBFluidSim):
+        subdomain = MyNameHereSubdomain
+
+    if __name__ == '__main__':
+        ctrl = LBSimulationController(MyNameHereSim).run()
+
+To start, do a global replacement of `MyNameHere` with something that makes sense
+for your simulation.
+
+Understanding node addressing
+-----------------------------
+Sailfish uses numpy index arrays in order to provide a domain
+decomposition-independent way of adressing nodes in functions within the
+:class:`Subdomain` class.  The functions get `hx`, `hy`, and `hz` as arguments.
+In order to select the nodes you want to modify, you need to formulate an expression
+using these arrays.  For instance, if you want nodes where the X coordinate is
+lower than 5, you would use `hx < 5`. You can combine multiple conditions with
+numpy logical functions (`np.logical_and`, `np.logical_or`, etc), for instance
+`np.logical_and(hx < 5, hy == 8)`.
+
+Boundary conditions
+-------------------
+Boundary conditions are specified in the body of the :func:`boundary_conditions` function
+in your :class:`Subdomain` subclass.  You should use :func:`Subdomain.set_node`
+to set node types.
+
+The first argument is an addressing expression as explained
+in the previous section, and the second argument identifies the node type.
+Every node can only be set once, so make sure addressing expressions used in
+different :func:`set_node` calls select disjoint nodes.
+
+The second argument of :func:`set_node` identifies the type of the boundary
+condition, and it can be one of the following:
+
+* a node type class (use this when the type does not have any parameters),
+* a node type instance (use this when the type has parameters).
+
+If you need to provide parameters for your boundary condition, you can do this
+in several ways:
+
+* To set the same parameter for all nodes being addressed: a single number
+  or a tuple of numbers (vector value).
+* To set different parameters for different nodes:
+
+  * a numpy array (scalar field),
+  * a vector field built via :func:`node_type.multifield`.
+
+  Fields need to have the same number of elements as the
+  the number of nodes that you are setting.  If you are building the fields
+  using the indexing arrays (`hx`, `hy`, `hz`), you can just select the right
+  part using the same indexing expression that you pass to
+  :func:`set_node`.  For :func:`node_type.multifield`, you need to
+  provide that indexing expression as the second argument.
+* To set a time-dependent parameter: instantiate a
+  :class:`node_type.DynamicValue` object.  The constructor takes
+  sympy expressions that will be evaluated on every step on the device.  Use
+  :attr:`sym.S.gx`, :attr:`sym.S.gy`, :attr:`sym.S.gz` in the
+  expression to get the node position in the global lattice coordinate system,
+  and :attr:`sym.S.time` to reference the *physical* time.  Note that in order
+  for the time to have a meaningful value, you will need to provide the
+  ``dt_per_lattice_time_unit`` config option specifying the physical time corresponding
+  to a single simulation step.
+
+Initial conditions
+------------------
+Initial conditions are set in :func:`Subdomain.initial_conditions`, by assigning
+values to numpy arrays representing the velocity and density fields.  These fields
+can be accessed via ``sim.rho``, ``sim.vx``, ``sim.vy`` and ``sim.vz``.  When assigning
+values to these, make sure that you set elements within the numpy array instead of
+overriding it, i.e. you need to provide an indexing expression on the left hand side
+of the assignment, e.g. ``sim.rho[:] = 1.0``.
+
 Mapping physical quantities to simulation parameters
 ----------------------------------------------------
 
