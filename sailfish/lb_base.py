@@ -28,7 +28,9 @@ class LBSim(object):
 
     @classmethod
     def add_options(cls, group, dim):
-        pass
+        group.add_argument('--dt_per_lattice_time_unit',
+                help='physical time delta corresponding to one iteration '
+                'of the simulation', type=float, default=0.0)
 
     @classmethod
     def modify_config(cls, config):
@@ -62,6 +64,7 @@ class LBSim(object):
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['constants'] = self.constants()
         ctx['relaxation_enabled'] = self.config.relaxation_enabled
+        ctx['dt_per_lattice_time_unit'] = self.config.dt_per_lattice_time_unit
 
     def init_fields(self, runner):
         suffixes = ['x', 'y', 'z']

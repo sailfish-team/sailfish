@@ -100,9 +100,6 @@ class LBFluidSim(LBSim):
                 help='subgrid model to use')
         group.add_argument('--smagorinsky_const',
                 help='Smagorinsky constant', type=float, default=0.03)
-        group.add_argument('--dt_per_lattice_time_unit',
-                help='physical time delta corresponding to one iteration '
-                'of the simulation', type=float, default=0.00)
 
         grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == dim]
         group.add_argument('--grid', help='LB grid', type=str,
@@ -138,7 +135,6 @@ class LBFluidSim(LBSim):
         ctx['subgrid'] = self.config.subgrid
         ctx['smagorinsky_const'] = self.config.smagorinsky_const
         ctx['entropy_tolerance'] = 1e-7 if self.config.precision == 'single' else 1e-16
-        ctx['dt_per_lattice_time_unit'] = self.config.dt_per_lattice_time_unit
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
