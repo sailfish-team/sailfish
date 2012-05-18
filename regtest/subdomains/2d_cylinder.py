@@ -10,7 +10,7 @@ import numpy as np
 from examples.cylinder import CylinderSimulation, CylinderGeometry
 from sailfish import io
 from sailfish.controller import LBSimulationController
-from regtest.blocks import util
+from regtest.subdomains import util
 from utils.merge_subdomains import merge_subdomains
 
 tmpdir = tempfile.mkdtemp()
