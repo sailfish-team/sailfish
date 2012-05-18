@@ -6,9 +6,11 @@
 <%namespace file="code_common.mako" import="*"/>
 <%namespace file="propagation.mako" import="rel_offset,get_odist"/>
 
-${device_func} inline float get_time_from_iteration(unsigned int iteration) {
-	return iteration * ${dt_per_lattice_time_unit};
-}
+%if time_dependence:
+	${device_func} inline float get_time_from_iteration(unsigned int iteration) {
+		return iteration * ${dt_per_lattice_time_unit};
+	}
+%endif
 
 <%def name="noneq_bb(orientation)">
 	case ${orientation}:
