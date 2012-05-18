@@ -7,8 +7,8 @@ __license__ = 'LGPL3'
 from collections import defaultdict
 import numpy as np
 from sailfish import subdomain_runner, sym, util
-from sailfish.lb_base import LBSim, ScalarField, VectorField
-from sailfish.lb_single import LBForcedSim, MacroKernels
+from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField
+from sailfish.lb_single import MacroKernels
 
 
 class LBBinaryFluidBase(LBSim):

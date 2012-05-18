@@ -6,7 +6,8 @@ from sailfish.geo import LBGeometry2D
 from sailfish.subdomain import Subdomain2D
 from sailfish.node_type import NTFullBBWall, NTHalfBBWall, NTEquilibriumDensity, DynamicValue
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFluidSim, LBForcedSim
+from sailfish.lb_single import LBFluidSim
+from sailfish.lb_base import LBForcedSim
 from sailfish.sym import S
 from sympy import sin
 
