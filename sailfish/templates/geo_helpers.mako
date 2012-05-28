@@ -104,3 +104,23 @@ ${device_func} inline unsigned int decodeNodeParamIdx(unsigned int nodetype) {
 		return gx + ${arr_nx} * gy + ${arr_nx * arr_ny} * gz;
 	}
 %endif
+
+
+## Experimental code below
+#############################################################################
+<%
+	def rel_offset(x, y, z=0):
+		if grid.dim == 2:
+			return x + y * arr_nx
+		else:
+			return x + arr_nx * (y + arr_ny * z)
+%>
+
+// Performs propagation when reading distributions from global memory.
+// This implements the propagate-on-read scheme.
+${device_func} inline void getUnpropagatedDist(Dist *dout, ${global_ptr} float *din, int idx) {
+	%for i, (dname, ei) in enumerate(zip(grid.idx_name, grid.basis)):
+		dout->${dname} = ${get_dist('din', i, 'idx', offset=rel_offset(*(-ei)))};
+	%endfor
+}
+

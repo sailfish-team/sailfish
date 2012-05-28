@@ -2,6 +2,7 @@
     from sailfish import sym
 %>
 
+<%namespace file="kernel_common.mako" import="*"/>
 <%namespace file="opencl_compat.mako" import="*"/>
 
 <%def name="prop_bnd(dist_out, dist_in, effective_dir, i, di, local, offset)">
@@ -89,8 +90,8 @@
 	%endif
 </%def>
 
-// Propagate distributions using global memory only.
-// TODO: This function is DEPRECATED and should be removed.
+## Propagate distributions using global memory only.
+## TODO: This function is DEPRECATED and should be removed.
 <%def name="propagate2(dist_out, dist_in='fi')">
 	// update the 0-th direction distribution
 	${dist_out}[gi] = ${dist_in}.fC;
@@ -121,8 +122,20 @@
 	%endif
 </%def>
 
-// Propagate distributions using a 1D shared memory array to make the propagation
-// in the X direction more efficient.
+## Same mass fractions directly to global memory without perfoming
+## propagation.  This is used to implement the propagate-on-read
+## scheme, which is 10-15% faster on pre-Fermi devices.
+##
+## This function is experimental and currently unused other than for
+## one-off tests.
+<%def name="propagate_inplace(dist_out, dist_in='fi')">
+	%for i, dname in enumerate(grid.idx_name):
+		${get_dist(dist_out, i, 'gi')} = ${dist_in}.${dname};
+	%endfor
+</%def>
+
+## Propagate distributions using a 1D shared memory array to make the propagation
+## in the X direction more efficient.
 <%def name="propagate(dist_out, dist_in='fi')">
 	<%
 		first_prop_dist = grid.idx_name[sym.get_prop_dists(grid, 1)[0]]
