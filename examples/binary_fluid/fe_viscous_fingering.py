@@ -7,7 +7,7 @@ from sailfish.subdomain import Subdomain3D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidFreeEnergy
-from sailfish.lb_single import LBForcedSim
+from sailfish.lb_base import LBForcedSim
 
 
 class FingeringDomain(Subdomain3D):

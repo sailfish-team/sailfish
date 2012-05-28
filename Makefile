@@ -24,23 +24,23 @@ test_examples:
 	@bash tests/run_examples.sh
 
 regtest:
-	python regtest/blocks/2d_propagation.py
-	python regtest/blocks/2d_ldc.py
-	python regtest/blocks/2d_cylinder.py
-	python regtest/blocks/3d_propagation.py
-	python regtest/blocks/3d_ldc.py
-	python regtest/blocks/binary_pbc.py
-	python regtest/blocks/2d_binary.py
+	python regtest/subdomains/2d_propagation.py
+	python regtest/subdomains/2d_ldc.py
+	python regtest/subdomains/2d_cylinder.py
+	python regtest/subdomains/3d_propagation.py
+	python regtest/subdomains/3d_ldc.py
+	python regtest/subdomains/binary_pbc.py
+	python regtest/subdomains/2d_binary.py
 
 # Necessary to trigger bulk/boundary split code.
 regtest_small_block:
-	python regtest/blocks/2d_propagation.py --block_size=16
-	python regtest/blocks/2d_ldc.py --block_size=16
-	python regtest/blocks/2d_cylinder.py --block_size=16
-	python regtest/blocks/3d_propagation.py --block_size=16
-	python regtest/blocks/3d_ldc.py --block_size=16
-	python regtest/blocks/binary_pbc.py --block_size=16
-	python regtest/blocks/2d_binary.py --block_size=16
+	python regtest/subdomains/2d_propagation.py --block_size=16
+	python regtest/subdomains/2d_ldc.py --block_size=16
+	python regtest/subdomains/2d_cylinder.py --block_size=16
+	python regtest/subdomains/3d_propagation.py --block_size=16
+	python regtest/subdomains/3d_ldc.py --block_size=16
+	python regtest/subdomains/binary_pbc.py --block_size=16
+	python regtest/subdomains/2d_binary.py --block_size=16
 
 presubmit: test regtest regtest_small_block test_examples
 

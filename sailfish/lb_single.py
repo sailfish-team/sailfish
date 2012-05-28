@@ -8,75 +8,10 @@ from collections import defaultdict, namedtuple
 import numpy as np
 
 from sailfish import subdomain_runner, sym, util
-from sailfish.lb_base import LBSim, ScalarField, VectorField
+from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField
 
 
 MacroKernels = namedtuple('MacroKernels', 'distributions macro')
-
-
-# TODO(michalj): Move this to lb_base.
-class LBForcedSim(LBSim):
-    """Adds support for body forces."""
-
-    def __init__(self, config):
-        super(LBForcedSim, self).__init__(config)
-        self._forces = {}
-        self._force_couplings = {}
-        self._force_term_for_eq = {}
-
-    # TODO(michalj): Add support for dynamical forces via sympy expressions
-    # and for global force fields via numpy arrays.
-    def add_body_force(self, force, grid=0, accel=True):
-        """Adds a constant global force field acting on the fluid.
-
-        Multiple calls to this function will add the value of `force` to any
-        previously set value.  Forces and accelerations are processed separately
-        and are never mixed in this addition process.
-
-        :param force: n-vector representing the force value
-        :param grid: grid number on which this force is acting
-        :param accel: if ``True``, the added field is an acceleration field, otherwise
-            it is an actual force field
-        """
-        dim = self.grids[0].dim
-        assert len(force) == dim
-
-        # Create an empty force vector.  Use numpy so that we can easily compute
-        # sums.
-        self._forces.setdefault(grid, {}).setdefault(accel, np.zeros(dim, np.float64))
-        a = self._forces[grid][accel] + np.float64(force)
-        self._forces[grid][accel] = a
-
-    def update_context(self, ctx):
-        super(LBForcedSim, self).update_context(ctx)
-        ctx['forces'] = self._forces
-        ctx['force_couplings'] = self._force_couplings
-        ctx['force_for_eq'] = self._force_term_for_eq
-
-    def use_force_for_equilibrium(self, force_grid, target_grid):
-        """Makes it possible to use acceleration from force_grid when calculating
-        velocity for the equlibrium of target_grid.
-
-        For instance, to use the acceleration from grid 0 in relaxation of
-        grid 1, use the parameters (0, 1).
-
-        To disable acceleration on a grid, pass an invalid grid ID in force_grid
-        (e.g. None or -1).
-
-        :param force_grid: grid ID from which the acceleration will be used
-        :param target_grid: grid ID on which the acceleration will act
-        """
-        self._force_term_for_eq[target_grid] = force_grid
-
-    def add_force_coupling(self, grid_a, grid_b, const_name):
-        """Adds a Shan-Chen type coupling between two lattices.
-
-        :param grid_a: numerical ID of the first lattice
-        :param grid_b: numerical ID of the second lattice
-        :param const_name: name of the global variable containing the value of the
-                coupling constant
-        """
-        self._force_couplings[(grid_a, grid_b)] = const_name
 
 
 class LBFluidSim(LBSim):
@@ -176,9 +111,11 @@ class LBFluidSim(LBSim):
 
         kernels = []
         kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args1, 'P'*(len(args1)-1) + 'i'))
+                'CollideAndPropagate', args1, 'P'*(len(args1)-1) + 'i',
+                needs_iteration=self.config.time_dependence))
         kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args2, 'P'*(len(args2)-1) + 'i'))
+                'CollideAndPropagate', args2, 'P'*(len(args2)-1) + 'i',
+                needs_iteration=self.config.time_dependence))
         return kernels
 
     def get_pbc_kernels(self, runner):
@@ -316,9 +253,11 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
 
         macro_kernels = [
             runner.get_kernel('PrepareMacroFields', macro_args1,
-                'P' * (len(macro_args1) - 1) + 'i'),
+                'P' * (len(macro_args1) - 1) + 'i',
+                needs_iteration=self.config.time_dependence),
             runner.get_kernel('PrepareMacroFields', macro_args2,
-                'P' * (len(macro_args2) - 1) + 'i')]
+                'P' * (len(macro_args2) - 1) + 'i',
+                needs_iteration=self.config.time_dependence)]
 
         sim_kernels = super(LBSingleFluidShanChen, self).get_compute_kernels(
                 runner, full_output, bulk)

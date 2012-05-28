@@ -8,6 +8,12 @@
 %endif
 </%def>
 
+<%def name="iteration_number_if_required()">
+	%if time_dependence:
+		, unsigned int iteration_number
+	%endif
+</%def>
+
 ## Convenience function to call getGlobalIdx without an explicit conditional
 ## clause in the template code.
 <%def name="get_global_idx(x='gx', y='gy', z='gz')" filter="trim">
@@ -298,6 +304,14 @@ extern int printf (__const char *__restrict __format, ...);
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
+
+${device_func} void die(void) {
+	%if backend == 'cuda':
+		asm("trap;");
+	%else:
+		return;
+	%endif
+}
 
 ${opencl_compat.body()}
 <%include file="geo_helpers.mako"/>

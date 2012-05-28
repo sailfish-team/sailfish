@@ -9,7 +9,7 @@ from sailfish.subdomain import Subdomain2D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidShanChen
-from sailfish.lb_single import LBForcedSim
+from sailfish.lb_base import LBForcedSim
 
 
 class CapillaryDomain(Subdomain2D):

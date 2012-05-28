@@ -13,7 +13,7 @@ from sailfish import io
 from sailfish.controller import LBSimulationController
 from sailfish.geo import LBGeometry2D
 from sailfish.subdomain import SubdomainSpec2D
-from regtest.blocks import util
+from regtest.subdomains import util
 
 MAX_ITERS = 10
 block_size = 64

@@ -5,7 +5,8 @@ from sailfish.geo import LBGeometry2D
 from sailfish.subdomain import SubdomainSpec2D, Subdomain2D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFluidSim, LBForcedSim
+from sailfish.lb_single import LBFluidSim
+from sailfish.lb_base import LBForcedSim
 
 class CylinderGeometry(LBGeometry2D):
     def subdomains(self, n=None):

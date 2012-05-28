@@ -20,11 +20,16 @@ def _convert_to_double(src):
     import re
     t = re.sub('([0-9]+\.[0-9]*(e-?[0-9]*)?)f([^a-zA-Z0-9\.])', '\\1\\3',
                src.replace('float', 'double'))
+    t = _remove_math_function_suffix(t)
+    return t
+
+def _remove_math_function_suffix(t):
     t = t.replace('logf(', 'log(')
     t = t.replace('expf(', 'exp(')
     t = t.replace('powf(', 'pow(')
+    t = t.replace('sinf(', 'sin(')
+    t = t.replace('cosf(', 'cos(')
     return t
-
 
 class BlockCodeGenerator(object):
     """Generates CUDA/OpenCL code for a simulation."""
@@ -32,7 +37,7 @@ class BlockCodeGenerator(object):
     #: The command to use to automatically format the compute unit source code.
     _format_cmd = (
         r"sed -i -e '{{:s;N;\#//#{{p ;d}}; \!#!{{p;d}} ; s/\n//g;t s}}' {path} ; "
-        r"sed -i -e 's/}}/}}\n\n/g' {path} ; indent -linux -sob -l120 {path} ; "
+        r"sed -i -e 's/}}/}}\n\n/g' {path} ; {indent} -linux -sob -l120 {path} ; "
         r"sed -i -e '/^$/{{N; s/\n\([\t ]*}}\)$/\1/}}' "
                 r"-e '/{{$/{{N; s/{{\n$/{{/}}' {path}")
     # The first sed call removes all newline characters except for those terminating lines
@@ -58,6 +63,8 @@ class BlockCodeGenerator(object):
                 default=False)
         group.add_argument('--block_size', type=int, default=64,
                 help='size of the block of threads on the compute device')
+        group.add_argument('--indent', type=str, default='indent',
+                help='path to the GNU indent program')
 
     def __init__(self, simulation):
         self._sim = simulation
@@ -66,7 +73,7 @@ class BlockCodeGenerator(object):
     def config(self):
         return self._sim.config
 
-    def get_code(self, subdomain_runner):
+    def get_code(self, subdomain_runner, target_type):
         if self.config.use_src:
             source_fn = sailfish.io.source_filename(self.config.use_src,
                     subdomain_runner._block.id)
@@ -97,6 +104,10 @@ class BlockCodeGenerator(object):
         if self.is_double_precision():
             src = _convert_to_double(src)
 
+        # TODO(michalj): Consider using native_ or half_ functions here.
+        if target_type == 'opencl':
+            src = _remove_math_function_suffix(src)
+
         if self.config.save_src:
             self.save_code(src,
                     sailfish.io.source_filename(self.config.save_src,
@@ -110,7 +121,8 @@ class BlockCodeGenerator(object):
             print >>fsrc, code
 
         if reformat:
-            os.system(self._format_cmd.format(path=dest_path))
+            os.system(self._format_cmd.format(path=dest_path,
+                indent=self.config.indent))
 
     def is_double_precision(self):
         return self.config.precision == 'double'

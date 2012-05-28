@@ -8,7 +8,7 @@ from sailfish.subdomain import Subdomain2D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidShanChen
-from sailfish.lb_single import LBForcedSim
+from sailfish.lb_base import LBForcedSim
 
 class RayleighTaylorDomain(Subdomain2D):
     def boundary_conditions(self, hx, hy):

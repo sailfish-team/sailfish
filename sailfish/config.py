@@ -58,6 +58,7 @@ class LBConfigParser(object):
         # Additional internal config options, not settable via
         # command line parameters.
         self.config.relaxation_enabled = True
+        self.config.time_dependence = False
         return self.config
 
 

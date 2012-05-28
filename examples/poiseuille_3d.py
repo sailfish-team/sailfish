@@ -7,7 +7,8 @@ from sailfish.geo import LBGeometry3D
 from sailfish.subdomain import Subdomain3D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFluidSim, LBForcedSim
+from sailfish.lb_single import LBFluidSim
+from sailfish.lb_base import LBForcedSim
 
 
 class PoiseuilleSubdomain(Subdomain3D):

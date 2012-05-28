@@ -10,7 +10,7 @@ import numpy as np
 from examples.sphere_3d import SphereSimulation, SphereGeometry
 from sailfish import io
 from sailfish.controller import LBSimulationController
-from regtest.blocks import util
+from regtest.subdomains import util
 
 block_size = 64
 blocks = 2
