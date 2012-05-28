@@ -529,6 +529,10 @@ class BlockRunner(object):
             self._boundary_size = 0
             self._kernel_grid_bulk = self._kernel_grid_full
 
+        self.config.logger.debug('Bulk grid: %s' % repr(self._kernel_grid_bulk))
+        self.config.logger.debug('Boundary grid: %s' %
+                repr(self._boundary_blocks))
+
         # Global grid size as seen by the simulation class.
         if self._block.dim == 2:
             self._global_size = (self.config.lat_ny, self.config.lat_nx)
