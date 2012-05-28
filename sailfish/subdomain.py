@@ -678,10 +678,13 @@ class Subdomain(object):
                         "have exactly as many nodes as there are True values "
                         "in the 'where' array.  Use node_util.multifield() to "
                         "generate the array in an easy way.")
-            # TODO(kasiaj): Add support for sympy expressions here for
-            # time-dep. boundary conditions.
+            elif isinstance(param, nt.DynamicValue):
+                self.config.time_dependence = True
+                # TODO: Ensure that time is a parameter in the expression.
+                continue
             else:
-                raise ValueError("Unrecognized node param: %s" % name)
+                raise ValueError("Unrecognized node param: {0} (type {1})".
+                        format(name, type(param)))
 
     def set_node(self, where, node_type):
         """Set a boundary condition at selected node(s).
@@ -729,6 +732,10 @@ class Subdomain(object):
     def update_context(self, ctx):
         assert self._encoder is not None
         self._encoder.update_context(ctx)
+        ctx['x_local_device_to_global_offset'] = self.spec.ox - self.spec.envelope_size
+        ctx['y_local_device_to_global_offset'] = self.spec.oy - self.spec.envelope_size
+        if self.dim == 3:
+            ctx['z_local_device_to_global_offset'] = self.spec.oz - self.spec.envelope_size
 
     def encoded_map(self):
         if not self._type_map_encoded:

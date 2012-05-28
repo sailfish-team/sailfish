@@ -28,7 +28,9 @@ class LBSim(object):
 
     @classmethod
     def add_options(cls, group, dim):
-        pass
+        group.add_argument('--dt_per_lattice_time_unit',
+                help='physical time delta corresponding to one iteration '
+                'of the simulation', type=float, default=0.0)
 
     @classmethod
     def modify_config(cls, config):
@@ -62,6 +64,7 @@ class LBSim(object):
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['constants'] = self.constants()
         ctx['relaxation_enabled'] = self.config.relaxation_enabled
+        ctx['dt_per_lattice_time_unit'] = self.config.dt_per_lattice_time_unit
 
     def init_fields(self, runner):
         suffixes = ['x', 'y', 'z']
@@ -95,6 +98,79 @@ class LBSim(object):
     # TODO(michalj): Restore support for iter hooks.
     # TODO(michalj): Restore support for defining visualization fields.
     # TODO(michalj): Restore support for tracer particles.
+
+
+class LBForcedSim(LBSim):
+    """Adds support for body forces.
+
+    This is a mix-in class. When defining a new simulation, inherit
+    from another LBSim-based class first.
+    """
+
+    def __init__(self, config):
+        super(LBForcedSim, self).__init__(config)
+        self._forces = {}
+        self._force_couplings = {}
+        self._force_term_for_eq = {}
+
+    @classmethod
+    def add_options(cls, group, dim):
+        pass
+
+    # TODO(michalj): Add support for dynamical forces via sympy expressions
+    # and for global force fields via numpy arrays.
+    def add_body_force(self, force, grid=0, accel=True):
+        """Adds a constant global force field acting on the fluid.
+
+        Multiple calls to this function will add the value of `force` to any
+        previously set value.  Forces and accelerations are processed separately
+        and are never mixed in this addition process.
+
+        :param force: n-vector representing the force value
+        :param grid: grid number on which this force is acting
+        :param accel: if ``True``, the added field is an acceleration field, otherwise
+            it is an actual force field
+        """
+        dim = self.grids[0].dim
+        assert len(force) == dim
+
+        # Create an empty force vector.  Use numpy so that we can easily compute
+        # sums.
+        self._forces.setdefault(grid, {}).setdefault(accel, np.zeros(dim, np.float64))
+        a = self._forces[grid][accel] + np.float64(force)
+        self._forces[grid][accel] = a
+
+    def update_context(self, ctx):
+        super(LBForcedSim, self).update_context(ctx)
+        ctx['forces'] = self._forces
+        ctx['force_couplings'] = self._force_couplings
+        ctx['force_for_eq'] = self._force_term_for_eq
+
+    def use_force_for_equilibrium(self, force_grid, target_grid):
+        """Makes it possible to use acceleration from force_grid when calculating
+        velocity for the equlibrium of target_grid.
+
+        For instance, to use the acceleration from grid 0 in relaxation of
+        grid 1, use the parameters (0, 1).
+
+        To disable acceleration on a grid, pass an invalid grid ID in force_grid
+        (e.g. None or -1).
+
+        :param force_grid: grid ID from which the acceleration will be used
+        :param target_grid: grid ID on which the acceleration will act
+        """
+        self._force_term_for_eq[target_grid] = force_grid
+
+    def add_force_coupling(self, grid_a, grid_b, const_name):
+        """Adds a Shan-Chen type coupling between two lattices.
+
+        :param grid_a: numerical ID of the first lattice
+        :param grid_b: numerical ID of the second lattice
+        :param const_name: name of the global variable containing the value of the
+                coupling constant
+        """
+        self._force_couplings[(grid_a, grid_b)] = const_name
+
 
 class Field(object):
     def __init__(self, name, expr=None, need_nn=False):

@@ -131,7 +131,8 @@ ${kernel} void PrepareMacroFields(
 	${global_ptr} float *dist2_in,
 	${global_ptr} float *orho,
 	${global_ptr} float *ophi,
-	int options)
+	int options
+	${iteration_number_if_required()})
 {
 	${local_indices_split()}
 
@@ -257,7 +258,8 @@ ${kernel} void CollideAndPropagate(
 	${global_ptr} float *gg0m0,
 	${global_ptr} float *gg1m0,
 	${kernel_args_1st_moment('ov')}
-	int options)
+	int options
+	${iteration_number_if_required()})
 {
 	${local_indices_split()}
 
@@ -331,7 +333,7 @@ ${kernel} void CollideAndPropagate(
 	float g0m0, v[${dim}], g1m0;
 
 	%if simtype == 'free-energy':
-		getMacro(&d0, ncode, type, orientation, &g0m0, v);
+		getMacro(&d0, ncode, type, orientation, &g0m0, v ${time_dep_call_args()});
 		// TODO(michalj): Is this really needed?
 		get0thMoment(&d1, type, orientation, &g1m0);
 	%elif simtype == 'shan-chen':

@@ -7,8 +7,8 @@ __license__ = 'LGPL3'
 from collections import defaultdict
 import numpy as np
 from sailfish import subdomain_runner, sym, util
-from sailfish.lb_base import LBSim, ScalarField, VectorField
-from sailfish.lb_single import LBForcedSim, MacroKernels
+from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField
+from sailfish.lb_single import MacroKernels
 
 
 class LBBinaryFluidBase(LBSim):
@@ -130,15 +130,19 @@ class LBBinaryFluidBase(LBSim):
 
         macro_kernels = [
             runner.get_kernel('PrepareMacroFields', macro_args1,
-                'P' * (len(macro_args1) - 1) + 'i'),
+                'P' * (len(macro_args1) - 1) + 'i',
+                needs_iteration=self.config.time_dependence),
             runner.get_kernel('PrepareMacroFields', macro_args2,
-                'P' * (len(macro_args2) - 1) + 'i')]
+                'P' * (len(macro_args2) - 1) + 'i',
+                needs_iteration=self.config.time_dependence)]
 
         sim_kernels = [
             runner.get_kernel('CollideAndPropagate', args1,
-                'P' * (len(args1) - 1) + 'i'),
+                'P' * (len(args1) - 1) + 'i',
+                needs_iteration=self.config.time_dependence),
             runner.get_kernel('CollideAndPropagate', args2,
-                'P' * (len(args2) - 1) + 'i')]
+                'P' * (len(args2) - 1) + 'i',
+                needs_iteration=self.config.time_dependence)]
         return zip(macro_kernels, sim_kernels)
 
     def initial_conditions(self, runner):

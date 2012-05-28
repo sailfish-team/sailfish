@@ -7,16 +7,16 @@ import unittest
 
 import numpy as np
 
-from examples.ldc_3d import LDCGeometry, LDCSim
+from examples.ldc_2d import LDCGeometry, LDCSim
 from sailfish import io
 from sailfish.controller import LBSimulationController
-from regtest.blocks import util
+from regtest.subdomains import util
 
 block_size = 64
 tmpdir = tempfile.mkdtemp()
 blocks = 1
 output = ''
-MAX_ITERS = 200
+MAX_ITERS = 100
 
 class SimulationTest(LDCSim):
     @classmethod
@@ -30,6 +30,7 @@ class SimulationTest(LDCSim):
         defaults['output'] = output
         defaults['cuda_cache'] = False
 
+
 # NOTE: This test class is not thread safe.
 class TestInterblockPropagation(unittest.TestCase):
     @classmethod
@@ -41,12 +42,18 @@ class TestInterblockPropagation(unittest.TestCase):
         cls.digits = io.filename_iter_digits(MAX_ITERS)
         cls.ref = np.load(io.filename(output, cls.digits, 0, MAX_ITERS))
 
-    def test_8blocks(self):
+    def test_4blocks(self):
         global blocks, output
-        output = os.path.join(tmpdir, 'horiz_8block')
-        blocks = 8
-        ctrl = LBSimulationController(SimulationTest, LDCGeometry)
-        ctrl.run(ignore_cmdline=True)
+        output = os.path.join(tmpdir, 'horiz_4block')
+        blocks = 4
+        LBSimulationController(SimulationTest, LDCGeometry).run(ignore_cmdline=True)
+        util.verify_fields(self.ref, output, self.digits, MAX_ITERS)
+
+    def test_3blocks(self):
+        global blocks, output
+        output = os.path.join(tmpdir, 'horiz_3block')
+        blocks = 3
+        LBSimulationController(SimulationTest, LDCGeometry).run(ignore_cmdline=True)
         util.verify_fields(self.ref, output, self.digits, MAX_ITERS)
 
 

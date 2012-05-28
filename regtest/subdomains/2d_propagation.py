@@ -13,7 +13,7 @@ from sailfish.subdomain import SubdomainSpec2D, Subdomain2D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
 from sailfish.sym import D2Q9
-from regtest.blocks import util
+from regtest.subdomains import util
 
 #
 #  b1  b3

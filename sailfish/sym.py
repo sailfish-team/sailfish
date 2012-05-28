@@ -1136,10 +1136,9 @@ class KernelCodePrinter(CCodePrinter):
                                               self.parenthesize(expr.exp, PREC)))
 
     def _print_Function(self, expr):
-        if expr.func.__name__ == 'log':
-            return 'logf(%s)' % self.stringify(expr.args, ', ')
-        elif expr.func.__name__ == 'exp':
-            return 'expf(%s)' % self.stringify(expr.args, ', ')
+        if expr.func.__name__ in ('log', 'exp', 'sin', 'cos'):
+            return '{0}f({1})'.format(expr.func.__name__,
+                    self.stringify(expr.args, ', '))
         else:
             return super(KernelCodePrinter, self)._print_Function(expr)
 
@@ -1410,6 +1409,13 @@ class S(object):
         else:
             setattr(cls, sym_dst, Matrix(([syms[0], syms[1]],)))
 
+
+class SlfSymbol(Symbol):
+    def __init__(self, name, comment=None):
+        Symbol.__init__(name)
+        self.comment = comment
+
+
 def _prepare_symbols():
     comp_map = {0: 'x', 1: 'y', 2: 'z'}
 
@@ -1464,7 +1470,11 @@ def _prepare_symbols():
     S.visc = Symbol('visc')
     S.gravity = Symbol('gravity')
 
-
+    # Node coordinate in the global coordinate system.
+    S.gx = SlfSymbol('gx', 'X node location in the global coordinate system')
+    S.gy = SlfSymbol('gy', 'Y node location in the global coordinate system')
+    S.gz = SlfSymbol('gz', 'Z node location in the global coordinate system')
+    S.time = SlfSymbol('phys_time', 'time in physical units')
 
 KNOWN_GRIDS = (D2Q9, D3Q13, D3Q15, D3Q19)
 

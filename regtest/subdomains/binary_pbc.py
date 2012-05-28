@@ -17,7 +17,7 @@ from sailfish.subdomain import Subdomain2D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidShanChen, LBBinaryFluidFreeEnergy
 from sailfish import io
-from regtest.blocks import util
+from regtest.subdomains import util
 
 
 SHIFT = [17, 4, 13]
