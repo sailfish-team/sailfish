@@ -508,12 +508,17 @@ class LBSimulationController(object):
 
     def _finish_simulation(self, subdomains, summary_receiver):
         timing_infos = []
+        min_timings = []
+        max_timings = []
 
         if self.config.cluster_spec or self._is_pbs_cluster():
             if self.config.mode == 'benchmark':
                 for ch, subdomains in zip(self._cluster_channels, self._node_subdomains):
                     for sub in subdomains:
-                        timing_infos.append(util.TimingInfo(*ch.receive()))
+                        ti, min_ti, max_ti = ch.receive()
+                        timing_infos.append(util.TimingInfo(*ti))
+                        min_timings.append(util.TimingInfo(*min_ti))
+                        max_timings.append(util.TimingInfo(*max_ti))
 
             for ch in self._cluster_channels:
                 data = ch.receive()
@@ -528,9 +533,11 @@ class LBSimulationController(object):
             if self.config.mode == 'benchmark':
                 # Collect timing information from all subdomains.
                 for i in range(len(subdomains)):
-                    ti = summary_receiver.recv_pyobj()
+                    ti, min_ti, max_ti = summary_receiver.recv_pyobj()
                     summary_receiver.send('ack')
                     timing_infos.append(ti)
+                    min_timings.append(min_ti)
+                    max_timings.append(max_ti)
 
             self._simulation_process.join()
 
@@ -546,7 +553,7 @@ class LBSimulationController(object):
             if not self.config.quiet:
                 print ('Total MLUPS: eff:{0:.2f}  comp:{1:.2f}'.format(
                         mlups_total, mlups_comp))
-            return timing_infos, subdomains
+            return timing_infos, min_timings, max_timings, blocks
 
         return None, None
 

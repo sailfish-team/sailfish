@@ -14,7 +14,7 @@ import numpy as np
 from sailfish import config
 from sailfish import sym
 
-TimingInfo = namedtuple('TimingInfo', 'comp bulk bnd coll data recv send wait total block_id')
+TimingInfo = namedtuple('TimingInfo', 'comp bulk bnd coll net_wait recv send total block_id')
 
 
 class GridError(Exception):

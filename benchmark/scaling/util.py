@@ -2,9 +2,18 @@ import argparse
 import sys
 
 
-def save_result(filename_base, num_blocks, timing_infos, subdomains):
+def save_result(filename_base, num_blocks, timing_infos, min_timings,
+        max_timings, subdomains):
     f = open('%s_%d' % (filename_base, num_blocks), 'w')
     f.write(str(timing_infos))
+    f.close()
+
+    f = open('%s_min_%d' % (filename_base, num_blocks), 'w')
+    f.write(str(min_timings))
+    f.close()
+
+    f = open('%s_max_%d' % (filename_base, num_blocks), 'w')
+    f.write(str(max_timings))
     f.close()
 
     mlups_total = 0

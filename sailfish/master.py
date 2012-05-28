@@ -300,8 +300,8 @@ class LBMachineMaster(object):
 
         if self._channel is not None and self.config.mode == 'benchmark':
             for socket in sockets:
-                timing_info = socket.recv_pyobj()
-                self._channel.send(tuple(timing_info))
+                ti, min_ti, max_ti = socket.recv_pyobj()
+                self._channel.send(tuple(tuple(ti), tuple(min_ti), tuple(max_ti)))
                 socket.send('ack')
 
         # Wait for all subdomain runners to finish.

@@ -20,8 +20,9 @@ def run_benchmark(num_blocks):
         }
 
     ctrl = LBSimulationController(LDCSim, EqualSubdomainsGeometry2D, settings)
-    timing_infos, subdomains = ctrl.run()
-    util.save_result('weak_2d_single', num_blocks, timing_infos, subdomains)
+    timing_infos, min_timings, max_timings, subdomains = ctrl.run()
+    util.save_result('weak_2d_single', num_blocks, timing_infos, min_timings,
+            max_timings, subdomains)
 
 if __name__ == '__main__':
     args = util.process_cmdline()

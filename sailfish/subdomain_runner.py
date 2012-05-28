@@ -126,16 +126,20 @@ class TimeProfile(object):
     RECV_DISTS = 9
     SEND_MACRO = 10
     RECV_MACRO = 11
-    STEP = 12
+    NET_RECV = 12
+
+    # This event needs to have the highest ID>
+    STEP = 13
 
     def __init__(self, runner):
         self._runner = runner
         self._make_event = runner.backend.make_event
         self._events_start = {}
         self._events_end = {}
-        self._times_start = {}
-        self._times_end = {}
+        self._times_start = [0.0] * (self.STEP + 1)
         self._timings = [0.0] * (self.STEP + 1)
+        self._min_timings = [1000.0] * (self.STEP + 1)
+        self._max_timings = [0.0] * (self.STEP + 1)
 
     def record_start(self):
         self.t_start = time.time()
@@ -151,13 +155,36 @@ class TimeProfile(object):
                 bulk=self._timings[self.BULK] / mi,
                 bnd =self._timings[self.BOUNDARY] / mi,
                 coll=self._timings[self.COLLECTION] / mi,
-                data=0,
+                net_wait=self._timings[self.NET_RECV] / mi,
                 recv=self._timings[self.RECV_DISTS] / mi,
                 send=self._timings[self.SEND_DISTS] / mi,
-                wait=0,
                 total=self._timings[self.STEP] / mi,
                 block_id=self._runner._block.id)
-        self._runner.send_summary_info(ti)
+
+
+        min_ti = util.TimingInfo(
+                comp=(self._min_timings[self.BULK] + self._min_timings[self.BOUNDARY]),
+                bulk=self._min_timings[self.BULK],
+                bnd =self._min_timings[self.BOUNDARY],
+                coll=self._min_timings[self.COLLECTION],
+                net_wait=self._min_timings[self.NET_RECV],
+                recv=self._min_timings[self.RECV_DISTS],
+                send=self._min_timings[self.SEND_DISTS],
+                total=self._min_timings[self.STEP],
+                block_id=self._runner._block.id)
+
+        max_ti = util.TimingInfo(
+                comp=(self._max_timings[self.BULK] + self._max_timings[self.BOUNDARY]),
+                bulk=self._max_timings[self.BULK],
+                bnd =self._max_timings[self.BOUNDARY],
+                coll=self._max_timings[self.COLLECTION],
+                net_wait=self._max_timings[self.NET_RECV],
+                recv=self._max_timings[self.RECV_DISTS],
+                send=self._max_timings[self.SEND_DISTS],
+                total=self._max_timings[self.STEP],
+                block_id=self._runner._block.id)
+
+        self._runner.send_summary_info(ti, min_ti, max_ti)
 
     def start_step(self):
         self.record_cpu_start(self.STEP)
@@ -166,10 +193,10 @@ class TimeProfile(object):
         self.record_cpu_end(self.STEP)
 
         for i, ev_start in self._events_start.iteritems():
-            self._timings[i] += self._events_end[i].time_since(ev_start) / 1e3
-
-        for i, t_start in self._times_start.iteritems():
-            self._timings[i] += self._times_end[i] - t_start
+            duration = self._events_end[i].time_since(ev_start) / 1e3
+            self._timings[i] += duration
+            self._min_timings[i] = min(self._min_timings[i], duration)
+            self._max_timings[i] = max(self._max_timings[i], duration)
 
     def record_gpu_start(self, event, stream):
         ev = self._make_event(stream, timing=True)
@@ -185,7 +212,11 @@ class TimeProfile(object):
         self._times_start[event] = time.time()
 
     def record_cpu_end(self, event):
-        self._times_end[event] = time.time()
+        t_end = time.time()
+        duration = t_end - self._times_start[event]
+        self._min_timings[event] = min(self._min_timings[event], duration)
+        self._max_timings[event] = max(self._max_timings[event], duration)
+        self._timings[event] += duration
 
 
 def profile(profile_event):
@@ -934,9 +965,11 @@ class BlockRunner(object):
             conn_bufs = self._recv_block_to_connbuf[b_id]
             if len(conn_bufs) > 1:
                 dest = np.hstack([np.ravel(x.recv_buf) for x in conn_bufs])
+                self._profile.record_cpu_start(TimeProfile.NET_RECV)
                 # Returns false only if quit event is active.
                 if not connector.recv(dest, self._quit_event):
                     return
+                self._profile.record_cpu_end(TimeProfile.NET_RECV)
                 i = 0
                 for cbuf in conn_bufs:
                     l = cbuf.recv_buf.size
@@ -947,8 +980,10 @@ class BlockRunner(object):
                 cbuf = conn_bufs[0]
                 dest = np.ravel(cbuf.recv_buf)
                 # Returns false only if quit event is active.
+                self._profile.record_cpu_start(TimeProfile.NET_RECV)
                 if not connector.recv(dest, self._quit_event):
                     return
+                self._profile.record_cpu_end(TimeProfile.NET_RECV)
                 # If ravel returned a copy, we need to write the data
                 # back to the proper buffer.
                 # TODO(michalj): Check if there is any way of avoiding this
@@ -1154,9 +1189,10 @@ class BlockRunner(object):
         gy = rest / arr_nx
         return dist_num, gy, gx
 
-    def send_summary_info(self, timing_info):
+    def send_summary_info(self, timing_info, min_timings, max_timings):
         if self._summary_sender is not None:
-            self._summary_sender.send_pyobj(timing_info)
+            self._summary_sender.send_pyobj((timing_info, min_timings,
+                    max_timings))
             self.config.logger.debug('Sending timing information to controller.')
             assert self._summary_sender.recv() == 'ack'
 
