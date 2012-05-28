@@ -17,9 +17,9 @@ def run_benchmark(num_blocks):
         'subdomains': num_blocks,
         'conn_axis': 'z',
         'mode': 'benchmark',
-        'lat_nx': 382,
-        'lat_ny': 384,
-        'lat_nz': 100 * num_blocks
+        'lat_nx': 254,
+        'lat_ny': 192,
+        'lat_nz': 300 * num_blocks,
         }
 
     ctrl = LBSimulationController(LDCSim, EqualSubdomainsGeometry3D, settings)
