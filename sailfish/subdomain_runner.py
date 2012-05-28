@@ -286,7 +286,7 @@ class SubdomainRunner(object):
         self._vector_fields = []
         self._gpu_field_map = {}
         self._gpu_grids_primary = []
-        self._gpu_grids_secondary = []
+        self._gpu_grids_secondary = []  # only used for the AB access pattern
         self._vis_map_cache = None
         self._quit_event = quit_event
 
@@ -826,7 +826,8 @@ class SubdomainRunner(object):
             size = self._get_dist_bytes(grid)
             self.config.logger.debug("Using {0} bytes for buffer".format(size))
             self._gpu_grids_primary.append(self.backend.alloc_buf(size=size))
-            self._gpu_grids_secondary.append(self.backend.alloc_buf(size=size))
+            if self.config.access_pattern == 'AB':
+                self._gpu_grids_secondary.append(self.backend.alloc_buf(size=size))
 
         self._gpu_geo_map = self.backend.alloc_buf(
                 like=self._subdomain.encoded_map())
@@ -846,7 +847,12 @@ class SubdomainRunner(object):
         if copy == 0:
             return self._gpu_grids_primary[num]
         else:
-            return self._gpu_grids_secondary[num]
+            if self.config.access_pattern == 'AB':
+                return self._gpu_grids_secondary[num]
+            # XXX: we should simply not pass the arguments to the kernels
+            # instead
+            else:
+                return self._gpu_grids_primary[num]
 
     def gpu_geo_map(self):
         return self._gpu_geo_map

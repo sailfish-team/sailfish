@@ -131,7 +131,16 @@ ${kernel} void CollideAndPropagate(
 
 	// Cache the distributions in local variables
 	Dist d0;
-	getDist(&d0, dist_in, gi);
+
+	%if access_pattern == 'AB':
+		getDist(&d0, dist_in, gi);
+	%else:
+		if ((iteration_number & 1) == 0) {
+			getDist(&d0, dist_in, gi);
+		} else {
+			getUnpropagatedDist(&d0, dist_in, gi);
+		}
+	%endif
 
 	%if simtype == 'shan-chen':
 		${sc_calculate_accel()}

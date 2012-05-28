@@ -20,6 +20,10 @@ class LBConfig(argparse.Namespace):
     def output_required(self):
         return self.output or self.mode == 'visualization'
 
+    @property
+    def needs_iteration_num(self):
+        return self.time_dependence or self.access_pattern == 'AA'
+
 
 class LBConfigParser(object):
     def __init__(self, description=None):

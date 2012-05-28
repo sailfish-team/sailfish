@@ -34,6 +34,10 @@ class LBSim(object):
         grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == dim]
         group.add_argument('--grid', help='LB grid', type=str,
                 choices=grids, default=grids[0])
+        group.add_argument('--access_pattern', type=str, default='AB',
+                choices=['AB', 'AA'], help='Lattice access pattern. Valid '
+                'values are: AB (two copies of the whole domain in memory,'
+                ' faster), AA (single copy of the domain in memory)')
 
     @classmethod
     def modify_config(cls, config):
@@ -71,6 +75,8 @@ class LBSim(object):
         ctx['constants'] = self.constants()
         ctx['relaxation_enabled'] = self.config.relaxation_enabled
         ctx['dt_per_lattice_time_unit'] = self.config.dt_per_lattice_time_unit
+        ctx['access_pattern'] = self.config.access_pattern
+        ctx['needs_iteration_num'] = self.config.needs_iteration_num
 
     def init_fields(self, runner):
         suffixes = ['x', 'y', 'z']

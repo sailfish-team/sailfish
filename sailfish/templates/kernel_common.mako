@@ -10,7 +10,7 @@
 </%def>
 
 <%def name="iteration_number_if_required()">
-	%if time_dependence:
+	%if needs_iteration_num:
 		, unsigned int iteration_number
 	%endif
 </%def>

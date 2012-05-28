@@ -67,7 +67,9 @@ class LBFluidSim(LBSim):
         args2 = [gpu_dist1b] + gpu_v + [gpu_rho]
 
         runner.exec_kernel('SetInitialConditions', args1, 'P'*len(args1))
-        runner.exec_kernel('SetInitialConditions', args2, 'P'*len(args2))
+
+        if self.config.access_pattern == 'AB':
+            runner.exec_kernel('SetInitialConditions', args2, 'P'*len(args2))
 
     def get_compute_kernels(self, runner, full_output, bulk):
         """
@@ -109,12 +111,19 @@ class LBFluidSim(LBSim):
             signature += 'P'
 
         kernels = []
+
         kernels.append(runner.get_kernel(
                 'CollideAndPropagate', args1, signature,
-                needs_iteration=self.config.time_dependence))
-        kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args2, signature,
-                needs_iteration=self.config.time_dependence))
+                needs_iteration=self.config.needs_iteration_num))
+
+        if self.config.access_pattern == 'AB':
+            secondary_args = args2 if self.config.access_pattern == 'AB' else args1
+            kernels.append(runner.get_kernel(
+                    'CollideAndPropagate', secondary_args, signature,
+                    needs_iteration=self.config.needs_iteration_num))
+        else:
+            kernels.append(kernels[-1])
+
         return kernels
 
     def get_pbc_kernels(self, runner):
@@ -131,9 +140,15 @@ class LBFluidSim(LBSim):
             kernels[0][i] = [runner.get_kernel(
                 'ApplyPeriodicBoundaryConditions', [gpu_dist1a, np.uint32(i)],
                 'Pi')]
+
+        if self.config.access_pattern == 'AB':
+            gpu_dist = gpu_dist1b
+        else:
+            gpu_dist = gpu_dist1a
+
         for i in range(0, 3):
             kernels[1][i] = [runner.get_kernel(
-                'ApplyPeriodicBoundaryConditions', [gpu_dist1b, np.uint32(i)],
+                'ApplyPeriodicBoundaryConditions', [gpu_dist, np.uint32(i)],
                 'Pi')]
 
         return kernels
@@ -278,10 +293,10 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
         macro_kernels = [
             runner.get_kernel('PrepareMacroFields', macro_args1,
                 signature,
-                needs_iteration=self.config.time_dependence),
+                needs_iteration=self.config.needs_iteration_num),
             runner.get_kernel('PrepareMacroFields', macro_args2,
                 signature,
-                needs_iteration=self.config.time_dependence)]
+                needs_iteration=self.config.needs_iteration_num)]
 
         sim_kernels = super(LBSingleFluidShanChen, self).get_compute_kernels(
                 runner, full_output, bulk)

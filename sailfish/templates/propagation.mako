@@ -125,9 +125,6 @@
 ## Same mass fractions directly to global memory without perfoming
 ## propagation.  This is used to implement the propagate-on-read
 ## scheme, which is 10-15% faster on pre-Fermi devices.
-##
-## This function is experimental and currently unused other than for
-## one-off tests.
 <%def name="propagate_inplace(dist_out, dist_in='fi')">
 	%for i, dname in enumerate(grid.idx_name):
 		${get_dist(dist_out, i, 'gi')} = ${dist_in}.${dname};
@@ -136,7 +133,7 @@
 
 ## Propagate distributions using a 1D shared memory array to make the propagation
 ## in the X direction more efficient.
-<%def name="propagate(dist_out, dist_in='fi')">
+<%def name="propagate_shared(dist_out, dist_in='fi')">
 	<%
 		first_prop_dist = grid.idx_name[sym.get_prop_dists(grid, 1)[0]]
 	%>
@@ -222,6 +219,21 @@
 	{
 		${prop_block_bnd(dist_out, dist_in, -1, 'prop_local')}
 	}
+
+</%def>
+
+<%def name="propagate(dist_out, dist_in='fi')">
+	%if access_pattern == 'AB':
+		${propagate_shared(dist_out, dist_in)}
+	%elif access_pattern == 'AA':
+		if (iteration_number & 1) {
+			${propagate_shared(dist_out, dist_in)}
+		} else {
+			${propagate_inplace(dist_out, dist_in)}
+		}
+	%else:
+		__UNSUPPORTED_PROPAGATTION_PATTERN_${access_pattern}__
+	%endif
 </%def>
 
 

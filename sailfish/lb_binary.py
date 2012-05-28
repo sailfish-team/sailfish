@@ -141,6 +141,7 @@ class LBBinaryFluidBase(LBSim):
             runner.get_kernel('CollideAndPropagate', args2,
                 args_signature,
                 needs_iteration=self.config.time_dependence)]
+
         return zip(macro_kernels, sim_kernels)
 
     def initial_conditions(self, runner):
