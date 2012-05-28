@@ -456,57 +456,61 @@ class BlockRunner(object):
         bns = self._boundary_size
         assert bns < bs
 
-        # Number of blocks to be handled by the boundary kernel.  This is also
-        # the grid size for boundary kernels.
         if self._block.dim == 2:
             arr_ny, arr_nx = self._physical_size
             lat_ny, lat_nx = self._lat_size
-
-            ew_conns = 0        # east-west
-            block = self._block
-
-            # Sometimes, due to misalignment, two blocks might be necessary to
-            # cover the right boundary.
-            padding = arr_nx - lat_nx
-            if block.has_face_conn(block.X_HIGH) or block.periodic_x:
-                if bs - padding < bns:
-                    ew_conns = 1    # 1 block on the left, 1 block on the right
-                else:
-                    ew_conns = 2    # 1 block on the left, 2 blocks on the right
-
-            if block.has_face_conn(block.X_LOW) or block.periodic_x:
-                ew_conns += 1
-
-            ns_conns = 0        # north-south
-            if block.has_face_conn(block.Y_LOW) or block.periodic_y:
-                ns_conns += 1
-            if block.has_face_conn(block.Y_HIGH) or block.periodic_y:
-                ns_conns += 1
-
-            self._boundary_blocks = (
-                    (bns * arr_nx / bs) * ns_conns +       # top & bottom
-                    (arr_ny - ns_conns * bns) * ew_conns)  # left & right (w/o top & bottom rows)
-            self._kernel_grid_bulk = [arr_nx - ew_conns * bs, arr_ny - ns_conns * bns]
-            self._kernel_grid_full = [arr_nx / bs, arr_ny]
         else:
             arr_nz, arr_ny, arr_nx = self._physical_size
             lat_nz, lat_ny, lat_nx = self._lat_size
 
-            # Sometimes, due to misalignment, two blocks might be necessary to
-            # cover the right boundary.
-            padding = arr_nx - lat_nx
+        padding = arr_nx - lat_nx
+        block = self._block
 
+        x_conns = 0
+        # Sometimes, due to misalignment, two blocks might be necessary to
+        # cover the right boundary.
+        if block.has_face_conn(block.X_HIGH) or block.periodic_x:
             if bs - padding < bns:
-                aux_main = 3    # 1 block on the left, 2 blocks on the right
+                x_conns = 1    # 1 block on the left, 1 block on the right
             else:
-                aux_main = 2    # 1 block on the left, 1 block on the right
+                x_conns = 2    # 1 block on the left, 2 blocks on the right
 
+        if block.has_face_conn(block.X_LOW) or block.periodic_x:
+            x_conns += 1
+
+        y_conns = 0        # north-south
+        if block.has_face_conn(block.Y_LOW) or block.periodic_y:
+            y_conns += 1
+        if block.has_face_conn(block.Y_HIGH) or block.periodic_y:
+            y_conns += 1
+
+        if self._block.dim == 3:
+            z_conns = 0        # top-bottom
+            if block.has_face_conn(block.Z_LOW) or block.periodic_z:
+                z_conns += 1
+            if block.has_face_conn(block.Z_HIGH) or block.periodic_z:
+                z_conns += 1
+
+        # Number of blocks to be handled by the boundary kernel.  This is also
+        # the grid size for boundary kernels.  Note that the number of X-connection
+        # blocks does not have the 'bns' factor to account for the thickness of
+        # the boundary layer, as the X connection is handled by whole compute
+        # device blocks which are assumed to be larger than the boundary layer
+        # (i.e. bs > bns).
+        if block.dim == 2:
             self._boundary_blocks = (
-                    arr_nx * arr_nz * bns / bs * 2 +                # N/S faces
-                    arr_nx * (arr_ny - 2 * bns) * bns / bs * 2 +    # T/B faces
-                    (arr_ny - 2 * bns) * (arr_nz - 2 * bns) * aux_main) # E/W faces
-            self._kernel_grid_bulk = [(arr_nx - 2 * bs) * (arr_ny - 2 * bns),
-                    arr_nz - 2 * bns]
+                    (bns * arr_nx / bs) * y_conns +      # top & bottom
+                    (arr_ny - y_conns * bns) * x_conns)  # left & right (w/o top & bottom rows)
+            self._kernel_grid_bulk = [arr_nx - x_conns * bs, arr_ny - y_conns * bns]
+            self._kernel_grid_full = [arr_nx / bs, arr_ny]
+        else:
+            self._boundary_blocks = (
+                    arr_nx * arr_ny * bns / bs * z_conns +                    # T/B faces
+                    arr_nx * (arr_nz - z_conns * bns) / bs * bns * y_conns +  # N/S faces
+                    (arr_ny - y_conns * bns) * (arr_nz - z_conns * bns) * x_conns)
+            self._kernel_grid_bulk = [
+                    (arr_nx - x_conns * bs) * (arr_ny - y_conns * bns),
+                    arr_nz - z_conns * bns]
             self._kernel_grid_full = [arr_nx * arr_ny / bs, arr_nz]
 
         if self._boundary_blocks >= 65536:

@@ -79,25 +79,39 @@
 ## the boundary.
 <%def name="local_indices_bulk()">
 	lx = get_local_id(0);	// ID inside the current block
+	<%
+		if block.has_face_conn(block.X_LOW) or block.periodic_x:
+			xoff = block_size
+		else:
+			xoff = 0
+
+		if block.has_face_conn(block.Y_LOW) or block.periodic_y:
+			yoff = boundary_size
+		else:
+			yoff = 0
+	%>
 	%if dim == 2:
-		<%
-			if block.has_face_conn(block.X_LOW) or block.periodic_x:
-				xoff = block_size
-			else:
-				xoff = 0
-
-			if block.has_face_conn(block.Y_LOW) or block.periodic_y:
-				yoff = boundary_size
-			else:
-				yoff = 0
-		%>
-
 		gx = ${xoff} + get_global_id(0);
 		gy = ${yoff} + get_group_id(1);
 	%else:
-		gx = ${block_size} + get_global_id(0) % ${arr_nx - 2 * block_size};
-		gy = ${boundary_size} + get_global_id(0) / ${arr_nx - 2 * block_size};
-		gz = ${boundary_size} + get_global_id(1);
+		<%
+			if block.has_face_conn(block.Z_LOW) or block.periodic_z:
+				zoff = boundary_size
+			else:
+				zoff = 0
+
+			if block.has_face_conn(block.X_HIGH) or block.periodic_x:
+				xconns = xoff + block_size
+				padding = arr_nx - lat_nx
+				if block_size - padding >= boundary_size:
+					xconns += block_size
+			else:
+				xconns = xoff
+		%>
+		## Also see how _kernel_grid_bulk is set in block_runnner.py
+		gx = ${xoff} + get_global_id(0) % ${arr_nx - xconns};
+		gy = ${yoff} + get_global_id(0) / ${arr_nx - xconns};
+		gz = ${zoff} + get_global_id(1);
 	%endif
 
 	gi = ${get_global_idx()};
@@ -112,25 +126,29 @@
 <%def name="local_indices_boundary()">
 	lx = get_local_id(0);	// ID inside the current block
 	int gid = get_group_id(0) + get_group_id(1) * get_global_size(0) / get_local_size(0);
+
+	<%
+		# Code common to 2D and 3D cases.
+		has_ylow = int(block.has_face_conn(block.Y_LOW) or block.periodic_y)
+		has_yhigh = int(block.has_face_conn(block.Y_HIGH) or block.periodic_y)
+		has_xlow = int(block.has_face_conn(block.X_LOW) or block.periodic_x)
+		has_xhigh = int(block.has_face_conn(block.X_HIGH) or block.periodic_x)
+		y_conns = has_ylow + has_yhigh
+		padding = arr_nx - lat_nx
+		bns = boundary_size
+
+		if bool(has_xhigh) and block_size - padding >= boundary_size:
+			aux_ew = 1	# 2 blocks on the right due to misalignment
+		else:
+			aux_ew = 0	# 1 block on the right
+	%>
 	%if dim == 2:
 		<%
-			has_ylow = int(block.has_face_conn(block.Y_LOW) or block.periodic_y)
-			has_yhigh = int(block.has_face_conn(block.Y_HIGH) or block.periodic_y)
-			has_xlow = int(block.has_face_conn(block.X_LOW) or block.periodic_x)
-			has_xhigh = int(block.has_face_conn(block.X_HIGH) or block.periodic_x)
-
-			ns_conns = has_ylow + has_yhigh
 			xblocks = arr_nx / block_size
-			yblocks = arr_ny - ns_conns * boundary_size
+			yblocks = arr_ny - y_conns * boundary_size
 
-			padding = arr_nx - lat_nx
-			if bool(has_xhigh) and block_size - padding >= boundary_size:
-				aux_ew = 1	# 2 blocks on the right due to misalignment
-			else:
-				aux_ew = 0	# 1 block on the right
-
-			bottom_idx = has_ylow * boundary_size * xblocks
-			left_idx = bottom_idx + has_yhigh * boundary_size * xblocks
+			bottom_idx = has_ylow * bns * xblocks
+			left_idx = bottom_idx + has_yhigh * bns * xblocks
 			right_idx = left_idx + has_xlow * yblocks
 			right2_idx = right_idx + has_xhigh * yblocks
 			max_idx = right2_idx + aux_ew * yblocks
@@ -170,59 +188,93 @@
 		}
 	%else:
 		<%
-			xblocks = arr_nx / block_size
-			yblocks = arr_ny - 2 * boundary_size
-			zblocks = arr_nz - 2 * boundary_size
-			ortho_blocks = yblocks * zblocks
+			has_zlow = int(block.has_face_conn(block.Z_LOW) or block.periodic_z)
+			has_zhigh = int(block.has_face_conn(block.Z_HIGH) or block.periodic_z)
+			z_conns = has_zlow + has_zhigh
 
-			bottom_idx = boundary_size * xblocks * arr_nz * 2
-			left_idx = bottom_idx + xblocks * yblocks * boundary_size * 2
-			right_idx = left_idx + ortho_blocks
-			right2_idx = right_idx + ortho_blocks
-			max_idx = right2_idx + ortho_blocks
+			xblocks = arr_nx / block_size
+			yblocks = arr_ny - y_conns * boundary_size
+			zblocks = arr_nz - z_conns * boundary_size
+			yz_blocks = yblocks * zblocks
+
+			x_face = yblocks * zblocks
+			y_face = xblocks * zblocks
+			z_face = xblocks * arr_ny
+
+			zlow_idx = has_zlow * z_face * bns
+			zhigh_idx = zlow_idx + has_zhigh * z_face * bns
+			ylow_idx = zhigh_idx + has_ylow * y_face * bns
+			yhigh_idx = ylow_idx + has_yhigh * y_face * bns
+			xlow_idx = yhigh_idx + has_xlow * x_face
+			xhigh_idx = xlow_idx + has_xhigh * x_face
+			max_idx = xhigh_idx  + aux_ew * x_face
 		%>
-		// N/S faces, Y-connection.  Face area is arr_nx * arr_nz.
-		if (gid < ${bottom_idx}) {
-			gx = (gid % ${xblocks}) * ${block_size} + lx;
-			gid = gid / ${xblocks};
-			gz = gid % ${arr_nz};
-			gid = gid / ${arr_nz};
-			if (gid < ${boundary_size}) {
-				gy = gid;
-			} else {
-				gy = ${arr_ny - boundary_size} + gid - ${boundary_size};
+		// x: ${xblocks}, y: ${yblocks}, z: ${zblocks}
+		if (0) {;}
+		%if block.has_face_conn(block.Z_LOW) or block.periodic_z:
+			// B face.  Face area is arr_nx * arr_ny.
+			else if (gid < ${zlow_idx}) {
+				gx = (gid % ${xblocks}) * ${block_size} + lx;
+				gid = gid / ${xblocks};
+				gy = gid % ${arr_ny};
+				gz = gid / ${arr_ny};
 			}
-		// B/T faces, Z-connection.  Face area is arr_nx * (arr_ny-2)
-		} else if (gid < ${left_idx}) {
-			gid -= ${bottom_idx};
-			gx = (gid % ${xblocks}) * ${block_size} + lx;
-			gid = gid / ${xblocks};
-			// The area within the boundary is handled in the first case
-			// above (N/S faces.
-			gy = ${boundary_size} + gid / ${2 * boundary_size};
-			gz = gid % ${2 * boundary_size};
-			if (gz >= ${boundary_size}) {
-				gz = ${arr_nz - boundary_size} + gz - ${boundary_size};
+		%endif
+		%if block.has_face_conn(block.Z_HIGH) or block.periodic_z:
+			// T face.  Face area is arr_nx * arr_ny.
+			else if (gid < ${zhigh_idx}) {
+				gid -= ${zlow_idx};
+				gx = (gid % ${xblocks}) * ${block_size} + lx;
+				gid = gid / ${xblocks};
+				gy = gid % ${arr_ny};
+				gz = ${arr_nz-1} - gid / ${arr_ny};
 			}
-		// E face
-		} else if (gid < ${right_idx}) {
-			gid -= ${left_idx};
-			gx = lx;
-			gy = ${boundary_size} + gid % ${yblocks};
-			gz = ${boundary_size} + gid / ${yblocks};
-		// W face (part 1)
-		} else if (gid < ${right2_idx}) {
-			gid -= ${right_idx};
-			gx = ${arr_nx - block_size} + lx;
-			gy = ${boundary_size} + gid % ${yblocks};
-			gz = ${boundary_size} + gid / ${yblocks};
-		// W face (part 2)
-		} else if (gid < ${max_idx}) {
-			gid -= ${right2_idx};
-			gx = ${arr_nx - 2*block_size} + lx;
-			gy = ${boundary_size} + gid % ${yblocks};
-			gz = ${boundary_size} + gid / ${yblocks};
-		} else {
+		%endif
+		%if block.has_face_conn(block.Y_LOW) or block.periodic_y:
+			// S face.
+			else if (gid < ${ylow_idx}) {
+				gid -= ${zhigh_idx};
+				gx = (gid % ${xblocks}) * ${block_size} + lx;
+				gid = gid / ${xblocks};
+				gz = gid % ${zblocks} + ${has_zlow * boundary_size};
+				gy = gid / ${zblocks};
+			}
+		%endif
+		%if block.has_face_conn(block.Y_HIGH) or block.periodic_y:
+			// N face.
+			else if (gid < ${yhigh_idx}) {
+				gid -= ${ylow_idx};
+				gx = (gid % ${xblocks}) * ${block_size} + lx;
+				gid = gid / ${xblocks};
+				gz = gid % ${zblocks} + ${has_zlow * boundary_size};
+				gy = ${arr_ny-1} - gid / ${zblocks};
+			}
+		%endif
+		%if block.has_face_conn(block.X_LOW) or block.periodic_x:
+			// W face.
+			else if (gid < ${xlow_idx}) {
+				gid -= ${yhigh_idx};
+				gx = lx;
+				gy = gid % ${yblocks} + ${has_ylow * boundary_size};
+				gz = gid / ${yblocks} + ${has_zlow * boundary_size};
+			}
+		%endif
+		%if block.has_face_conn(block.X_HIGH) or block.periodic_x:
+			// E face (part 1)
+			else if (gid < ${xhigh_idx}) {
+				gid -= ${xlow_idx};
+				gx = ${arr_nx - block_size} + lx;
+				gy = gid % ${yblocks} + ${has_ylow * boundary_size};
+				gz = gid / ${yblocks} + ${has_zlow * boundary_size};
+			// E face (part 2)
+			} else if (gid < ${max_idx}) {
+				gid -= ${xhigh_idx};
+				gx = ${arr_nx - 2*block_size} + lx;
+				gy = gid % ${yblocks} + ${has_ylow * boundary_size};
+				gz = gid / ${yblocks} + ${has_zlow * boundary_size};
+			}
+		%endif
+		else {
 			return;
 		}
 	%endif
