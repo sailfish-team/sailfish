@@ -164,23 +164,37 @@ class GeoEncoderConst(GeoEncoder):
         orientation = np.zeros_like(self._type_map)
         cnt = np.zeros_like(self._type_map)
 
-        dry_types = self._type_map.dtype.type(nt.get_dry_node_type_ids())
-        wet_types = self._type_map.dtype.type(nt.get_wet_node_type_ids())
+        # Limit dry and wet types to these that are actually used in the simulation.
+        uniq_types = set(np.unique(self._type_map.base))
+        dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
+        wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
 
-        for i, vec in enumerate(self.subdomain.grid.basis):
-            l = len(list(vec)) - 1
-            shifted_map = self._type_map
-            for j, shift in enumerate(vec):
-                shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
+        # Convert to a numpy array.
+        dry_types = self._type_map.dtype.type(dry_types)
+        dry_types = self._type_map.dtype.type(wet_types)
 
-            cnt[util.in_anyd(shifted_map, dry_types)] += 1
-            # FIXME: we're currently only processing the primary directions
-            # here
-            if vec.dot(vec) == 1:
-                idx = np.logical_and(
-                        util.in_anyd(self._type_map, dry_types),
-                        util.in_anyd(shifted_map, wet_types))
-                orientation[idx] = self.subdomain.grid.vec_to_dir(list(vec))
+        # Check if there are any node types that need the orientation vector.
+        needs_orientation = False
+        for nt_code in uniq_types:
+            if nt._NODE_TYPES[nt_code].needs_orientation:
+                needs_orientation = True
+                break
+
+        if needs_orientation:
+            for i, vec in enumerate(self.subdomain.grid.basis):
+                l = len(list(vec)) - 1
+                shifted_map = self._type_map
+                for j, shift in enumerate(vec):
+                    shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
+
+                cnt[util.in_anyd_fast(shifted_map, dry_types)] += 1
+                # FIXME: we're currently only processing the primary directions
+                # here
+                if vec.dot(vec) == 1:
+                    idx = np.logical_and(
+                            util.in_anyd_fast(self._type_map, dry_types),
+                            util.in_anyd_fast(shifted_map, wet_types))
+                    orientation[idx] = self.subdomain.grid.vec_to_dir(list(vec))
 
         # Remap type IDs.
         max_type_code = max(self._type_id_remap.keys())

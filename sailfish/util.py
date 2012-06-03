@@ -115,6 +115,21 @@ def in_anyd(arr1, arr2):
     return np.in1d(arr1, arr2).reshape(arr1.shape)
 
 
+def in_anyd_fast(arr1, values):
+    """Faster version of in_anyd.
+
+    :param arr1: array to check
+    :param values: an iterable of values to look for in arr1
+    """
+    if len(values) == 0:
+        return np.zeros(arr1.shape, dtype=np.bool)
+
+    ret = arr1 == values[0]
+    for v in values[1:]:
+        ret = np.logical_or(ret, arr1 == v)
+    return ret
+
+
 def is_number(param):
     return type(param) is float or type(param) is int or isinstance(param, np.number)
 

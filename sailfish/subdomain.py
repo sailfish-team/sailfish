@@ -709,21 +709,27 @@ class Subdomain(object):
         self._seen_types.add(node_type.id)
 
     def reset(self):
+        self.config.logger.debug('Setting subdomain geometry...')
         self._type_map_encoded = False
         mgrid = self._get_mgrid()
         self.boundary_conditions(*mgrid)
+        self.config.logger.debug('... boundary conditions done.')
 
         # Cache the unencoded type map for visualization.
         self._type_vis_map[:] = self._type_map[:]
 
         self._postprocess_nodes()
+        self.config.logger.debug('... postprocessing done.')
         self._define_ghosts()
+        self.config.logger.debug('... ghosts done.')
 
         # TODO: At this point, we should decide which GeoEncoder class to use.
         from sailfish import geo_encoder
         self._encoder = geo_encoder.GeoEncoderConst(self)
         self._encoder.prepare_encode(self._type_map.base,
                 self._param_map.base, self._params)
+
+        self.config.logger.debug('... encoder done.')
 
     def init_fields(self, sim):
         mgrid = self._get_mgrid()
@@ -770,7 +776,9 @@ class Subdomain2D(Subdomain):
         self._type_map.base[:, es + self.spec.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
-        dry_types = self._type_map.dtype.type(nt.get_dry_node_type_ids())
+        uniq_types = set(np.unique(self._type_map.base))
+        dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
+        dry_types = self._type_map.dtype.type(dry_types)
 
         # Find nodes which are walls themselves and are completely surrounded by
         # walls.  These nodes are marked as unused, as they do not contribute to
@@ -779,7 +787,7 @@ class Subdomain2D(Subdomain):
         for i, vec in enumerate(self.grid.basis):
             a = np.roll(self._type_map.base, int(-vec[0]), axis=1)
             a = np.roll(a, int(-vec[1]), axis=0)
-            cnt[util.in_anyd(a, dry_types)] += 1
+            cnt[util.in_anyd_fast(a, dry_types)] += 1
 
         self._type_map.base[(cnt == self.grid.Q)] = nt._NTUnused.id
 
@@ -809,7 +817,9 @@ class Subdomain3D(Subdomain):
         self._type_map.base[:, :, es + self.spec.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
-        dry_types = self._type_map.dtype.type(nt.get_dry_node_type_ids())
+        uniq_types = set(np.unique(self._type_map.base))
+        dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
+        dry_types = self._type_map.dtype.type(dry_types)
 
         # Find nodes which are walls themselves and are completely surrounded by
         # walls.  These nodes are marked as unused, as they do not contribute to
@@ -819,7 +829,7 @@ class Subdomain3D(Subdomain):
             a = np.roll(self._type_map.base, int(-vec[0]), axis=2)
             a = np.roll(a, int(-vec[1]), axis=1)
             a = np.roll(a, int(-vec[2]), axis=0)
-            cnt[util.in_anyd(a, dry_types)] += 1
+            cnt[util.in_anyd_fast(a, dry_types)] += 1
 
         self._type_map.base[(cnt == self.grid.Q)] = nt._NTUnused.id
 

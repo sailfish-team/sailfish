@@ -2,6 +2,7 @@ import os
 import random
 import unittest
 import tempfile
+import numpy as np
 from sailfish import config, util
 
 class TestPbsUtils(unittest.TestCase):
@@ -37,6 +38,13 @@ class TestMiscUtils(unittest.TestCase):
         self.assertEqual(l4, [2, 1])
         l5 = list(util.reverse_pairs(ls, 2))
         self.assertEqual(l5, [1, 2])
+
+    def test_inanyd_fast(self):
+        a = np.random.random_integers(0, 20, (128, 128))
+        b = np.uint32([1, 4, 6, 10, 19])
+
+        np.testing.assert_array_equal(
+                util.in_anyd(a, b), util.in_anyd_fast(a, b))
 
 
 if __name__ == '__main__':

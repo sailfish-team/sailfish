@@ -23,6 +23,10 @@ class LBNodeType(object):
     # are known.
     standard_macro = False
 
+    # If True, the node needs a basic orientation vector (only primary
+    # directions are currently supported).
+    needs_orientation = False
+
     def __init__(self, **params):
         self.params = params
 
