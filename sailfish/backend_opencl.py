@@ -46,6 +46,10 @@ class OpenCLBackend(object):
         self.arrays = {}
         self._iteration_kernels = []
 
+    @property
+    def info(self):
+        return ''
+
     def set_iteration(self, it):
         self._iteration = it
         for kernel in self._iteration_kernels:

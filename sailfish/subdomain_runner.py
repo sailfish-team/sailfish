@@ -1202,6 +1202,7 @@ class BlockRunner(object):
 
     def run(self):
         self.config.logger.info("Initializing block.")
+        self.config.logger.debug(self.backend.info)
 
         self._init_geometry()
         self._sim.init_fields(self)

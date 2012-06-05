@@ -90,6 +90,12 @@ class CUDABackend(object):
         self._iteration_kernels = []
 
     @property
+    def info(self):
+        return '{0} / CC {1} / MEM {2}'.format(
+                self._device.name(), self._device.compute_capability(),
+                self.total_memory)
+
+    @property
     def total_memory(self):
         return self._device.total_memory()
 
