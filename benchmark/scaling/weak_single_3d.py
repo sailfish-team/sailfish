@@ -10,7 +10,7 @@ from benchmark.scaling import util
 def run_benchmark(num_blocks):
     # Lattice size is optimized for Tesla C2050.
     settings = {
-        'max_iters': 1000,
+        'max_iters': 5000,
         'every': 500,
         'quiet': True,
         'block_size': 128,

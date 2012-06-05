@@ -159,7 +159,7 @@ class TimeProfile(object):
                 recv=self._timings[self.RECV_DISTS] / mi,
                 send=self._timings[self.SEND_DISTS] / mi,
                 total=self._timings[self.STEP] / mi,
-                block_id=self._runner._block.id)
+                subdomain_id=self._runner._block.id)
 
 
         min_ti = util.TimingInfo(
@@ -171,7 +171,7 @@ class TimeProfile(object):
                 recv=self._min_timings[self.RECV_DISTS],
                 send=self._min_timings[self.SEND_DISTS],
                 total=self._min_timings[self.STEP],
-                block_id=self._runner._block.id)
+                subdomain_id=self._runner._block.id)
 
         max_ti = util.TimingInfo(
                 comp=(self._max_timings[self.BULK] + self._max_timings[self.BOUNDARY]),
@@ -182,7 +182,7 @@ class TimeProfile(object):
                 recv=self._max_timings[self.RECV_DISTS],
                 send=self._max_timings[self.SEND_DISTS],
                 total=self._max_timings[self.STEP],
-                block_id=self._runner._block.id)
+                subdomain_id=self._runner._block.id)
 
         self._runner.send_summary_info(ti, min_ti, max_ti)
 

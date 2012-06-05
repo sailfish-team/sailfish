@@ -268,7 +268,7 @@ class LBSimulationController(object):
 
         group = self._config_parser.add_group('Runtime mode settings')
         group.add_argument('--mode', help='runtime mode', type=str,
-            choices=['batch', 'visualization', 'benchmark']),
+            choices=['batch', 'visualization', 'benchmark'], default='batch'),
         group.add_argument('--every',
             help='save/visualize simulation results every N iterations ',
             metavar='N', type=int, default=100)
@@ -446,8 +446,10 @@ class LBSimulationController(object):
         def _start_socketserver(addr, port):
             return subprocess.Popen(['pbsdsh', '-h',
                 addr, 'sh', '-c',
-                ". %s ; python sailfish/socketserver.py :%s %s" %
-                (self.config.cluster_pbs_initscript, port, id_string)])
+                ". %s ; python %s/socketserver.py :%s %s" %
+                (self.config.cluster_pbs_initscript,
+                    os.path.realpath(os.path.dirname(util.__file__)),
+                    port, id_string)])
 
         for node in cluster.nodes:
             port = node.get_port()
@@ -513,8 +515,8 @@ class LBSimulationController(object):
 
         if self.config.cluster_spec or self._is_pbs_cluster():
             if self.config.mode == 'benchmark':
-                for ch, subdomains in zip(self._cluster_channels, self._node_subdomains):
-                    for sub in subdomains:
+                for ch, node_subdomains in zip(self._cluster_channels, self._node_subdomains):
+                    for sub in node_subdomains:
                         ti, min_ti, max_ti = ch.receive()
                         timing_infos.append(util.TimingInfo(*ti))
                         min_timings.append(util.TimingInfo(*min_ti))
@@ -553,7 +555,7 @@ class LBSimulationController(object):
             if not self.config.quiet:
                 print ('Total MLUPS: eff:{0:.2f}  comp:{1:.2f}'.format(
                         mlups_total, mlups_comp))
-            return timing_infos, min_timings, max_timings, blocks
+            return timing_infos, min_timings, max_timings, subdomains
 
         return None, None
 

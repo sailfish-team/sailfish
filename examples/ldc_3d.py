@@ -11,9 +11,9 @@ from sailfish.lb_single import LBFluidSim
 class LDCGeometry(LBGeometry3D):
     def subdomains(self, n=None):
         subdomains = []
-        bps = int(self.config.subdomains**(1.0/3))
+        bps = int(self.config.ldc_subdomains**(1.0/3))
 
-        if bps**3 != self.config.subdomains:
+        if bps**3 != self.config.ldc_subdomains:
             print ('Only configurations with '
                     'a third power of an integer number of subdomains are '
                     'supported.  Falling back to {0} x {0} subdomains.'.
@@ -82,7 +82,7 @@ class LDCSim(LBFluidSim):
     def add_options(cls, group, dim):
         LBFluidSim.add_options(group, dim)
 
-        group.add_argument('--subdomains', type=int, default=1, help='number of blocks to use')
+        group.add_argument('--ldc_subdomains', type=int, default=1, help='number of subdomains to use')
 
 
 if __name__ == '__main__':

@@ -20,7 +20,7 @@ def save_result(filename_base, num_blocks, timing_infos, min_timings,
     mlups_comp = 0
 
     for ti in timing_infos:
-        block = subdomains[ti.block_id]
+        block = subdomains[ti.subdomain_id]
         mlups_total += block.num_nodes / ti.total * 1e-6
         mlups_comp  += block.num_nodes / ti.comp * 1e-6
 

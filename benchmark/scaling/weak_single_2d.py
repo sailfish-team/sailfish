@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """Weak scaling with 2D single phase fluid."""
 
-from examples.lbc_2d import LDCSim
+from examples.ldc_2d import LDCSim
 from sailfish.controller import LBSimulationController
 from sailfish.geo import EqualSubdomainsGeometry2D
-
+from benchmark.scaling import util
 
 def run_benchmark(num_blocks):
     # Lattice size is optimized for Tesla C2050.
@@ -26,4 +26,4 @@ def run_benchmark(num_blocks):
 
 if __name__ == '__main__':
     args = util.process_cmdline()
-    run_benchmark()
+    run_benchmark(args.num_blocks)
