@@ -13,7 +13,7 @@ using namespace cvmlcpp;
 using namespace std;
 
 // Outputs VTK 3.0 UNSTRUCTURED_GRID.
-void outputVTK(Matrix<char, 3u> &voxels, const char* filename, float length)
+void outputVTK(Matrix<char, 3u> &voxels, const char* filename)
 {
 	std::ofstream output(filename);
 	int N = count_if(voxels.begin(), voxels.end(), bind2nd(equal_to<int>(),1));
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
 	Matrix<char, 3u> voxels;
 	Geometry<float> geometry;
 
-	double voxel_size = 1.0 / 200.0;;
+	double voxel_size = 1.0 / 200.0;
 
 	if (argc < 2) {
 		cerr << "Usage: ./voxelizer <STL file> [voxel_size]" << endl;
@@ -101,7 +101,7 @@ int main(int argc, char **argv)
 	out.close();
 
 	// Export a VTK file with the voxelized geometry.
-	outputVTK(voxels, "output.vtk", resolution);
+	outputVTK(voxels, "output.vtk");
 
 	return 0;
 }
