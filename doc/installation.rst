@@ -77,14 +77,8 @@ To install the required packages on an Ubuntu system::
 
   apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-scipy python-sympy python-zmq python-execnet
   apt-get install python-mako python-decorator python-pytools build-essential python-dev python-setuptools libboost-dev libboost-python-dev libboost-thread-dev
-  apt-get install git-core
-  git clone http://git.tiker.net/trees/pycuda.git
-  cd pycuda
-  git submodule init
-  git submodule update
-  ./configure.py --cuda-root=/usr/local/cuda --cudadrv-lib-dir=/usr/local/cuda/lib64 --boost-inc-dir=/usr/include --boost-lib-dir=/usr/lib --boost-python-libname=boost_python-mt --boost-thread-libname=boost_thread-mt
-  make -j4
-  python setup.py install
+  apt-get install python-pip git-core
+  sudo pip install pycuda
 
 For 32-bit systems please change ``/usr/local/cuda/lib64`` to ``/usr/local/cuda/lib``.
 
