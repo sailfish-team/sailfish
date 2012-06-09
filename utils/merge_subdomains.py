@@ -79,8 +79,9 @@ if __name__ == '__main__':
     digits = len(it)
 
     if args.all:
-        for fn in glob.glob('.'.join([base, sub_id, ('[0-9]' * digits)])):
+        for fn in glob.glob('.'.join([base, sub_id, ('[0-9]' * digits), 'npz'])):
             _, _, it, _ = fn.rsplit('.', 3)
+            print 'Processing {0}'.format(it)
             merge_subdomains(base, digits, int(it))
     else:
         merge_subdomains(base, digits, int(it))
