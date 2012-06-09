@@ -78,7 +78,7 @@ To install the required packages on an Ubuntu system::
   apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-scipy python-sympy python-zmq python-execnet
   apt-get install python-mako python-decorator python-pytools build-essential python-dev python-setuptools libboost-dev libboost-python-dev libboost-thread-dev
   apt-get install python-pip git-core
-  sudo pip install pycuda
+  sudo PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH pip install pycuda
 
 For 32-bit systems please change ``/usr/local/cuda/lib64`` to ``/usr/local/cuda/lib``.
 
