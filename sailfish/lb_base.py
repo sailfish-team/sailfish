@@ -95,6 +95,10 @@ class LBSim(object):
         self.S = sym.S()
         self.iteration = 0
 
+    def need_output(self):
+        return ((self.iteration + 1) % self.config.every) == 0 and self.config.from_ <= (self.iteration)
+
+
     # TODO(michalj): Restore support for iter hooks.
     # TODO(michalj): Restore support for defining visualization fields.
     # TODO(michalj): Restore support for tracer particles.

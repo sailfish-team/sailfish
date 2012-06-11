@@ -1247,12 +1247,13 @@ class BlockRunner(object):
             return True
 
         return False
+    
 
     def main(self):
         self._profile.record_start()
         while True:
             self._profile.start_step()
-            output_req = ((self._sim.iteration + 1) % self.config.every) == 0 and self.config.from_ <= (self._sim.iteration)
+            output_req = self._sim.need_output()
 
             if output_req and self.config.debug_dump_dists:
                 dbuf = self._debug_get_dist(self)
