@@ -272,6 +272,9 @@ class LBSimulationController(object):
         group.add_argument('--every',
             help='save/visualize simulation results every N iterations ',
             metavar='N', type=int, default=100)
+        group.add_argument('--from', dest='from_',
+            help='save/visualize simulation results from N iterations ', metavar='N',
+            type=int, default=0)
         group.add_argument('--max_iters',
             help='number of iterations to run; use 0 to run indefinitely',
             type=int, default=0)
