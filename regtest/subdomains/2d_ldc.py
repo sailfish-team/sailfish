@@ -24,7 +24,7 @@ class SimulationTest(LDCSim):
         global block_size, blocks, output
         LDCSim.update_defaults(defaults)
         defaults['block_size'] = block_size
-        defaults['subdomains'] = blocks
+        defaults['ldc_subdomains'] = blocks
         defaults['max_iters'] = MAX_ITERS
         defaults['quiet'] = True
         defaults['output'] = output
