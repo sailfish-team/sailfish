@@ -1,4 +1,5 @@
 <%page args="bgk_args_decl"/>
+<%namespace file="code_common.mako" import="cex"/>
 
 <%def name="kernel_args_1st_moment(name)">
 	${global_ptr} float *${name}x,
@@ -346,7 +347,7 @@ extern int printf (__const char *__restrict __format, ...);
 	// Additional geometry parameters (velocities, pressures, etc)
 	${const_var} float node_params[${len(node_params)}] = {
 	%for param in node_params:
-		${param}f,
+		${cex(param)},
 	%endfor
 	};
 %else:
