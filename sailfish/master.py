@@ -268,7 +268,7 @@ class LBMachineMaster(object):
             runner_ports = socket.recv_pyobj()
             ports.update(runner_ports)
 
-        # Only process rmeote port information if we have a channel open
+        # Only process remote port information if we have a channel open
         # back to the controller.
         if self._channel is not None:
             self._channel.send(ports)
@@ -332,3 +332,5 @@ class LBMachineMaster(object):
 
         for ipcfile in ipc_files:
             os.unlink(ipcfile)
+
+        return self._quit_event.is_set()

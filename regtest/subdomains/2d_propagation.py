@@ -82,6 +82,8 @@ class SimulationTest(LBFluidSim):
             'output': os.path.join(tmpdir, 'test_out'),
             'debug_dump_dists': True,
             'cuda_cache': False,
+            'check_invalid_results_gpu': False,
+            'check_invalid_results_host': False,
         })
 
     def initial_conditions(self, runner):
@@ -462,6 +464,8 @@ class ThreeBlocksSimulationTest(LBFluidSim):
             'output': os.path.join(tmpdir, 'test_out'),
             'debug_dump_dists': True,
             'cuda_cache': False,
+            'check_invalid_results_gpu': False,
+            'check_invalid_results_host': False,
         })
 
     def initial_conditions(self, runner):

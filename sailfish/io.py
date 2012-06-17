@@ -42,6 +42,12 @@ class LBOutput(object):
     def dump_dists(self, i):
         pass
 
+    def verify(self):
+        return (all((np.all(np.isfinite(f)) for f in
+                    self._scalar_fields.itervalues()))
+                and all(np.all(np.isfinite(f)) for f in
+                    self._vector_fields.itervalues()))
+
 
 class VisualizationWrapper(LBOutput):
     """Passes data to a visualization engine, and handles saving it to a

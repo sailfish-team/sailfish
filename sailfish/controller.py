@@ -63,13 +63,14 @@ def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
         master = LBMachineMaster(*pickle.loads(args), lb_class=lb_class,
                 subdomain_addr_map=subdomain_addr_map, channel=channel,
                 iface=iface)
-        master.run()
+        early_termination = master.run()
     except Exception:
-        # Send any exceptions by to the controller to aid
+        # Send any exceptions to the controller to aid
         # debugging.
         channel.send(traceback.format_exc())
 
-    channel.send('FIN')
+    if not early_termination:
+        channel.send('FIN')
 
 
 # TODO: This is currently a very dumb procedure.  Ideally, we would
@@ -324,6 +325,14 @@ class LBSimulationController(object):
         group.add_argument('--cluster_pbs_interface', type=str,
                 default='', help='Network interface to use on PBS nodes for '
                 'internode communication.')
+        group.add_argument('--check_invalid_results_host', type=bool,
+                default=True, help='If True, will terminate the simulation if '
+                'the results obtained on the host contain invalid values '
+                '(inf, nan).')
+        group.add_argument('--check_invalid_results_gpu', type=bool,
+                default=True, help='If True, will terminate the simulation '
+                'when invalid values (inf, nan) are detected in the domain '
+                'during the simulation.')
 
         group = self._config_parser.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)
@@ -520,6 +529,33 @@ class LBSimulationController(object):
         else:
             self._start_local_simulation(subdomains)
 
+    def _wait_for_masters(self):
+        done = set()
+        while len(done) != len(self._cluster_channels):
+            for i, ch in enumerate(self._cluster_channels):
+                if i in done:
+                    continue
+
+                try:
+                    data = ch.receive(timeout=1)
+                except execnet.TimeoutError:
+                    continue
+                except Exception as err:
+                    sys.stderr.write('Terminating simulation (%s) %s\n' % (
+                        err.__class__, str(err)))
+                    sys.stderr.flush()
+                    execnet.default_group.terminate(timeout=5)
+                    return
+
+                if data != 'FIN':
+                    sys.stderr.write('Terminating simulation ("%s" received).\n' %
+                            data)
+                    sys.stderr.flush()
+                    execnet.default_group.terminate(timeout=5)
+                    return
+                else:
+                    done.add(i)
+
     def _finish_simulation(self, subdomains, summary_receiver):
         timing_infos = []
         min_timings = []
@@ -534,9 +570,8 @@ class LBSimulationController(object):
                         min_timings.append(util.TimingInfo(*min_ti))
                         max_timings.append(util.TimingInfo(*max_ti))
 
-            for ch in self._cluster_channels:
-                data = ch.receive()
-                assert data == 'FIN'
+            self._wait_for_masters()
+
             for gw in self._cluster_gateways:
                 gw.exit()
 

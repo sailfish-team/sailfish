@@ -86,6 +86,8 @@ class SimulationTest(LBFluidSim):
             'output': os.path.join(tmpdir, 'test_out'),
             'debug_dump_dists': True,
             'cuda_cache': False,
+            'check_invalid_results_gpu': False,
+            'check_invalid_results_host': False,
         })
 
     # Permutation functions.
@@ -218,6 +220,8 @@ class PeriodicSimulationTest(LBFluidSim):
             'output': os.path.join(tmpdir, 'per_horiz_out'),
             'debug_dump_dists': True,
             'cuda_cache': False,
+            'check_invalid_results_gpu': False,
+            'check_invalid_results_host': False,
         })
 
     def initial_conditions(self, runner):
@@ -351,6 +355,8 @@ class SingleBlockPeriodicSimulationTest(LBFluidSim):
             'output': os.path.join(tmpdir, 'per_single_out'),
             'debug_dump_dists': True,
             'cuda_cache': False,
+            'check_invalid_results_gpu': False,
+            'check_invalid_results_host': False,
         })
 
     def initial_conditions(self, runner):

@@ -376,6 +376,7 @@ class SubdomainRunner(object):
         ctx['sim'] = self._sim
         ctx['block'] = self._block
         ctx['time_dependence'] = self.config.time_dependence
+        ctx['check_invalid_values'] = self.config.check_invalid_results_gpu
 
         arr_nx = self._physical_size[-1]
         arr_ny = self._physical_size[-2]
@@ -1276,6 +1277,13 @@ class SubdomainRunner(object):
             self._data_stream.synchronize()
             self._calc_stream.synchronize()
             if output_req and self.config.output_required:
+                if self.config.check_invalid_results_host:
+                    if not self._output.verify():
+                        self.config.logger.error("Invalid value detected in "
+                                "output for iteration {0}".format(
+                                self._sim.iteration))
+                        self._quit_event.set()
+                        break
                 self._output.save(self._sim.iteration)
             self._profile.end_step()
 
