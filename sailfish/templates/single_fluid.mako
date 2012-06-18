@@ -76,6 +76,7 @@ ${kernel} void PrepareMacroFields(
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *orho,
 	int options
+	${scratch_space_if_required()}
 	${iteration_number_if_required()})
 {
 	${local_indices_split()}
@@ -104,7 +105,9 @@ ${kernel} void CollideAndPropagate(
 	${global_ptr} float *gg0m0,
 	${kernel_args_1st_moment('ov')}
 	int options
-	${iteration_number_if_required()})
+	${scratch_space_if_required()}
+	${iteration_number_if_required()}
+	)
 {
 	${local_indices_split()}
 

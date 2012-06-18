@@ -109,12 +109,19 @@ class LBFluidSim(LBSim):
         args1.append(np.uint32(options))
         args2.append(np.uint32(options))
 
+        signature = 'P' * (len(args1) - 1) + 'i'
+
+        if runner.gpu_scratch_space is not None:
+            args1.append(runner.gpu_scratch_space)
+            args2.append(runner.gpu_scratch_space)
+            signature += 'P'
+
         kernels = []
         kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args1, 'P'*(len(args1)-1) + 'i',
+                'CollideAndPropagate', args1, signature,
                 needs_iteration=self.config.time_dependence))
         kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args2, 'P'*(len(args2)-1) + 'i',
+                'CollideAndPropagate', args2, signature,
                 needs_iteration=self.config.time_dependence))
         return kernels
 
@@ -251,12 +258,19 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
         macro_args1 = [gpu_map, gpu_dist1a, gpu_rho, options]
         macro_args2 = [gpu_map, gpu_dist1b, gpu_rho, options]
 
+        signature = 'P' * (len(macro_args1) - 1) + 'i',
+
+        if runner.gpu_scratch_space is not None:
+            macro_args1.append(runner.gpu_scratch_space)
+            macro_args2.append(runner.gpu_scratch_space)
+            signature += 'P'
+
         macro_kernels = [
             runner.get_kernel('PrepareMacroFields', macro_args1,
-                'P' * (len(macro_args1) - 1) + 'i',
+                signature,
                 needs_iteration=self.config.time_dependence),
             runner.get_kernel('PrepareMacroFields', macro_args2,
-                'P' * (len(macro_args2) - 1) + 'i',
+                signature,
                 needs_iteration=self.config.time_dependence)]
 
         sim_kernels = super(LBSingleFluidShanChen, self).get_compute_kernels(

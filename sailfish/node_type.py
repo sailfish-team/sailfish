@@ -5,6 +5,9 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 import numpy as np
+from collections import namedtuple
+
+ScratchSize = namedtuple('ScratchSize', ('dim2', 'dim3'))
 
 
 # Node type classes.  Use this to define boundary conditions.
@@ -27,8 +30,27 @@ class LBNodeType(object):
     # directions are currently supported).
     needs_orientation = False
 
+    # Number of floating point values that the node needs to keep as additional
+    # information in global memory. This can be an int or an instance of
+    # ScratchSize.
+    scratch_space = 0
+
     def __init__(self, **params):
         self.params = params
+
+    @classmethod
+    def scratch_space_size(cls, dim):
+        """Returns the required size (# of floats) of the scratch space.
+
+        :param dim: dimensionality of the simulation (2 or 3)
+        """
+        if type(cls.scratch_space) is int:
+            return cls.scratch_space
+        else:
+            if dim == 2:
+                return cls.scratch_space.dim2
+            else:
+                return cls.scratch_space.dim3
 
 
 class _NTFluid(LBNodeType):
@@ -98,6 +120,12 @@ class NTGuoDensity(LBNodeType):
 
     def __init__(self, density):
         self.params = {'density': density}
+
+class NTGrad(LBNodeType):
+    """Outflow node using Grad's approximation."""
+    wet_node = True
+    standard_macro = True
+    scratch_space = ScratchSize(dim2=3, dim3=6)
 
 
 def __init_node_type_list():

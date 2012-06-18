@@ -15,6 +15,12 @@
 	%endif
 </%def>
 
+<%def name="scratch_space_if_required()">
+	%if scratch_space:
+		, float* node_scratch_space
+	%endif
+</%def>
+
 ## Convenience function to call getGlobalIdx without an explicit conditional
 ## clause in the template code.
 <%def name="get_global_idx(x='gx', y='gy', z='gz')" filter="trim">

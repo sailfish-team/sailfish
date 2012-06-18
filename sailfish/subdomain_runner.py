@@ -816,6 +816,12 @@ class BlockRunner(object):
         self._gpu_geo_map = self.backend.alloc_buf(
                 like=self._subdomain.encoded_map())
 
+        if self._subdomain.scratch_space_size > 0:
+            self.gpu_scratch_space = self.backend.alloc_buf(
+                    size=self._subdomain.scratch_space_size * self.float().nbytes)
+        else:
+            self.gpu_scratch_space = None
+
     def gpu_field(self, field):
         """Returns the GPU copy of a field."""
         return self._gpu_field_map[id(field)]

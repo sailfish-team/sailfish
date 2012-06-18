@@ -30,6 +30,10 @@ class GeoEncoder(object):
         self._type_id_remap = {0: 0}  # fluid nodes are not remapped
         self.subdomain = subdomain
 
+    @property
+    def dim(self):
+        return self.subdomain.dim
+
     def encode(self):
         raise NotImplementedError("encode() should be implemented in a subclass")
 
@@ -59,10 +63,12 @@ class GeoEncoderConst(GeoEncoder):
         self._node_types = set([nt._NTFluid])
         self._bits_type = 0
         self._bits_param = 0
+        self._bits_scratch = 0
         self._type_map = None
         self._param_map = None
         self._geo_params = []
         self.config = subdomain.spec.runner.config
+        self.scratch_space_size = 0
 
     def prepare_encode(self, type_map, param_map, param_dict):
         """
@@ -83,6 +89,7 @@ class GeoEncoderConst(GeoEncoder):
         self._param_map = param_map
         self._param_dict = param_dict
         self._encoded_param_map = np.zeros_like(self._type_map)
+        self._scratch_map = np.zeros_like(self._type_map)
 
         param_to_idx = dict()  # Maps entries in seen_params to ids.
         seen_params = set()
@@ -157,6 +164,35 @@ class GeoEncoderConst(GeoEncoder):
 
         self._bits_param = bit_len(param_items)
 
+        # Maps node type ID to base offset within the scratch space array.
+        self._scratch_space_base = {}
+        type_to_node_count = {}
+        # Generate unique (within node type) scratch space ids.
+        for node_type in self._node_types:
+            if node_type.scratch_space_size(self.dim) <= 0:
+                continue
+
+            def _selector(idx_list):
+                return [slice(i, i+1) for i in idx_list]
+
+            idx = np.argwhere(self._type_map == node_type.id)
+            num_nodes = idx.shape[0]
+            type_to_node_count[node_type.id] = num_nodes
+
+            for i in xrange(num_nodes):
+               self._scratch_map[_selector(idx[i,:])] = i
+
+            self._scratch_space_base[node_type.id] = self.scratch_space_size
+
+            # Accumulate size requirements of specific types into a global
+            # size value for the whole scratch buffer.
+            self.scratch_space_size += num_nodes * node_type.scratch_space_size(self.dim)
+
+        if type_to_node_count:
+            self._bits_scratch = bit_len(max(type_to_node_count.itervalues()))
+        else:
+            self._bits_scratch = 0
+
 
     def encode(self):
         assert self._type_map is not None
@@ -204,7 +240,8 @@ class GeoEncoderConst(GeoEncoder):
 
         self._type_map[:] = self._encode_node(orientation,
                 self._encoded_param_map,
-                np.choose(np.int32(self._type_map), type_choice_map))
+                np.choose(np.int32(self._type_map), type_choice_map),
+                self._scratch_map)
 
         # Drop the reference to the map array.
         self._type_map = None
@@ -229,21 +266,30 @@ class GeoEncoderConst(GeoEncoder):
             'nt_misc_shift': self._bits_type,
             'nt_type_mask': (1 << self._bits_type) - 1,
             'nt_param_shift': self._bits_param,
+            'nt_scratch_shift': self._bits_scratch,
             'nt_dir_other': 0,  # used to indicate non-primary direction
                                 # in orientation processing code
             'node_params': self._geo_params,
             'symbol_idx_map': self._symbol_map,
             'non_symbolic_idxs': self._non_symbolic_idxs,
+            'scratch_space': self.scratch_space_size > 0,
+            'scratch_space_base': self._scratch_space_base,
         })
 
-    def _encode_node(self, orientation, param, node_type):
+    def _encode_node(self, orientation, param, node_type, scratch_id=0):
         """Encodes information for a single node into a uint32.
 
         The node code consists of the following bit fields:
-          orientation | param_index | node_type
+          orientation | scratch_index | param_index | node_type
+
+                                                    ^_______ nt_misc_shift
+                                      ^____ nt_param_shift + nt_misc_shift
+                      ^_ nt_scratch_shift + nt_param_shift + nt_misc_shift
+
         """
-        misc_data = (orientation << self._bits_param) | param
-        return node_type | (misc_data << self._bits_type)
+        misc_data = (orientation << self._bits_scratch) | scratch_id
+        misc_data = (misc_data << self._bits_param) | param
+        return (misc_data << self._bits_type) | node_type
 
 
 # TODO: Implement this class.

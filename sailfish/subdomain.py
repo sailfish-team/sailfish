@@ -731,6 +731,11 @@ class Subdomain(object):
 
         self.config.logger.debug('... encoder done.')
 
+    @property
+    def scratch_space_size(self):
+        """Node scratch space size expressed in number of floating point values."""
+        return self._encoder.scratch_space_size if self._encoder is not None else 0
+
     def init_fields(self, sim):
         mgrid = self._get_mgrid()
         self.initial_conditions(sim, *mgrid)

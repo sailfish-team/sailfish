@@ -128,20 +128,32 @@ class LBBinaryFluidBase(LBSim):
         macro_args2 = [gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi,
                 options]
 
+        args_signature = 'P' * (len(args1) - 1) + 'i',
+        macro_signature = 'P' * (len(macro_args1) - 1) + 'i',
+
+        if runner.gpu_scratch_space is not None:
+            macro_args1.append(runner.gpu_scratch_space)
+            macro_args2.append(runner.gpu_scratch_space)
+            macro_signature += 'P'
+
+            args1.append(runner.gpu_scratch_space)
+            args2.append(runner.gpu_scratch_space)
+            args_signature += 'P'
+
         macro_kernels = [
             runner.get_kernel('PrepareMacroFields', macro_args1,
-                'P' * (len(macro_args1) - 1) + 'i',
+                macro_signature,
                 needs_iteration=self.config.time_dependence),
             runner.get_kernel('PrepareMacroFields', macro_args2,
-                'P' * (len(macro_args2) - 1) + 'i',
+                macro_signature,
                 needs_iteration=self.config.time_dependence)]
 
         sim_kernels = [
             runner.get_kernel('CollideAndPropagate', args1,
-                'P' * (len(args1) - 1) + 'i',
+                args_signature,
                 needs_iteration=self.config.time_dependence),
             runner.get_kernel('CollideAndPropagate', args2,
-                'P' * (len(args2) - 1) + 'i',
+                args_signature,
                 needs_iteration=self.config.time_dependence)]
         return zip(macro_kernels, sim_kernels)
 
