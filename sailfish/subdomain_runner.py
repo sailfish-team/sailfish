@@ -1274,6 +1274,7 @@ class BlockRunner(object):
                 self._output.save(self._sim.iteration)
             self._profile.end_step()
 
+            self._sim.after_step()
         # Receive any data from remote nodes prior to termination.  This ensures
         # we don't run into problems with zmq.
         self._data_stream.synchronize()
