@@ -296,6 +296,11 @@ class LBSimulationController(object):
         group.add_argument('--debug_dump_dists', action='store_true',
                 default=False, help='dump the contents of the distribution '
                 'arrays to files'),
+        group.add_argument('--debug_single_process', action='store_true',
+                default=False,
+                help='If True, will run the controller, master and subdomain '
+                'runner in a single process, which can be helpful for '
+                'debugging.')
         group.add_argument('--log', type=str, default='',
                 help='name of the file to which data is to be logged')
         group.add_argument('--loglevel', type=int, default=logging.INFO,
@@ -508,6 +513,8 @@ class LBSimulationController(object):
             self._start_cluster_simulation(subdomains, cluster)
         elif self.config.cluster_spec:
             self._start_cluster_simulation(subdomains)
+        elif self.config.debug_single_process:
+            _start_machine_master(self.config, subdomains, self._lb_class)
         else:
             self._start_local_simulation(subdomains)
 
@@ -544,7 +551,8 @@ class LBSimulationController(object):
                     min_timings.append(min_ti)
                     max_timings.append(max_ti)
 
-            self._simulation_process.join()
+            if not self.config.debug_single_process:
+                self._simulation_process.join()
 
         if self.config.mode == 'benchmark':
             mlups_total = 0.0
@@ -560,6 +568,7 @@ class LBSimulationController(object):
                         mlups_total, mlups_comp))
             return timing_infos, min_timings, max_timings, subdomains
 
+        self.config.logger.debug('Simulation run complete. Exiting.')
         return None, None
 
     def save_subdomain_config(self, subdomains):

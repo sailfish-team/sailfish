@@ -89,6 +89,9 @@ class CUDABackend(object):
 
         self._iteration_kernels = []
 
+    def __del__(self):
+        self._ctx.pop()
+
     @property
     def info(self):
         return '{0} / CC {1} / MEM {2}'.format(
