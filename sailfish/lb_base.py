@@ -96,8 +96,18 @@ class LBSim(object):
         self.iteration = 0
 
     def need_output(self):
+        """Returns True when data for macroscopic fields is necessary
+        for the current iteration, based on command line parameters
+        --from --every.
+        It is used in subdomain_runner.py:main loop.
+        """
         return ((self.iteration + 1) % self.config.every) == 0 and self.config.from_ <= (self.iteration)
+
     def after_step(self):
+        """ This function is called in main loop of
+        subdomain_runner.py after each step. 
+        It replaces functionality of hooks in v0.2
+        """
         pass
 
     # TODO(michalj): Restore support for defining visualization fields.
