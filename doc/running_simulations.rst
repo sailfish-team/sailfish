@@ -193,6 +193,15 @@ so that the generated code roughly follows the formatting style of the Linux ker
 Troubleshooting
 ---------------
 
+Debugging Sailfish programs in an interactive debugger.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+By default, Sailfish simulations are run in multiple processes regardless of whether more than
+one subdomain is used or not. This can present a challenge to programs such as pudb, which will
+not be able to easily cross the subprocess boundary. The ``--debug_single_process`` option can
+be used to force the controller, master and subdomain runner to run in a single process.
+Note that only one subdomain is allowed in this mode, and that the visualization code
+will still run in a separate process.
+
 My simulation works fine in single precision, but breaks in double precision.
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 If your simulation runs in double precision, but generates clearly unphysical results that

@@ -236,25 +236,8 @@ class LBMachineMaster(object):
         self._vis_quit_event.set()
         self._vis_process.join()
 
-    def run(self):
-        self.config.logger.info('Machine master starting with PID {0}'.format(os.getpid()))
-        self.config.logger.info('Handling subdomains: {0}'.format([b.id for b in
-            self.subdomains]))
-
-        sim = self.lb_class(self.config)
-        subdomain2gpu = self._assign_subdomains_to_gpus()
-
-        self.config.logger.info('Subdomain -> GPU map: {0}'.format(subdomain2gpu))
-
-        ipc_files = self._init_connectors()
-        output_initializer = self._init_visualization_and_io(sim)
-        try:
-            backend_cls = util.get_backends(self.config.backends.split(',')).next()
-        except StopIteration:
-            self.config.logger.error('Failed to initialize compute backend.'
-                    ' Make sure pycuda/pyopencl is installed.')
-            return
-
+    def _run_subprocesses(self, output_initializer, ipc_files, backend_cls,
+            subdomain2gpu, sim):
         ctx = zmq.Context()
         sockets = []
 
@@ -307,6 +290,40 @@ class LBMachineMaster(object):
         # Wait for all subdomain runners to finish.
         for runner in self.runners:
             runner.join()
+
+    def run(self):
+        self.config.logger.info('Machine master starting with PID {0}'.format(os.getpid()))
+        self.config.logger.info('Handling subdomains: {0}'.format([b.id for b in
+            self.subdomains]))
+
+        sim = self.lb_class(self.config)
+        subdomain2gpu = self._assign_subdomains_to_gpus()
+
+        self.config.logger.info('Subdomain -> GPU map: {0}'.format(subdomain2gpu))
+
+        ipc_files = self._init_connectors()
+        output_initializer = self._init_visualization_and_io(sim)
+        try:
+            backend_cls = util.get_backends(self.config.backends.split(',')).next()
+        except StopIteration:
+            self.config.logger.error('Failed to initialize compute backend.'
+                    ' Make sure pycuda/pyopencl is installed.')
+            return
+
+        if self.config.debug_single_process:
+            assert len(self.subdomains) == 1, ('Only a single subdomain can be'
+                    'simulated in the single process mode.')
+
+            subdomain = self.subdomains[0]
+            output = output_initializer(subdomain)
+            _start_subdomain_runner(subdomain, self.config, sim,
+                    len(self.subdomains), backend_cls,
+                    subdomain2gpu[subdomain.id], output, self._quit_event,
+                    None, self._channel is not None)
+            self.config.logger.debug('Finished single process subdomain runner.')
+        else:
+            self._run_subprocesses(self, output_initializer, ipc_files, backend_cls,
+                    subdomain2gpu, sim)
 
         self._finish_visualization()
 
