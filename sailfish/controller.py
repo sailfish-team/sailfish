@@ -568,7 +568,6 @@ class LBSimulationController(object):
                         mlups_total, mlups_comp))
             return timing_infos, min_timings, max_timings, subdomains
 
-        self.config.logger.debug('Simulation run complete. Exiting.')
         return None, None
 
     def save_subdomain_config(self, subdomains):

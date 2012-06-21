@@ -236,10 +236,10 @@ class LBMachineMaster(object):
         self._vis_quit_event.set()
         self._vis_process.join()
 
-    def _run_subprocesses(self, output_initializer, ipc_files, backend_cls,
-            subdomain2gpu, sim):
+    def _run_subprocesses(self, output_initializer, backend_cls, subdomain2gpu, sim):
         ctx = zmq.Context()
         sockets = []
+        ipc_files = []
 
         # Create subdomain runners for all subdomains.
         for subdomain in self.subdomains:
@@ -291,6 +291,9 @@ class LBMachineMaster(object):
         for runner in self.runners:
             runner.join()
 
+        for ipcfile in ipc_files:
+            os.unlink(ipcfile)
+
     def run(self):
         self.config.logger.info('Machine master starting with PID {0}'.format(os.getpid()))
         self.config.logger.info('Handling subdomains: {0}'.format([b.id for b in
@@ -322,8 +325,7 @@ class LBMachineMaster(object):
                     None, self._channel is not None)
             self.config.logger.debug('Finished single process subdomain runner.')
         else:
-            self._run_subprocesses(self, output_initializer, ipc_files, backend_cls,
-                    subdomain2gpu, sim)
+            self._run_subprocesses(output_initializer, backend_cls, subdomain2gpu, sim)
 
         self._finish_visualization()
 
