@@ -5,7 +5,7 @@ from sailfish.config import LBConfig
 from sailfish.lb_base import LBSim
 from sailfish.node_type import NTEquilibriumVelocity, multifield
 from sailfish.subdomain import Subdomain2D, Subdomain3D, SubdomainSpec2D, SubdomainSpec3D
-from sailfish.subdomain_runner import BlockRunner
+from sailfish.subdomain_runner import SubdomainRunner
 from sailfish.sym import D2Q9, D3Q19
 from dummy import *
 
@@ -35,7 +35,7 @@ class TestNodeTypeSetting2D(unittest.TestCase):
         envelope = 1
         spec = SubdomainSpec2D((0, 0), self.lattice_size,
                 envelope_size=envelope, id_=0)
-        spec.runner = BlockRunner(self.sim, spec, output=None,
+        spec.runner = SubdomainRunner(self.sim, spec, output=None,
                 backend=self.backend, quit_event=None)
         spec.runner._init_shape()
         sub = SubdomainTest2D(list(reversed(self.lattice_size)), spec, D2Q9)
@@ -73,7 +73,7 @@ class TestNodeTypeSetting3D(unittest.TestCase):
         envelope = 1
         spec = SubdomainSpec3D((0, 0, 0), self.lattice_size,
                 envelope_size=envelope, id_=0)
-        spec.runner = BlockRunner(self.sim, spec, output=None,
+        spec.runner = SubdomainRunner(self.sim, spec, output=None,
                 backend=self.backend, quit_event=None)
         spec.runner._init_shape()
         sub = SubdomainTest3D(list(reversed(self.lattice_size)), spec, D3Q19)

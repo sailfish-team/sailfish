@@ -1,0 +1,4 @@
+Small to medium tests verifying specific functionality.
+
+Tests that require the presence of a GPU should be located in the gpu/
+subdirectory.

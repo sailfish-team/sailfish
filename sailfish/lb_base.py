@@ -19,7 +19,7 @@ class LBSim(object):
 
     kernel_file = "__TEMPLATE_NOT_SET__"
 
-    #: Set this to a class implementing the BlockRunner interface in order
+    #: Set this to a class implementing the SubdomainRunner interface in order
     #  to use subdomain runner other than default.
     subdomain_runner = None
 
@@ -31,6 +31,9 @@ class LBSim(object):
         group.add_argument('--dt_per_lattice_time_unit',
                 help='physical time delta corresponding to one iteration '
                 'of the simulation', type=float, default=0.0)
+        grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == dim]
+        group.add_argument('--grid', help='LB grid', type=str,
+                choices=grids, default=grids[0])
 
     @classmethod
     def modify_config(cls, config):
@@ -39,6 +42,9 @@ class LBSim(object):
     @classmethod
     def update_defaults(cls, defaults):
         pass
+
+    def fields(self):
+        return []
 
     def constants(self):
         """Returns a dict mapping names to values and defining global constants
@@ -53,6 +59,10 @@ class LBSim(object):
         raise NotImplementedError("grid() should be defined in a subclass")
 
     @property
+    def grids(self):
+        raise NotImplementedError("grids() should be defined in a subclass")
+
+    @property
     def dim(self):
         return self.grid.dim
 
@@ -60,7 +70,6 @@ class LBSim(object):
         """Updates the context dicitionary containing variables used for
         code generation."""
         ctx['grid'] = self.grid
-        ctx['grids'] = self.grids
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['constants'] = self.constants()
         ctx['relaxation_enabled'] = self.config.relaxation_enabled
@@ -106,6 +115,15 @@ class LBSim(object):
 
     def after_step(self):
         """Called from the main loop after the completion of every step."""
+        pass
+
+    def get_compute_kernels(self, runner, full_output, bulk):
+        return []
+
+    def get_pbc_kernels(self, runner):
+        return []
+
+    def initial_conditions(self, runner):
         pass
 
     # TODO(michalj): Restore support for defining visualization fields.

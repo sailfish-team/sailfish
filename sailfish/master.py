@@ -27,7 +27,7 @@ def _start_subdomain_runner(subdomain, config, sim, num_subdomains,
     """
     :param num_subdomains: number of subdomains handled by this machine
     """
-    config.logger.debug('BlockRunner starting with PID {0}'.format(os.getpid()))
+    config.logger.debug('SubdomainRunner starting with PID {0}'.format(os.getpid()))
     # Make sure each subdomain has its own temporary directory.  This is
     # particularly important with Numpy 1.3.0, where there is a race
     # condition when saving npz files.
@@ -48,7 +48,7 @@ def _start_subdomain_runner(subdomain, config, sim, num_subdomains,
     else:
         summary_addr = master_addr
 
-    runner_cls = subdomain_runner.BlockRunner
+    runner_cls = subdomain_runner.SubdomainRunner
     if sim.subdomain_runner is not None:
         runner_cls = sim.subdomain_runner
 
@@ -167,7 +167,7 @@ class LBMachineMaster(object):
                 else:
                     face_str = str(face)
 
-                self.config.logger.debug("Block connection: {0} <-> {1}: {2}/{3}"
+                self.config.logger.debug("Subdomain connection: {0} <-> {1}: {2}/{3}"
                         "-element buffer (face {4}).".format(
                             subdomain.id, nbid, size1, size2, face_str))
 
@@ -236,7 +236,7 @@ class LBMachineMaster(object):
         self._vis_quit_event.set()
         self._vis_process.join()
 
-    def _run_subprocesses(self, output_initializer, backend_cls, subdomain2gpu, sim):
+    def _run_subprocesses(self, output_initializer, backend_cls, subdomain2gpu):
         ctx = zmq.Context()
         sockets = []
         ipc_files = []
@@ -251,8 +251,8 @@ class LBMachineMaster(object):
             sock.bind(master_addr)
             sockets.append(sock)
             p = Process(target=_start_subdomain_runner,
-                        name='Block/{0}'.format(subdomain.id),
-                        args=(subdomain, self.config, sim, len(self.subdomains),
+                        name='Subdomain/{0}'.format(subdomain.id),
+                        args=(subdomain, self.config, self.sim, len(self.subdomains),
                               backend_cls, subdomain2gpu[subdomain.id],
                               output, self._quit_event, master_addr,
                               self._channel is not None))
@@ -299,13 +299,13 @@ class LBMachineMaster(object):
         self.config.logger.info('Handling subdomains: {0}'.format([b.id for b in
             self.subdomains]))
 
-        sim = self.lb_class(self.config)
+        self.sim = self.lb_class(self.config)
         subdomain2gpu = self._assign_subdomains_to_gpus()
 
         self.config.logger.info('Subdomain -> GPU map: {0}'.format(subdomain2gpu))
 
         ipc_files = self._init_connectors()
-        output_initializer = self._init_visualization_and_io(sim)
+        output_initializer = self._init_visualization_and_io(self.sim)
         try:
             backend_cls = util.get_backends(self.config.backends.split(',')).next()
         except StopIteration:
@@ -319,13 +319,14 @@ class LBMachineMaster(object):
 
             subdomain = self.subdomains[0]
             output = output_initializer(subdomain)
-            _start_subdomain_runner(subdomain, self.config, sim,
+            _start_subdomain_runner(subdomain, self.config, self.sim,
                     len(self.subdomains), backend_cls,
                     subdomain2gpu[subdomain.id], output, self._quit_event,
                     None, self._channel is not None)
             self.config.logger.debug('Finished single process subdomain runner.')
         else:
-            self._run_subprocesses(output_initializer, backend_cls, subdomain2gpu, sim)
+            self._run_subprocesses(output_initializer, backend_cls,
+                    subdomain2gpu)
 
         self._finish_visualization()
 

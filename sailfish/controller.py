@@ -33,7 +33,7 @@ def _start_machine_master(config, subdomains, lb_class):
     from sailfish.master import LBMachineMaster
     master = LBMachineMaster(config, subdomains, lb_class)
     master.run()
-
+    return master
 
 def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
         subdomain_addr_map, iface):
@@ -514,7 +514,9 @@ class LBSimulationController(object):
         elif self.config.cluster_spec:
             self._start_cluster_simulation(subdomains)
         elif self.config.debug_single_process:
-            _start_machine_master(self.config, subdomains, self._lb_class)
+            # Keep a reference to the master instance.  This is useful in unit
+            # tests as it allows access to the simulation class.
+            self.master = _start_machine_master(self.config, subdomains, self._lb_class)
         else:
             self._start_local_simulation(subdomains)
 

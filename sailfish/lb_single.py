@@ -36,10 +36,6 @@ class LBFluidSim(LBSim):
         group.add_argument('--smagorinsky_const',
                 help='Smagorinsky constant', type=float, default=0.03)
 
-        grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == dim]
-        group.add_argument('--grid', help='LB grid', type=str,
-                choices=grids, default=grids[0])
-
     def __init__(self, config):
         super(LBFluidSim, self).__init__(config)
 
@@ -85,7 +81,7 @@ class LBFluidSim(LBSim):
 
     def get_compute_kernels(self, runner, full_output, bulk):
         """
-        :param runner: BlockRunner object
+        :param runner: SubdomainRunner object
         :param full_output: if True, returns kernels that prepare fields for
                 visualization or saving into a file
         :param bulk: if True, returns kernels that process the bulk domain,
@@ -189,7 +185,7 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
     """Single-phase Shan-Chen model."""
 
     nonlocality = 1
-    subdomain_runner = subdomain_runner.NNBlockRunner
+    subdomain_runner = subdomain_runner.NNSubdomainRunner
 
     def __init__(self, config):
         super(LBSingleFluidShanChen, self).__init__(config)

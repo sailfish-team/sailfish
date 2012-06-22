@@ -121,7 +121,8 @@ class NTGuoDensity(LBNodeType):
     def __init__(self, density):
         self.params = {'density': density}
 
-class NTGrad(LBNodeType):
+# TODO(kasiaj): Implement the logic for this node type.
+class NTGradFreeflow(LBNodeType):
     """Outflow node using Grad's approximation."""
     wet_node = True
     standard_macro = True

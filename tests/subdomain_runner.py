@@ -10,7 +10,7 @@ from sailfish.connector import ZMQSubdomainConnector
 from sailfish.lb_base import LBSim
 from sailfish.lb_binary import LBBinaryFluidShanChen
 from sailfish.backend_dummy import DummyBackend
-from sailfish.subdomain_runner import BlockRunner, NNBlockRunner
+from sailfish.subdomain_runner import SubdomainRunner, NNSubdomainRunner
 from sailfish.subdomain import SubdomainSpec2D, SubdomainSpec3D, SubdomainPair
 from sailfish.io import LBOutput
 from sailfish.sym import D2Q9
@@ -35,7 +35,7 @@ class BasicFunctionalityTest(unittest.TestCase):
         self.backend = DummyBackend()
 
     def get_subdomain_runner(self, block):
-        return BlockRunner(self.sim, block, output=None,
+        return SubdomainRunner(self.sim, block, output=None,
                 backend=self.backend, quit_event=None)
 
     def test_block_connection(self):
@@ -73,7 +73,7 @@ class BasicFunctionalityTest(unittest.TestCase):
         self.assertEqual(nodes, reduce(operator.mul, real_size))
 
 
-class NNBlockRunnerTest(unittest.TestCase):
+class NNSubdomainRunnerTest(unittest.TestCase):
 
     def setUp(self):
         config = LBConfig()
@@ -116,10 +116,10 @@ class NNBlockRunnerTest(unittest.TestCase):
         # Create simulation object and block runnners.
         sim1 = LBBinaryFluidShanChen(self.config)
         sim2 = LBBinaryFluidShanChen(self.config)
-        br1 = NNBlockRunner(sim1, b1, output=LBOutput(self.config, b1.id),
+        br1 = NNSubdomainRunner(sim1, b1, output=LBOutput(self.config, b1.id),
                 backend=self.backend,
                 quit_event=DummyEvent())
-        br2 = NNBlockRunner(sim2, b2, output=LBOutput(self.config, b2.id),
+        br2 = NNSubdomainRunner(sim2, b2, output=LBOutput(self.config, b2.id),
                 backend=self.backend,
                 quit_event=DummyEvent())
 

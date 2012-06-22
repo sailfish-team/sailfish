@@ -7,6 +7,7 @@ __license__ = 'LGPL3'
 import os
 import sys
 import tempfile
+import mako.exceptions
 from mako.lookup import TemplateLookup
 
 import sailfish.io
@@ -88,18 +89,28 @@ class BlockCodeGenerator(object):
         import locale
         locale.setlocale(locale.LC_ALL, 'C')
 
+        template_dirs = [
+                os.getcwd(),
+                os.path.join(os.getcwd(), os.path.dirname(sys.argv[0])),
+                os.path.join(
+                    os.path.realpath(os.path.dirname(__file__)),
+                    'templates')]
+
         if self.config.use_mako_cache:
             import pwd
-            lookup = TemplateLookup(directories=sys.path,
-                    module_directory='{0}/sailfish_modules-{1}'.format(
+            lookup = TemplateLookup(directories=template_dirs,
+                        module_directory='{0}/sailfish_modules-{1}'.format(
                         tempfile.gettempdir(), pwd.getpwuid(os.getuid())[0]))
         else:
-            lookup = TemplateLookup(directories=sys.path)
+            lookup = TemplateLookup(directories=template_dirs)
 
-        code_tmpl = lookup.get_template(os.path.join('sailfish/templates',
-                                        self._sim.kernel_file))
+        code_tmpl = lookup.get_template(self._sim.kernel_file)
         ctx = self._build_context(subdomain_runner)
-        src = code_tmpl.render(**ctx)
+        try:
+            src = code_tmpl.render(**ctx)
+        except:
+            print mako.exceptions.text_error_template().render()
+            return ''
 
         if self.is_double_precision():
             src = _convert_to_double(src)
@@ -131,6 +142,7 @@ class BlockCodeGenerator(object):
         ctx = {}
         ctx['block_size'] = self.config.block_size
         ctx['propagation_sentinels'] = True
+        ctx['unit_test'] = self.config.unit_test
 
         self._sim.update_context(ctx)
         subdomain_runner.update_context(ctx)

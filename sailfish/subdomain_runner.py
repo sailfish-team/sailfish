@@ -229,7 +229,7 @@ def profile(profile_event):
         return decorate
     return _profile
 
-class BlockRunner(object):
+class SubdomainRunner(object):
     """Runs the simulation for a single Subdomain.
 
     The simulation proceeds into two streams, which is used for overlapping
@@ -1174,10 +1174,10 @@ class BlockRunner(object):
 
         self.config.logger.debug('getting dist {0} ({1})'.format(iter_idx,
             self.gpu_dist(0, iter_idx)))
-        dbuf = np.zeros(self._get_dist_bytes(self._sim.grids[0]) / self.float().nbytes,
+        dbuf = np.zeros(self._get_dist_bytes(self._sim.grid) / self.float().nbytes,
             dtype=self.float)
         self.backend.from_buf(self.gpu_dist(0, iter_idx), dbuf)
-        dbuf = dbuf.reshape([self._sim.grids[0].Q] + self._physical_size)
+        dbuf = dbuf.reshape([self._sim.grid.Q] + self._physical_size)
         return dbuf
 
     def _debug_set_dist(self, dbuf, output=True):
@@ -1253,7 +1253,6 @@ class BlockRunner(object):
             return True
 
         return False
-    
 
     def main(self):
         self._profile.record_start()
@@ -1292,10 +1291,10 @@ class BlockRunner(object):
         self._profile.record_end()
 
 
-class NNBlockRunner(BlockRunner):
+class NNSubdomainRunner(SubdomainRunner):
     """Runs a fluid simulation for a single subdomain.
 
-    This is a specialization of the BlockRunner class for models which
+    This is a specialization of the SubdomainRunner class for models which
     require access to macroscopic fields from the nearest neighbor nodes.
     It changes the steps executed on the GPU as follows::
 
@@ -1390,7 +1389,7 @@ class NNBlockRunner(BlockRunner):
         return self._macro_idx_helper(gx, cpair.src.dst_macro_slice)
 
     def _init_buffers(self):
-        super(NNBlockRunner, self)._init_buffers()
+        super(NNSubdomainRunner, self)._init_buffers()
 
         alloc = self.backend.alloc_async_host_buf
         self._block_to_macrobuf = defaultdict(list)
@@ -1496,7 +1495,7 @@ class NNBlockRunner(BlockRunner):
 
 
     def _init_interblock_kernels(self):
-        super(NNBlockRunner, self)._init_interblock_kernels()
+        super(NNSubdomainRunner, self)._init_interblock_kernels()
 
         collect_block = 32
         def _grid_dim1(x):
@@ -1535,7 +1534,7 @@ class NNBlockRunner(BlockRunner):
             self.backend.run_kernel(kernel, grid, self._data_stream)
 
         self._data_stream.synchronize()
-        super(NNBlockRunner, self)._initial_conditions()
+        super(NNSubdomainRunner, self)._initial_conditions()
 
     def step(self, output_req):
         """Runs one simulation step."""

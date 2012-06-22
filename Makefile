@@ -23,6 +23,9 @@ test:
 test_examples:
 	@bash tests/run_examples.sh
 
+test_gpu:
+	python tests/gpu/scratch_space.py
+
 regtest:
 	python regtest/subdomains/2d_propagation.py
 	python regtest/subdomains/2d_ldc.py

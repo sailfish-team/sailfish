@@ -361,8 +361,11 @@ extern int printf (__const char *__restrict __format, ...);
 %endif
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
+
+%if not unit_test:
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
+%endif
 
 ${device_func} void die(void) {
 	%if backend == 'cuda':
@@ -374,6 +377,8 @@ ${device_func} void die(void) {
 
 ${opencl_compat.body()}
 <%include file="geo_helpers.mako"/>
-${boundary.body()}
-${relaxation.body(bgk_args_decl)}
 
+%if not unit_test:
+	${boundary.body()}
+	${relaxation.body(bgk_args_decl)}
+%endif

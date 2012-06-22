@@ -14,7 +14,7 @@ from sailfish.lb_single import MacroKernels
 class LBBinaryFluidBase(LBSim):
     """Base class for binary fluid simulations."""
 
-    subdomain_runner = subdomain_runner.NNBlockRunner
+    subdomain_runner = subdomain_runner.NNSubdomainRunner
     kernel_file = 'binary_fluid.mako'
     nonlocality = 1
 
@@ -38,10 +38,6 @@ class LBBinaryFluidBase(LBSim):
         LBSim.add_options(group, dim)
         group.add_argument('--tau_phi', type=float, default=1.0,
                 help='relaxation time for the phase field')
-
-        grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == dim]
-        group.add_argument('--grid', help='LB grid', type=str,
-                choices=grids, default=grids[0])
 
     @classmethod
     def visualization_fields(cls, dim):

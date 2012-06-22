@@ -59,6 +59,7 @@ class LBConfigParser(object):
         # command line parameters.
         self.config.relaxation_enabled = True
         self.config.time_dependence = False
+        self.config.unit_test = False
         return self.config
 
 
