@@ -1,5 +1,5 @@
 
-.PHONY: clean regtest regtest_small_block presubmit test_examples
+.PHONY: clean regtest regtest_small_block presubmit test_examples test_gpu
 
 regtest_ldc:
 	python -u regtest/ldc_3d.py
@@ -45,7 +45,7 @@ regtest_small_block:
 	python regtest/subdomains/binary_pbc.py --block_size=16
 	python regtest/subdomains/2d_binary.py --block_size=16
 
-presubmit: test regtest regtest_small_block test_examples
+presubmit: test test_gpu test_examples regtest regtest_small_block
 
 clean:
 	rm -f sailfish/*.pyc
