@@ -31,6 +31,7 @@ class BasicFunctionalityTest(unittest.TestCase):
         # Does not affect behaviour of any of the functions tested here.
         config.lat_nz, config.lat_nx, config.lat_ny = self.size_3d
         config.logger = DummyLogger()
+        config.grid = 'D3Q19'
         self.sim = LBSim(config)
         self.backend = DummyBackend()
 

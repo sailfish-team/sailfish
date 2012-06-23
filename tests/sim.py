@@ -23,7 +23,6 @@ class TestLBBase(unittest.TestCase):
         sim = SimTest(None)
         sim.init_fields(runner)
         sim.a = np.zeros([64, 64])
-
         self.assertRaises(AssertionError, sim.verify_fields)
 
 

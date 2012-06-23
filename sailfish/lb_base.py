@@ -1,7 +1,7 @@
 """Base class for all lattice Boltzman simulations in Sailfish."""
 
 from collections import namedtuple
-from sailfish import sym
+from sailfish import sym, util
 
 import numpy as np
 
@@ -56,11 +56,7 @@ class LBSim(object):
         """Returns a grid object representing the connectivity of the lattice
         used in the simulation.  If the simulation uses more than 1 grid,
         returns the grid with the highest connectivity."""
-        raise NotImplementedError("grid() should be defined in a subclass")
-
-    @property
-    def grids(self):
-        raise NotImplementedError("grids() should be defined in a subclass")
+        return max(self.grids, key=lambda grid: grid.Q)
 
     @property
     def dim(self):
@@ -70,6 +66,7 @@ class LBSim(object):
         """Updates the context dicitionary containing variables used for
         code generation."""
         ctx['grid'] = self.grid
+        ctx['grids'] = self.grids
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['constants'] = self.constants()
         ctx['relaxation_enabled'] = self.config.relaxation_enabled
@@ -103,6 +100,13 @@ class LBSim(object):
         self.config = config
         self.S = sym.S()
         self.iteration = 0
+
+        # For use in unit tests only.
+        if config is not None:
+            grid = util.get_grid_from_config(config)
+            if grid is None:
+                raise util.GridError('Invalid grid selected: {0}'.format(config.grid))
+            self.grids = [grid]
 
     def need_output(self):
         """Returns True when data for macroscopic fields is necessary

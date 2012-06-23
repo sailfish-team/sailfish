@@ -7,7 +7,7 @@ __license__ = 'LGPLv3'
 from collections import defaultdict, namedtuple
 import numpy as np
 
-from sailfish import subdomain_runner, sym, util
+from sailfish import subdomain_runner, sym
 from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField
 
 
@@ -38,19 +38,7 @@ class LBFluidSim(LBSim):
 
     def __init__(self, config):
         super(LBFluidSim, self).__init__(config)
-
-        grid = util.get_grid_from_config(config)
-
-        if grid is None:
-            raise util.GridError('Invalid grid selected: {0}'.format(config.grid))
-
-        self.grids = [grid]
-        self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(grid)
-
-    @property
-    def grid(self):
-        """Grid with the highest connectivity (Q)."""
-        return self.grids[0]
+        self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
 
     def update_context(self, ctx):
         super(LBFluidSim, self).update_context(ctx)

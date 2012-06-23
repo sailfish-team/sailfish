@@ -45,14 +45,6 @@ class TestSim(LBSim):
     def modify_config(cls, config):
         config.unit_test = True
 
-    @property
-    def grid(self):
-        return D2Q9
-
-    @property
-    def grids(self):
-        return [D2Q9]
-
     @classmethod
     def fields(cls):
         return [ScalarField('output_x'), ScalarField('output_y'),

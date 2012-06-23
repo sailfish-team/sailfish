@@ -27,6 +27,7 @@ class TestNodeTypeSetting2D(unittest.TestCase):
         # Does not affect behaviour of any of the functions tested here.
         config.lat_nx, config.lat_ny = self.lattice_size
         config.logger = DummyLogger()
+        config.grid = 'D2Q9'
         self.sim = LBSim(config)
         self.config = config
         self.backend = DummyBackend()
@@ -66,6 +67,7 @@ class TestNodeTypeSetting3D(unittest.TestCase):
         # Does not affect behaviour of any of the functions tested here.
         config.lat_nx, config.lat_ny, config.lat_nz = self.lattice_size
         config.logger = DummyLogger()
+        config.grid = 'D3Q19'
         self.sim = LBSim(config)
         self.backend = DummyBackend()
 

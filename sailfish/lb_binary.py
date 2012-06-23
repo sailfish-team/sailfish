@@ -6,7 +6,7 @@ __license__ = 'LGPL3'
 
 from collections import defaultdict
 import numpy as np
-from sailfish import subdomain_runner, sym, util
+from sailfish import subdomain_runner, sym
 from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField
 from sailfish.lb_single import MacroKernels
 
@@ -20,18 +20,8 @@ class LBBinaryFluidBase(LBSim):
 
     def __init__(self, config):
         super(LBBinaryFluidBase, self).__init__(config)
-        grid = util.get_grid_from_config(config)
-
-        if grid is None:
-            raise util.GridError('Invalid grid selected: {0}'.format(config.grid))
-
-        self.grids = [grid, grid]
+        self.grids.append(self.grid)
         self._prepare_symbols()
-
-    @property
-    def grid(self):
-        """Grid with the highest connectivity (Q)."""
-        return self.grids[0]
 
     @classmethod
     def add_options(cls, group, dim):
