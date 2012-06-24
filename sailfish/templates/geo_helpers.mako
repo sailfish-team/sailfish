@@ -170,6 +170,37 @@ ${device_func} inline unsigned int decodeNodeParamIdx(unsigned int nodetype) {
 	}
 %endif
 
+${device_func} void die(void) {
+	%if backend == 'cuda':
+		asm("trap;");
+	%else:
+		return;
+	%endif
+}
+
+${device_func} void checkInvalidValues(Dist* d, ${position_decl()}) {
+	%if check_invalid_values:
+		bool valid = true;
+		%for dname in grid.idx_name:
+			if (!isfinite(d->${dname})) {
+				valid = false;
+				printf("ERR(subdomain=${block.id}): Invalid value of ${dname} (%f) at: "
+						%if dim == 2:
+							"(%d, %d)"
+						%else:
+							"(%d, %d, %d)"
+						%endif
+						"\n", d->${dname}, ${position()});
+			}
+		%endfor
+
+		if (!valid) {
+			die();
+		}
+	%endif
+}
+
+
 
 ## Experimental code below
 #############################################################################

@@ -376,7 +376,14 @@ class SubdomainRunner(object):
         ctx['sim'] = self._sim
         ctx['block'] = self._block
         ctx['time_dependence'] = self.config.time_dependence
-        ctx['check_invalid_values'] = self.config.check_invalid_results_gpu
+        ctx['check_invalid_values'] = (
+                self.config.check_invalid_results_gpu and
+                self.backend.supports_printf)
+
+        if (self.config.check_invalid_results_gpu and
+                not self.backend.supports_printf):
+            self.config.logger.warning('On-GPU invalid result check disabled'
+                    ' as the device does not support all required features.')
 
         arr_nx = self._physical_size[-1]
         arr_ny = self._physical_size[-2]
@@ -1256,48 +1263,58 @@ class SubdomainRunner(object):
         return False
 
     def main(self):
-        self._profile.record_start()
-        while True:
-            self._profile.start_step()
-            output_req = self._sim.need_output()
+        is_quit = False
 
-            if output_req and self.config.debug_dump_dists:
-                dbuf = self._debug_get_dist(self)
-                self._output.dump_dists(dbuf, self._sim.iteration)
+        try:
+            self._profile.record_start()
+            while True:
+                self._profile.start_step()
+                output_req = self._sim.need_output()
 
-            self.step(output_req)
+                if output_req and self.config.debug_dump_dists:
+                    dbuf = self._debug_get_dist(self)
+                    self._output.dump_dists(dbuf, self._sim.iteration)
 
-            if output_req and self.config.output_required:
-                self._fields_to_host()
+                self.step(output_req)
 
-            if (self.config.max_iters > 0 and self._sim.iteration >=
-                    self.config.max_iters) or self.need_quit():
-                break
+                if output_req and self.config.output_required:
+                    self._fields_to_host()
 
+                if (self.config.max_iters > 0 and self._sim.iteration >=
+                        self.config.max_iters) or self.need_quit():
+                    break
+
+                self._data_stream.synchronize()
+                self._calc_stream.synchronize()
+                if output_req and self.config.output_required:
+                    if self.config.check_invalid_results_host:
+                        if not self._output.verify():
+                            self.config.logger.error("Invalid value detected in "
+                                    "output for iteration {0}".format(
+                                    self._sim.iteration))
+                            self._quit_event.set()
+                            break
+                    self._output.save(self._sim.iteration)
+                self._profile.end_step()
+
+                self._sim.after_step()
+
+            # Receive any data from remote nodes prior to termination.  This ensures
+            # we don't run into problems with zmq.
             self._data_stream.synchronize()
             self._calc_stream.synchronize()
             if output_req and self.config.output_required:
-                if self.config.check_invalid_results_host:
-                    if not self._output.verify():
-                        self.config.logger.error("Invalid value detected in "
-                                "output for iteration {0}".format(
-                                self._sim.iteration))
-                        self._quit_event.set()
-                        break
                 self._output.save(self._sim.iteration)
-            self._profile.end_step()
 
-            self._sim.after_step()
+            self._profile.record_end()
+        except self.backend.FatalError as e:
+            is_quit = True
+            self.config.logger.exception("Fatal on-device error at iteration "
+                    "{0}.".format(self._sim.iteration))
 
-        # Receive any data from remote nodes prior to termination.  This ensures
-        # we don't run into problems with zmq.
-        self._data_stream.synchronize()
-        self._calc_stream.synchronize()
-        if output_req and self.config.output_required:
-            self._output.save(self._sim.iteration)
-
-        self._profile.record_end()
-
+        if is_quit:
+            self.config.logger.error("Requesting quit.")
+            self._quit_event.set()
 
 class NNSubdomainRunner(SubdomainRunner):
     """Runs a fluid simulation for a single subdomain.

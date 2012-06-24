@@ -14,6 +14,7 @@ import numpy as np
 
 class OpenCLBackend(object):
     name='opencl'
+    FatalError = pyopencl.RuntimeError
 
     @classmethod
     def add_options(cls, group):
@@ -49,6 +50,10 @@ class OpenCLBackend(object):
     @property
     def info(self):
         return ''
+
+    @property
+    def supports_printf(self):
+        return False
 
     def set_iteration(self, it):
         self._iteration = it

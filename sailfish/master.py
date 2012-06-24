@@ -12,6 +12,7 @@ import logging
 import operator
 import os
 import tempfile
+import time
 
 import multiprocessing as mp
 from multiprocessing import Process, Array, Event, Value
@@ -287,9 +288,22 @@ class LBMachineMaster(object):
                 self._channel.send((tuple(ti), tuple(min_ti), tuple(max_ti)))
                 socket.send('ack')
 
+
         # Wait for all subdomain runners to finish.
-        for runner in self.runners:
-            runner.join()
+        done_runners = set()
+        while len(done_runners) != len(self.runners):
+            for runner in self.runners:
+                if runner not in done_runners and not runner.is_alive():
+                    done_runners.add(runner)
+
+            self._quit_event.wait(1)
+            if self._quit_event.is_set():
+                self.config.logger.info('Received termination request.')
+                time.sleep(5)
+                for runner in self.runners:
+                    if runner not in done_runners:
+                        runner.terminate()
+                break
 
         for ipcfile in ipc_files:
             os.unlink(ipcfile)

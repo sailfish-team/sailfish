@@ -367,13 +367,19 @@ extern int printf (__const char *__restrict __format, ...);
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 %endif
 
-${device_func} void die(void) {
-	%if backend == 'cuda':
-		asm("trap;");
-	%else:
-		return;
+<%def name="position_decl()">
+	int gx, int gy
+	%if dim == 3:
+		, int gz
 	%endif
-}
+</%def>
+
+<%def name="position()">
+	gx, gy
+	%if dim == 3:
+		, gz
+	%endif
+</%def>
 
 ${opencl_compat.body()}
 <%include file="geo_helpers.mako"/>

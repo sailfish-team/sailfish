@@ -42,6 +42,7 @@ def _set_txt_format(dsc, strides):
 
 class CUDABackend(object):
     name='cuda'
+    FatalError = pycuda.driver.LaunchError
 
     @classmethod
     def devices_count(cls):
@@ -91,6 +92,10 @@ class CUDABackend(object):
 
     def __del__(self):
         self._ctx.pop()
+
+    @property
+    def supports_printf(self):
+        return self._device.compute_capability()[0] >= 2
 
     @property
     def info(self):

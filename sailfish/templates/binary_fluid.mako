@@ -374,6 +374,9 @@ ${kernel} void CollideAndPropagate(
 		}
 	%endif
 
+	checkInvalidValues(&d0, ${position()});
+	checkInvalidValues(&d1, ${position()});
+
 	// Only save the macroscopic quantities if requested to do so.
 	if (options & OPTION_SAVE_MACRO_FIELDS) {
 		%if simtype == 'shan-chen':

@@ -149,6 +149,8 @@ ${kernel} void CollideAndPropagate(
 	${relaxate(bgk_args)}
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out);
 
+	checkInvalidValues(&d0, ${position()});
+
 	// Only save the macroscopic quantities if requested to do so.
 	if (options & OPTION_SAVE_MACRO_FIELDS) {
 		gg0m0[gi] = g0m0;
