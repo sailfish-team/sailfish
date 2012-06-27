@@ -5,13 +5,14 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 from collections import defaultdict, namedtuple
+import cPickle as pickle
 import math
 import operator
 import os
 import numpy as np
 import time
 import zmq
-from sailfish import codegen, util
+from sailfish import codegen, util, io
 
 # Used to hold a reference to a CUDA kernel and a grid on which it is
 # to be executed.
@@ -1223,8 +1224,33 @@ class SubdomainRunner(object):
         self._sim.initial_conditions(self)
         self._sim.verify_fields()
 
+    def save_checkpoint(self):
+        if self.config.single_checkpoint:
+            fname = io.checkpoint_filename(self.config.checkpoint_file,
+                    1, self._block.id, 0)
+        else:
+            fname = io.checkpoint_filename(self.config.checkpoint_file,
+                    io.filename_iter_digits(self.config.max_iters),
+                    self._block.id, self._sim.iteration)
+
+        sim_state = pickle.dumps(self._sim.get_state(), -1)
+        dbuf0 = self._debug_get_dist(True)
+        dbuf1 = self._debug_get_dist(False)
+        np.savez(fname, state=sim_state, d0=dbuf0, d1=dbuf1)
+
+    def restore_checkpoint(self, fname):
+        self.config.logger.info('Restoring checkpoint')
+
+        cpoint = np.load(fname)
+        sim_state = pickle.loads(str(cpoint['state']))
+        self._sim.set_state(sim_state)
+
+        # XXX: extend this to the case of multiple distributions.
+        dbuf0 = self._debug_set_dist(cpoint['d0'], True)
+        dbuf1 = self._debug_set_dist(cpoint['d1'], False)
+
     def run(self):
-        self.config.logger.info("Initializing block.")
+        self.config.logger.info("Initializing subdomain.")
         self.config.logger.debug(self.backend.info)
 
         self._init_geometry()
@@ -1252,6 +1278,9 @@ class SubdomainRunner(object):
 
         if not self.config.max_iters:
             self.config.logger.warning("Running infinite simulation.")
+
+        if self.config.restore_from:
+            self.restore_checkpoint(self.config.restore_from)
 
         self.main()
 
@@ -1306,6 +1335,9 @@ class SubdomainRunner(object):
                     self._output.save(self._sim.iteration)
                 self._profile.end_step()
 
+                if self.config.checkpoint_file and self._sim.need_checkpoint():
+                    self.save_checkpoint()
+
                 self._sim.after_step()
 
             # Receive any data from remote nodes prior to termination.  This ensures
@@ -1316,6 +1348,11 @@ class SubdomainRunner(object):
                 self._output.save(self._sim.iteration)
 
             self._profile.record_end()
+
+            if (self._sim.iteration >= self.config.max_iters and
+                    self.config.checkpoint_file and self.config.final_checkpoint):
+                self.save_checkpoint()
+
         except self.backend.FatalError as e:
             is_quit = True
             self.config.logger.exception("Fatal on-device error at iteration "

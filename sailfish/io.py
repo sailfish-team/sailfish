@@ -141,6 +141,8 @@ def source_filename(filename, subdomain_id):
     base, ext = os.path.splitext(filename)
     return '{0}.{1}{2}'.format(base, subdomain_id, ext)
 
+def checkpoint_filename(base, digits, subdomain_id, it):
+    return ('{0}.{1:0' + str(digits) + 'd}.cpoint').format(base, it, subdomain_id)
 
 class VTKOutput(LBOutput):
     """Saves simulation data in VTK files."""

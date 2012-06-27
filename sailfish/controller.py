@@ -334,6 +334,26 @@ class LBSimulationController(object):
                 'when invalid values (inf, nan) are detected in the domain '
                 'during the simulation.')
 
+        group = self._config_parser.add_group('Checkpointing')
+        group.add_argument('--checkpoint_file', type=str, help='Location of '
+                'the checkpoint file.', metavar='PATH')
+        group.add_argument('--single_checkpoint', type=bool, default=True,
+                help='If True, only a single checkpoint file will be '
+                'generated. If multiple checkpoints are requested, only the '
+                'last one will be retained. This is useful together with '
+                '--check_invalid_results_gpu')
+        group.add_argument('--restore_from', type=str, metavar='PATH',
+                help='Location of a checkpoint file from which to start the '
+                'simulation.')
+        group.add_argument('--final_checkpoint', action='store_true',
+                default=False, help='Generates a checkpoint after the simulation '
+                'is completed.')
+        group.add_argument('--checkpoint_every', type=int, default=100,
+                metavar='N', help='Generates a checkpoint every N steps.')
+        group.add_argument('--checkpoint_from', type=int, default=0,
+                metavar='N', help='Starts generating checkpoints after N '
+                'steps of the simulation have been completed.')
+
         group = self._config_parser.add_group('Simulation-specific settings')
         lb_class.add_options(group, self.dim)
 

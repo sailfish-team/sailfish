@@ -108,6 +108,12 @@ class LBSim(object):
                 raise util.GridError('Invalid grid selected: {0}'.format(config.grid))
             self.grids = [grid]
 
+    def get_state(self):
+        return {'iteration': self.iteration}
+
+    def set_state(self, state):
+        self.iteration = state['iteration']
+
     def need_output(self):
         """Returns True when data for macroscopic fields is necessary
         for the current iteration, based on command line parameters
@@ -116,6 +122,13 @@ class LBSim(object):
         Called from SubdomainRunner.main().
         """
         return ((self.iteration + 1) % self.config.every) == 0 and self.config.from_ <= (self.iteration)
+
+    def need_checkpoint(self):
+        """Returns True when a checkpoint is requested after the current
+        iteration."""
+
+        return ((self.iteration % self.config.checkpoint_every) == 0 and
+            self.iteration >= self.config.checkpoint_from)
 
     def after_step(self):
         """Called from the main loop after the completion of every step."""
