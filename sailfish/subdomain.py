@@ -177,7 +177,7 @@ def _get_dst_partial_map(dists, grid, src_slice_global, b1, slice_axes,
     for dist_idx in dists:
         # When we follow the basis vector backwards, do we end up at a
         # real (non-ghost) node in the source subdomain?
-        basis_vec = list(grid.basis[dist_idx])
+        basis_vec = [int(x) for x in grid.basis[dist_idx]]
         del basis_vec[conn_axis]
         src_block_node = src_coords - basis_vec
         dist_map = np.logical_and(src_block_node >= min_loc,
