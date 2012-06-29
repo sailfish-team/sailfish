@@ -69,6 +69,9 @@ class VisualizationWrapper(LBOutput):
     def register_field(self, field, name, visualization=False):
         self._output.register_field(field, name, visualization)
 
+    def verify(self):
+        return self._output.verify()
+
     def save(self, i):
         self._output.save(i)
 
