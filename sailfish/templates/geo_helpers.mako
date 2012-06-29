@@ -151,7 +151,7 @@ ${device_func} inline unsigned int decodeNodeOrientation(unsigned int nodetype) 
 	return nodetype >> ${nt_misc_shift + nt_param_shift + nt_scratch_shift};
 }
 
-// Returns the node's scratch ID, to be passed to {load,store}NodeScratchSpace as scratch_id.
+// Returns the node's scratch ID, to be passed to (load,store)NodeScratchSpace as scratch_id.
 ${device_func} inline unsigned int decodeNodeScratchId(unsigned int nodetype) {
 	return (nodetype >> ${nt_misc_shift + nt_param_shift}) & ${(1 << nt_scratch_shift)-1};
 }
