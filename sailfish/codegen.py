@@ -64,6 +64,11 @@ class BlockCodeGenerator(object):
                 default=False)
         group.add_argument('--block_size', type=int, default=64,
                 help='size of the block of threads on the compute device')
+        group.add_argument('--mem_alignment', type=int, default=32,
+                help='number of bytes to which rows of node should be aligned;'
+                ' this affects performance but can also increase memory usage '
+                'as the lattice size in the X dimension will be padded up to '
+                'the nearest multiple of this value')
         group.add_argument('--indent', type=str, default='indent',
                 help='path to the GNU indent program')
 

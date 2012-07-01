@@ -71,35 +71,6 @@ ${const_var} float tau1 = ${tau_phi}f;
 	%endfor
 </%def>
 
-%if dim == 2:
-${kernel} void SetLocalVelocity(
-	${global_ptr} float *dist1_in,
-	${global_ptr} float *dist2_in,
-	${global_ptr} float *irho,
-	${global_ptr} float *iphi,
-	${kernel_args_1st_moment('ov')}
-	int x, int y, float vx, float vy)
-{
-	int gx = x + get_global_id(0) - get_local_size(1) / 2;
-	int gy = y + get_global_id(1) - get_local_size(1) / 2;
-
-	${wrap_coords()}
-
-	int gi = gx + ${arr_nx}*gy;
-	float rho = irho[gi];
-	float phi = iphi[gi];
-	float v0[${dim}];
-
-	v0[0] = vx;
-	v0[1] = vy;
-
-	${init_dist_with_eq()}
-
-	ovx[gi] = vx;
-	ovy[gi] = vy;
-}
-%endif
-
 // A kernel to set the node distributions using the equilibrium distributions
 // and the macroscopic fields.
 ${kernel} void SetInitialConditions(

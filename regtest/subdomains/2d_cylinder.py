@@ -14,6 +14,7 @@ from regtest.subdomains import util
 from utils.merge_subdomains import merge_subdomains
 
 tmpdir = tempfile.mkdtemp()
+mem_align = 32
 block_size = 64
 blocks = 2
 vertical = False
@@ -23,9 +24,9 @@ MAX_ITERS = 100
 class SimulationTest(CylinderSimulation):
     @classmethod
     def update_defaults(cls, defaults):
-        global block_size, blocks, vertical, output
         CylinderSimulation.update_defaults(defaults)
         defaults['block_size'] = block_size
+        defaults['mem_alignment'] = mem_align
         defaults['subdomains'] = blocks
         defaults['vertical'] = vertical
         defaults['max_iters'] = MAX_ITERS
@@ -127,4 +128,6 @@ def tearDownModule():
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
+    if block_size < mem_align:
+        mem_align = block_size
     unittest.main()

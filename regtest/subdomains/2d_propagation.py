@@ -54,6 +54,7 @@ class BlockTest(Subdomain2D):
     def initial_conditions(self, sim, hx, hy):
         pass
 
+mem_align = 32
 block_size = 64
 tmpdir = None
 periodic_x = False
@@ -71,9 +72,9 @@ class SimulationTest(LBFluidSim):
 
     @classmethod
     def update_defaults(cls, defaults):
-        global block_size, tmpdir
         defaults.update({
             'block_size': block_size,
+            'mem_alignment': mem_align,
             'lat_nx': 256,
             'lat_ny': 256,
             'max_iters': 2,
@@ -453,9 +454,9 @@ class ThreeBlocksSimulationTest(LBFluidSim):
 
     @classmethod
     def update_defaults(cls, defaults):
-        global block_size, tmpdir
         defaults.update({
             'block_size': block_size,
+            'mem_alignment': mem_align,
             'lat_nx': 256,
             'lat_ny': 256,
             'max_iters': 2,
@@ -523,4 +524,6 @@ def tearDownModule():
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
+    if block_size < mem_align:
+        mem_align = block_size
     unittest.main()

@@ -24,6 +24,7 @@ class TestNodeTypeSetting2D(unittest.TestCase):
         config = LBConfig()
         config.precision = 'single'
         config.block_size = 8
+        config.mem_alignment = 8
         # Does not affect behaviour of any of the functions tested here.
         config.lat_nx, config.lat_ny = self.lattice_size
         config.logger = DummyLogger()
@@ -64,6 +65,7 @@ class TestNodeTypeSetting3D(unittest.TestCase):
         config = LBConfig()
         config.precision = 'single'
         config.block_size = 8
+        config.mem_alignment = 8
         # Does not affect behaviour of any of the functions tested here.
         config.lat_nx, config.lat_ny, config.lat_nz = self.lattice_size
         config.logger = DummyLogger()

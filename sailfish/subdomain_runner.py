@@ -347,8 +347,11 @@ class SubdomainRunner(object):
         ctx['lat_nx'] = self._lat_size[-1]
 
         # Actual size of the array, including any padding.
-        ctx['arr_nx'] = self._physical_size[-1]
-        ctx['arr_ny'] = self._physical_size[-2]
+        arr_nx = self._physical_size[-1]
+        arr_ny = self._physical_size[-2]
+        ctx['arr_nx'] = arr_nx
+        ctx['grid_nx'] = self._grid_nx
+        ctx['arr_ny'] = arr_ny
 
         bnd_limits = list(self._block.actual_size[:])
 
@@ -384,9 +387,6 @@ class SubdomainRunner(object):
                 not self.backend.supports_printf):
             self.config.logger.warning('On-GPU invalid result check disabled'
                     ' as the device does not support all required features.')
-
-        arr_nx = self._physical_size[-1]
-        arr_ny = self._physical_size[-2]
 
         ctx['pbc_offsets'] = [{-1:  self.config.lat_nx,
                                 1: -self.config.lat_nx},
@@ -484,7 +484,16 @@ class SubdomainRunner(object):
         # to a multiple of block_size.  Order is [nz], ny, nx
         self._physical_size = list(reversed(self._block.actual_size))
         bs = self.config.block_size
-        self._physical_size[-1] = int(math.ceil(float(self._physical_size[-1]) / bs)) * bs
+        alignment = self.config.mem_alignment
+        self._physical_size[-1] = int(math.ceil(float(self._physical_size[-1]) / alignment)) * alignment
+
+        # Size of the lattice as necessary for the kernel grid to fully cover
+        # all available space.  This has to be larger or equal than the real
+        # in-memory lattice.
+        assert bs >= alignment, ('The block size (--block_size) has to be at '
+                'least as large as --memory_alignment')
+        self._grid_nx = int(math.ceil(float(self._block.actual_size[0]) / bs)) * bs
+        grid_nx = self._grid_nx
 
         self.config.logger.debug('Effective lattice size is: {0}'.format(
             list(reversed(self._physical_size))))
@@ -502,7 +511,7 @@ class SubdomainRunner(object):
             arr_nz, arr_ny, arr_nx = self._physical_size
             lat_nz, lat_ny, lat_nx = self._lat_size
 
-        padding = arr_nx - lat_nx
+        padding = grid_nx - lat_nx
         block = self._block
 
         x_conns = 0
@@ -538,19 +547,19 @@ class SubdomainRunner(object):
         # (i.e. bs > bns).
         if block.dim == 2:
             self._boundary_blocks = (
-                    (bns * arr_nx / bs) * y_conns +      # top & bottom
+                    (bns * grid_nx / bs) * y_conns +      # top & bottom
                     (arr_ny - y_conns * bns) * x_conns)  # left & right (w/o top & bottom rows)
-            self._kernel_grid_bulk = [arr_nx - x_conns * bs, arr_ny - y_conns * bns]
-            self._kernel_grid_full = [arr_nx / bs, arr_ny]
+            self._kernel_grid_bulk = [grid_nx - x_conns * bs, arr_ny - y_conns * bns]
+            self._kernel_grid_full = [grid_nx / bs, arr_ny]
         else:
             self._boundary_blocks = (
-                    arr_nx * arr_ny * bns / bs * z_conns +                    # T/B faces
-                    arr_nx * (arr_nz - z_conns * bns) / bs * bns * y_conns +  # N/S faces
+                    grid_nx * arr_ny * bns / bs * z_conns +                    # T/B faces
+                    grid_nx * (arr_nz - z_conns * bns) / bs * bns * y_conns +  # N/S faces
                     (arr_ny - y_conns * bns) * (arr_nz - z_conns * bns) * x_conns)
             self._kernel_grid_bulk = [
-                    (arr_nx - x_conns * bs) * (arr_ny - y_conns * bns),
+                    (grid_nx - x_conns * bs) * (arr_ny - y_conns * bns),
                     arr_nz - z_conns * bns]
-            self._kernel_grid_full = [arr_nx * arr_ny / bs, arr_nz]
+            self._kernel_grid_full = [grid_nx * arr_ny / bs, arr_nz]
 
         if self._boundary_blocks >= 65536:
             # Use an artificial 2D grid to work around device limits.

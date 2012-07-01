@@ -12,6 +12,7 @@ from sailfish import io
 from sailfish.controller import LBSimulationController
 from regtest.subdomains import util
 
+mem_align = 32
 block_size = 64
 tmpdir = tempfile.mkdtemp()
 blocks = 1
@@ -24,6 +25,7 @@ class SimulationTest(LDCSim):
         global block_size, blocks, output
         LDCSim.update_defaults(defaults)
         defaults['block_size'] = block_size
+        defaults['mem_alignment'] = mem_align
         defaults['ldc_subdomains'] = blocks
         defaults['max_iters'] = MAX_ITERS
         defaults['quiet'] = True
@@ -57,4 +59,6 @@ def tearDownModule():
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
+    if block_size < mem_align:
+        mem_align = block_size
     unittest.main()

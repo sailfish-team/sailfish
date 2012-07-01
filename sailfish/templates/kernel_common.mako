@@ -48,8 +48,8 @@
 		//
 		// This works fine, as x is relatively small, since:
 		//   x = x_sim / block_size.
-		int gx = get_global_id(0) % ${arr_nx};
-		int gy = get_global_id(0) / ${arr_nx};
+		int gx = get_global_id(0) % ${grid_nx};
+		int gy = get_global_id(0) / ${grid_nx};
 		int gz = get_global_id(1);
 	%endif
 
@@ -109,15 +109,15 @@
 
 			if block.has_face_conn(block.X_HIGH) or block.periodic_x:
 				xconns = xoff + block_size
-				padding = arr_nx - lat_nx
+				padding = grid_nx - lat_nx
 				if block_size - padding >= boundary_size:
 					xconns += block_size
 			else:
 				xconns = xoff
 		%>
 		## Also see how _kernel_grid_bulk is set in block_runnner.py
-		gx = ${xoff} + get_global_id(0) % ${arr_nx - xconns};
-		gy = ${yoff} + get_global_id(0) / ${arr_nx - xconns};
+		gx = ${xoff} + get_global_id(0) % ${grid_nx - xconns};
+		gy = ${yoff} + get_global_id(0) / ${grid_nx - xconns};
 		gz = ${zoff} + get_global_id(1);
 	%endif
 
@@ -141,7 +141,7 @@
 		has_xlow = int(block.has_face_conn(block.X_LOW) or block.periodic_x)
 		has_xhigh = int(block.has_face_conn(block.X_HIGH) or block.periodic_x)
 		y_conns = has_ylow + has_yhigh
-		padding = arr_nx - lat_nx
+		padding = grid_nx - lat_nx
 		bns = boundary_size
 
 		if bool(has_xhigh) and block_size - padding >= boundary_size:
@@ -151,7 +151,7 @@
 	%>
 	%if dim == 2:
 		<%
-			xblocks = arr_nx / block_size
+			xblocks = grid_nx / block_size
 			yblocks = arr_ny - y_conns * boundary_size
 
 			bottom_idx = has_ylow * bns * xblocks
@@ -183,10 +183,10 @@
 		%endif
 		%if block.has_face_conn(block.X_HIGH) or block.periodic_x:
 			else if (gid < ${right2_idx}) {
-				gx = ${arr_nx - block_size} + lx;
+				gx = ${grid_nx - block_size} + lx;
 				gy = gid + ${has_ylow * boundary_size - right_idx};
 			} else if (gid < ${max_idx}) {
-				gx = ${arr_nx - 2*block_size} + lx;
+				gx = ${grid_nx - 2*block_size} + lx;
 				gy = gid + ${has_ylow * boundary_size - right2_idx};
 			}
 		%endif
@@ -199,7 +199,7 @@
 			has_zhigh = int(block.has_face_conn(block.Z_HIGH) or block.periodic_z)
 			z_conns = has_zlow + has_zhigh
 
-			xblocks = arr_nx / block_size
+			xblocks = grid_nx / block_size
 			yblocks = arr_ny - y_conns * boundary_size
 			zblocks = arr_nz - z_conns * boundary_size
 			yz_blocks = yblocks * zblocks
@@ -270,13 +270,13 @@
 			// E face (part 1)
 			else if (gid < ${xhigh_idx}) {
 				gid -= ${xlow_idx};
-				gx = ${arr_nx - block_size} + lx;
+				gx = ${grid_nx - block_size} + lx;
 				gy = gid % ${yblocks} + ${has_ylow * boundary_size};
 				gz = gid / ${yblocks} + ${has_zlow * boundary_size};
 			// E face (part 2)
 			} else if (gid < ${max_idx}) {
 				gid -= ${xhigh_idx};
-				gx = ${arr_nx - 2*block_size} + lx;
+				gx = ${grid_nx - 2*block_size} + lx;
 				gy = gid % ${yblocks} + ${has_ylow * boundary_size};
 				gz = gid / ${yblocks} + ${has_zlow * boundary_size};
 			}

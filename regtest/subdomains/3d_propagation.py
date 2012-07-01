@@ -45,6 +45,7 @@ class TwoBlocksZConnGeoTest(LBGeometry3D):
         return blocks
 
 
+mem_align = 32
 block_size = 64
 tmpdir = None
 periodic_x = False
@@ -76,6 +77,7 @@ class SimulationTest(LBFluidSim):
         global block_size, tmpdir
         defaults.update({
             'block_size': block_size,
+            'mem_alignment': mem_align,
             'lat_nx': lat_nx,
             'lat_ny': lat_ny,
             'lat_nz': lat_nz,
@@ -210,6 +212,7 @@ class PeriodicSimulationTest(LBFluidSim):
     def update_defaults(cls, defaults):
         defaults.update({
             'block_size': block_size,
+            'mem_alignment': mem_align,
             'lat_nx': 128,
             'lat_ny': 64,
             'lat_nz': 66,
@@ -345,6 +348,7 @@ class SingleBlockPeriodicSimulationTest(LBFluidSim):
     def update_defaults(cls, defaults):
         defaults.update({
             'block_size': block_size,
+            'mem_alignment': mem_align,
             'lat_nx': 64,
             'lat_ny': 62,
             'lat_nz': 66,
@@ -433,4 +437,6 @@ def tearDownModule():
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
+    if block_size < mem_align:
+        mem_align = block_size
     unittest.main()

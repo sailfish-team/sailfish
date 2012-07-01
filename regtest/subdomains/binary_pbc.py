@@ -23,6 +23,7 @@ from regtest.subdomains import util
 SHIFT = [17, 4, 13]
 output = ''
 tmpdir = tempfile.mkdtemp()
+mem_align = 32
 block_size = 64
 MAX_ITERS_2D = 1000
 MAX_ITERS_3D = 100
@@ -88,6 +89,7 @@ class SCTestSim2D(LBBinaryFluidShanChen):
     def update_defaults(cls, defaults):
         defaults.update({
             'block_size': block_size,
+            'mem_alignment': mem_align,
             'cuda_cache': False,
             'lat_nx': 254,
             'lat_ny': 230,
@@ -108,6 +110,7 @@ class SCTestSim3D(LBBinaryFluidShanChen):
     def update_defaults(cls, defaults):
         defaults.update({
             'block_size': block_size,
+            'mem_alignment': mem_align,
             'cuda_cache': False,
             'lat_nx': 62,
             'lat_ny': 48,
@@ -205,6 +208,7 @@ class FETestSim2D(LBBinaryFluidFreeEnergy):
     def update_defaults(cls, defaults):
         defaults.update({
             'block_size': block_size,
+            'mem_alignment': mem_align,
             'cuda_cache': False,
             'lat_nx': 254,
             'lat_ny': 256,
@@ -230,6 +234,7 @@ class FETestSim3D(LBBinaryFluidFreeEnergy):
     def update_defaults(cls, defaults):
         defaults.update({
             'block_size': block_size,
+            'mem_alignment': mem_align,
             'cuda_cache': False,
             'lat_nx': 62,
             'lat_ny': 48,
@@ -294,5 +299,7 @@ def tearDownModule():
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
+    if block_size < mem_align:
+        mem_align = block_size
     unittest.main()
 

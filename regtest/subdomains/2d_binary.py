@@ -16,6 +16,7 @@ from sailfish.subdomain import SubdomainSpec2D
 from regtest.subdomains import util
 
 MAX_ITERS = 10
+mem_align = 32
 block_size = 64
 output = ''
 tmpdir = tempfile.mkdtemp()
@@ -45,6 +46,7 @@ class SCSimulationTest(SeparationSCSim):
         SeparationSCSim.update_defaults(defaults)
         defaults.update({
             'block_size': block_size,
+            'mem_alignment': mem_align,
             'every': 1,
             'max_iters': MAX_ITERS,
             'quiet': True,
@@ -75,6 +77,7 @@ class FESimulationTest(SeparationFESim):
         SeparationFESim.update_defaults(defaults)
         defaults.update({
             'block_size': block_size,
+            'mem_alignment': mem_align,
             'every': 10,
             'max_iters': MAX_ITERS,
             'quiet': True,
@@ -175,4 +178,6 @@ def tearDownModule():
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
+    if block_size < mem_align:
+        mem_align = block_size
     unittest.main()

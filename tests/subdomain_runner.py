@@ -28,6 +28,7 @@ class BasicFunctionalityTest(unittest.TestCase):
         config = LBConfig()
         config.precision = 'single'
         config.block_size = 8
+        config.mem_alignment = 8
         # Does not affect behaviour of any of the functions tested here.
         config.lat_nz, config.lat_nx, config.lat_ny = self.size_3d
         config.logger = DummyLogger()
@@ -80,6 +81,7 @@ class NNSubdomainRunnerTest(unittest.TestCase):
         config = LBConfig()
         config.precision = 'single'
         config.block_size = 8
+        config.mem_alignment = 8
         config.lat_nx, config.lat_ny = 40, 80
         config.logger = DummyLogger()
         config.grid = 'D2Q9'
