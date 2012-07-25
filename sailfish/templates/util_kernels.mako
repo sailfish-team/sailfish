@@ -127,24 +127,26 @@
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
 			%for cond, dists in cond_to_dists.iteritems():
 				%if i in dists:
-					// Skip distributions which are not populated.
-					if (${cond}) {
-						${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
-					}
-					<% corner_cond, target = handle_corners(grid.basis[i], bnd_limits[axis] - 2) %>
-					%if corner_cond:
-						else if (${corner_cond}) {
-							int gi_high2 = getGlobalIdx(${target});
-							${get_dist('dist', i, 'gi_high2')} = f${grid.idx_name[i]};
+					if (isfinite(f${grid.idx_name[i]})) {
+						// Skip distributions which are not populated.
+						if (${cond}) {
+							${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
 						}
-					%endif
-					<%
-						done = True
-						# Keep track of the distributions and make sure no distribution
-						# appears with two different conditions.
-						assert i not in done_dists
-						done_dists.add(i)
-					%>
+						<% corner_cond, target = handle_corners(grid.basis[i], bnd_limits[axis] - 2) %>
+						%if corner_cond:
+							else if (${corner_cond}) {
+								int gi_high2 = getGlobalIdx(${target});
+								${get_dist('dist', i, 'gi_high2')} = f${grid.idx_name[i]};
+							}
+						%endif
+						<%
+							done = True
+							# Keep track of the distributions and make sure no distribution
+							# appears with two different conditions.
+							assert i not in done_dists
+							done_dists.add(i)
+						%>
+					}
 				%endif
 			%endfor
 
@@ -152,7 +154,9 @@
 				__BUG__
 			%endif
 		%else:
-			${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
+			if (isfinite(f${grid.idx_name[i]})) {
+				${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
+			}
 		%endif
 	%endfor
 
@@ -171,24 +175,26 @@
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
 			%for cond, dists in cond_to_dists.iteritems():
 				%if i in dists:
-					// Skip distributions which are not populated.
-					if (${cond}) {
-						${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
-					}
-					<% corner_cond, target = handle_corners(grid.basis[i], 1) %>
-					%if corner_cond:
-						else if (${corner_cond}) {
-							int gi_low2 = getGlobalIdx(${target});
-							${get_dist('dist', i, 'gi_low2')} = f${grid.idx_name[i]};
+					if (isfinite(f${grid.idx_name[i]})) {
+						// Skip distributions which are not populated.
+						if (${cond}) {
+							${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
 						}
-					%endif
-					<%
-						done = True
-						# Keep track of the distributions and make sure no distribution
-						# appears with two different conditions.
-						assert i not in done_dists
-						done_dists.add(i)
-					%>
+						<% corner_cond, target = handle_corners(grid.basis[i], 1) %>
+						%if corner_cond:
+							else if (${corner_cond}) {
+								int gi_low2 = getGlobalIdx(${target});
+								${get_dist('dist', i, 'gi_low2')} = f${grid.idx_name[i]};
+							}
+						%endif
+						<%
+							done = True
+							# Keep track of the distributions and make sure no distribution
+							# appears with two different conditions.
+							assert i not in done_dists
+							done_dists.add(i)
+						%>
+					}
 				%endif
 			%endfor
 
@@ -196,7 +202,9 @@
 				__BUG__
 			%endif
 		%else:
-			${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
+			if (isfinite(f${grid.idx_name[i]})) {
+				${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
+			}
 		%endif
 	%endfor
 </%def>
@@ -246,6 +254,12 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 	%endif
 }
 
+<%def name="_copy_field_if_finite(src, dest)">
+	if (isfinite(field[${src}])) {
+		field[${dest}] = field[${src}];
+	}
+</%def>
+
 // Applies periodic boundary conditions to a scalar field within a single subdomain.
 //  dist: pointer to the array with the field data
 //  axis: along which axis the PBCs are to be applied (0:x, 1:y, 2:z)
@@ -261,18 +275,18 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 			if (idx1 >= ${lat_ny}) { return; }
 			gi_low = getGlobalIdx(0, idx1);					// ghost node
 			gi_high = getGlobalIdx(${lat_nx-2}, idx1);		// real node
-			field[gi_low] = field[gi_high];
+			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(1, idx1);					// real node
 			gi_high = getGlobalIdx(${lat_nx-1}, idx1);		// ghost node
-			field[gi_high] = field[gi_low];
+			${_copy_field_if_finite('gi_low', 'gi_high')}
 		} else if (axis == 1) {
 			if (idx1 >= ${lat_nx}) { return; }
 			gi_low = getGlobalIdx(idx1, 0);					// ghost node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-2});		// real node
-			field[gi_low] = field[gi_high];
+			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(idx1, 1);					// real node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-1});		// ghost node
-			field[gi_high] = field[gi_low];
+			${_copy_field_if_finite('gi_low', 'gi_high')}
 		}
 	%else:
 		int idx2 = get_global_id(1);
@@ -280,26 +294,26 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 			if (idx1 >= ${lat_ny} || idx2 >= ${lat_nz}) { return; }
 			gi_low = getGlobalIdx(0, idx1, idx2);				// ghost node
 			gi_high = getGlobalIdx(${lat_nx-2}, idx1, idx2);	// real node
-			field[gi_low] = field[gi_high];
+			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(1, idx1, idx2);				// real node
 			gi_high = getGlobalIdx(${lat_nx-1}, idx1, idx2);	// ghost node
-			field[gi_high] = field[gi_low];
+			${_copy_field_if_finite('gi_low', 'gi_high')}
 		} else if (axis == 1) {
 			if (idx1 >= ${lat_nx} || idx2 >= ${lat_nz}) { return; }
 			gi_low = getGlobalIdx(idx1, 0, idx2);				// ghost node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-2}, idx2);	// real node
-			field[gi_low] = field[gi_high];
+			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(idx1, 1, idx2);				// real node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-1}, idx2);	// ghost node
-			field[gi_high] = field[gi_low];
+			${_copy_field_if_finite('gi_low', 'gi_high')}
 		} else {
 			if (idx1 >= ${lat_nx} || idx2 >= ${lat_ny}) { return; }
 			gi_low = getGlobalIdx(idx1, idx2, 0);				// ghsot node
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});	// real node
-			field[gi_low] = field[gi_high];
+			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(idx1, idx2, 1);				// real node
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-1});	// ghost node
-			field[gi_high] = field[gi_low];
+			${_copy_field_if_finite('gi_low', 'gi_high')}
 		}
 	%endif
 }

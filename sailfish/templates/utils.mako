@@ -123,3 +123,34 @@
 	%endif
 }
 </%def>
+
+<%def name="zero_gradient_at_boundaries()">
+	// If PBC are not enabled, there is no meaningful way to calculate gradients
+	// at boundaries -- assume 0.0.  If a different value is required, a row of
+	// 'unused' nodes can be used to work around this.
+	if (0
+		%if not block.periodic_x and not block.has_face_conn(block.X_LOW):
+			|| x == 1
+		%elif not block.periodic_x and not block.has_face_conn(block.X_HIGH):
+			|| x == ${lat_nx}
+		%endif
+		%if not block.periodic_y and not block.has_face_conn(block.Y_LOW):
+			|| y == 1
+		%elif not block.periodic_y and not block.has_face_conn(block.Y_HIGH):
+			|| y == ${lat_ny}
+		%endif
+		%if dim == 3 and not block.periodic_z:
+			%if not block.has_face_conn(block.Z_LOW):
+				|| z == 1
+			%elif not block.has_face_conn(block.Z_HIGH):
+				|| z == ${lat_nz}
+			%endif
+		%endif
+		) {
+		%for i in range(dim):
+			grad[${i}] = 0.0f;
+		%endfor
+		laplacian[0] = 0.0f;
+		return;
+	}
+</%def>

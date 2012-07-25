@@ -1,4 +1,4 @@
-<%namespace file="utils.mako" import="get_field_off"/>
+<%namespace file="utils.mako" import="get_field_off,zero_gradient_at_boundaries"/>
 
 // More sophisticated finite difference formulas optimized to minimize spurious velocities
 // at the surface of a spherical drop.  Fomulas taken from:
@@ -10,6 +10,8 @@ ${device_func} inline void laplacian_and_grad(${global_ptr} float *field, int fi
 )
 {
 	int off;
+
+	${zero_gradient_at_boundaries()}
 
 	%if block.envelope_size == 0:
 		__UNIMPLEMENTED__

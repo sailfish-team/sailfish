@@ -332,7 +332,7 @@ ${device_func} inline void postcollisionBoundaryConditions(
 			%for i in range(1, grid.dim*2+1):
 				case ${i}: {
 					%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
-						${get_odist('dist_out', lvalue.idx)} = ${rvalue};
+						${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
 					%endfor
 					break;
 				}
