@@ -204,10 +204,12 @@ class GeoEncoderConst(GeoEncoder):
         uniq_types = set(np.unique(self._type_map.base))
         dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
         wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
+        orient_types = list(set(nt.get_orientation_node_type_ids()) & uniq_types)
 
         # Convert to a numpy array.
         dry_types = self._type_map.dtype.type(dry_types)
-        dry_types = self._type_map.dtype.type(wet_types)
+        wet_types = self._type_map.dtype.type(wet_types)
+        orient_types = self._type_map.dtype.type(orient_types)
 
         # Check if there are any node types that need the orientation vector.
         needs_orientation = False
@@ -228,8 +230,8 @@ class GeoEncoderConst(GeoEncoder):
                 # here
                 if vec.dot(vec) == 1:
                     idx = np.logical_and(
-                            util.in_anyd_fast(self._type_map, dry_types),
-                            util.in_anyd_fast(shifted_map, wet_types))
+                            util.in_anyd_fast(self._type_map, orient_types),
+                            shifted_map == 0)
                     orientation[idx] = self.subdomain.grid.vec_to_dir(list(vec))
 
         # Remap type IDs.

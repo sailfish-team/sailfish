@@ -177,13 +177,14 @@ ${kernel} void PrepareMacroFields(
 			if (isNTFullBBWall(type)) {
 				switch (orientation) {
 					%for dir in grid.dir2vecidx.keys():
-						case ${dir}: {
+						case ${dir}: {  // ${grid.dir_to_vec(dir)}
 							%if dim == 3:
 								helper_idx += ${rel_offset(*(bc_wall_grad_order*grid.dir_to_vec(dir)))};
 							%else:
 								## rel_offset() needs a 3-vector, so make the z-coordinate 0
 								helper_idx += ${rel_offset(*(list(bc_wall_grad_order*grid.dir_to_vec(dir)) + [0]))};
 							%endif
+							break;
 						}
 					%endfor
 				}
@@ -197,20 +198,23 @@ ${kernel} void PrepareMacroFields(
 				__ONLY_FIRST_ORDER_GRADIENTS_ARE_SUPPORTED_FOR_HALF_BB_WETTING_WALLS__
 			%endif
 			int helper_idx = gi;
+
 			## Half-way  BB: F . W | U
 			##               x ----> y
 			if (isNTHalfBBWall(type)) {
 				switch (orientation) {
 					%for dir in grid.dir2vecidx.keys():
-						case ${dir}: {
+						case ${dir}: {  // ${grid.dir_to_vec(dir)}
 							%if dim == 3:
 								helper_idx -= ${rel_offset(*(grid.dir_to_vec(dir)))};
 							%else:
 								helper_idx -= ${rel_offset(*(list(grid.dir_to_vec(dir)) + [0]))};
 							%endif
+							break;
 						}
 					%endfor
 				}
+
 				ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
 			}
 		%endif

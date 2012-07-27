@@ -11,7 +11,7 @@ ${sym.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors, phi=phi
 		format_str = ""
 		values = []
 		for dname in grid.idx_name:
-			format_str += dname + ':%f '
+			format_str += dname + ':%.5e '
 			values.append('%s.%s' % (name, dname))
 
 		values = ', '.join(values)

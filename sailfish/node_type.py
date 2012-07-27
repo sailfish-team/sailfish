@@ -74,6 +74,7 @@ class NTHalfBBWall(LBNodeType):
     """Half-way bounce-back (no-slip) node."""
     wet_node = True
     standard_macro = True
+    needs_orientation = True
 
 
 class NTFullBBWall(LBNodeType):
@@ -89,6 +90,7 @@ class NTSlip(LBNodeType):
 
 class NTEquilibriumVelocity(LBNodeType):
     """Velocity boundary condition using the equilibrium distribution."""
+    needs_orientation = True
 
     def __init__(self, velocity):
         self.params = {'velocity': velocity}
@@ -96,6 +98,7 @@ class NTEquilibriumVelocity(LBNodeType):
 
 class NTEquilibriumDensity(LBNodeType):
     """Density boundary condition using the equilibrium distribution."""
+    needs_orientation = True
 
     def __init__(self, density):
         self.params = {'density': density}
@@ -103,6 +106,7 @@ class NTEquilibriumDensity(LBNodeType):
 
 class NTZouHeVelocity(LBNodeType):
     """Zou-he velocity."""
+    needs_orientation = True
 
     def __init__(self, velocity):
         self.params = {'velocity': velocity}
@@ -110,6 +114,7 @@ class NTZouHeVelocity(LBNodeType):
 
 class NTZouHeDensity(LBNodeType):
     """Zou-He density."""
+    needs_orientation = True
 
     def __init__(self, density):
         self.params = {'density': density}
@@ -151,6 +156,9 @@ def get_wet_node_type_ids():
 
 def get_dry_node_type_ids():
     return [id for id, nt in _NODE_TYPES.iteritems() if not nt.wet_node]
+
+def get_orientation_node_type_ids():
+    return [id for id, nt in _NODE_TYPES.iteritems() if nt.needs_orientation]
 
 def multifield(values, where):
     """Collapses a list of numpy arrays into a structured field that can be
