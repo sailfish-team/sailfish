@@ -82,6 +82,8 @@ class NTFullBBWall(LBNodeType):
     # XXX: location
     standard_macro = True
 
+    # Only necessary for wetting conditions in binary fluid models.
+    needs_orientation = True
 
 class NTSlip(LBNodeType):
     """Full-slip node."""
