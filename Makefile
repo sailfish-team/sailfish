@@ -30,6 +30,8 @@ test_checkpoint:
 	@bash tests/gpu/checkpoint.sh examples/ldc_2d.py
 	@bash tests/gpu/checkpoint.sh examples/ldc_3d.py
 	@bash tests/gpu/checkpoint.sh examples/sc_drop.py
+	@bash tests/gpu/checkpoint.sh "examples/binary_fluid/sc_rayleigh_taylor_2d.py --seed 123"
+	@bash tests/gpu/checkpoint.sh examples/binary_fluid/fe_viscous_fingering.py
 
 regtest:
 	python regtest/subdomains/2d_propagation.py

@@ -1236,7 +1236,7 @@ class SubdomainRunner(object):
         sim_state = pickle.dumps(self._sim.get_state(), -1)
         data = { 'state': sim_state }
 
-        for i in enumerate(self._sim.grids);
+        for i in range(len(self._sim.grids)):
             data['dist{0}a'.format(i)] = self._debug_get_dist(True, i)
             data['dist{0}b'.format(i)] = self._debug_get_dist(False, i)
 
