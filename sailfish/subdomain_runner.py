@@ -1181,7 +1181,7 @@ class SubdomainRunner(object):
         self._collect_kernels = (collect_primary, collect_secondary)
         self._distrib_kernels = (distrib_primary, distrib_secondary)
 
-    def _debug_get_dist(self, output=True):
+    def _debug_get_dist(self, output=True, grid_num=0):
         """Copies the distributions from the GPU to a properly structured host array.
         :param output: if True, returns the contents of the distributions set *after*
                 the current simulation step
@@ -1190,20 +1190,20 @@ class SubdomainRunner(object):
         if not output:
             iter_idx = 1 - iter_idx
 
-        self.config.logger.debug('getting dist {0} ({1})'.format(iter_idx,
-            self.gpu_dist(0, iter_idx)))
+        self.config.logger.debug('getting dist for grid {0} iter={1} ({2})'.format(
+            grid_num, iter_idx, self.gpu_dist(grid_num, iter_idx)))
         dbuf = np.zeros(self._get_dist_bytes(self._sim.grid) / self.float().nbytes,
             dtype=self.float)
-        self.backend.from_buf(self.gpu_dist(0, iter_idx), dbuf)
+        self.backend.from_buf(self.gpu_dist(grid_num, iter_idx), dbuf)
         dbuf = dbuf.reshape([self._sim.grid.Q] + self._physical_size)
         return dbuf
 
-    def _debug_set_dist(self, dbuf, output=True):
+    def _debug_set_dist(self, dbuf, output=True, grid_num=0):
         iter_idx = self._sim.iteration & 1
         if not output:
             iter_idx = 1 - iter_idx
 
-        self.backend.to_buf(self.gpu_dist(0, iter_idx), dbuf)
+        self.backend.to_buf(self.gpu_dist(grid_num, iter_idx), dbuf)
 
     def _debug_global_idx_to_tuple(self, gi):
         dist_num = gi / self._get_nodes()
@@ -1234,9 +1234,13 @@ class SubdomainRunner(object):
                     self._block.id, self._sim.iteration)
 
         sim_state = pickle.dumps(self._sim.get_state(), -1)
-        dbuf0 = self._debug_get_dist(True)
-        dbuf1 = self._debug_get_dist(False)
-        np.savez(fname, state=sim_state, d0=dbuf0, d1=dbuf1)
+        data = { 'state': sim_state }
+
+        for i in enumerate(self._sim.grids);
+            data['dist{0}a'.format(i)] = self._debug_get_dist(True, i)
+            data['dist{0}b'.format(i)] = self._debug_get_dist(False, i)
+
+        np.savez(fname, **data)
 
     def restore_checkpoint(self, fname):
         self.config.logger.info('Restoring checkpoint')
@@ -1245,9 +1249,14 @@ class SubdomainRunner(object):
         sim_state = pickle.loads(str(cpoint['state']))
         self._sim.set_state(sim_state)
 
-        # XXX: extend this to the case of multiple distributions.
-        dbuf0 = self._debug_set_dist(cpoint['d0'], True)
-        dbuf1 = self._debug_set_dist(cpoint['d1'], False)
+        for k, v in cpoint.iteritems():
+            if not k.startswith('dist'):
+                continue
+
+            is_primary = k.endswith('a')
+            dist_num = int(k[4:-1])
+
+            self._debug_set_dist(v, is_primary, dist_num)
 
     def run(self):
         self.config.logger.info("Initializing subdomain.")

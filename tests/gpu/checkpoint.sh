@@ -13,6 +13,8 @@ if utils/compare_results.py ${tmpdir}/result_1step.0.200.npz ${tmpdir}/result_2s
 	echo "ok"
 else
 	echo "failed"
+	echo "Data in ${tmpdir}"
+	exit 1
 fi
 
 rm ${tmpdir}/tmp* ${tmpdir}/result*
