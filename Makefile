@@ -29,7 +29,7 @@ test_gpu:
 test_checkpoint:
 	@bash tests/gpu/checkpoint.sh examples/ldc_2d.py
 	@bash tests/gpu/checkpoint.sh examples/ldc_3d.py
-	@bash tests/gpu/checkpoint.sh examples/sc_phase_separation.py
+	@bash tests/gpu/checkpoint.sh examples/sc_drop.py
 
 regtest:
 	python regtest/subdomains/2d_propagation.py
