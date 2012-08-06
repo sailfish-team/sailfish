@@ -262,7 +262,12 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 %if model == 'elbm':
 <%include file="entropic.mako"/>
 
-${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0)
+${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
+%if alpha_output:
+	, int options,
+	${global_ptr} float* alpha_out
+%endif
+)
 {
 	%for i in range(0, len(grids)):
 		Dist feq${i};
@@ -297,6 +302,12 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0)
 	} else {
 		alpha = EstimateAlphaFromEntropy(d0, &feq0);
 	}
+
+	%if model == 'elbm' and alpha_output:
+		if (options & OPTION_SAVE_MACRO_FIELDS) {
+			*alpha_out = alpha;
+		}
+	%endif
 
 	alpha *= 1.0f / (2.0f * tau0 + 1.0f);
 
@@ -412,7 +423,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 %endfor
 	type);
 	%elif model == 'elbm':
-		ELBM_relaxate(${bgk_args()}, &d0);
+		ELBM_relaxate(${bgk_args()}, &d0 ${cond(alpha_output, ', options, alpha + gi')});
 	%else:
 		MS_relaxate(&d0, type, v);
 	%endif

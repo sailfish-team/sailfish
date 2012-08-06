@@ -21,6 +21,12 @@
 	%endif
 </%def>
 
+<%def name="scalar_field_if_required(name, required)">
+	%if required:
+		, ${global_ptr} float *${name}
+	%endif
+</%def>
+
 ## Convenience function to call getGlobalIdx without an explicit conditional
 ## clause in the template code.
 <%def name="get_global_idx(x='gx', y='gy', z='gz')" filter="trim">

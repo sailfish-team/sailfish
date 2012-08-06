@@ -18,6 +18,7 @@ class LBFluidSim(LBSim):
     """Simulates a single fluid."""
 
     kernel_file = "single_fluid.mako"
+    alpha_output = False
 
     @classmethod
     def add_options(cls, group, dim):
@@ -54,6 +55,7 @@ class LBFluidSim(LBSim):
         ctx['subgrid'] = self.config.subgrid
         ctx['smagorinsky_const'] = self.config.smagorinsky_const
         ctx['entropy_tolerance'] = 1e-6 if self.config.precision == 'single' else 1e-10
+        ctx['alpha_output'] = self.alpha_output
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
@@ -100,6 +102,12 @@ class LBFluidSim(LBSim):
             args2.append(runner.gpu_scratch_space)
             signature += 'P'
 
+        # Alpha field for the entropic LBM.
+        if self.alpha_output:
+            args1.append(runner.gpu_field(self.alpha))
+            args2.append(runner.gpu_field(self.alpha))
+            signature += 'P'
+
         kernels = []
         kernels.append(runner.get_kernel(
                 'CollideAndPropagate', args1, signature,
@@ -143,6 +151,24 @@ class LBFluidSim(LBSim):
             return [ScalarField('v^2',
                     expr=lambda f: np.square(f['vx']) + np.square(f['vy']) +
                         np.square(f['vz']))]
+
+
+class LBEntropicFluidSim(LBFluidSim):
+    """LBFluidSim with alpha field tracking.
+
+    The alpha field is 2.0 in areas where the fluid dynamics is fully resolved.
+    alpha < 2.0 means that the flow field is smoothened, while alpha > 2.0
+    indicates enhancement of flow perturbation."""
+
+    alpha_output = True
+
+    @classmethod
+    def modify_config(cls, config):
+        config.model = 'elbm'
+
+    @classmethod
+    def fields(cls):
+        return [ScalarField('rho'), VectorField('v'), ScalarField('alpha')]
 
 
 class LBFreeSurface(LBFluidSim):

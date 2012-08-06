@@ -18,3 +18,10 @@ ${sym.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors, phi=phi
 	%>
 	printf("dists: ${format_str}\n", ${values});
 </%def>
+
+<%def name="cond(cond, text)">
+	%if cond:
+		${text}
+	%endif
+</%def>
+

@@ -98,13 +98,16 @@ ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* feq) {
 	}
 
 	if (alpha < 1.0f) {
-		printf("Alpha estimated at: %e\n", alpha);
+		%if check_invalid_values:
+			printf("Alpha estimated at: %e\n", alpha);
+		%endif
 		die();
 	}
 	return alpha;
 }
 
 ${device_func} inline bool SmallEquilibriumDeviation(Dist* fi, Dist* feq) {
+	return false;
 	%if grid is not sym.D3Q15:
 		return false;
 	%else:

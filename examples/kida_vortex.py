@@ -5,7 +5,7 @@ import numpy as np
 from sailfish.geo import EqualSubdomainsGeometry3D
 from sailfish.subdomain import Subdomain3D
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFluidSim
+from sailfish.lb_single import LBEntropicFluidSim
 
 class KidaSubdomain(Subdomain3D):
     max_v = 0.05
@@ -28,7 +28,7 @@ class KidaSubdomain(Subdomain3D):
         sim.vz[:] = self.max_v * sin(z) * (cos(3 * x) * cos(y) - cos(x) * cos(3 * y))
 
 
-class KidaSim(LBFluidSim):
+class KidaSim(LBEntropicFluidSim):
     subdomain = KidaSubdomain
 
     @classmethod
