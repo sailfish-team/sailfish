@@ -53,7 +53,7 @@ class LBFluidSim(LBSim):
         ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
         ctx['subgrid'] = self.config.subgrid
         ctx['smagorinsky_const'] = self.config.smagorinsky_const
-        ctx['entropy_tolerance'] = 1e-7 if self.config.precision == 'single' else 1e-16
+        ctx['entropy_tolerance'] = 1e-6 if self.config.precision == 'single' else 1e-10
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
