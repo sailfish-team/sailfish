@@ -2,7 +2,7 @@
 ## This includes:
 ##  - handling periodic boundary conditions via ghost nodes
 ##  - collecting data for transfer to other computational nodes
-##  - distribution data received from other computational nodes
+##  - distributing data received from other computational nodes
 <%!
     from sailfish import sym
 %>
@@ -48,73 +48,39 @@
 
 			return ' && '.join(conditions), ', '.join(target)
 
-
-		def make_cond_to_dists(axis_direction):
-			direction = [0] * dim
-			direction[axis] = axis_direction
-
-			# Maps condition (string) to a list of distributions.  The condition
-			# has to be satisfied in order for the distributions to filled in the
-			# source node.
-			cond_to_dists = {}
+		def make_cond(i):
+			conds = []
 
 			if dim == 2:
-				direction[1 - axis] = 1
-				corner_dists = sym.get_interblock_dists(grid, direction)
-				cond = 'idx1 > 1'
-				#if block_periodicity[1 - axis] and block_periodicity[axis]:
-				cond += ' && idx1 <= {0}'.format(max_dim)
-				cond_to_dists[cond] = corner_dists
-
-				direction[1 - axis] = -1
-				corner_dists = sym.get_interblock_dists(grid, direction)
-				cond = 'idx1 < {0}'.format(max_dim)
-				#if block_periodicity[1 - axis] and block_periodicity[axis]:
-				cond += ' && idx1 >= 1'
-				cond_to_dists[cond] = corner_dists
+				if grid.basis[i][1 - axis] == 1:
+					return 'idx1 > 1 && idx1 <= {0}'.format(max_dim)
+				elif grid.basis[i][1 - axis] == -1:
+					return 'idx1 < {0} && idx1 >= 1'.format(max_dim)
 			else:
-				# Covers full NN connectivity in 3D.  Needs to be extended for
-				# models with a higher level of connectivity.
-				for i in (1, 0, -1):
-					for j in (1, 0, -1):
-						if i == 0 and j == 0:
-							continue
-						oa1 = other_axes[axis][0]
-						oa2 = other_axes[axis][1]
+				oa1 = other_axes[axis][0]
+				oa2 = other_axes[axis][1]
 
-						direction[oa1] = i
-						direction[oa2] = j
-						corner_dists = sym.get_interblock_dists(grid, direction)
-						conds = []
-						## XXX use smart limits as in 2D
-						if i == 1:
-							cond = 'idx1 > 1'
-							if block_periodicity[axis] and block_periodicity[oa1]:
-								cond += ' && idx1 <= {0}'.format(max_dim)
-							conds.append(cond)
-						elif i == -1:
-							cond = 'idx1 < {0}'.format(max_dim)
-							if block_periodicity[axis] and block_periodicity[oa1]:
-								cond += ' && idx1 >= 1'
-							conds.append(cond)
-						if j == 1:
-							cond = 'idx2 > 1'
-							if block_periodicity[axis] and block_periodicity[oa2]:
-								cond += ' && idx2 <= {0}'.format(max_dim2)
-							conds.append(cond)
-						elif j == -1:
-							cond = 'idx2 < {0}'.format(max_dim2)
-							if block_periodicity[axis] and block_periodicity[oa2]:
-								cond += ' && idx2 >= 1'
-							conds.append(cond)
-						cond = ' && '.join(conds)
-						cond_to_dists[cond] = corner_dists
-
-			return cond_to_dists
-
-		cond_to_dists = make_cond_to_dists(-1)
-		done = False
-		done_dists = set()
+				if grid.basis[i][oa1] == 1:
+					cond = 'idx1 > 1'
+					if block_periodicity[axis] and block_periodicity[oa1]:
+						cond += ' && idx1 <= {0}'.format(max_dim)
+					conds.append(cond)
+				elif grid.basis[i][oa1] == -1:
+					cond = 'idx1 < {0}'.format(max_dim)
+					if block_periodicity[axis] and block_periodicity[oa1]:
+						cond += ' && idx1 >= 1'
+					conds.append(cond)
+				if grid.basis[i][oa2] == 1:
+					cond = 'idx2 > 1'
+					if block_periodicity[axis] and block_periodicity[oa2]:
+						cond += ' && idx2 <= {0}'.format(max_dim2)
+					conds.append(cond)
+				elif grid.basis[i][oa2] == -1:
+					cond = 'idx2 < {0}'.format(max_dim2)
+					if block_periodicity[axis] and block_periodicity[oa2]:
+						cond += ' && idx2 >= 1'
+					conds.append(cond)
+			return ' && '.join(conds)
 	%>
 
 	// TODO(michalj): Generalize this for grids with e_i > 1.
@@ -125,34 +91,19 @@
 
 	%for i in sym.get_prop_dists(grid, -1, axis):
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
-			%for cond, dists in cond_to_dists.iteritems():
-				%if i in dists:
-					if (isfinite(f${grid.idx_name[i]})) {
-						// Skip distributions which are not populated.
-						if (${cond}) {
-							${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
-						}
-						<% corner_cond, target = handle_corners(grid.basis[i], bnd_limits[axis] - 2) %>
-						%if corner_cond:
-							else if (${corner_cond}) {
-								int gi_high2 = getGlobalIdx(${target});
-								${get_dist('dist', i, 'gi_high2')} = f${grid.idx_name[i]};
-							}
-						%endif
-						<%
-							done = True
-							# Keep track of the distributions and make sure no distribution
-							# appears with two different conditions.
-							assert i not in done_dists
-							done_dists.add(i)
-						%>
+			if (isfinite(f${grid.idx_name[i]})) {
+				// Skip distributions which are not populated.
+				if (${make_cond(i)}) {
+					${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
+				}
+				<% corner_cond, target = handle_corners(grid.basis[i], bnd_limits[axis] - 2) %>
+				%if corner_cond:
+					else if (${corner_cond}) {
+						int gi_high2 = getGlobalIdx(${target});
+						${get_dist('dist', i, 'gi_high2')} = f${grid.idx_name[i]};
 					}
 				%endif
-			%endfor
-
-			%if not done:
-				__BUG__
-			%endif
+			}
 		%else:
 			if (isfinite(f${grid.idx_name[i]})) {
 				${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
@@ -165,42 +116,21 @@
 		float f${grid.idx_name[i]} = ${get_dist('dist', i, 'gi_high', offset)};
 	%endfor
 
-	<%
-		cond_to_dists = make_cond_to_dists(1)
-		done = False
-		done_dists = set()
-	%>
-
 	%for i in sym.get_prop_dists(grid, 1, axis):
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
-			%for cond, dists in cond_to_dists.iteritems():
-				%if i in dists:
-					if (isfinite(f${grid.idx_name[i]})) {
-						// Skip distributions which are not populated.
-						if (${cond}) {
-							${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
-						}
-						<% corner_cond, target = handle_corners(grid.basis[i], 1) %>
-						%if corner_cond:
-							else if (${corner_cond}) {
-								int gi_low2 = getGlobalIdx(${target});
-								${get_dist('dist', i, 'gi_low2')} = f${grid.idx_name[i]};
-							}
-						%endif
-						<%
-							done = True
-							# Keep track of the distributions and make sure no distribution
-							# appears with two different conditions.
-							assert i not in done_dists
-							done_dists.add(i)
-						%>
+			if (isfinite(f${grid.idx_name[i]})) {
+				// Skip distributions which are not populated.
+				if (${make_cond(i)}) {
+					${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
+				}
+				<% corner_cond, target = handle_corners(grid.basis[i], 1) %>
+				%if corner_cond:
+					else if (${corner_cond}) {
+						int gi_low2 = getGlobalIdx(${target});
+						${get_dist('dist', i, 'gi_low2')} = f${grid.idx_name[i]};
 					}
 				%endif
-			%endfor
-
-			%if not done:
-				__BUG__
-			%endif
+			}
 		%else:
 			if (isfinite(f${grid.idx_name[i]})) {
 				${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
