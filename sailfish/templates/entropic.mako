@@ -51,6 +51,7 @@ ${device_func} inline float CalculateEntropy(Dist* fi) {
 	return ent;
 }
 
+// Calculates entropy for the mirror state with a given alpha.
 ${device_func} inline float CalculateEntropyIneq(Dist* fi, Dist* feq, float alpha) {
 	float ent = 0.0f;
 	float t;
@@ -63,6 +64,7 @@ ${device_func} inline float CalculateEntropyIneq(Dist* fi, Dist* feq, float alph
 	return ent;
 }
 
+// Calculates d \Delta entropy / d alpha.
 ${device_func} inline float CalculateEntropyGrowthDerivative(Dist* fi, Dist* feq, float alpha) {
 	float dent = 0.0f;
 	float t, neq;
@@ -91,8 +93,13 @@ ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* feq) {
 		alpha = alpha - ent_increase / CalculateEntropyGrowthDerivative(fi, feq, alpha);
 		i++;
 		if (i > 10000) {
-			asm("trap;");
+			die();
 		}
+	}
+
+	if (alpha < 1.0f) {
+		printf("Alpha estimated at: %e\n", alpha);
+		die();
 	}
 	return alpha;
 }
