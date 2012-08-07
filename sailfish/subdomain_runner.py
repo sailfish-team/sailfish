@@ -1347,7 +1347,7 @@ class SubdomainRunner(object):
                 if self.config.checkpoint_file and self._sim.need_checkpoint():
                     self.save_checkpoint()
 
-                self._sim.after_step()
+                self._sim.after_step(self)
 
             # Receive any data from remote nodes prior to termination.  This ensures
             # we don't run into problems with zmq.

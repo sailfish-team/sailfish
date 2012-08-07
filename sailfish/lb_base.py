@@ -42,7 +42,7 @@ class LBSim(object):
     @classmethod
     def update_defaults(cls, defaults):
         pass
-
+    
     def fields(self):
         return []
 
@@ -130,7 +130,7 @@ class LBSim(object):
         return ((self.iteration % self.config.checkpoint_every) == 0 and
             self.iteration >= self.config.checkpoint_from)
 
-    def after_step(self):
+    def after_step(self,runner):
         """Called from the main loop after the completion of every step."""
         pass
 
