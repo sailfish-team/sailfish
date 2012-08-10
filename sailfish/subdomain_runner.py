@@ -869,9 +869,9 @@ class SubdomainRunner(object):
                 needs_iteration=needs_iteration)
         self.backend.run_kernel(kernel, self._kernel_grid_full)
 
-    def step(self, output_req):
-        self._step_boundary(output_req)
-        self._step_bulk(output_req)
+    def step(self, sync_req):
+        self._step_boundary(sync_req)
+        self._step_bulk(sync_req)
         self._sim.iteration += 1
         self._send_dists()
         # Run this at a point after the compute step is fully scheduled for execution
@@ -883,8 +883,8 @@ class SubdomainRunner(object):
             self.backend.run_kernel(kernel, grid, self._data_stream)
         self._profile.record_gpu_end(TimeProfile.DISTRIB, self._data_stream)
 
-    def _get_bulk_kernel(self, output_req):
-        if output_req:
+    def _get_bulk_kernel(self, sync_req):
+        if sync_req:
             kernel = self._kernels_bulk_full[self._sim.iteration & 1]
         else:
             kernel = self._kernels_bulk_none[self._sim.iteration & 1]
@@ -918,7 +918,7 @@ class SubdomainRunner(object):
             for kernel in kernels[base][2]:
                 self.backend.run_kernel(kernel, grid_size, self._calc_stream)
 
-    def _step_bulk(self, output_req):
+    def _step_bulk(self, sync_req):
         """Runs one simulation step in the bulk domain.
 
         Bulk domain is defined to be all nodes that belong to CUDA
@@ -929,26 +929,26 @@ class SubdomainRunner(object):
         # _step_bulk only needs to handle PBC (below).
         self._profile.record_gpu_start(TimeProfile.BULK, self._calc_stream)
         if self._boundary_blocks is not None:
-            kernel, grid = self._get_bulk_kernel(output_req)
+            kernel, grid = self._get_bulk_kernel(sync_req)
             self.backend.run_kernel(kernel, grid, self._calc_stream)
 
         self._apply_pbc(self._pbc_kernels)
         self._profile.record_gpu_end(TimeProfile.BULK, self._calc_stream)
 
-    def _step_boundary(self, output_req):
+    def _step_boundary(self, sync_req):
         """Runs one simulation step for the boundary blocks.
 
         Boundary blocks are CUDA blocks that depend on input from
         ghost nodes."""
 
         if self._boundary_blocks is not None:
-            if output_req:
+            if sync_req:
                 kernel = self._kernels_bnd_full[self._sim.iteration & 1]
             else:
                 kernel = self._kernels_bnd_none[self._sim.iteration & 1]
             grid = self._boundary_blocks
         else:
-            kernel, grid = self._get_bulk_kernel(output_req)
+            kernel, grid = self._get_bulk_kernel(sync_req)
 
         blk_str = self._calc_stream
 
@@ -1316,15 +1316,17 @@ class SubdomainRunner(object):
             self._profile.record_start()
             while True:
                 self._profile.start_step()
-                output_req = self._sim.need_output()
 
-                if output_req and self.config.debug_dump_dists:
+                output_req = self._sim.need_output()
+                sync_req = self._sim.need_sync()
+
+                if sync_req and self.config.debug_dump_dists:
                     dbuf = self._debug_get_dist(self)
                     self._output.dump_dists(dbuf, self._sim.iteration)
 
-                self.step(output_req)
+                self.step(sync_req)
 
-                if output_req and self.config.output_required:
+                if sync_req:
                     self._fields_to_host()
 
                 if (self.config.max_iters > 0 and self._sim.iteration >=
@@ -1333,7 +1335,7 @@ class SubdomainRunner(object):
 
                 self._data_stream.synchronize()
                 self._calc_stream.synchronize()
-                if output_req and self.config.output_required:
+                if output_req:
                     if self.config.check_invalid_results_host:
                         if not self._output.verify():
                             self.config.logger.error("Invalid value detected in "
@@ -1353,7 +1355,7 @@ class SubdomainRunner(object):
             # we don't run into problems with zmq.
             self._data_stream.synchronize()
             self._calc_stream.synchronize()
-            if output_req and self.config.output_required:
+            if output_req:
                 self._output.save(self._sim.iteration)
 
             self._profile.record_end()
@@ -1616,10 +1618,10 @@ class NNSubdomainRunner(SubdomainRunner):
         self._data_stream.synchronize()
         super(NNSubdomainRunner, self)._initial_conditions()
 
-    def step(self, output_req):
+    def step(self, sync_req):
         """Runs one simulation step."""
 
-        if output_req:
+        if sync_req:
             bnd = self._kernels_bnd_full
             bulk = self._kernels_bulk_full
         else:
