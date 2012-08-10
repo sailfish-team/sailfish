@@ -159,6 +159,7 @@ class Fluid2DVis(vis.FluidVis):
         self._vis_config = vis_config
         self._blocks = blocks
 
+        # this will default visualization to the fist component of velocity field
         self._vis_config.field = 1
 
         # Whether a single block is visualized.

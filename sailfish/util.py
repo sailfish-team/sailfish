@@ -10,6 +10,7 @@ import socket
 import sys
 
 import numpy as np
+from math import exp,log
 
 from sailfish import config
 from sailfish import sym
@@ -133,36 +134,34 @@ def in_anyd_fast(arr1, values):
 def is_number(param):
     return type(param) is float or type(param) is int or isinstance(param, np.number)
 
-def logpoints(i,Min=1.,Max=.1,n=10):
-    """Return numbers spaced evenly on a log scale, similar to
-    np.logspace, the difference if that it gets one number,
-    and it take values not exponents as Min,Max
+def logpoints(i, min_=1., max_=.1, n=10):
+    """Return  i-th number from a set spaced evenly on a log scale, 
+    similar to np.logspace, the difference is that it gets one number,
+    and it take values not exponents as min_, max_
 
     :param i: get i-th number
-    :param Min,Max: range
+    :param min_, max_: range
     :param n: number of samples
     """
-
-    from math import exp,log
-    if i<=0:
-        return Min
-    if i >=(n-1):
-        return Max
+    if i <= 0:
+        return min_
+    if i >= (n-1):
+        return max_
     
-    return exp(log(Min)+i*(log(Max)-log(Min))/(n-1))
+    return exp(log(min_) + i * (log(max_) - log(min_)) / (n - 1))
 
-def linpoints(i,Min=1.,Max=.1,n=10):
-    """Return numbers spaced evenly on a linear scale, similar to
-    np.logspace, the difference if that it gets one number.
+def linpoints(i, min_=1., max_=.1, n=10):
+    """Return  i-th number from a set spaced evenly on a log scale, 
+    similar to np.logspace, the difference is that it gets one number,
+    and it take values not exponents as min_, max_
 
     :param i: get i-th number
-    :param Min,Max: range
+    :param min_, max_: range
     :param n: number of samples
     """
-
-    if i<=0:
-        return Min
-    if i >=(n-1):
-        return Max
+    if i <= 0:
+        return min_
+    if i >= (n-1):
+        return max_
     
-    return Min+i*(Max-Min)/(n-1)
+    return min_ + i * (max_ - min_) / (n - 1)

@@ -100,7 +100,7 @@ class LBSim(object):
         self.config = config
         self.S = sym.S()
         self.iteration = 0
-        self.need_sync_flag=False        
+        self.need_sync_flag = False        
 
         # For use in unit tests only.
         if config is not None:
@@ -116,8 +116,8 @@ class LBSim(object):
         self.iteration = state['iteration']
 
     def need_output(self):
-        """Returns True when data will be required for  output,  
-        based on command line parameters   --from --every.
+        """Returns True when data will be required for output,  
+        based on command line parameters --from --every.
 
         Called from SubdomainRunner.main().
         """
@@ -133,14 +133,13 @@ class LBSim(object):
         It will take place in two cases: 
 
         1) data output  
-        2) need_sync_flag, which will syncronize one time macroscopic
-          fields, it can be used e.g. in after_step
+        2) need_sync_flag, which will synchronize one time macroscopic
+           fields, it can be used e.g. in after_step
       
-          Called from SubdomainRunner.main().
+        Called from SubdomainRunner.main().
         """
-
         if self.need_sync_flag:
-            self.need_sync_flag=False
+            self.need_sync_flag = False
             return True
         else:
             return self.need_output() 
@@ -154,7 +153,7 @@ class LBSim(object):
         return ((self.iteration % self.config.checkpoint_every) == 0 and
             self.iteration >= self.config.checkpoint_from)
 
-    def after_step(self,runner):
+    def after_step(self, runner):
         """Called from the main loop after the completion of every step."""
         pass
 
