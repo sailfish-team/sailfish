@@ -85,7 +85,7 @@ class LDCSim(LBFluidSim):
         defaults.update({
             'lat_nx': 1024/8,
             'lat_ny': 1024/8,
-            'max_iters':200000,
+            'max_iters':30000,
             'every':100,
             'visc': 0.06011, # overwritten in after step
             'model':'mrt',
@@ -104,13 +104,11 @@ class LDCSim(LBFluidSim):
         from sailfish.sym import relaxation_time
         import pycuda.driver as cuda
 
-        every_n=1000 #self.config.every/1
+        every_n=10000 #self.config.every/1
 
 ########### before each u field processing
         if self.iteration%(every_n-1) == 0:
             self.need_sync_flag=True
-        else:
-            self.need_sync_flag=False
 
 ############## Calculate and save the norm of valocity field ######
         if self.iteration==every_n:
