@@ -134,11 +134,18 @@ def in_anyd_fast(arr1, values):
 def is_number(param):
     return type(param) is float or type(param) is int or isinstance(param, np.number)
 
+<<<<<<< HEAD
 
 def logpoints(i, min_=1., max_=.1, n=10):
     """Returns i-th number from a set spaced evenly on a log scale,
     similar to np.logspace, the difference is that it gets one number,
     and it take values (not exponents) as min_, max_.
+=======
+def logpoints(i, min_=1., max_=.1, n=10):
+    """Return  i-th number from a set spaced evenly on a log scale, 
+    similar to np.logspace, the difference is that it gets one number,
+    and it take values not exponents as min_, max_
+>>>>>>> Corrections to prev. commits
 
     :param i: get i-th number
     :param min_, max_: range
@@ -146,6 +153,7 @@ def logpoints(i, min_=1., max_=.1, n=10):
     """
     if i <= 0:
         return min_
+<<<<<<< HEAD
     if i >= (n - 1):
         return max_
 
@@ -156,6 +164,17 @@ def linpoints(i, min_=1., max_=.1, n=10):
     """Returns i-th number from a set spaced evenly on a log scale,
     similar to np.logspace, the difference is that it gets one number,
     and it take values (not exponents) as min_, max_.
+=======
+    if i >= (n-1):
+        return max_
+    
+    return exp(log(min_) + i * (log(max_) - log(min_)) / (n - 1))
+
+def linpoints(i, min_=1., max_=.1, n=10):
+    """Return  i-th number from a set spaced evenly on a log scale, 
+    similar to np.logspace, the difference is that it gets one number,
+    and it take values not exponents as min_, max_
+>>>>>>> Corrections to prev. commits
 
     :param i: get i-th number
     :param min_, max_: range
@@ -163,6 +182,7 @@ def linpoints(i, min_=1., max_=.1, n=10):
     """
     if i <= 0:
         return min_
+<<<<<<< HEAD
     if i >= (n - 1):
         return max_
 
@@ -216,3 +236,9 @@ def energy_spectrum(velocity, buckets=None, density=True):
             spectrum[i] /= (high**3 - low**3)
 
     return spectrum
+=======
+    if i >= (n-1):
+        return max_
+    
+    return min_ + i * (max_ - min_) / (n - 1)
+>>>>>>> Corrections to prev. commits
