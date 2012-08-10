@@ -133,3 +133,36 @@ def in_anyd_fast(arr1, values):
 def is_number(param):
     return type(param) is float or type(param) is int or isinstance(param, np.number)
 
+def logpoints(i,Min=1.,Max=.1,n=10):
+    """Return numbers spaced evenly on a log scale, similar to
+    np.logspace, the difference if that it gets one number,
+    and it take values not exponents as Min,Max
+
+    :param i: get i-th number
+    :param Min,Max: range
+    :param n: number of samples
+    """
+
+    from math import exp,log
+    if i<=0:
+        return Min
+    if i >=(n-1):
+        return Max
+    
+    return exp(log(Min)+i*(log(Max)-log(Min))/(n-1))
+
+def linpoints(i,Min=1.,Max=.1,n=10):
+    """Return numbers spaced evenly on a linear scale, similar to
+    np.logspace, the difference if that it gets one number.
+
+    :param i: get i-th number
+    :param Min,Max: range
+    :param n: number of samples
+    """
+
+    if i<=0:
+        return Min
+    if i >=(n-1):
+        return Max
+    
+    return Min+i*(Max-Min)/(n-1)

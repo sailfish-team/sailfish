@@ -42,7 +42,7 @@ class Fluid2DVis(vis.FluidVis):
             return
 
         # XXX
-        self._vis_config.field = 1
+        self._vis_config.field = 2
         width, height = self.size
         block = self._blocks[self._vis_config.block]
         buffer = np.zeros((height, width))
