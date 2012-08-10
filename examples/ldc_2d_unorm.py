@@ -47,15 +47,15 @@ class LDCSim(LBFluidSim):
         if self.iteration % every_n == 0 and self.iteration > every_n:
 
             u = np.sqrt(runner._vector_fields[0][0]**2 + runner._vector_fields[0][1]**2)
-            du_norma = np.linalg.norm(u - self.u_old) / (self.config.lat_nx * self.config.lat_ny)
-            u_norma = np.linalg.norm(u / (self.config.lat_nx * self.config.lat_ny) )
+            du_norm = np.linalg.norm(u - self.u_old) / (self.config.lat_nx * self.config.lat_ny)
+            u_norm = np.linalg.norm(u / (self.config.lat_nx * self.config.lat_ny) )
             self.u_old = u.copy()
-            self.u_norm_table.append((self.iteration,du_norma,u_norma))
+            self.u_norm_table.append((self.iteration, du_norm,u_norm))
 
         if self.iteration == self.config.max_iters-1:
 
             u_norm_table_np = np.array(self.u_norm_table)
-            np.savez('unorm',it=u_norm_table_np[:,0], du_norma=u_norm_table_np[:,1], u_norma=u_norm_table_np[:,2])
+            np.savez('unorm',it=u_norm_table_np[:,0], du_norm=u_norm_table_np[:,1], u_norm=u_norm_table_np[:,2])
             
 if __name__ == '__main__':
     LDCBlock.max_v = 0.05
@@ -67,6 +67,6 @@ if __name__ == '__main__':
     figure(1)
     clf()
     dane=np.load('unorm.npz')
-    semilogy(dane['it'], dane['du_norma']  ,'ro-' )
+    semilogy(dane['it'], dane['du_norm']  ,'ro-' )
     grid(True)
     savefig("unorm.png")
