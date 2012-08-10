@@ -46,7 +46,7 @@ class LDCSim(LBFluidSim):
 
             self.u_old = np.sqrt(runner._vector_fields[0][0]**2 + runner._vector_fields[0][1]**2)
 
-        if self.iteration%every_n == 0 and self.iteration > every_n:
+        if self.iteration % every_n == 0 and self.iteration > every_n:
 
             u=np.sqrt(runner._vector_fields[0][0]**2 + runner._vector_fields[0][1]**2)
             du_norma=np.linalg.norm(u - self.u_old) / (self.config.lat_nx * self.config.lat_ny)
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     ctrl = LBSimulationController(LDCSim, LDCGeometry)
     ctrl.run()
   
-    # simple pylab code displaying relaxation
+    # simple pylab code displaying time evolution of the norm ||u-u0||
     from pylab import *
     figure(1)
     clf()
