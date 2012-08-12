@@ -126,12 +126,28 @@ class SCTestSim3D(LBBinaryFluidShanChen):
             'max_iters': MAX_ITERS_3D,
             'every': 50})
 
+class SCTestSim3DQ15(SCTestSim3D):
+    @classmethod
+    def update_defaults(cls, defaults):
+        SCTestSim3D.update_defaults(defaults)
+        defaults.update({
+            'grid': 'D3Q15',
+            })
+
 
 class TestShanChenShift(unittest.TestCase):
+    def _verify(self, ref, shifted):
+        match_fields(ref['rho'], shifted['rho'])
+        match_fields(ref['phi'], shifted['phi'])
+        self.assertFalse(np.any(np.isnan(ref['rho'])))
+        self.assertFalse(np.any(np.isnan(ref['phi'])))
+        self.assertFalse(np.any(np.isnan(shifted['rho'])))
+        self.assertFalse(np.any(np.isnan(shifted['phi'])))
+
     def test_shift_2d(self):
         global output
         output = os.path.join(tmpdir, 'baseline')
-        ctrl = LBSimulationController(SCTestSim2D, LBGeometry2D).run(ignore_cmdline=True)
+        LBSimulationController(SCTestSim2D, LBGeometry2D).run(ignore_cmdline=True)
         digits = io.filename_iter_digits(MAX_ITERS_2D)
         ref = np.load(io.filename(output, digits, 0, MAX_ITERS_2D))
 
@@ -139,17 +155,12 @@ class TestShanChenShift(unittest.TestCase):
         SCTestDomain2D.shift = True
         LBSimulationController(SCTestSim2D, LBGeometry2D).run(ignore_cmdline=True)
         shifted = np.load(io.filename(output, digits, 0, MAX_ITERS_2D))
-        match_fields(ref['rho'], shifted['rho'])
-        match_fields(ref['phi'], shifted['phi'])
-        self.assertFalse(np.any(np.isnan(ref['rho'])))
-        self.assertFalse(np.any(np.isnan(ref['phi'])))
-        self.assertFalse(np.any(np.isnan(shifted['rho'])))
-        self.assertFalse(np.any(np.isnan(shifted['phi'])))
+        self._verify(ref, shifted)
 
     def test_shift_3d(self):
         global output
         output = os.path.join(tmpdir, 'baseline')
-        ctrl = LBSimulationController(SCTestSim3D, LBGeometry3D).run(ignore_cmdline=True)
+        LBSimulationController(SCTestSim3D, LBGeometry3D).run(ignore_cmdline=True)
         digits = io.filename_iter_digits(MAX_ITERS_3D)
         ref = np.load(io.filename(output, digits, 0, MAX_ITERS_3D))
 
@@ -157,12 +168,22 @@ class TestShanChenShift(unittest.TestCase):
         SCTestDomain3D.shift = True
         LBSimulationController(SCTestSim3D, LBGeometry3D).run(ignore_cmdline=True)
         shifted = np.load(io.filename(output, digits, 0, MAX_ITERS_3D))
-        match_fields(ref['rho'], shifted['rho'])
-        match_fields(ref['phi'], shifted['phi'])
-        self.assertFalse(np.any(np.isnan(ref['rho'])))
-        self.assertFalse(np.any(np.isnan(ref['phi'])))
-        self.assertFalse(np.any(np.isnan(shifted['rho'])))
-        self.assertFalse(np.any(np.isnan(shifted['phi'])))
+        self._verify(ref, shifted)
+
+    def test_shift_3dq15(self):
+        global output
+        output = os.path.join(tmpdir, 'baseline')
+        SCTestDomain3D.shift = False
+        LBSimulationController(SCTestSim3DQ15, LBGeometry3D).run(ignore_cmdline=True)
+        digits = io.filename_iter_digits(MAX_ITERS_3D)
+        ref = np.load(io.filename(output, digits, 0, MAX_ITERS_3D))
+
+        output = os.path.join(tmpdir, 'shifted')
+        SCTestDomain3D.shift = True
+        LBSimulationController(SCTestSim3DQ15, LBGeometry3D).run(ignore_cmdline=True)
+        shifted = np.load(io.filename(output, digits, 0, MAX_ITERS_3D))
+        self._verify(ref, shifted)
+
 #
 # Free-energy model.
 #
@@ -291,6 +312,7 @@ class TestFreeEnergyShift(unittest.TestCase):
         self.assertFalse(np.any(np.isnan(ref['phi'])))
         self.assertFalse(np.any(np.isnan(shifted['rho'])))
         self.assertFalse(np.any(np.isnan(shifted['phi'])))
+
 
 def tearDownModule():
     shutil.rmtree(tmpdir)

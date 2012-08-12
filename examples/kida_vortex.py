@@ -19,9 +19,9 @@ class KidaSubdomain(Subdomain3D):
         sin = np.sin
         cos = np.cos
 
-        x = (hx + self.config.shift_x) * np.pi * 4.0 / self.gx
-        y = (hy + self.config.shift_y) * np.pi * 4.0 / self.gy
-        z = (hz + self.config.shift_z) * np.pi * 4.0 / self.gz
+        x = (hx + self.config.shift_x) * np.pi * 2.0 / self.gx
+        y = (hy + self.config.shift_y) * np.pi * 2.0 / self.gy
+        z = (hz + self.config.shift_z) * np.pi * 2.0 / self.gz
 
         sim.vx[:] = self.max_v * sin(x) * (cos(3 * y) * cos(z) - cos(y) * cos(3 * z))
         sim.vy[:] = self.max_v * sin(y) * (cos(3 * z) * cos(x) - cos(z) * cos(3 * x))
