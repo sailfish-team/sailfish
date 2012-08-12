@@ -652,7 +652,7 @@ class Subdomain(object):
 
     def boundary_conditions(self, *args):
         raise NotImplementedError('boundary_conditions() not defined in a child'
-                'class.')
+                ' class.')
 
     def initial_conditions(self, sim, *args):
         raise NotImplementedError('initial_conditions() not defined in a child '

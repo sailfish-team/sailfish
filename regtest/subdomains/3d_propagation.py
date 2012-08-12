@@ -12,7 +12,7 @@ from sailfish.geo import LBGeometry3D
 from sailfish.subdomain import SubdomainSpec3D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
-from sailfish.sym import D3Q19
+from sailfish.sym import D3Q19, D3Q15
 from regtest.subdomains import util
 
 
@@ -50,6 +50,7 @@ block_size = 64
 tmpdir = None
 periodic_x = False
 vi = lambda x, y, z: D3Q19.vec_idx([x, y, z])
+vi2 = lambda x, y, z: D3Q15.vec_idx([x, y, z])
 
 
 class SimulationTest(LBFluidSim):
@@ -334,6 +335,7 @@ class SingleBlockGeoTest(LBGeometry3D):
     def subdomains(self, n=None):
         return [SubdomainSpec3D((0,0,0), (64, 62, 66))]
 
+
 class SingleBlockPeriodicSimulationTest(LBFluidSim):
     subdomain = BlockTest
 
@@ -425,6 +427,94 @@ class SingleBlockPeriodicTest(unittest.TestCase):
 
         ae(b0[vi(-1, 0, 0), 32, 1, 64], np.float32(0.31))
         ae(b0[vi(-1, -1, 0), 32, 1, 64], np.float32(0.32))
+
+
+class SingleBlockPeriodicSimulationQ15Test(SingleBlockPeriodicSimulationTest):
+    @classmethod
+    def update_defaults(cls, defaults):
+        SingleBlockPeriodicSimulationTest.update_defaults(defaults)
+        defaults.update({
+            'grid': 'D3Q15'
+            })
+
+    def initial_conditions(self, runner):
+        dbuf = runner._debug_get_dist()
+        dbuf[:] = 0.0
+
+        # X-face, left, middle
+        dbuf[vi2(-1, 0, 0), 32, 32, 1] = 0.11
+        dbuf[vi2(-1, -1, -1), 32, 32, 1] = 0.12
+        dbuf[vi2(-1, -1, 1), 32, 32, 1] = 0.13
+        dbuf[vi2(-1, 1, -1), 32, 32, 1] = 0.14
+        dbuf[vi2(-1, 1, 1), 32, 32, 1] = 0.15
+
+        # Y-face, low, middle
+        dbuf[vi2(0, -1, 0), 32, 1, 32] = 0.21
+        dbuf[vi2(1, -1, 1), 32, 1, 32] = 0.22
+        dbuf[vi2(-1, -1, 1), 32, 1, 32] = 0.23
+        dbuf[vi2(-1, -1, -1), 32, 1, 32] = 0.24
+        dbuf[vi2(1, -1, -1), 32, 1, 32] = 0.25
+
+        # X-face, left, edge
+        dbuf[vi2(-1, 0, 0), 32, 1, 1] = 0.16
+        dbuf[vi2(-1, 0, 0), 1, 1, 1] = 0.17
+        dbuf[vi2(-1, 0, 0), 1, 32, 1] = 0.18
+        dbuf[vi2(-1, 0, 0), 66, 1, 1] = 0.19
+        dbuf[vi2(-1, 0, 0), 1, 62, 1] = 0.20
+
+        # corners
+        dbuf[vi2(-1, -1, -1), 1, 1, 1] = 0.30
+        dbuf[vi2(-1, -1, 1), 66, 1, 1] = 0.31
+        dbuf[vi2(-1, 1, -1), 1, 62, 1] = 0.32
+        dbuf[vi2(-1, 1, 1), 66, 62, 1] = 0.33
+
+        dbuf[vi2(-1, 1, 1), 65, 2, 1] = 0.40
+        dbuf[vi2(-1, 1, 1), 2, 61, 1] = 0.41
+        dbuf[vi2(-1, 1, 1), 66, 2, 1] = 0.42
+        dbuf[vi2(-1, 1, 1), 2, 62, 1] = 0.43
+
+        runner._debug_set_dist(dbuf)
+        runner._debug_set_dist(dbuf, False)
+
+class SingleBlockPeriodicQ15Test(unittest.TestCase):
+    def test_x_face_propagation(self):
+        global tmpdir
+        ctrl = LBSimulationController(SingleBlockPeriodicSimulationQ15Test,
+                SingleBlockGeoTest)
+        ctrl.run(ignore_cmdline=True)
+
+        output = os.path.join(tmpdir, 'per_single_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        ae = np.testing.assert_equal
+
+        ae(b0[vi2(-1, 0, 0), 32, 32, 64], np.float32(0.11))
+        ae(b0[vi2(-1, -1, -1), 31, 31, 64], np.float32(0.12))
+        ae(b0[vi2(-1, -1, 1), 33, 31, 64], np.float32(0.13))
+        ae(b0[vi2(-1, 1, -1), 31, 33, 64], np.float32(0.14))
+        ae(b0[vi2(-1, 1, 1), 33, 33, 64], np.float32(0.15))
+
+        ae(b0[vi2(0, -1, 0), 32, 62, 32], np.float32(0.21))
+        ae(b0[vi2(1, -1, 1), 33, 62, 33], np.float32(0.22))
+        ae(b0[vi2(-1, -1, 1), 33, 62, 31], np.float32(0.23))
+        ae(b0[vi2(-1, -1, -1), 31, 62, 31], np.float32(0.24))
+        ae(b0[vi2(1, -1, -1), 31, 62, 33], np.float32(0.25))
+
+        ae(b0[vi2(-1, 0, 0), 32, 1, 64], np.float32(0.16))
+        ae(b0[vi2(-1, 0, 0), 1, 1, 64], np.float32(0.17))
+        ae(b0[vi2(-1, 0, 0), 1, 32, 64], np.float32(0.18))
+        ae(b0[vi2(-1, 0, 0), 66, 1, 64], np.float32(0.19))
+        ae(b0[vi2(-1, 0, 0), 1, 62, 64], np.float32(0.20))
+
+        ae(b0[vi2(-1, -1, -1), 66, 62, 64], np.float32(0.30))
+        ae(b0[vi2(-1, -1, 1), 1, 62, 64], np.float32(0.31))
+        ae(b0[vi2(-1, 1, -1), 66, 1, 64], np.float32(0.32))
+        ae(b0[vi2(-1, 1, 1), 1, 1, 64], np.float32(0.33))
+
+        ae(b0[vi2(-1, 1, 1), 66, 3, 64], np.float32(0.40))
+        ae(b0[vi2(-1, 1, 1), 3, 62, 64], np.float32(0.41))
+        ae(b0[vi2(-1, 1, 1), 1, 3, 64], np.float32(0.42))
+        ae(b0[vi2(-1, 1, 1), 3, 1, 64], np.float32(0.43))
+
 
 def setUpModule():
     global tmpdir
