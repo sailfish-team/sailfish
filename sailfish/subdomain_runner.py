@@ -359,13 +359,11 @@ class SubdomainRunner(object):
         if self.dim == 3:
             ctx['lat_nz'] = self._lat_size[-3]
             ctx['arr_nz'] = self._physical_size[-3]
-            periodic_z = int(self._block.periodic_z)
             ctx['block_periodicity'] = [self._block.periodic_x,
                     self._block.periodic_y, self._block.periodic_z]
         else:
             ctx['lat_nz'] = 1
             ctx['arr_nz'] = 1
-            periodic_z = 0
             bnd_limits.append(1)
             ctx['block_periodicity'] = [self._block.periodic_x,
                     self._block.periodic_y, False]
@@ -451,7 +449,6 @@ class SubdomainRunner(object):
     def make_vector_field(self, name=None, output=False, async=False):
         """Allocates several scalar arrays representing a vector field."""
         components = []
-        view_components = []
 
         for x in range(0, self._block.dim):
             field = self.make_scalar_field(self.float, register=False, async=async)
