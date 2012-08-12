@@ -42,7 +42,7 @@ class LBSim(object):
     @classmethod
     def update_defaults(cls, defaults):
         pass
-    
+
     def fields(self):
         return []
 
@@ -100,7 +100,7 @@ class LBSim(object):
         self.config = config
         self.S = sym.S()
         self.iteration = 0
-        self.need_sync_flag = False        
+        self.need_sync_flag = False
 
         # For use in unit tests only.
         if config is not None:
@@ -116,7 +116,7 @@ class LBSim(object):
         self.iteration = state['iteration']
 
     def need_output(self):
-        """Returns True when data will be required for output,  
+        """Returns True when data will be required for output,
         based on command line parameters --from --every.
 
         Called from SubdomainRunner.main().
@@ -126,25 +126,22 @@ class LBSim(object):
         else:
             return False
 
-
     def need_sync(self):
         """Returns True when data for macroscopic fields is necessary
         for the current iteration, and is used when data will be copied from device.
-        It will take place in two cases: 
+        It will take place in two cases:
 
-        1) data output  
+        1) data output
         2) need_sync_flag, which will synchronize one time macroscopic
            fields, it can be used e.g. in after_step
-      
+
         Called from SubdomainRunner.main().
         """
         if self.need_sync_flag:
             self.need_sync_flag = False
             return True
         else:
-            return self.need_output() 
-
-
+            return self.need_output()
 
     def need_checkpoint(self):
         """Returns True when a checkpoint is requested after the current
