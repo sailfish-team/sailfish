@@ -22,6 +22,14 @@
 		other_axes = [[1,2], [0,2], [0,1]]
 
 		def handle_corners(basis, axis_target):
+			"""
+			:param basis: basis vector
+			:param axis_target: location of the target node along the dimension
+				aligned with the axis to which PBCs are applied
+
+			:rvalue: tuple of: conditions on the index variables; target string
+				to be passed to getGlobalIdx
+			"""
 			if basis[axis] == 0:
 				return None, None
 
@@ -30,10 +38,17 @@
 			else:
 				other = other_axes[axis]
 
+			ret_cond = []
+			ret_targ = []
+
+			# Conditions.
 			conditions = []
+
+			# Location of the target node.
 			target = [''] * dim
 			target[axis] = str(axis_target)
 
+			# Corner nodes (cross three PBC boundaries).
 			for i, other_ax in enumerate(other):
 				if basis[other_ax] == 0 or not block_periodicity[other_ax]:
 					target[other_ax] = 'idx%d' % (i + 1)
@@ -45,10 +60,52 @@
 				elif basis[other_ax] == -1:
 					conditions.append('idx%d == 0' % (i + 1))
 					target[other_ax] = str(bnd_limits[other_ax] - 2)
+				else:
+					raise ValueError("Unexpected basis vector component.")
 
-			return ' && '.join(conditions), ', '.join(target)
+			ret_cond.append(' && '.join(conditions))
+			ret_targ.append(', '.join(target))
+
+			# Edge nodes.(cross two PBC boundaries).
+			if sum((abs(i) for i in basis)) == 3:
+				for i, other_ax in enumerate(other):
+					id_ = 'idx%d' % (i + 1)
+					id2 = 'idx%d' % (2 - i)
+
+					target = [''] * dim
+					target[axis] = str(axis_target)
+					conditions = []
+
+					if basis[other_ax] == 1:
+						conditions.append('%s >= %d && %s < %d' % (id_, 2, id_, bnd_limits[other_ax] - 1))
+						target[other_ax] = id_
+					elif basis[other_ax] == -1:
+						conditions.append('%s < %d && %s >= 1' % (id_, bnd_limits[other_ax] - 2, id_))
+						target[other_ax] = id_
+					else:
+						raise ValueError("Unexpected basis vector component.")
+
+					ax = other[1 - i]
+					if basis[ax] == 1:
+						conditions.append('%s == %d' % (id2, bnd_limits[ax] - 1))
+						target[ax] = '1'
+					elif basis[ax] == -1:
+						conditions.append('%s == 0' % id2)
+						target[ax] = str(bnd_limits[ax] - 2)
+
+					ret_targ.append(', '.join(target))
+					ret_cond.append(' && '.join(conditions))
+
+			return ret_cond, ret_targ
 
 		def make_cond(i):
+			"""Returns a string of representing a boolean condition that has
+			to be satisfied in order for the specified distribution to be
+			moved to the target along a single axis.
+
+			:param i: distribution index
+			"""
+
 			conds = []
 
 			if dim == 2:
@@ -92,15 +149,22 @@
 	%for i in sym.get_prop_dists(grid, -1, axis):
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
 			if (isfinite(f${grid.idx_name[i]})) {
-				// Skip distributions which are not populated.
+				// Skip distributions which are not populated or cross multiple boundaries.
 				if (${make_cond(i)}) {
 					${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
 				}
 				<% corner_cond, target = handle_corners(grid.basis[i], bnd_limits[axis] - 2) %>
 				%if corner_cond:
-					else if (${corner_cond}) {
-						int gi_high2 = getGlobalIdx(${target});
-						${get_dist('dist', i, 'gi_high2')} = f${grid.idx_name[i]};
+					else {
+						if (0) {}
+						%for cond, targ in zip(corner_cond, target):
+							%if cond:
+								else if (${cond}) {
+									int gi_high2 = getGlobalIdx(${targ});
+									${get_dist('dist', i, 'gi_high2')} = f${grid.idx_name[i]};
+								}
+							%endif
+						%endfor
 					}
 				%endif
 			}
@@ -119,15 +183,22 @@
 	%for i in sym.get_prop_dists(grid, 1, axis):
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
 			if (isfinite(f${grid.idx_name[i]})) {
-				// Skip distributions which are not populated.
+				// Skip distributions which are not populated or cross multiple boundaries.
 				if (${make_cond(i)}) {
 					${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
 				}
 				<% corner_cond, target = handle_corners(grid.basis[i], 1) %>
 				%if corner_cond:
-					else if (${corner_cond}) {
-						int gi_low2 = getGlobalIdx(${target});
-						${get_dist('dist', i, 'gi_low2')} = f${grid.idx_name[i]};
+					else {
+						if (0) {}
+						%for cond, targ in zip(corner_cond, target):
+							%if cond:
+								else if (${cond}) {
+									int gi_low2 = getGlobalIdx(${targ});
+									${get_dist('dist', i, 'gi_low2')} = f${grid.idx_name[i]};
+								}
+							%endif
+						%endfor
 					}
 				%endif
 			}

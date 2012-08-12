@@ -434,7 +434,7 @@ class SingleBlockPeriodicSimulationQ15Test(SingleBlockPeriodicSimulationTest):
     def update_defaults(cls, defaults):
         SingleBlockPeriodicSimulationTest.update_defaults(defaults)
         defaults.update({
-            'grid': 'D3Q15'
+            'grid': 'D3Q15',
             })
 
     def initial_conditions(self, runner):
