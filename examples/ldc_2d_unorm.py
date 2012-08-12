@@ -2,31 +2,21 @@
 
 import numpy as np
 from sailfish.controller import LBSimulationController
-from sailfish.lb_single import LBFluidSim
-from examples.ldc_2d import LDCGeometry
-from examples.ldc_2d import LDCBlock
+from examples.ldc_2d import LDCGeometry, LDCBlock, LDCSim
 
-class LDCSim(LBFluidSim):
-    subdomain = LDCBlock
-
+class LDCSimUnorm(LDCSim):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
-            'lat_nx': 1024/8,
-            'lat_ny': 1024/8,
+            'lat_nx': 128,
+            'lat_ny': 128,
             'max_iters': 30000,
             'every': 250,
             'visc': 0.16011,
             'model':'mrt',
             })
 
-    @classmethod
-    def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
-        group.add_argument('--ldc_subdomains', type=int, default=1, help='number of blocks to use')
-
     u_norm_table = []
-
     def after_step(self, runner):
         every_n = 523
 
@@ -47,11 +37,12 @@ class LDCSim(LBFluidSim):
 
         if self.iteration == self.config.max_iters - 1:
             u_norm_table_np = np.array(self.u_norm_table)
-            np.savez('unorm',it=u_norm_table_np[:, 0], du_norm=u_norm_table_np[:, 1], u_norm=u_norm_table_np[:, 2])
+            np.savez('unorm', it=u_norm_table_np[:, 0], du_norm=u_norm_table_np[:, 1], u_norm=u_norm_table_np[:, 2])
+
 
 if __name__ == '__main__':
     LDCBlock.max_v = 0.05
-    ctrl = LBSimulationController(LDCSim, LDCGeometry)
+    ctrl = LBSimulationController(LDCSimUnorm, LDCGeometry)
     ctrl.run()
 
     # simple pylab code displaying time evolution of the norm ||u-u0||
