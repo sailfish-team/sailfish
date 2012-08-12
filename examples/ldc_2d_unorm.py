@@ -1,13 +1,8 @@
 #!/usr/bin/python
 
-import math
 import numpy as np
-from sailfish.geo import LBGeometry2D
-from sailfish.subdomain import SubdomainSpec2D, Subdomain2D
-from sailfish.node_type import NTFullBBWall, NTEquilibriumVelocity
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
-from sailfish.util import logpoints,linpoints
 from examples.ldc_2d import LDCGeometry
 from examples.ldc_2d import LDCBlock
 
