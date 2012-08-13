@@ -63,10 +63,12 @@ if __name__ == '__main__':
     ctrl.run()
   
     # simple pylab code displaying time evolution of the norm ||u-u0||
-    from pylab import *
-    figure(1)
-    clf()
-    dane=np.load('unorm.npz')
-    semilogy(dane['it'], dane['du_norm']  ,'ro-' )
-    grid(True)
-    savefig("unorm.png")
+    import matplotlib as mpl
+    mpl.use('Agg')
+    import matplotlib.pyplot as plt
+    fig=plt.figure(1)
+    ax = fig.add_subplot(111)
+    data = np.load('unorm.npz')
+    ax.semilogy(data['it'], data['du_norm'], 'ro-')
+    ax.grid(True)
+    fig.savefig("unorm.png")
