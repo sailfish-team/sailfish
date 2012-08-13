@@ -10,7 +10,7 @@ import socket
 import sys
 
 import numpy as np
-from math import exp,log
+from math import exp, log, ceil
 
 from sailfish import config
 from sailfish import sym
@@ -134,10 +134,11 @@ def in_anyd_fast(arr1, values):
 def is_number(param):
     return type(param) is float or type(param) is int or isinstance(param, np.number)
 
+
 def logpoints(i, min_=1., max_=.1, n=10):
-    """Return  i-th number from a set spaced evenly on a log scale, 
+    """Returns i-th number from a set spaced evenly on a log scale,
     similar to np.logspace, the difference is that it gets one number,
-    and it take values not exponents as min_, max_
+    and it take values (not exponents) as min_, max_.
 
     :param i: get i-th number
     :param min_, max_: range
@@ -145,15 +146,16 @@ def logpoints(i, min_=1., max_=.1, n=10):
     """
     if i <= 0:
         return min_
-    if i >= (n-1):
+    if i >= (n - 1):
         return max_
-    
+
     return exp(log(min_) + i * (log(max_) - log(min_)) / (n - 1))
 
+
 def linpoints(i, min_=1., max_=.1, n=10):
-    """Return  i-th number from a set spaced evenly on a log scale, 
+    """Returns i-th number from a set spaced evenly on a log scale,
     similar to np.logspace, the difference is that it gets one number,
-    and it take values not exponents as min_, max_
+    and it take values (not exponents) as min_, max_.
 
     :param i: get i-th number
     :param min_, max_: range
@@ -161,7 +163,56 @@ def linpoints(i, min_=1., max_=.1, n=10):
     """
     if i <= 0:
         return min_
-    if i >= (n-1):
+    if i >= (n - 1):
         return max_
-    
+
     return min_ + i * (max_ - min_) / (n - 1)
+
+
+def energy_spectrum(velocity, buckets=None, density=True):
+    """Calculates the energy spectrum E(k).
+
+    :param velocity: velocity field
+    :param buckets: if not None, an iterable of wavenumber buckets; if n values
+        are provided here, the energy spectrum will contain n-1 values
+    :param density: if True, a energy density spectrum in k-space will be
+        calculated; if False the energy will simply be integrated
+    :rvalue: numpy array with the energy spectrum
+    """
+    vx = velocity[0]
+    vy = velocity[1]
+    vz = velocity[2]
+
+    Vx = np.fft.fftshift(np.fft.fftn(vx))
+    Vy = np.fft.fftshift(np.fft.fftn(vy))
+    Vz = np.fft.fftshift(np.fft.fftn(vz))
+
+    z, y, x = vx.shape
+    # Scaling factor.  Numpy's definition of the FFT does not include
+    # any normalization.  For a symmetric FT/inverse FT weighting use
+    # sqrt(x * y * z).
+    scale = x * y * z
+
+    Vx /= scale
+    Vy /= scale
+    Vz /= scale
+
+    kz, ky, kx = np.mgrid[-z/2:z/2, -y/2:y/2, -x/2:x/2]
+    kz += 1
+    ky += 1
+    kx += 1
+
+    energy = np.abs(Vx)**2 + np.abs(Vy)**2 + np.abs(Vz)**2
+    k = np.sqrt(kx**2 + ky**2 + kz**2)
+    kmax = int(ceil(x / 2))
+
+    if buckets is None:
+        buckets = np.linspace(0, kmax, kmax + 1)
+
+    spectrum = np.zeros(len(buckets))
+    for i, (low, high) in enumerate(zip(buckets, buckets[1:])):
+        spectrum[i] = np.sum(energy[(k >= low) & (k < high)])
+        if density:
+            spectrum[i] /= (high**3 - low**3)
+
+    return spectrum
