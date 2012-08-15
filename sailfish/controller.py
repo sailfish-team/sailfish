@@ -313,7 +313,8 @@ class LBSimulationController(object):
                 help='local_path:dest_path; if specified, will send the '
                 'contents of "local_path" to "dest_path" on all cluster '
                 'machines before starting the simulation.')
-        group.add_argument('--cluster_pbs', type=bool, default=True,
+        group.add_argument('--nocluster_pbs', action='store_false', default=True,
+                dest='cluster_pbs',
                 help='If True, standard PBS variables will be used to run '
                 'the job in a cluster.')
         group.add_argument('--cluster_pbs_initscript', type=str,
@@ -323,11 +324,13 @@ class LBSimulationController(object):
         group.add_argument('--cluster_pbs_interface', type=str,
                 default='', help='Network interface to use on PBS nodes for '
                 'internode communication.')
-        group.add_argument('--check_invalid_results_host', type=bool,
+        group.add_argument('--nocheck_invalid_results_host', action='store_false',
+                dest='check_invalid_results_host',
                 default=True, help='If True, will terminate the simulation if '
                 'the results obtained on the host contain invalid values '
                 '(inf, nan).')
-        group.add_argument('--check_invalid_results_gpu', type=bool,
+        group.add_argument('--nocheck_invalid_results_gpu',
+                action='store_false', dest='check_invalid_results_gpu',
                 default=True, help='If True, will terminate the simulation '
                 'when invalid values (inf, nan) are detected in the domain '
                 'during the simulation.')
@@ -340,7 +343,8 @@ class LBSimulationController(object):
         group = self._config_parser.add_group('Checkpointing')
         group.add_argument('--checkpoint_file', type=str, help='Location of '
                 'the checkpoint file.', metavar='PATH')
-        group.add_argument('--single_checkpoint', type=bool, default=True,
+        group.add_argument('--single_checkpoint', action='store_true',
+                default=False,
                 help='If True, only a single checkpoint file will be '
                 'generated. If multiple checkpoints are requested, only the '
                 'last one will be retained. This is useful together with '
