@@ -42,7 +42,7 @@ class LBSim(object):
     @classmethod
     def update_defaults(cls, defaults):
         pass
-
+    
     def fields(self):
         return []
 
