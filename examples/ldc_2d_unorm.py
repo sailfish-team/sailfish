@@ -61,8 +61,8 @@ if __name__ == '__main__':
     LDCBlock.max_v = 0.05
     ctrl = LBSimulationController(LDCSim, LDCGeometry)
     ctrl.run()
-  
-    # simple pylab code displaying time evolution of the norm ||u-u0||
+
+    # simple matplotlib code displaying time evolution of the norm ||u-u0||
     import matplotlib as mpl
     mpl.use('Agg')
     import matplotlib.pyplot as plt
