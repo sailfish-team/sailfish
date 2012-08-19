@@ -21,6 +21,7 @@ class LBOutput(object):
     def __init__(self, config, subdomain_id, *args, **kwargs):
         self._scalar_fields = {}
         self._vector_fields = {}
+        self._fluid_map = None
 
         # Additional scalar fields used for visualization.
         self._visualization_fields = {}
@@ -42,11 +43,19 @@ class LBOutput(object):
     def dump_dists(self, i):
         pass
 
+    def set_fluid_map(self, fluid_map):
+        """
+        :param fluid_map: boolean array selecting nodes that represent fluid
+            within a scalar field array
+        """
+        self._fluid_map = fluid_map
+
     def verify(self):
-        return (all((np.all(np.isfinite(f)) for f in
+        fm = self._fluid_map
+        return (all((np.all(np.isfinite(f[fm])) for f in
                     self._scalar_fields.itervalues()))
-                and all(np.all(np.isfinite(f)) for f in
-                    self._vector_fields.itervalues()))
+                and all(np.all(np.isfinite(fc[fm])) for f in
+                    self._vector_fields.itervalues() for fc in f))
 
 
 class VisualizationWrapper(LBOutput):
@@ -68,6 +77,9 @@ class VisualizationWrapper(LBOutput):
 
     def register_field(self, field, name, visualization=False):
         self._output.register_field(field, name, visualization)
+
+    def set_fluid_map(self, fluid_map):
+        self._output.set_fluid_map(fluid_map)
 
     def verify(self):
         return self._output.verify()

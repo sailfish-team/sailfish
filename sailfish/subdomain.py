@@ -715,13 +715,13 @@ class Subdomain(object):
         self.boundary_conditions(*mgrid)
         self.config.logger.debug('... boundary conditions done.')
 
-        # Cache the unencoded type map for visualization.
-        self._type_vis_map[:] = self._type_map[:]
-
         self._postprocess_nodes()
         self.config.logger.debug('... postprocessing done.')
         self._define_ghosts()
         self.config.logger.debug('... ghosts done.')
+
+        # Cache the unencoded type map for visualization.
+        self._type_vis_map[:] = self._type_map[:]
 
         # TODO: At this point, we should decide which GeoEncoder class to use.
         from sailfish import geo_encoder
@@ -756,8 +756,16 @@ class Subdomain(object):
         return self._type_map.base
 
     def visualization_map(self):
+        """Returns an unencoded type map for visualization/
+        postprocessing purposes."""
         return self._type_vis_map
 
+    def fluid_map(self):
+        fm = self.visualization_map()
+        uniq_types = set(np.unique(fm))
+        wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
+        wet_types = self._type_map.dtype.type(wet_types)
+        return util.in_anyd_fast(fm, wet_types)
 
 class Subdomain2D(Subdomain):
     dim = 2

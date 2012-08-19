@@ -471,6 +471,7 @@ class SubdomainRunner(object):
         self._subdomain = self._sim.subdomain(self._global_size, self._block,
                 self._sim.grid)
         self._subdomain.reset()
+        self._output.set_fluid_map(self._subdomain.fluid_map())
 
     def _init_shape(self):
         # Logical size of the lattice (including ghost nodes).
