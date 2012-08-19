@@ -60,13 +60,8 @@ class LDCBlock(Subdomain2D):
         wall_bc = NTFullBBWall
         velocity_bc = NTEquilibriumVelocity
 
-        lor = np.logical_or
-        land = np.logical_and
-        lnot = np.logical_not
-
-        wall_map = land(lor(lor(hx == self.gx-1, hx == 0), hy == 0),
-                        lnot(hy == self.gy-1))
-        self.set_node(hy == self.gy-1, velocity_bc((self.max_v, 0.0)))
+        wall_map = (hx == self.gx-1) | (hx == 0) | (hy == 0)
+        self.set_node((hy == self.gy-1) & (hx > 0) & (hx < self.gx-1), velocity_bc((self.max_v, 0.0)))
         self.set_node(wall_map, wall_bc)
 
     def initial_conditions(self, sim, hx, hy):
