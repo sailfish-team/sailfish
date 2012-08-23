@@ -32,3 +32,10 @@ License
 Unless stated otherwise, all code of the Sailfish project is licensed under the LGPL v3.
 The project documentation, including this manual, is licensed under the Creative Commons Attribution-ShareAlike 3.0 license.
 
+Acknowledgements
+----------------
+We would like to thank for the support of:
+
+* University of Silesia in Katowice
+* the `TWING <http://twing.us.edu.pl/>`_ project
+* NVIDIA corporation
