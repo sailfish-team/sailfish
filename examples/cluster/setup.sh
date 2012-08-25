@@ -73,3 +73,4 @@ pip install numpy
 pip install scipy
 pip install ipython
 pip install pycuda
+pip install blosc

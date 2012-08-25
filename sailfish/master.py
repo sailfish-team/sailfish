@@ -20,7 +20,7 @@ from multiprocessing import Process, Array, Event, Value
 import zmq
 
 from sailfish import subdomain_runner, util, io
-from sailfish.connector import ZMQSubdomainConnector, ZMQRemoteSubdomainConnector
+from sailfish.connector import ZMQSubdomainConnector, ZMQRemoteSubdomainConnector, CompressedZMQRemoteSubdomainConnector
 
 def _start_subdomain_runner(subdomain, config, sim, num_subdomains,
         backend_class, gpu_id, output,
@@ -184,7 +184,11 @@ class LBMachineMaster(object):
                         addr = "tcp://{0}".format(self._subdomain_addr_map[nbid])
                     else:
                         addr = "tcp://{0}".format(self._iface)
-                    c1 = ZMQRemoteSubdomainConnector(addr, receiver=subdomain.id > nbid)
+                    if self.config.compress_intersubdomain_data:
+                        c1 = CompressedZMQRemoteSubdomainConnector(addr,
+                                receiver=subdomain.id > nbid)
+                    else:
+                        c1 = ZMQRemoteSubdomainConnector(addr, receiver=subdomain.id > nbid)
                     subdomain.add_connector(nbid, c1)
 
         return ipc_files

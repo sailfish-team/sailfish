@@ -333,6 +333,11 @@ class LBSimulationController(object):
                 default=True, help='If True, will terminate the simulation '
                 'when invalid values (inf, nan) are detected in the domain '
                 'during the simulation.')
+        group.add_argument('--compress_intersubdomain_data',
+                action='store_true', default=False, help='Uses blosc to '
+                'compress data exchanged between subdomains. Can improve '
+                'performance in distributed simulations limited by bandwidth '
+                'available between computational nodes.')
 
         group = self._config_parser.add_group('Checkpointing')
         group.add_argument('--checkpoint_file', type=str, help='Location of '

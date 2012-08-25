@@ -9,8 +9,8 @@ import cPickle as pickle
 import math
 import operator
 import os
-import numpy as np
 import time
+import numpy as np
 import zmq
 from sailfish import codegen, util, io
 

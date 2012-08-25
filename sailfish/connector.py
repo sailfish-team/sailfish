@@ -4,6 +4,10 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+try:
+    import blosc
+except ImportError:
+    pass
 import os
 import tempfile
 
@@ -149,3 +153,17 @@ class ZMQRemoteSubdomainConnector(ZMQSubdomainConnector):
         if addr is not None:
             self._addr = 'tcp://{0}'.format(addr)
 
+
+class CompressedZMQRemoteSubdomainConnector(ZMQRemoteSubdomainConnector):
+    """Like ZMQRemoteSubdomainConnector, but transfers compressed data."""
+
+    def send(self, data):
+        self.socket.send(blosc.pack_array(data), copy=False)
+
+    def recv(self, data, quit_ev):
+        if quit_ev.is_set():
+            return False
+
+        msg = self.socket.recv(copy=False)
+        data[:] = blosc.unpack_array(bytes(msg))
+        return True
