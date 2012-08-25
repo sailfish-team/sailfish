@@ -4,7 +4,7 @@
 
 <%namespace file="code_common.mako" import="*"/>
 
-${device_func} inline void ComputeACoeff(Dist* fi, Dist* feq, float *a1,
+${device_func} inline void ComputeACoeff(Dist* fi, Dist* fneq, float *a1,
 		float *a2, float *a3, float *a4) {
 	*a1 = 0.0f;
 	*a2 = 0.0f;
@@ -12,10 +12,10 @@ ${device_func} inline void ComputeACoeff(Dist* fi, Dist* feq, float *a1,
 	*a4 = 0.0f;
 	float t, p;
 
-	%for i in range(grid.Q):
-		t = feq->${grid.idx_name[i]} - fi->${grid.idx_name[i]};
-		p = t * t / fi->${grid.idx_name[i]};
-		t /= fi->${grid.idx_name[i]};
+	%for name in grid.idx_name:
+		t = fneq->${name};
+		p = t * t / fi->${name};
+		t /= fi->${name};
 		*a1 += p;
 		p = p * t;
 		*a2 += p;
@@ -31,10 +31,10 @@ ${device_func} inline void ComputeACoeff(Dist* fi, Dist* feq, float *a1,
 	*a4 *= -1.0f / 20.0f;
 }
 
-${device_func} inline float EstimateAlphaSeries(Dist* fi, Dist* feq) {
+${device_func} inline float EstimateAlphaSeries(Dist* fi, Dist* fneq) {
 	float a1, a2, a3, a4;
 
-	ComputeACoeff(fi, feq, &a1, &a2, &a3, &a4);
+	ComputeACoeff(fi, fneq, &a1, &a2, &a3, &a4);
 	float alpha = ${cex(sym.alpha_series())};
 	return alpha;
 }
@@ -44,20 +44,20 @@ ${device_func} inline float EstimateAlphaSeries(Dist* fi, Dist* feq) {
 ${device_func} inline float CalculateEntropy(Dist* fi) {
 	float ent = 0.0f;
 
-	%for i, w in enumerate(grid.entropic_weights):
-		ent += fi->${grid.idx_name[i]} * logf(fi->${grid.idx_name[i]} / (${cex(w)}));
+	%for w, name in zip(grid.entropic_weights, grid.idx_name):
+		ent += fi->${name} * logf(fi->${name} / (${cex(w)}));
 	%endfor
 
 	return ent;
 }
 
 // Calculates entropy for the mirror state with a given alpha.
-${device_func} inline float CalculateEntropyIneq(Dist* fi, Dist* feq, float alpha) {
+${device_func} inline float CalculateEntropyIneq(Dist* fi, Dist* fneq, float alpha) {
 	float ent = 0.0f;
 	float t;
 
-	%for i, w in enumerate(grid.entropic_weights):
-		t = fi->${grid.idx_name[i]} + alpha * (feq->${grid.idx_name[i]} - fi->${grid.idx_name[i]});
+	%for w, name in zip(grid.entropic_weights, grid.idx_name):
+		t = fi->${name} + alpha * fneq->${name};
 		ent += t * logf(t / (${cex(w)}));
 	%endfor
 
@@ -65,32 +65,31 @@ ${device_func} inline float CalculateEntropyIneq(Dist* fi, Dist* feq, float alph
 }
 
 // Calculates d \Delta entropy / d alpha.
-${device_func} inline float CalculateEntropyGrowthDerivative(Dist* fi, Dist* feq, float alpha) {
+${device_func} inline float CalculateEntropyGrowthDerivative(Dist* fi, Dist* fneq, float alpha) {
 	float dent = 0.0f;
-	float t, neq;
+	float t;
 
-	%for i, w in enumerate(grid.entropic_weights):
-		neq = feq->${grid.idx_name[i]} - fi->${grid.idx_name[i]};
-		t = fi->${grid.idx_name[i]} + alpha * neq;
-		dent += neq * (logf(t / (${cex(w)})) + 1.0f);
+	%for w, name in zip(grid.entropic_weights, grid.idx_name):
+		t = fi->${name} + alpha * fneq->${name};
+		dent += fneq->${name} * (logf(t / (${cex(w)})) + 1.0f);
 	%endfor
 
 	return dent;
 }
 
-${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* feq) {
+${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq) {
 	float ent = CalculateEntropy(fi);
 	float alpha = 2.0f;
 	int i = 0;
 
 	// Newton's method to find alpha.
 	while (true) {
-		float ent_ineq = CalculateEntropyIneq(fi, feq, alpha);
+		float ent_ineq = CalculateEntropyIneq(fi, fneq, alpha);
 		float ent_increase = ent_ineq - ent;
 		if (ent_increase < ${cex(entropy_tolerance)}) {
 			break;
 		}
-		alpha = alpha - ent_increase / CalculateEntropyGrowthDerivative(fi, feq, alpha);
+		alpha = alpha - ent_increase / CalculateEntropyGrowthDerivative(fi, fneq, alpha);
 		i++;
 		if (i > 10000) {
 			die();

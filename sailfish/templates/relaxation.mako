@@ -270,7 +270,7 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 )
 {
 	%for i in range(0, len(grids)):
-		Dist feq${i};
+		Dist fneq${i};
 	%endfor
 
 	<%
@@ -291,16 +291,16 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 
 	%for i, eq in enumerate(elbm_eq):
 		%for feq, idx in eq:
-			feq${i}.${idx} = ${cex(feq, vectors=True)};
+			fneq${i}.${idx} = ${cex(feq, vectors=True)} - d0->${idx};
 		%endfor
 	%endfor
 
 	float alpha;
 
-	if (SmallEquilibriumDeviation(d0, &feq0)) {
-		alpha = EstimateAlphaSeries(d0, &feq0);
+	if (SmallEquilibriumDeviation(d0, &fneq0)) {
+		alpha = EstimateAlphaSeries(d0, &fneq0);
 	} else {
-		alpha = EstimateAlphaFromEntropy(d0, &feq0);
+		alpha = EstimateAlphaFromEntropy(d0, &fneq0);
 	}
 
 	%if model == 'elbm' and alpha_output:
@@ -312,7 +312,7 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 	alpha *= 1.0f / (2.0f * tau0 + 1.0f);
 
 	%for idx in grid.idx_name:
-		d0->${idx} += alpha * (feq0.${idx} - d0->${idx});
+		d0->${idx} += alpha * fneq0.${idx};
 	%endfor
 
 	${fluid_velocity(0, save=True)}
