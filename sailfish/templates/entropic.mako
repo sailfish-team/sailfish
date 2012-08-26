@@ -1,5 +1,6 @@
 <%!
 	from sailfish import sym
+	from math import log
 %>
 
 <%namespace file="code_common.mako" import="*"/>
@@ -45,7 +46,7 @@ ${device_func} inline float CalculateEntropy(Dist* fi) {
 	float ent = 0.0f;
 
 	%for w, name in zip(grid.entropic_weights, grid.idx_name):
-		ent += fi->${name} * logf(fi->${name} / (${cex(w)}));
+		ent += fi->${name} * (logf(fi->${name}) + (${cex(-log(w))}));
 	%endfor
 
 	return ent;
@@ -60,7 +61,7 @@ ${device_func} inline float CalculateEntropyIneq(Dist* fi, Dist* fneq, float alp
 
 	%for w, name in zip(grid.entropic_weights, grid.idx_name):
 		t = fi->${name} + alpha * fneq->${name};
-		h = logf(t / (${cex(w)}));
+		h = logf(t) + (${cex(-log(w))});
 		ent += t * h;
 		dent += fneq->${name} * (h + 1.0f);
 	%endfor
