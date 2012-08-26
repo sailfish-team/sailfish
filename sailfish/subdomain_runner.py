@@ -472,6 +472,8 @@ class SubdomainRunner(object):
                 self._sim.grid)
         self._subdomain.reset()
         self._output.set_fluid_map(self._subdomain.fluid_map())
+        if self.config.debug_dump_node_type_map:
+            self._output.dump_node_type(self._subdomain.visualization_map())
 
     def _init_shape(self):
         # Logical size of the lattice (including ghost nodes).

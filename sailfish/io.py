@@ -40,7 +40,10 @@ class LBOutput(object):
     def save(self, i):
         pass
 
-    def dump_dists(self, i):
+    def dump_dists(self, dists, i):
+        pass
+
+    def dump_node_type(self, node_type):
         pass
 
     def set_fluid_map(self, fluid_map):
@@ -146,6 +149,9 @@ def merged_filename(base, digits, it, suffix='.npz'):
 def dists_filename(base, digits, subdomain_id, it, suffix='.npy'):
     return filename(base + '_dists', digits, subdomain_id, it, suffix=suffix)
 
+def node_type_filename(base, subdomain_id, suffix='.npy'):
+    return filename(base + '_node_type_map', 1, subdomain_id, 0, suffix=suffix)
+
 def subdomains_filename(base):
     return base + '.subdomains'
 
@@ -207,7 +213,6 @@ class VTKOutput(LBOutput):
     def dump_dists(self, dists, i):
         pass
 
-
 class NPYOutput(LBOutput):
     """Saves simulation data as np arrays."""
     format_name = 'npy'
@@ -227,6 +232,9 @@ class NPYOutput(LBOutput):
         fname = dists_filename(self.basename, self.digits, self.subdomain_id, i)
         np.save(fname, dists)
 
+    def dump_node_type(self, node_type_map):
+        fname = node_type_filename(self.basename, self.subdomain_id)
+        np.save(fname, node_type_map)
 
 class MatlabOutput(LBOutput):
     """Saves simulation data as Matlab .mat files."""
@@ -247,7 +255,7 @@ class MatlabOutput(LBOutput):
     def dump_dists(self, dists, i):
         import scipy.io
         fname = dists_filename(self.basename, self.digits, self.subdomain_id, i)
-        scipy.io.savemat(dists)
+        scipy.io.savemat(fname, dists)
 
 
 _OUTPUTS = [NPYOutput, VTKOutput, MatlabOutput]

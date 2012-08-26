@@ -300,6 +300,9 @@ class LBSimulationController(object):
                 help='If True, will run the controller, master and subdomain '
                 'runner in a single process, which can be helpful for '
                 'debugging.')
+        group.add_argument('--debug_dump_node_type_map', action='store_true',
+                default=False, help='Dump the contents of the node type map '
+                'into a file'),
         group.add_argument('--log', type=str, default='',
                 help='name of the file to which data is to be logged')
         group.add_argument('--loglevel', type=int, default=logging.INFO,
