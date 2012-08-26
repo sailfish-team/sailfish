@@ -52,29 +52,21 @@ ${device_func} inline float CalculateEntropy(Dist* fi) {
 }
 
 // Calculates entropy for the mirror state with a given alpha.
-${device_func} inline float CalculateEntropyIneq(Dist* fi, Dist* fneq, float alpha) {
+// Also calculates d \Delta entropy / d alpha and returns it in 'derivative'.
+${device_func} inline float CalculateEntropyIneq(Dist* fi, Dist* fneq, float alpha, float *derivative) {
 	float ent = 0.0f;
-	float t;
-
-	%for w, name in zip(grid.entropic_weights, grid.idx_name):
-		t = fi->${name} + alpha * fneq->${name};
-		ent += t * logf(t / (${cex(w)}));
-	%endfor
-
-	return ent;
-}
-
-// Calculates d \Delta entropy / d alpha.
-${device_func} inline float CalculateEntropyGrowthDerivative(Dist* fi, Dist* fneq, float alpha) {
 	float dent = 0.0f;
-	float t;
+	float t, h;
 
 	%for w, name in zip(grid.entropic_weights, grid.idx_name):
 		t = fi->${name} + alpha * fneq->${name};
-		dent += fneq->${name} * (logf(t / (${cex(w)})) + 1.0f);
+		h = logf(t / (${cex(w)}));
+		ent += t * h;
+		dent += fneq->${name} * (h + 1.0f);
 	%endfor
 
-	return dent;
+	*derivative = dent;
+	return ent;
 }
 
 ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq) {
@@ -84,12 +76,14 @@ ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq) {
 
 	// Newton's method to find alpha.
 	while (true) {
-		float ent_ineq = CalculateEntropyIneq(fi, fneq, alpha);
+		float delta_ent_derivative;
+		float ent_ineq = CalculateEntropyIneq(fi, fneq, alpha, &delta_ent_derivative);
 		float ent_increase = ent_ineq - ent;
 		if (ent_increase < ${cex(entropy_tolerance)}) {
 			break;
 		}
-		alpha = alpha - ent_increase / CalculateEntropyGrowthDerivative(fi, fneq, alpha);
+		// Newton's method to solve: H(f_i) = H(f + alpha f_neq).
+		alpha = alpha - ent_increase / delta_ent_derivative;
 		i++;
 		if (i > 10000) {
 			die();
