@@ -37,6 +37,14 @@ class LBOutput(object):
             else:
                 self._scalar_fields[name] = field
 
+    def mask_nonfluid_nodes(self):
+        nonfluid = np.logical_not(self._fluid_map)
+        for f in self._scalar_fields.itervalues():
+            f[nonfluid] = np.nan
+        for fv in self._vector_fields.itervalues():
+            for f in fv:
+                f[nonfluid] = np.nan
+
     def save(self, i):
         pass
 
@@ -171,6 +179,7 @@ class VTKOutput(LBOutput):
         self.digits = filename_iter_digits(config.max_iters)
 
     def save(self, i):
+        self.mask_nonfluid_nodes()
         os.environ['ETS_TOOLKIT'] = 'null'
         from tvtk.api import tvtk
         idata = tvtk.ImageData(spacing=(1, 1, 1), origin=(0, 0, 0))
@@ -222,6 +231,7 @@ class NPYOutput(LBOutput):
         self.digits = filename_iter_digits(config.max_iters)
 
     def save(self, i):
+        self.mask_nonfluid_nodes()
         fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='')
         data = {}
         data.update(self._scalar_fields)
@@ -245,6 +255,7 @@ class MatlabOutput(LBOutput):
         self.digits = filename_iter_digits(config.max_iters)
 
     def save(self, i):
+        self.mask_nonfluid_nodes()
         import scipy.io
         fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='')
         data = {}
