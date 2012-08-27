@@ -1121,9 +1121,9 @@ class SubdomainRunner(object):
             # Continuous indexing.
             elif cbuf.cpair.dst.dst_slice:
                 # [X, Z * dists] or [X, Y * dists]
-                low = [x + self._block.envelope_size for x in cbuf.cpair.dst.dst_low]
-                min_max = ([(x + y.start) for x, y in zip(low, cbuf.cpair.dst.dst_slice)] +
-                        list(reversed(cbuf.dist_full_buf.host.shape[1:])))
+                min_max = ([y.start + self._block.envelope_size
+                            for y in cbuf.cpair.dst.dst_slice] +
+                           list(reversed(cbuf.dist_full_buf.host.shape[1:])))
                 min_max[-1] = min_max[-1] * len(cbuf.cpair.dst.dists)
 
                 if self.dim == 2:

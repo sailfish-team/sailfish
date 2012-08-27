@@ -37,6 +37,7 @@ class TwoBlocksYConnGeoTest(LBGeometry3D):
         blocks.append(SubdomainSpec3D((0, 64, 0), (64, 64, 66)))
         return blocks
 
+
 class TwoBlocksZConnGeoTest(LBGeometry3D):
     def subdomains(self, n=None):
         blocks = []
@@ -55,6 +56,7 @@ vi2 = lambda x, y, z: D3Q15.vec_idx([x, y, z])
 
 class SimulationTest(LBFluidSim):
     subdomain = BlockTest
+    axis = 0
 
     @classmethod
     def modify_config(cls, config):
@@ -198,6 +200,72 @@ class TwoBlockPropagationTest(unittest.TestCase):
         b0 = np.load(io.dists_filename(output, 1, 0, 1))
         b1 = np.load(io.dists_filename(output, 1, 1, 1))
         self._verify(b0, b1, DepthTest)
+
+
+#############################################################################
+
+class TwoBlocksShiftedYConnGeoTest(LBGeometry3D):
+    def subdomains(self, n=None):
+        return [SubdomainSpec3D((0, 0, 0), (50, 30, 13)),
+                SubdomainSpec3D((5, 30, 0), (50, 10, 13))]
+
+class MisalignedVertTest(SimulationTest):
+    @classmethod
+    def update_defaults(cls, defaults):
+        SimulationTest.update_defaults(defaults)
+        defaults.update({
+            'lat_nx': 55,
+            'lat_ny': 40,
+            'lat_nz': 13,
+            })
+
+    def initial_conditions(self, runner):
+        dbuf = runner._debug_get_dist()
+        dbuf[:] = 0.0
+
+        # dbuf indices are: dist, z, y, x
+        # vec indices are: x, y, z
+        if runner._block.id == 0:
+            dbuf[vi(0, 1, 0),  5, 30, 25] = 0.11
+            dbuf[vi(1, 1, 0),  5, 30, 25] = 0.12
+            dbuf[vi(-1, 1, 0), 5, 30, 25] = 0.13
+            dbuf[vi(0, 1, 1),  5, 30, 25] = 0.14
+            dbuf[vi(0, 1, -1), 5, 30, 25] = 0.15
+        elif runner._block.id == 1:
+            dbuf[vi(0, -1, 0),  5, 1, 25] = 0.21
+            dbuf[vi(1, -1, 0),  5, 1, 25] = 0.22
+            dbuf[vi(-1, -1, 0), 5, 1, 25] = 0.23
+            dbuf[vi(0, -1, 1),  5, 1, 25] = 0.24
+            dbuf[vi(0, -1, -1), 5, 1, 25] = 0.25
+
+        runner._debug_set_dist(dbuf)
+        runner._debug_set_dist(dbuf, False)
+
+
+class TwoBlockMisalignedPropagationTest(unittest.TestCase):
+
+    def test_vert_spread(self):
+        ctrl = LBSimulationController(MisalignedVertTest,
+                TwoBlocksShiftedYConnGeoTest)
+        ctrl.run(ignore_cmdline=True)
+
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+
+        ae = np.testing.assert_equal
+        ae(b1[vi(0, 1, 0),  5, 1, 20], np.float32(0.11))
+        ae(b1[vi(1, 1, 0),  5, 1, 21], np.float32(0.12))
+        ae(b1[vi(-1, 1, 0), 5, 1, 19], np.float32(0.13))
+        ae(b1[vi(0, 1, 1),  6, 1, 20], np.float32(0.14))
+        ae(b1[vi(0, 1, -1), 4, 1, 20], np.float32(0.15))
+
+        ae(b0[vi(0, -1, 0),  5, 30, 30], np.float32(0.21))
+        ae(b0[vi(1, -1, 0),  5, 30, 31], np.float32(0.22))
+        ae(b0[vi(-1, -1, 0), 5, 30, 29], np.float32(0.23))
+        ae(b0[vi(0, -1, 1),  6, 30, 30], np.float32(0.24))
+        ae(b0[vi(0, -1, -1), 4, 30, 30], np.float32(0.25))
+
 
 #############################################################################
 
