@@ -209,6 +209,43 @@ class TwoBlocksShiftedYConnGeoTest(LBGeometry3D):
         return [SubdomainSpec3D((0, 0, 0), (50, 30, 13)),
                 SubdomainSpec3D((5, 30, 0), (50, 10, 13))]
 
+class TwoBlocksShiftedXConnGeoTest(LBGeometry3D):
+    def subdomains(self, n=None):
+        return [SubdomainSpec3D((0, 0, 0), (20, 15, 30)),
+                SubdomainSpec3D((20, 2, 7), (10, 15, 30))]
+
+class MisalignedHorizTest(SimulationTest):
+    @classmethod
+    def update_defaults(cls, defaults):
+        SimulationTest.update_defaults(defaults)
+        defaults.update({
+            'lat_nx': 30,
+            'lat_ny': 17,
+            'lat_nz': 37,
+            })
+
+    def initial_conditions(self, runner):
+        dbuf = runner._debug_get_dist()
+        dbuf[:] = 0.0
+
+        # dbuf indices are: dist, z, y, x
+        # vec indices are: x, y, z
+        if runner._block.id == 0:
+            dbuf[vi(1, 0, 0),  15, 7, 20] = 0.11
+            dbuf[vi(1, 1, 0),  15, 7, 20] = 0.12
+            dbuf[vi(1, -1, 0), 15, 7, 20] = 0.13
+            dbuf[vi(1, 0, 1),  15, 7, 20] = 0.14
+            dbuf[vi(1, 0, -1), 15, 7, 20] = 0.15
+        elif runner._block.id == 1:
+            dbuf[vi(-1, 0, 0),  10, 7, 1] = 0.21
+            dbuf[vi(-1, 1, 0),  10, 7, 1] = 0.22
+            dbuf[vi(-1, -1, 0), 10, 7, 1] = 0.23
+            dbuf[vi(-1, 0, 1),  10, 7, 1] = 0.24
+            dbuf[vi(-1, 0, -1), 10, 7, 1] = 0.25
+
+        runner._debug_set_dist(dbuf)
+        runner._debug_set_dist(dbuf, False)
+
 class MisalignedVertTest(SimulationTest):
     @classmethod
     def update_defaults(cls, defaults):
@@ -241,9 +278,7 @@ class MisalignedVertTest(SimulationTest):
         runner._debug_set_dist(dbuf)
         runner._debug_set_dist(dbuf, False)
 
-
 class TwoBlockMisalignedPropagationTest(unittest.TestCase):
-
     def test_vert_spread(self):
         ctrl = LBSimulationController(MisalignedVertTest,
                 TwoBlocksShiftedYConnGeoTest)
@@ -266,6 +301,27 @@ class TwoBlockMisalignedPropagationTest(unittest.TestCase):
         ae(b0[vi(0, -1, 1),  6, 30, 30], np.float32(0.24))
         ae(b0[vi(0, -1, -1), 4, 30, 30], np.float32(0.25))
 
+    def test_horiz_spread(self):
+        ctrl = LBSimulationController(MisalignedHorizTest,
+                TwoBlocksShiftedXConnGeoTest)
+        ctrl.run(ignore_cmdline=True)
+
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+
+        ae = np.testing.assert_equal
+        ae(b1[vi(1, 0, 0),  8, 5, 1], np.float32(0.11))
+        ae(b1[vi(1, 1, 0),  8, 6, 1], np.float32(0.12))
+        ae(b1[vi(1, -1, 0), 8, 4, 1], np.float32(0.13))
+        ae(b1[vi(1, 0, 1),  9, 5, 1], np.float32(0.14))
+        ae(b1[vi(1, 0, -1), 7, 5, 1], np.float32(0.15))
+
+        ae(b0[vi(-1, 0, 0),  17, 9, 20], np.float32(0.21))
+        ae(b0[vi(-1, 1, 0),  17, 10, 20], np.float32(0.22))
+        ae(b0[vi(-1, -1, 0), 17, 8, 20], np.float32(0.23))
+        ae(b0[vi(-1, 0, 1),  18, 9, 20], np.float32(0.24))
+        ae(b0[vi(-1, 0, -1), 16, 9, 20], np.float32(0.25))
 
 #############################################################################
 
