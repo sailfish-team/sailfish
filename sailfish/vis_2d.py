@@ -237,8 +237,8 @@ class Fluid2DVis(vis.FluidVis):
         tmp = np.zeros((height, width), dtype=np.float32)
         tmp.reshape(width * height)[:] = block.vis_buffer[:]
 
-        v_max = np.max(tmp)
-        v_min = np.min(tmp)
+        v_max = np.nanmax(tmp)
+        v_min = np.nanmin(tmp)
 
         cmap = cmaps[1][self._cmap[1]]
         if hasattr(cmap, 'symmetric'):
