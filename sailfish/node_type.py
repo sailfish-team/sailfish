@@ -93,6 +93,7 @@ class NTSlip(LBNodeType):
 class NTEquilibriumVelocity(LBNodeType):
     """Velocity boundary condition using the equilibrium distribution."""
     needs_orientation = True
+    wet_node = True
 
     def __init__(self, velocity):
         self.params = {'velocity': velocity}
@@ -101,6 +102,7 @@ class NTEquilibriumVelocity(LBNodeType):
 class NTEquilibriumDensity(LBNodeType):
     """Density boundary condition using the equilibrium distribution."""
     needs_orientation = True
+    wet_node = True
 
     def __init__(self, density):
         self.params = {'density': density}
