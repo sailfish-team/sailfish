@@ -303,7 +303,7 @@ class LBMachineMaster(object):
             self._quit_event.wait(1)
             if self._quit_event.is_set():
                 self.config.logger.info('Received termination request.')
-                time.sleep(5)
+                time.sleep(0.5)
                 for runner in self.runners:
                     if runner not in done_runners:
                         runner.terminate()
