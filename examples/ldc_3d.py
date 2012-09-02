@@ -52,15 +52,11 @@ class LDCBlock(Subdomain3D):
         wall_bc = NTFullBBWall
         velocity_bc = NTEquilibriumVelocity
 
-        lor = np.logical_or
-        land = np.logical_and
-        lnot = np.logical_not
-
-        wall_map = land(lor(hz == 0, lor(lor(hx == self.gx - 1, hx == 0),
-                        lor(hy == self.gy - 1, hy == 0))), lnot(hz == self.gz - 1))
-
+        wall_map = ((hz == 0) | (hx == self.gx - 1) | (hx == 0) | (hy == 0) |
+                (hy == self.gy - 1))
         self.set_node(wall_map, wall_bc)
-        self.set_node(hz == self.gz - 1, velocity_bc((self.max_v, 0.0, 0.0)))
+        self.set_node((hz == self.gz - 1) & np.logical_not(wall_map),
+                velocity_bc((self.max_v, 0.0, 0.0)))
 
     def initial_conditions(self, sim, hx, hy, hz):
         sim.rho[:] = 1.0
