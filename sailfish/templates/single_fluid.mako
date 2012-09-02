@@ -93,7 +93,7 @@ ${kernel} void PrepareMacroFields(
 	Dist fi;
 	float out;
 
-	getDist(&fi, dist1_in, gi);
+	getDist(&fi, dist1_in, gi ${iteration_number_arg_if_required()});
 	get0thMoment(&fi, type, orientation, &out);
 	orho[gi] = out;
 }
@@ -131,16 +131,7 @@ ${kernel} void CollideAndPropagate(
 
 	// Cache the distributions in local variables
 	Dist d0;
-
-	%if access_pattern == 'AB':
-		getDist(&d0, dist_in, gi);
-	%else:
-		if ((iteration_number & 1) == 0) {
-			getDist(&d0, dist_in, gi);
-		} else {
-			getUnpropagatedDistFromOppositeSlots(&d0, dist_in, gi);
-		}
-	%endif
+	getDist(&d0, dist_in, gi ${iteration_number_arg_if_required()});
 
 	%if simtype == 'shan-chen':
 		${sc_calculate_accel()}
@@ -159,7 +150,9 @@ ${kernel} void CollideAndPropagate(
 	${relaxate(bgk_args)}
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out);
 
-	checkInvalidValues(&d0, ${position()});
+	if (isWetNode(type)) {
+		checkInvalidValues(&d0, ${position()});
+	}
 
 	// Only save the macroscopic quantities if requested to do so.
 	if (options & OPTION_SAVE_MACRO_FIELDS) {

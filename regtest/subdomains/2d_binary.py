@@ -51,7 +51,8 @@ class SCSimulationTest(SeparationSCSim):
             'max_iters': MAX_ITERS,
             'quiet': True,
             'cuda_cache': False,
-            'output': output})
+            'output': output,
+            'access_pattern': access_pattern})
 
 
 class FETestDomain(SeparationDomain):
@@ -82,7 +83,8 @@ class FESimulationTest(SeparationFESim):
             'max_iters': MAX_ITERS,
             'quiet': True,
             'cuda_cache': False,
-            'output': output})
+            'output': output,
+            'access_pattern': access_pattern})
 
 
 class Geometry4Blocks(LBGeometry2D):
@@ -178,6 +180,7 @@ def tearDownModule():
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
+    access_pattern = args.access_pattern
     if block_size < mem_align:
         mem_align = block_size
     unittest.main()

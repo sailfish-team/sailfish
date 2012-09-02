@@ -27,6 +27,7 @@ class BasicFunctionalityTest(unittest.TestCase):
     def setUp(self):
         config = LBConfig()
         config.seed = 0
+        config.access_pattern = 'AA'
         config.precision = 'single'
         config.block_size = 8
         config.mem_alignment = 8
@@ -81,6 +82,7 @@ class NNSubdomainRunnerTest(unittest.TestCase):
     def setUp(self):
         config = LBConfig()
         config.seed = 0
+        config.access_pattern = 'AA'
         config.precision = 'single'
         config.block_size = 8
         config.mem_alignment = 8

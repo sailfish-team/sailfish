@@ -229,7 +229,6 @@
 	{
 		${prop_block_bnd(dist_out, dist_in, -1, 'prop_local')}
 	}
-
 </%def>
 
 <%def name="propagate(dist_out, dist_in='fi')">

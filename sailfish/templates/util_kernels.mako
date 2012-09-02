@@ -9,7 +9,12 @@
 
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
 
-<%def name="pbc_helper(axis, max_dim, max_dim2=None)">
+##
+## opposite: if True, the distributions are read and written to slots
+##           opposite to where they normally should be; this is used
+##           after the fully local step in the AA access pattern.
+##
+<%def name="pbc_helper(axis, max_dim, max_dim2=None, opposite=False)">
 	<%
 		if axis == 0:
 			offset = 1
@@ -17,6 +22,9 @@
 			offset = arr_nx
 		else:
 			offset = arr_nx * arr_ny
+
+		if opposite:
+			offset = -offset
 
 		# Maps axis number to a list of other axes.
 		other_axes = [[1,2], [0,2], [0,1]]
@@ -55,18 +63,21 @@
 					continue
 
 				if basis[other_ax] == 1:
-					conditions.append('idx%d == %d' % ((i + 1), bnd_limits[other_ax] - 1))
-					target[other_ax] = '1'
+					shift = 1 if not opposite else 2
+					conditions.append('idx%d == %d' % ((i + 1), bnd_limits[other_ax] - shift))
+					target[other_ax] = '1' if not opposite else '0'
 				elif basis[other_ax] == -1:
-					conditions.append('idx%d == 0' % (i + 1))
-					target[other_ax] = str(bnd_limits[other_ax] - 2)
+					shift = 0 if not opposite else 1
+					conditions.append('idx%d == %d' % ((i + 1), shift))
+					shift = 2 if not opposite else 1
+					target[other_ax] = str(bnd_limits[other_ax] - shift)
 				else:
 					raise ValueError("Unexpected basis vector component.")
 
 			ret_cond.append(' && '.join(conditions))
 			ret_targ.append(', '.join(target))
 
-			# Edge nodes.(cross two PBC boundaries).
+			# Edge nodes (cross two PBC boundaries).
 			if sum((abs(i) for i in basis)) == 3:
 				for i, other_ax in enumerate(other):
 					id_ = 'idx%d' % (i + 1)
@@ -76,22 +87,30 @@
 					target[axis] = str(axis_target)
 					conditions = []
 
+					# XXX: verify this code
 					if basis[other_ax] == 1:
-						conditions.append('%s >= %d && %s < %d' % (id_, 2, id_, bnd_limits[other_ax] - 1))
+						shift = 1 if not opposite else 2
+						start = 2 if not opposite else 1
+						conditions.append('%s >= %d && %s < %d' % (id_, start, id_, bnd_limits[other_ax] - shift))
 						target[other_ax] = id_
 					elif basis[other_ax] == -1:
-						conditions.append('%s < %d && %s >= 1' % (id_, bnd_limits[other_ax] - 2, id_))
+						shift = 2 if not opposite else 1
+						conditions.append('%s < %d && %s >= 1' % (id_, bnd_limits[other_ax] - shift, id_))
 						target[other_ax] = id_
 					else:
 						raise ValueError("Unexpected basis vector component.")
 
+					# The other 'other' axis.
 					ax = other[1 - i]
 					if basis[ax] == 1:
-						conditions.append('%s == %d' % (id2, bnd_limits[ax] - 1))
-						target[ax] = '1'
+						shift = 1 if not opposite else 2
+						conditions.append('%s == %d' % (id2, bnd_limits[ax] - shift))
+						target[ax] = '1' if not opposite else '0'
 					elif basis[ax] == -1:
-						conditions.append('%s == 0' % id2)
-						target[ax] = str(bnd_limits[ax] - 2)
+						shift = 0 if not opposite else 1
+						conditions.append('%s == %d' % (id2, shift))
+						shift = 2 if not opposite else 1
+						target[ax] = str(bnd_limits[ax] - shift)
 
 					ret_targ.append(', '.join(target))
 					ret_cond.append(' && '.join(conditions))
@@ -108,60 +127,85 @@
 
 			conds = []
 
-			if dim == 2:
-				if grid.basis[i][1 - axis] == 1:
-					return 'idx1 > 1 && idx1 <= {0}'.format(max_dim)
-				elif grid.basis[i][1 - axis] == -1:
-					return 'idx1 < {0} && idx1 >= 1'.format(max_dim)
+			# In the local step of the AA access pattern, all distributions are
+			# unpropagated, so every fluid node has to participate in the PBC
+			# (but ghost nodes do not).
+			if opposite:
+				if dim == 2:
+					return 'idx1 >= 1 && idx1 <= {0}'.format(max_dim)
+				else:
+					return 'idx1 >= 1 && idx2 >= 1 && idx1 <= {0} && idx2 <= {0}'.format(
+						max_dim, max_dim2)
+			# If the distributions are already propagated, then certain locations
+			# could not have been propagated to. For instance, fNW for a node at
+			# y == 1 should not take part in the PBC copy.
 			else:
-				oa1 = other_axes[axis][0]
-				oa2 = other_axes[axis][1]
+				if dim == 2:
+					if grid.basis[i][1 - axis] == 1:
+						return 'idx1 > 1 && idx1 <= {0}'.format(max_dim)
+					elif grid.basis[i][1 - axis] == -1:
+						return 'idx1 < {0} && idx1 >= 1'.format(max_dim)
+				else:
+					oa1 = other_axes[axis][0]
+					oa2 = other_axes[axis][1]
 
-				if grid.basis[i][oa1] == 1:
-					cond = 'idx1 > 1'
-					if block_periodicity[axis] and block_periodicity[oa1]:
-						cond += ' && idx1 <= {0}'.format(max_dim)
-					conds.append(cond)
-				elif grid.basis[i][oa1] == -1:
-					cond = 'idx1 < {0}'.format(max_dim)
-					if block_periodicity[axis] and block_periodicity[oa1]:
-						cond += ' && idx1 >= 1'
-					conds.append(cond)
-				if grid.basis[i][oa2] == 1:
-					cond = 'idx2 > 1'
-					if block_periodicity[axis] and block_periodicity[oa2]:
-						cond += ' && idx2 <= {0}'.format(max_dim2)
-					conds.append(cond)
-				elif grid.basis[i][oa2] == -1:
-					cond = 'idx2 < {0}'.format(max_dim2)
-					if block_periodicity[axis] and block_periodicity[oa2]:
-						cond += ' && idx2 >= 1'
-					conds.append(cond)
+					if grid.basis[i][oa1] == 1:
+						cond = 'idx1 > 1'
+						if block_periodicity[axis] and block_periodicity[oa1]:
+							cond += ' && idx1 <= {0}'.format(max_dim)
+						conds.append(cond)
+					elif grid.basis[i][oa1] == -1:
+						cond = 'idx1 < {0}'.format(max_dim)
+						if block_periodicity[axis] and block_periodicity[oa1]:
+							cond += ' && idx1 >= 1'
+						conds.append(cond)
+					if grid.basis[i][oa2] == 1:
+						cond = 'idx2 > 1'
+						if block_periodicity[axis] and block_periodicity[oa2]:
+							cond += ' && idx2 <= {0}'.format(max_dim2)
+						conds.append(cond)
+					elif grid.basis[i][oa2] == -1:
+						cond = 'idx2 < {0}'.format(max_dim2)
+						if block_periodicity[axis] and block_periodicity[oa2]:
+							cond += ' && idx2 >= 1'
+						conds.append(cond)
 			return ' && '.join(conds)
 	%>
 
 	// TODO(michalj): Generalize this for grids with e_i > 1.
 	// From low idx to high idx.
 	%for i in sym.get_prop_dists(grid, -1, axis):
-		float f${grid.idx_name[i]} = ${get_dist('dist', i, 'gi_low')};
+		<%
+			j = grid.idx_opposite[i] if opposite else i
+		%>
+		float f${grid.idx_name[i]} = ${get_dist('dist', j, 'gi_low')};
 	%endfor
 
 	%for i in sym.get_prop_dists(grid, -1, axis):
+		<%
+			j = grid.idx_opposite[i] if opposite else i
+		%>
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
 			if (isfinite(f${grid.idx_name[i]})) {
 				// Skip distributions which are not populated or cross multiple boundaries.
 				if (${make_cond(i)}) {
-					${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
+					${get_dist('dist', j, 'gi_high')} = f${grid.idx_name[i]};
 				}
-				<% corner_cond, target = handle_corners(grid.basis[i], bnd_limits[axis] - 2) %>
+				<%
+					axis_target = bnd_limits[axis] - 2 if not opposite else bnd_limits[axis] - 1
+					corner_cond, target = handle_corners(grid.basis[i], axis_target)
+				%>
 				%if corner_cond:
-					else {
+					%if not opposite:
+						else
+					%endif
+					{
 						if (0) {}
 						%for cond, targ in zip(corner_cond, target):
 							%if cond:
 								else if (${cond}) {
 									int gi_high2 = getGlobalIdx(${targ});
-									${get_dist('dist', i, 'gi_high2')} = f${grid.idx_name[i]};
+									${get_dist('dist', j, 'gi_high2')} = f${grid.idx_name[i]};
 								}
 							%endif
 						%endfor
@@ -170,32 +214,44 @@
 			}
 		%else:
 			if (isfinite(f${grid.idx_name[i]})) {
-				${get_dist('dist', i, 'gi_high')} = f${grid.idx_name[i]};
+				${get_dist('dist', j, 'gi_high')} = f${grid.idx_name[i]};
 			}
 		%endif
 	%endfor
 
 	// From high idx to low idx.
 	%for i in sym.get_prop_dists(grid, 1, axis):
-		float f${grid.idx_name[i]} = ${get_dist('dist', i, 'gi_high', offset)};
+		<%
+			j = grid.idx_opposite[i] if opposite else i
+		%>
+		float f${grid.idx_name[i]} = ${get_dist('dist', j, 'gi_high', offset)};
 	%endfor
 
 	%for i in sym.get_prop_dists(grid, 1, axis):
+		<%
+			j = grid.idx_opposite[i] if opposite else i
+		%>
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
 			if (isfinite(f${grid.idx_name[i]})) {
 				// Skip distributions which are not populated or cross multiple boundaries.
 				if (${make_cond(i)}) {
-					${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
+					${get_dist('dist', j, 'gi_low', offset)} = f${grid.idx_name[i]};
 				}
-				<% corner_cond, target = handle_corners(grid.basis[i], 1) %>
+				<%
+					axis_target = 1 if not opposite else 0
+					corner_cond, target = handle_corners(grid.basis[i], axis_target)
+				%>
 				%if corner_cond:
-					else {
+					%if not opposite:
+						else
+					%endif
+					{
 						if (0) {}
 						%for cond, targ in zip(corner_cond, target):
 							%if cond:
 								else if (${cond}) {
 									int gi_low2 = getGlobalIdx(${targ});
-									${get_dist('dist', i, 'gi_low2')} = f${grid.idx_name[i]};
+									${get_dist('dist', j, 'gi_low2')} = f${grid.idx_name[i]};
 								}
 							%endif
 						%endfor
@@ -204,7 +260,7 @@
 			}
 		%else:
 			if (isfinite(f${grid.idx_name[i]})) {
-				${get_dist('dist', i, 'gi_low', offset)} = f${grid.idx_name[i]};
+				${get_dist('dist', j, 'gi_low', offset)} = f${grid.idx_name[i]};
 			}
 		%endif
 	%endfor
@@ -226,7 +282,7 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 		if (axis == 0) {
 			if (idx1 >= ${lat_ny}) { return; }
 			gi_low = getGlobalIdx(0, idx1);				// ghost node
-			gi_high = getGlobalIdx(${lat_nx-2}, idx1);	// read node
+			gi_high = getGlobalIdx(${lat_nx-2}, idx1);	// real node
 			${pbc_helper(0, lat_ny-2)}
 		} else if (axis == 1) {
 			if (idx1 >= ${lat_nx}) { return; }
@@ -251,6 +307,52 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 			gi_low = getGlobalIdx(idx1, idx2, 0);				// ghost node
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});	// real node
 			${pbc_helper(2, lat_nx-2, lat_ny-2)}
+		}
+	%endif
+}
+
+// Like ApplyPeriodicBoundaryConditions above, but works after the fully local
+// step of the AA access pattern. The differences are:
+//  - distributions opposite to normal ones are copied
+//  - data is copied from real nodes to ghost nodes
+${kernel} void ApplyPeriodicBoundaryConditionsWithSwap(
+		${global_ptr} float *dist, int axis)
+{
+	int idx1 = get_global_id(0);
+	int gi_low, gi_high;
+
+	// For single block PBC, the envelope size (width of the ghost node
+	// layer) is always 1.
+	// TODO(michalj): Generalize this for the case when envelope_size != 1.
+	%if dim == 2:
+		if (axis == 0) {
+			if (idx1 >= ${lat_ny}) { return; }
+			gi_low = getGlobalIdx(1, idx1);				// real node
+			gi_high = getGlobalIdx(${lat_nx-1}, idx1);	// ghost node
+			${pbc_helper(0, lat_ny-2, opposite=True)}
+		} else if (axis == 1) {
+			if (idx1 >= ${lat_nx}) { return; }
+			gi_low = getGlobalIdx(idx1, 1);				// real node
+			gi_high = getGlobalIdx(idx1, ${lat_ny-1});	// ghost node
+			${pbc_helper(1, lat_nx-2, opposite=True)}
+		}
+	%else:
+		int idx2 = get_global_id(1);
+		if (axis == 0) {
+			if (idx1 >= ${lat_ny} || idx2 >= ${lat_nz}) { return; }
+			gi_low = getGlobalIdx(1, idx1, idx2);				// real node
+			gi_high = getGlobalIdx(${lat_nx-1}, idx1, idx2);	// ghost node
+			${pbc_helper(0, lat_ny-2, lat_nz-2, opposite=True)}
+		} else if (axis == 1) {
+			if (idx1 >= ${lat_nx} || idx2 >= ${lat_nz}) { return; }
+			gi_low = getGlobalIdx(idx1, 1, idx2);				// real node
+			gi_high = getGlobalIdx(idx1, ${lat_ny-1}, idx2);	// ghost node
+			${pbc_helper(1, lat_nx-2, lat_nz-2, opposite=True)}
+		} else {
+			if (idx1 >= ${lat_nx} || idx2 >= ${lat_ny}) { return; }
+			gi_low = getGlobalIdx(idx1, idx2, 1);				// real node
+			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-1});	// ghost node
+			${pbc_helper(2, lat_nx-2, lat_ny-2, opposite=True)}
 		}
 	%endif
 }
@@ -321,15 +423,7 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 }
 
 %if dim == 2:
-// Collects ghost node data for connections along axes other than X.
-// dist: distributions array
-// base_gy: where along the X axis to start collecting the data
-// face: see LBBlock class constants
-// buffer: buffer where the data is to be saved
-${kernel} void CollectContinuousData(
-		${global_ptr} float *dist, int face, int base_gx,
-		int max_lx, ${global_ptr} float *buffer)
-{
+<%def name="collect_continuous_data_body_2d(opposite=False)">
 	int idx = get_global_id(0);
 	int gi;
 	float tmp;
@@ -344,6 +438,10 @@ ${kernel} void CollectContinuousData(
 			<%
 				normal = block.face_to_normal(axis)
 				dists = sym.get_interblock_dists(grid, normal)
+				if opposite:
+					gy = lat_linear_macro[axis]
+				else:
+					gy = lat_linear[axis]
 			%>
 			int dist_size = max_lx / ${len(dists)};
 			int dist_num = idx / dist_size;
@@ -352,8 +450,12 @@ ${kernel} void CollectContinuousData(
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
 				case ${i}: {
-					gi = getGlobalIdx(base_gx + gx, ${lat_linear[axis]});
-					tmp = ${get_dist('dist', prop_dist, 'gi')};
+					gi = getGlobalIdx(base_gx + gx, ${gy});
+					%if opposite:
+						tmp = ${get_dist('dist', grid.idx_opposite[prop_dist], 'gi')};
+					%else:
+						tmp = ${get_dist('dist', prop_dist, 'gi')};
+					%endif
 					break;
 				}
 				%endfor
@@ -363,6 +465,25 @@ ${kernel} void CollectContinuousData(
 		}
 	%endfor
 	}
+</%def>
+
+// Collects ghost node data for connections along axes other than X.
+// dist: distributions array
+// base_gy: where along the X axis to start collecting the data
+// face: see LBBlock class constants
+// buffer: buffer where the data is to be saved
+${kernel} void CollectContinuousData(
+		${global_ptr} float *dist, int face, int base_gx,
+		int max_lx, ${global_ptr} float *buffer)
+{
+	${collect_continuous_data_body_2d(False)}
+}
+
+${kernel} void CollectContinuousDataWithSwap(
+		${global_ptr} float *dist, int face, int base_gx,
+		int max_lx, ${global_ptr} float *buffer)
+{
+	${collect_continuous_data_body_2d(True)}
 }
 %else:
 <%def name="_get_global_idx(axis)">
@@ -375,24 +496,19 @@ ${kernel} void CollectContinuousData(
 	%endif
 </%def>
 
-// The data is collected from a rectangular area of the plane corresponding to 'face'.
-// The grid with which the kernel is to be called has the following dimensions:
-//
-//  x: # nodes along the X direction + any padding (real # nodes is identified by max_lx)
-//  y: # nodes along the Y/Z direction * # of dists to transfer + any padding
-//
-// The data will be placed into buffer, in the following linear layout:
-//
-// (x0, y0, d0), (x1, y0, d0), .. (xN, y0, d0),
-// (x0, y1, d0), (x1, y1, d0), .. (xN, y1, d0),
-// ..
-// (x0, yM, d0), (x1, yM, d0). .. (xN, yM, d0),
-// (x0, y0, d1), (x1, y0, d1), .. (xN, y0, d1),
-// ...
-${kernel} void CollectContinuousData(
-	${global_ptr} float *dist, int face, int base_gx, int base_other,
-	int max_lx, int max_other, ${global_ptr} float *buffer)
-{
+## In the case of in-place propagation, the data is read from the same place as
+## in the case of macroscopic variables.
+<%def name="_get_global_idx_opp(axis)">
+	## Y-axis
+	%if axis < 4:
+		gi = getGlobalIdx(base_gx + gx, ${lat_linear_macro[axis]}, base_other + other);
+	## Z-axis
+	%else:
+		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_macro[axis]});
+	%endif
+</%def>
+
+<%def name="collect_continuous_data_body_3d(opposite=False)">
 	int gx = get_global_id(0);
 	int idx = get_global_id(1);
 	int gi;
@@ -417,8 +533,13 @@ ${kernel} void CollectContinuousData(
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
 				case ${i}: {
-					${_get_global_idx(axis)};
-					tmp = ${get_dist('dist', prop_dist, 'gi')};
+					%if opposite:
+						${_get_global_idx_opp(axis)};
+						tmp = ${get_dist('dist', grid.idx_opposite[prop_dist], 'gi')};
+					%else:
+						${_get_global_idx(axis)};
+						tmp = ${get_dist('dist', prop_dist, 'gi')};
+					%endif
 					break;
 				}
 				%endfor
@@ -430,14 +551,39 @@ ${kernel} void CollectContinuousData(
 		}
 	%endfor
 	}
+</%def>
+
+// The data is collected from a rectangular area of the plane corresponding to 'face'.
+// The grid with which the kernel is to be called has the following dimensions:
+//
+//  x: # nodes along the X direction + any padding (real # nodes is identified by max_lx)
+//  y: # nodes along the Y/Z direction * # of dists to transfer + any padding
+//
+// The data will be placed into buffer, in the following linear layout:
+//
+// (x0, y0, d0), (x1, y0, d0), .. (xN, y0, d0),
+// (x0, y1, d0), (x1, y1, d0), .. (xN, y1, d0),
+// ..
+// (x0, yM, d0), (x1, yM, d0). .. (xN, yM, d0),
+// (x0, y0, d1), (x1, y0, d1), .. (xN, y0, d1),
+// ...
+${kernel} void CollectContinuousData(
+	${global_ptr} float *dist, int face, int base_gx, int base_other,
+	int max_lx, int max_other, ${global_ptr} float *buffer)
+{
+	${collect_continuous_data_body_3d(False)};
+}
+
+${kernel} void CollectContinuousDataWithSwap(
+	${global_ptr} float *dist, int face, int base_gx, int base_other,
+	int max_lx, int max_other, ${global_ptr} float *buffer)
+{
+	${collect_continuous_data_body_3d(True)};
 }
 %endif
 
 %if dim == 2:
-${kernel} void DistributeContinuousData(
-		${global_ptr} float *dist, int face, int base_gx,
-		int max_lx, ${global_ptr} float *buffer)
-{
+<%def name="distribute_continuous_data_body_2d(opposite)">
 	int idx = get_global_id(0);
 	int gi;
 
@@ -451,6 +597,10 @@ ${kernel} void DistributeContinuousData(
 			<%
 				normal = block.face_to_normal(axis)
 				dists = sym.get_interblock_dists(grid, normal)
+				if opposite:
+					gy = lat_linear_with_swap[axis]
+				else:
+					gy = lat_linear_dist[axis]
 			%>
 			int dist_size = max_lx / ${len(dists)};
 			int dist_num = idx / dist_size;
@@ -459,8 +609,12 @@ ${kernel} void DistributeContinuousData(
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
 				case ${i}: {
-					gi = getGlobalIdx(base_gx + gx, ${lat_linear_dist[axis]});
-					${get_dist('dist', prop_dist, 'gi')} = tmp;
+					gi = getGlobalIdx(base_gx + gx, ${gy});
+					%if opposite:
+						${get_dist('dist', grid.idx_opposite[prop_dist], 'gi')} = tmp;
+					%else:
+						${get_dist('dist', prop_dist, 'gi')} = tmp;
+					%endif
 					break;
 				}
 				%endfor
@@ -470,6 +624,20 @@ ${kernel} void DistributeContinuousData(
 		}
 	%endfor
 	}
+</%def>
+
+${kernel} void DistributeContinuousData(
+		${global_ptr} float *dist, int face, int base_gx,
+		int max_lx, ${global_ptr} float *buffer)
+{
+	${distribute_continuous_data_body_2d(False)}
+}
+
+${kernel} void DistributeContinuousDataWithSwap(
+		${global_ptr} float *dist, int face, int base_gx,
+		int max_lx, ${global_ptr} float *buffer)
+{
+	${distribute_continuous_data_body_2d(True)}
 }
 %else:
 ## 3D
@@ -483,12 +651,17 @@ ${kernel} void DistributeContinuousData(
 	%endif
 </%def>
 
-// Layout of the data in the buffer is the same as in the output buffer of
-// CollectContinuousData.
-${kernel} void DistributeContinuousData(
-		${global_ptr} float *dist, int face, int base_gx, int base_other,
-		int max_lx, int max_other, ${global_ptr} float *buffer)
-{
+<%def name="_get_global_dist_idx_opp(axis)">
+	## Y-axis
+	%if axis < 4:
+		gi = getGlobalIdx(base_gx + gx, ${lat_linear_with_swap[axis]}, base_other + other);
+	## Z-axis
+	%else:
+		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_with_swap[axis]});
+	%endif
+</%def>
+
+<%def name="distribute_continuous_data_body_3d(opposite)">
 	int gx = get_global_id(0);
 	int idx = get_global_id(1);
 	int gi;
@@ -513,8 +686,13 @@ ${kernel} void DistributeContinuousData(
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
 				case ${i}: {
-					${_get_global_dist_idx(axis)}
-					${get_dist('dist', prop_dist, 'gi')} = tmp;
+					%if opposite:
+						${_get_global_dist_idx_opp(axis)}
+						${get_dist('dist', grid.idx_opposite[prop_dist], 'gi')} = tmp;
+					%else:
+						${_get_global_dist_idx(axis)}
+						${get_dist('dist', prop_dist, 'gi')} = tmp;
+					%endif
 					break;
 				}
 				%endfor
@@ -523,6 +701,22 @@ ${kernel} void DistributeContinuousData(
 		}
 	%endfor
 	}
+</%def>
+
+// Layout of the data in the buffer is the same as in the output buffer of
+// CollectContinuousData.
+${kernel} void DistributeContinuousData(
+		${global_ptr} float *dist, int face, int base_gx, int base_other,
+		int max_lx, int max_other, ${global_ptr} float *buffer)
+{
+	${distribute_continuous_data_body_3d(False)}
+}
+
+${kernel} void DistributeContinuousDataWithSwap(
+		${global_ptr} float *dist, int face, int base_gx, int base_other,
+		int max_lx, int max_other, ${global_ptr} float *buffer)
+{
+	${distribute_continuous_data_body_3d(True)}
 }
 %endif
 

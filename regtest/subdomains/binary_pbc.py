@@ -88,6 +88,8 @@ class SCTestSim2D(LBBinaryFluidShanChen):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
+            'check_invalid_results_gpu': False,
+            'access_pattern': access_pattern,
             'block_size': block_size,
             'mem_alignment': mem_align,
             'cuda_cache': False,
@@ -109,6 +111,8 @@ class SCTestSim3D(LBBinaryFluidShanChen):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
+            'check_invalid_results_gpu': False,
+            'access_pattern': access_pattern,
             'block_size': block_size,
             'mem_alignment': mem_align,
             'cuda_cache': False,
@@ -228,6 +232,7 @@ class FETestSim2D(LBBinaryFluidFreeEnergy):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
+            'access_pattern': access_pattern,
             'block_size': block_size,
             'mem_alignment': mem_align,
             'cuda_cache': False,
@@ -254,6 +259,7 @@ class FETestSim3D(LBBinaryFluidFreeEnergy):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
+            'access_pattern': access_pattern,
             'block_size': block_size,
             'mem_alignment': mem_align,
             'cuda_cache': False,
@@ -321,6 +327,7 @@ def tearDownModule():
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
+    access_pattern = args.access_pattern
     if block_size < mem_align:
         mem_align = block_size
     unittest.main()

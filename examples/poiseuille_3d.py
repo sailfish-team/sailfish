@@ -3,7 +3,7 @@
 import math
 import numpy as np
 
-from sailfish.geo import LBGeometry3D
+from sailfish.geo import EqualSubdomainsGeometry3D
 from sailfish.subdomain import Subdomain3D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
@@ -162,7 +162,7 @@ class PoiseuilleSim(LBFluidSim, LBForcedSim):
             accel = self.subdomain.max_v * (16.0 * config.visc) / channel_width**2
             if config.flow_direction == 'x':
                 force_vec = (accel, 0.0, 0.0)
-            elif config.flow_direciton == 'y':
+            elif config.flow_direction == 'y':
                 force_vec = (0.0, accel, 0.0)
             else:
                 force_vec = (0.0, 0.0, accel)
@@ -170,4 +170,4 @@ class PoiseuilleSim(LBFluidSim, LBForcedSim):
 
 
 if __name__ == '__main__':
-    LBSimulationController(PoiseuilleSim, LBGeometry3D).run()
+    LBSimulationController(PoiseuilleSim, EqualSubdomainsGeometry3D).run()

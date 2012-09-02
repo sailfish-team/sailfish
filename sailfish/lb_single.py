@@ -143,12 +143,14 @@ class LBFluidSim(LBSim):
 
         if self.config.access_pattern == 'AB':
             gpu_dist = gpu_dist1b
+            kernel = 'ApplyPeriodicBoundaryConditions'
         else:
             gpu_dist = gpu_dist1a
+            kernel = 'ApplyPeriodicBoundaryConditionsWithSwap'
 
         for i in range(0, 3):
             kernels[1][i] = [runner.get_kernel(
-                'ApplyPeriodicBoundaryConditions', [gpu_dist, np.uint32(i)],
+                kernel, [gpu_dist, np.uint32(i)],
                 'Pi')]
 
         return kernels
@@ -283,7 +285,7 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
         macro_args1 = [gpu_map, gpu_dist1a, gpu_rho, options]
         macro_args2 = [gpu_map, gpu_dist1b, gpu_rho, options]
 
-        signature = 'P' * (len(macro_args1) - 1) + 'i',
+        signature = 'P' * (len(macro_args1) - 1) + 'i'
 
         if runner.gpu_scratch_space is not None:
             macro_args1.append(runner.gpu_scratch_space)

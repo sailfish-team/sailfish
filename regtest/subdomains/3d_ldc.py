@@ -31,6 +31,9 @@ class SimulationTest(LDCSim):
         defaults['quiet'] = True
         defaults['output'] = output
         defaults['cuda_cache'] = False
+        defaults.update({
+            'access_pattern': access_pattern
+            })
 
 # NOTE: This test class is not thread safe.
 class TestInterblockPropagation(unittest.TestCase):
@@ -59,6 +62,7 @@ def tearDownModule():
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
+    access_pattern = args.access_pattern
     if block_size < mem_align:
         mem_align = block_size
     unittest.main()

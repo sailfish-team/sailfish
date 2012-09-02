@@ -19,16 +19,6 @@ typedef struct DistM {
 } DistM;
 %endif
 
-//
-// Copy the idx-th distribution from din into dout.
-//
-${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int idx)
-{
-	%for i, dname in enumerate(grid.idx_name):
-		dout->${dname} = ${get_dist('din', i, 'idx')};
-	%endfor
-}
-
 // Functions for checking whether a node is of a given specific type.
 %for nt_class in node_types:
 	${device_func} inline bool is${nt_class.__name__}(unsigned int type) {
@@ -164,11 +154,24 @@ ${device_func} inline unsigned int decodeNodeParamIdx(unsigned int nodetype) {
 	${device_func} inline int getGlobalIdx(int gx, int gy) {
 		return gx + ${arr_nx} * gy;
 	}
+
+	${device_func} inline void decodeGlobalIdx(int gi, int *gx, int *gy) {
+		*gx = gi % ${arr_nx};
+		*gy = gi / ${arr_nx};
+	}
 %else:
 	${device_func} inline int getGlobalIdx(int gx, int gy, int gz) {
 		return gx + ${arr_nx} * gy + ${arr_nx * arr_ny} * gz;
 	}
+
+	${device_func} inline void decodeGlobalIdx(int gi, int *gx, int *gy, int *gz) {
+		*gz = gi / ${arr_nx * arr_ny};
+		int t = gi % ${arr_nx * arr_ny};
+		*gy = t / ${arr_nx};
+		*gx = t % ${arr_nx};
+	}
 %endif
+
 
 ${device_func} void die(void) {
 	%if backend == 'cuda':
@@ -209,6 +212,14 @@ ${device_func} void checkInvalidValues(Dist* d, ${position_decl()}) {
 			return x + arr_nx * (y + arr_ny * z)
 %>
 
+// Load the distributions from din to dout, for the node with the index 'idx'.
+${device_func} inline void getDistLocal(Dist *dout, ${global_ptr} float *din, int idx)
+{
+	%for i, dname in enumerate(grid.idx_name):
+		dout->${dname} = ${get_dist('din', i, 'idx')};
+	%endfor
+}
+
 // Performs propagation when reading distributions from global memory.
 // This implements the propagate-on-read scheme.
 ${device_func} inline void getUnpropagatedDist(Dist *dout, ${global_ptr} float *din, int idx) {
@@ -227,4 +238,17 @@ ${device_func} inline void getUnpropagatedDistFromOppositeSlots(
 	%for i, (dname, ei) in enumerate(zip(grid.idx_name, grid.basis)):
 		dout->${dname} = ${get_dist('din', grid.idx_opposite[i], 'idx', offset=rel_offset(*(-ei)))};
 	%endfor
+}
+
+${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int gi
+								   ${iteration_number_if_required()}) {
+	%if access_pattern == 'AB':
+		getDistLocal(dout, din, gi);
+	%else:
+		if ((iteration_number & 1) == 0) {
+			getDistLocal(dout, din, gi);
+		} else {
+			getUnpropagatedDistFromOppositeSlots(dout, din, gi);
+		}
+	%endif
 }

@@ -15,6 +15,12 @@
 	%endif
 </%def>
 
+<%def name="iteration_number_arg_if_required()">
+	%if needs_iteration_num:
+		, iteration_number
+	%endif
+</%def>
+
 <%def name="scratch_space_if_required()">
 	%if scratch_space:
 		, float* node_scratch_space

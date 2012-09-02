@@ -51,9 +51,14 @@ class ConnectionBuffer(object):
     """Contains buffers needed to transfer distributions between two
     subdomains."""
 
+    # TODO: Use a single buffer for dist_full_buf and dist_local_full_buf.
     def __init__(self, face, cpair, coll_buf, coll_idx, recv_buf,
             dist_partial_buf, dist_partial_idx, dist_partial_sel,
-            dist_full_buf, dist_full_idx, grid_id=0):
+            dist_full_buf, dist_full_idx, grid_id=0,
+            coll_idx_opposite=None,
+            dist_full_idx_opposite=None,
+            local_coll_buf=None,
+            local_recv_buf=None):
         """
         :param face: face ID
         :param cpair: ConnectionPair, a tuple of two LBConnection objects
@@ -75,6 +80,14 @@ class ConnectionBuffer(object):
             the position of nodes to which data is to be distributed; this is
             only used for connections via the X_LOW and X_HIGH faces
         :param grid_id: grid ID
+        :param coll_idx_opposite: like coll_idx, buf for the fully local step of
+            the AA access pattern
+        :param dist_full_idx_opposite: like dist_full_idx, but for the fully
+            local step of the AA access pattern
+        :param local_coll_buf: like coll_buf, but for the fully local step of
+            the AA access pattern
+        :param local_recv_buf: like recv_buf, but for the fully local step of
+            the AA access pattern
         """
         self.face = face
         self.cpair = cpair
@@ -87,6 +100,10 @@ class ConnectionBuffer(object):
         self.dist_full_buf = dist_full_buf
         self.dist_full_idx = dist_full_idx
         self.grid_id = grid_id
+        self.coll_idx_opposite = coll_idx_opposite
+        self.dist_full_idx_opposite = dist_full_idx_opposite
+        self.local_coll_buf = local_coll_buf
+        self.local_recv_buf = local_recv_buf
 
     def distribute(self, backend, stream):
         # Serialize partial distributions into a contiguous buffer.
@@ -99,6 +116,9 @@ class ConnectionBuffer(object):
                     reversed(self.cpair.dst.dst_full_buf_slice))
             self.dist_full_buf.host[:] = self.recv_buf[slc]
             backend.to_buf_async(self.dist_full_buf.gpu, stream)
+
+    def distribute_unpropagated(self, backend, stream):
+        backend.to_buf_async(self.local_recv_buf.gpu, stream)
 
 
 class GPUBuffer(object):
@@ -372,6 +392,7 @@ class SubdomainRunner(object):
 
         ctx['boundary_size'] = self._boundary_size
         ctx['lat_linear'] = self.lat_linear
+        ctx['lat_linear_with_swap'] = self.lat_linear_with_swap
         ctx['lat_linear_dist'] = self.lat_linear_dist
         ctx['lat_linear_macro'] = self.lat_linear_macro
 
@@ -386,7 +407,7 @@ class SubdomainRunner(object):
 
         if (self.config.check_invalid_results_gpu and
                 not self.backend.supports_printf):
-            self.config.logger.warning('On-GPU invalid result check disabled'
+            self.config.logger.info('On-GPU invalid result check disabled'
                     ' as the device does not support all required features.')
 
         ctx['pbc_offsets'] = [{-1:  self.config.lat_nx,
@@ -595,20 +616,27 @@ class SubdomainRunner(object):
             self._global_size = (self.config.lat_nz, self.config.lat_ny,
                     self.config.lat_nx)
 
+        evs = self._block.envelope_size
         # Used so that face values map to the limiting coordinate
         # along a specific axis, e.g. lat_linear[X_LOW] = 0
-        evs = self._block.envelope_size
         self.lat_linear = [0, self._lat_size[-1] - 1, 0, self._lat_size[-2] - 1]
+        # As above, but the opposite face is used as an index in the list.
+        self.lat_linear_with_swap = [self._lat_size[-1] - 1, 0,
+                self._lat_size[-2] - 1, 0]
+        # As lat_linear above, but the values in the list specify the location
+        # of the first/last active node for the _opposite_ face to the
+        # one used as an index in the list.
         self.lat_linear_dist = [self._lat_size[-1] - 1 - evs, evs,
                 self._lat_size[-2] - 1 - evs, evs]
+        # As lat_linear above, but the values in the list specify the
+        # location of the first/last active node for the corresponding
+        # axis.
         self.lat_linear_macro = [evs, self._lat_size[-1] - 1 - evs, evs,
                 self._lat_size[-2] - 1 - evs]
-        # No need to define this, as it's the same as lat_linear above:
-        # self.lat_linear_macro_dist = [self._lat_size[-1] - 1, 0,
-        #         self._lat_size[-2] - 1, 0]
 
         if self._block.dim == 3:
             self.lat_linear.extend([0, self._lat_size[-3] - 1])
+            self.lat_linear_with_swap.extend([self._lat_size[-3] - 1, 0])
             self.lat_linear_dist.extend([self._lat_size[-3] - 1 - evs, evs])
             self.lat_linear_macro.extend([evs, self._lat_size[-3] - 1 - evs])
 
@@ -652,6 +680,13 @@ class SubdomainRunner(object):
                     (self._get_nodes() * dist_num))
 
     def _idx_helper(self, gx, buf_slice, dists):
+        """Returns a numpy array of global indices (in the subdomain coordinate
+        system).
+
+        :param gx: location along the x axis
+        :param buf_slice: slice in the area perpendicular to the X axis
+        :param dists: a list of distribution indices
+        """
         sel = [slice(0, len(dists))]
         idx = np.mgrid[sel + list(reversed(buf_slice))].astype(np.uint32)
         for i, dist_num in enumerate(dists):
@@ -662,41 +697,68 @@ class SubdomainRunner(object):
             return self._get_global_idx((gx, idx[2], idx[1]),
                     idx[0]).astype(np.uint32)
 
-    def _get_src_slice_indices(self, face, cpair):
+    def _get_src_slice_indices(self, face, cpair, opposite=False):
         """Returns a numpy array of indices of sparse nodes from which
         data is to be collected.
 
         :param face: face ID for the connection
         :param cpair: ConnectionPair describing the connection
+        :param opposite: if True, use opposite distributions than normally,
+                and a location suitable for the fully local step in the AA
+                access pattern
         """
-        if face in (self._block.X_LOW, self._block.X_HIGH):
-            gx = self.lat_linear[face]
-        else:
+        if face not in (self._block.X_LOW, self._block.X_HIGH):
             return None
-        return self._idx_helper(gx, cpair.src.src_slice, cpair.src.dists)
 
-    def _get_dst_slice_indices(self, face, cpair):
+        # For the AA access pattern, the locations of the nodes are the same
+        # as for the macroscopic fields.
+        if opposite:
+            gx = self.lat_linear_macro[face]
+            return self._idx_helper(gx, cpair.src.src_macro_slice,
+                    [self._sim.grid.idx_opposite[d] for d in cpair.src.dists])
+        else:
+            gx = self.lat_linear[face]
+            return self._idx_helper(gx, cpair.src.src_slice, cpair.src.dists)
+
+    def _get_dst_slice_indices(self, face, cpair, opposite=False):
         """Returns a numpy array of indices of sparse nodes to which
         data is to be distributed.
 
         :param face: face ID for the connection
         :param cpair: ConnectionPair describing the connection
+        :param opposite: if True, use opposite distributions than normally,
+                and a location suitable for the fully local step in the AA
+                access pattern
         """
-        if not cpair.dst.dst_slice:
-            return None
-        if face in (self._block.X_LOW, self._block.X_HIGH):
-            gx = self.lat_linear_dist[self._block.opposite_face(face)]
-        else:
+        if face not in (self._block.X_LOW, self._block.X_HIGH):
             return None
         es = self._block.envelope_size
-        dst_slice = [
+        if opposite:
+            if not cpair.src.dst_macro_slice:
+                return None
+            gx = self.lat_linear_with_swap[self._block.opposite_face(face)]
+            return self._idx_helper(gx, cpair.src.dst_macro_slice,
+                    [self._sim.grid.idx_opposite[d] for d in cpair.dst.dists])
+        else:
+            if not cpair.dst.dst_slice:
+                return None
+            dst_slice = [
                 slice(x.start + es, x.stop + es) for x in
                 cpair.dst.dst_slice]
-        return self._idx_helper(gx, dst_slice, cpair.dst.dists)
+            gx = self.lat_linear_dist[self._block.opposite_face(face)]
+            return self._idx_helper(gx, dst_slice, cpair.dst.dists)
 
-    def _dst_face_loc_to_full_loc(self, face, face_loc):
+    def _dst_face_loc_to_full_loc(self, face, face_loc, opposite=False):
+        """Expands a location tuple in the (full) face coordinate system into a
+        a complete location tuple in the full coordinate system of the subdomain."""
         axis = self._block.face_to_axis(face)
-        missing_loc = self.lat_linear_dist[self._block.opposite_face(face)]
+        # In the fully local step of the AA access pattern, the location along
+        # the connection axis is different.
+        if opposite:
+            missing_loc = self.lat_linear_with_swap[self._block.opposite_face(face)]
+        else:
+            missing_loc = self.lat_linear_dist[self._block.opposite_face(face)]
+
         if axis == 0:
             return [missing_loc] + face_loc
         elif axis == 1:
@@ -711,12 +773,14 @@ class SubdomainRunner(object):
         """Returns objects used to store data for nodes for which a partial
         set of distributions is available.
 
-        This has the form of a triple:
+        This has the form of a tuple:
         - a page-locked numpy buffer for the distributions
         - a numpy array of indices of nodes to which partial data is to be
           distributed
+        - like the previous item, but for the fully local step in the AA access
+          pattern
         - a selector to be applied to the receive buffer to get the partial
-          distributions.
+          distributions
 
         :param face: face ID for the connection
         :param cpair: ConnectionPair describing the connection
@@ -732,6 +796,8 @@ class SubdomainRunner(object):
         for dist_num, locations in sorted(cpair.dst.dst_partial_map.items()):
             for loc in locations:
                 dst_loc = [x + y for x, y in zip(dst_low, loc)]
+                dst_loc_opp = self._dst_face_loc_to_full_loc(face, dst_loc,
+                        opposite=True)
                 dst_loc = self._dst_face_loc_to_full_loc(face, dst_loc)
 
                 # Reverse 'loc' here to go from natural order (x, y, z) to the
@@ -766,11 +832,34 @@ class SubdomainRunner(object):
                 dist_full_idx = self._get_dst_slice_indices(face, cpair)
                 dist_full_idx = GPUBuffer(dist_full_idx, self.backend)
 
+                if self.config.access_pattern == 'AA':
+                    coll_idx_opposite = self._get_src_slice_indices(face, cpair,
+                            True)
+                    coll_idx_opposite = GPUBuffer(coll_idx_opposite,
+                            self.backend)
+
+                    dist_full_idx_opposite = self._get_dst_slice_indices(face,
+                            cpair, True)
+                    dist_full_idx_opposite = GPUBuffer(dist_full_idx_opposite,
+                            self.backend)
+                else:
+                    dist_full_idx_opposite = None
+                    coll_idx_opposite = None
+
                 for i, grid in enumerate(self._sim.grids):
                     # TODO(michalj): Optimize this by providing proper padding.
                     coll_buf = alloc(cpair.src.transfer_shape, dtype=self.float)
                     recv_buf = alloc(cpair.dst.transfer_shape, dtype=self.float)
                     dist_full_buf = alloc(cpair.dst.full_shape, dtype=self.float)
+
+                    if self.config.access_pattern == 'AA':
+                        local_coll_buf = GPUBuffer(alloc(cpair.src.local_transfer_shape, dtype=self.float),
+                                self.backend)
+                        local_recv_buf = GPUBuffer(alloc(cpair.dst.local_transfer_shape, dtype=self.float),
+                                self.backend)
+                    else:
+                        local_coll_buf = None
+                        local_recv_buf = None
 
                     # Any partial dists are serialized into a single continuous buffer.
                     dist_partial_buf, dist_partial_idx, dist_partial_sel = \
@@ -784,7 +873,11 @@ class SubdomainRunner(object):
                             GPUBuffer(dist_partial_idx, self.backend),
                             dist_partial_sel,
                             GPUBuffer(dist_full_buf, self.backend),
-                            dist_full_idx, i)
+                            dist_full_idx, i,
+                            coll_idx_opposite,
+                            dist_full_idx_opposite,
+                            local_coll_buf,
+                            local_recv_buf)
 
                     self.config.logger.debug('adding buffer for conn: {0} -> {1} '
                             '(face {2})'.format(self._block.id, block_id, face))
@@ -883,7 +976,7 @@ class SubdomainRunner(object):
         self._sim.iteration += 1
         self._send_dists()
         # Run this at a point after the compute step is fully scheduled for execution
-        # on the GPU and where it doesn't unnecessarily delay othe operations.
+        # on the GPU and where it doesn't unnecessarily delay other operations.
         self.backend.set_iteration(self._sim.iteration)
         self._recv_dists()
         self._profile.record_gpu_start(TimeProfile.DISTRIB, self._data_stream)
@@ -976,53 +1069,76 @@ class SubdomainRunner(object):
 
     @profile(TimeProfile.SEND_DISTS)
     def _send_dists(self):
+        if self.config.access_pattern == 'AA' and self._sim.iteration & 1:
+            buf = 'local_coll_buf'
+        else:
+            buf = 'coll_buf'
+
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
             for x in conn_bufs:
-                self.backend.from_buf_async(x.coll_buf.gpu, self._data_stream)
+                self.backend.from_buf_async(getattr(x, buf).gpu, self._data_stream)
 
         self._data_stream.synchronize()
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
+
             if len(conn_bufs) > 1:
                 connector.send(np.hstack(
-                    [np.ravel(x.coll_buf.host) for x in conn_bufs]))
+                    [np.ravel(getattr(x, buf).host) for x in conn_bufs]))
             else:
                 # TODO(michalj): Use non-blocking sends here?
-                connector.send(np.ravel(conn_bufs[0].coll_buf.host).copy())
+                connector.send(np.ravel(getattr(conn_bufs[0], buf).host).copy())
 
     @profile(TimeProfile.RECV_DISTS)
     def _recv_dists(self):
+        def distribute(cbuf):
+            # _recv_dists is called after the iteration counter has been updated.
+            if self.config.access_pattern == 'AA' and self._sim.iteration & 1:
+                cbuf.distribute_unpropagated(self.backend, self._data_stream)
+            else:
+                cbuf.distribute(self.backend, self._data_stream)
+
+        if self.config.access_pattern == 'AA' and self._sim.iteration & 1:
+            get_buf = operator.attrgetter('local_recv_buf.host')
+        else:
+            get_buf = operator.attrgetter('recv_buf')
+
         for b_id, connector in self._block._connectors.iteritems():
             conn_bufs = self._recv_block_to_connbuf[b_id]
             if len(conn_bufs) > 1:
-                dest = np.hstack([np.ravel(x.recv_buf) for x in conn_bufs])
+                dest = np.hstack([np.ravel(get_buf(x)) for x in conn_bufs])
                 self._profile.record_cpu_start(TimeProfile.NET_RECV)
                 # Returns false only if quit event is active.
                 if not connector.recv(dest, self._quit_event):
                     return
+
                 self._profile.record_cpu_end(TimeProfile.NET_RECV)
                 i = 0
                 for cbuf in conn_bufs:
-                    l = cbuf.recv_buf.size
-                    cbuf.recv_buf[:] = dest[i:i+l].reshape(cbuf.recv_buf.shape)
+                    recv_buf = get_buf(cbuf)
+                    l = recv_buf.size
+                    recv_buf[:] = dest[i:i+l].reshape(recv_buf.shape)
                     i += l
-                    cbuf.distribute(self.backend, self._data_stream)
+                    distribute(cbuf)
             else:
                 cbuf = conn_bufs[0]
-                dest = np.ravel(cbuf.recv_buf)
+                recv_buf = get_buf(cbuf)
+                dest = np.ravel(recv_buf)
+
                 # Returns false only if quit event is active.
                 self._profile.record_cpu_start(TimeProfile.NET_RECV)
                 if not connector.recv(dest, self._quit_event):
                     return
+
                 self._profile.record_cpu_end(TimeProfile.NET_RECV)
                 # If ravel returned a copy, we need to write the data
                 # back to the proper buffer.
                 # TODO(michalj): Check if there is any way of avoiding this
                 # copy.
                 if dest.flags.owndata:
-                    cbuf.recv_buf[:] = dest.reshape(cbuf.recv_buf.shape)
-                cbuf.distribute(self.backend, self._data_stream)
+                    recv_buf[:] = dest.reshape(recv_buf.shape)
+                distribute(cbuf)
 
     def _fields_to_host(self):
         """Copies data for all fields from the GPU to the host."""
@@ -1036,52 +1152,68 @@ class SubdomainRunner(object):
     def _init_collect_kernels(self, cbuf, grid_dim1, block_size):
         """Returns collection kernels for a connection.
 
+        The iteration number used for indexing the kernel lists is the same
+        as the one used for the simulation kernels.
+
         :param cbuf: ConnectionBuffer
         :param grid_dim1: callable returning the size of the CUDA grid
             given the total size
         :param block_size: CUDA block size for the kernels
 
-        Returns: secondary, primary.
+        Returns: primary, secondary.
         """
         # Sparse data collection.
         if cbuf.coll_idx.host is not None:
-            grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
-
-            def _get_sparse_coll_kernel(i):
+            def _get_sparse_coll_kernel(i, idx_buffer=cbuf.coll_idx.gpu,
+                    coll_buf=cbuf.coll_buf):
                 return KernelGrid(
                     self.get_kernel('CollectSparseData',
-                    [cbuf.coll_idx.gpu, self.gpu_dist(cbuf.grid_id, i),
-                     cbuf.coll_buf.gpu, cbuf.coll_buf.host.size],
+                    [idx_buffer, self.gpu_dist(cbuf.grid_id, i),
+                     coll_buf.gpu, coll_buf.host.size],
                     'PPPi', (block_size,)),
-                    grid_size)
+                    grid=(grid_dim1(coll_buf.host.size),))
 
-            return _get_sparse_coll_kernel(1), _get_sparse_coll_kernel(0)
+            if self.config.access_pattern == 'AA':
+                return (_get_sparse_coll_kernel(0, cbuf.coll_idx_opposite.gpu, cbuf.local_coll_buf),
+                        _get_sparse_coll_kernel(0))
+            else:
+                return _get_sparse_coll_kernel(1), _get_sparse_coll_kernel(0)
         # Continuous data collection.
         else:
-            # [X, Z * dists] or [X, Y * dists]
-            min_max = ([x.start for x in cbuf.cpair.src.src_slice] +
-                    list(reversed(cbuf.coll_buf.host.shape[1:])))
-            min_max[-1] = min_max[-1] * len(cbuf.cpair.src.dists)
-            if self.dim == 2:
-                signature = 'PiiiP'
-                grid_size = (grid_dim1(cbuf.coll_buf.host.size),)
-            else:
-                signature = 'PiiiiiP'
-                grid_size = (grid_dim1(cbuf.coll_buf.host.shape[-1]),
-                    cbuf.coll_buf.host.shape[-2] * len(cbuf.cpair.src.dists))
+            def _get_cont_coll_kernel(i, kernel='CollectContinuousData', coll_buf=cbuf.coll_buf,
+                    src_slice=cbuf.cpair.src.src_slice):
+                # [X, Z * dists] or [X, Y * dists]
+                min_max = ([x.start for x in src_slice] +
+                        list(reversed(coll_buf.host.shape[1:])))
+                min_max[-1] = min_max[-1] * len(cbuf.cpair.src.dists)
+                if self.dim == 2:
+                    signature = 'PiiiP'
+                    grid_size = (grid_dim1(coll_buf.host.size),)
+                else:
+                    signature = 'PiiiiiP'
+                    grid_size = (grid_dim1(coll_buf.host.shape[-1]),
+                        coll_buf.host.shape[-2] * len(cbuf.cpair.src.dists))
 
-            def _get_cont_coll_kernel(i):
                 return KernelGrid(
-                    self.get_kernel('CollectContinuousData',
+                    self.get_kernel(kernel,
                     [self.gpu_dist(cbuf.grid_id, i),
-                     cbuf.face] + min_max + [cbuf.coll_buf.gpu],
+                     cbuf.face] + min_max + [coll_buf.gpu],
                      signature, (block_size,)),
                      grid_size)
 
-            return _get_cont_coll_kernel(1), _get_cont_coll_kernel(0)
+            if self.config.access_pattern == 'AA':
+                return (_get_cont_coll_kernel(0, 'CollectContinuousDataWithSwap', cbuf.local_coll_buf,
+                                              src_slice=cbuf.cpair.src.src_macro_slice),
+                        _get_cont_coll_kernel(0))
+            else:
+                return _get_cont_coll_kernel(1), _get_cont_coll_kernel(0)
 
     def _init_distrib_kernels(self, cbuf, grid_dim1, block_size):
         """Returns distribution kernels for a connection.
+
+        The iteration number used for indexing the kernel lists is +1
+        wrt to the iteration number used for the simulation kernels in the
+        same step.
 
         :param cbuf: ConnectionBuffer
         :param grid_dim1: callable returning the size of the CUDA grid
@@ -1090,6 +1222,51 @@ class SubdomainRunner(object):
 
         Returns: lists of: primary, secondary.
         """
+        primary = []
+        secondary = []
+
+        primary, secondary = self._init_distrib_kernels_ab(cbuf, grid_dim1,
+                block_size)
+
+        if self.config.access_pattern == 'AB':
+            return primary, secondary
+
+        secondary = []
+
+        if cbuf.dist_full_idx_opposite.host is not None:
+            grid_size = (grid_dim1(cbuf.local_recv_buf.host.size),)
+            secondary.append(KernelGrid(
+                    self.get_kernel('DistributeSparseData',
+                        [cbuf.dist_full_idx_opposite.gpu,
+                         self.gpu_dist(cbuf.grid_id, 0),
+                         cbuf.local_recv_buf.gpu,
+                         cbuf.local_recv_buf.host.size],
+                    'PPPi', (block_size,)),
+                    grid_size))
+        else:
+            min_max = ([y.start for y in cbuf.cpair.src.dst_macro_slice] +
+                list(reversed(cbuf.local_recv_buf.host.shape[1:])))
+            min_max[-1] = min_max[-1] * len(cbuf.cpair.dst.dists)
+
+            if self.dim == 2:
+                signature = 'PiiiP'
+                grid_size = (grid_dim1(cbuf.local_recv_buf.host.size),)
+            else:
+                signature = 'PiiiiiP'
+                grid_size = (grid_dim1(cbuf.local_recv_buf.host.shape[-1]),
+                    cbuf.local_recv_buf.host.shape[-2] * len(cbuf.cpair.dst.dists))
+
+            secondary.append(KernelGrid(
+                    self.get_kernel('DistributeContinuousDataWithSwap',
+                            [self.gpu_dist(cbuf.grid_id, 0),
+                             self._block.opposite_face(cbuf.face)] +
+                            min_max + [cbuf.local_recv_buf.gpu],
+                            signature, (block_size,)),
+                            grid_size))
+
+        return primary, secondary
+
+    def _init_distrib_kernels_ab(self, cbuf, grid_dim1, block_size):
         primary = []
         secondary = []
 
@@ -1178,6 +1355,7 @@ class SubdomainRunner(object):
             for cbuf in conn_bufs:
                 primary, secondary = self._init_collect_kernels(cbuf,
                         _grid_dim1, collect_block)
+
                 collect_primary.append(primary)
                 collect_secondary.append(secondary)
 
@@ -1372,7 +1550,7 @@ class SubdomainRunner(object):
                     self.config.checkpoint_file and self.config.final_checkpoint):
                 self.save_checkpoint()
 
-        except self.backend.FatalError as e:
+        except self.backend.FatalError:
             is_quit = True
             self.config.logger.exception("Fatal on-device error at iteration "
                     "{0}.".format(self._sim.iteration))

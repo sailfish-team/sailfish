@@ -7,7 +7,7 @@ find examples -perm +0111 -name '*.py' | while read filename ; do
 	if [[ ${blacklist/${filename}/} == ${blacklist} ]]; then
 		echo -n "Testing ${filename}..."
 		python $filename --max_iters=50 --access_pattern=AB --every=50 --seed=1234 --quiet --output=${tmpdir}/result_ab
-		python $filename --max_iters=50 --access_pattern=AA --every=50 --seed=1234 --quiet --output=${tmpdir}/result_aa
+		python $filename --max_iters=50 --access_pattern=AA --every=50 --seed=1234 --quiet --output=${tmpdir}/result_aa --nocheck_invalid_results_gpu
 
 		if utils/compare_results.py ${tmpdir}/result_ab.0.50.npz ${tmpdir}/result_aa.0.50.npz ; then
 			echo "ok"
@@ -19,5 +19,5 @@ find examples -perm +0111 -name '*.py' | while read filename ; do
 	fi
 done
 
-#rm ${tmpdir}/result*
-#rmdir ${tmpdir}
+rm ${tmpdir}/result*
+rmdir ${tmpdir}

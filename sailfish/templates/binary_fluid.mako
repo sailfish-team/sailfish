@@ -142,14 +142,14 @@ ${kernel} void PrepareMacroFields(
 	float out;
 
 	%if sim._fields['rho'].abstract.need_nn:
-		getDist(&fi, dist1_in, gi);
+		getDist(&fi, dist1_in, gi ${iteration_number_arg_if_required()});
 		get0thMoment(&fi, type, orientation, &out);
 		orho[gi] = out;
 	%endif
 
 	%if simtype == 'free-energy':
 		if (isWetNode(type)) {
-			getDist(&fi, dist2_in, gi);
+			getDist(&fi, dist2_in, gi ${iteration_number_arg_if_required()});
 			get0thMoment(&fi, type, orientation, &out);
 			ophi[gi] = out;
 		}
@@ -188,7 +188,7 @@ ${kernel} void PrepareMacroFields(
 						}
 					%endfor
 				}
-				getDist(&fi, dist2_in, helper_idx);
+				getDist(&fi, dist2_in, helper_idx ${iteration_number_arg_if_required()});
 				get0thMoment(&fi, type, orientation, &out);
 				ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
 			}
@@ -219,7 +219,7 @@ ${kernel} void PrepareMacroFields(
 			}
 		%endif
 	%else:	## shan-chen
-		getDist(&fi, dist2_in, gi);
+		getDist(&fi, dist2_in, gi ${iteration_number_arg_if_required()});
 		get0thMoment(&fi, type, orientation, &out);
 		ophi[gi] = out;
 	%endif
@@ -297,8 +297,8 @@ ${kernel} void CollideAndPropagate(
 
 	// cache the distributions in local variables
 	Dist d0, d1;
-	getDist(&d0, dist1_in, gi);
-	getDist(&d1, dist2_in, gi);
+	getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
+	getDist(&d1, dist2_in, gi ${iteration_number_arg_if_required()});
 
 	%if nt.NTGuoDensity in node_types:
 		if (isNTGuoDensity(type)) {

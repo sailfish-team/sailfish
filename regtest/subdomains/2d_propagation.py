@@ -38,10 +38,23 @@ class DoubleBlockGeometryTest(LBGeometry2D):
         blocks.append(SubdomainSpec2D((q, 0), (q, 2*q)))
         return blocks
 
+class Vertical2BlockGeo(LBGeometry2D):
+    def subdomains(self, n=None):
+        q = 128
+        return [SubdomainSpec2D((0, 0), (q, q)),
+                SubdomainSpec2D((0, q), (q, q))]
+
 class ThreeBlocksGeometryTest(LBGeometry2D):
     def subdomains(self, n=None):
         blocks = []
         q = 128
+
+        # +-------+
+        # | 1 |   |
+        # |---| 2 |
+        # | 0 |   |
+        # +-------+
+
         blocks.append(SubdomainSpec2D((0, 0), (q, q)))
         blocks.append(SubdomainSpec2D((0, q), (q, q)))
         blocks.append(SubdomainSpec2D((q, 0), (q, 2*q)))
@@ -151,6 +164,122 @@ class MixedPeriodicPropagationTest(unittest.TestCase):
         ae(b1[vi(1, 0), 1, 1], np.float32(0.41))
         ae(b1[vi(1, 1), 2, 1], np.float32(0.42))
         ae(b1[vi(1, -1), 256, 1], np.float32(0.43))
+
+class AASimulationTest(SimulationTest):
+    subdomain = BlockTest
+
+    @classmethod
+    def update_defaults(cls, defaults):
+        SimulationTest.update_defaults(defaults)
+        defaults.update({
+            'access_pattern': 'AA',
+            })
+
+class AAPropagationTest(unittest.TestCase):
+    def test_horiz_spread(self):
+        def ic(self, runner):
+            dbuf = runner._debug_get_dist()
+            dbuf[:] = 0.0
+
+            if runner._block.id == 0:
+                dbuf[vi(1, 0), 64, 128] = 0.11
+                dbuf[vi(1, 1), 64, 128] = 0.12
+                dbuf[vi(1, -1), 64, 128] = 0.13
+
+            runner._debug_set_dist(dbuf)
+
+        HorizTest = type('HorizTest', (AASimulationTest,),
+                {'initial_conditions': ic})
+        ctrl = LBSimulationController(HorizTest, DoubleBlockGeometryTest)
+        ctrl.run(ignore_cmdline=True)
+
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        ae = np.testing.assert_equal
+
+        # No propagation in the first step, but the distributions are stored
+        # in opposite slots.
+        ae(b1[vi(-1, 0), 64, 0], np.float32(0.11))
+        ae(b1[vi(-1, -1), 64, 0], np.float32(0.12))
+        ae(b1[vi(-1, 1), 64, 0], np.float32(0.13))
+
+    def test_vert_spread(self):
+        def ic(self, runner):
+            dbuf = runner._debug_get_dist()
+            dbuf[:] = 0.0
+
+            if runner._block.id == 0:
+                dbuf[vi(-1, 1), 128, 64] = 0.11
+                dbuf[vi(0, 1), 128, 64] = 0.12
+                dbuf[vi(1, 1), 128, 64] = 0.13
+
+            runner._debug_set_dist(dbuf)
+
+        VertTest = type('VertTest', (AASimulationTest,),
+                {'initial_conditions': ic})
+        ctrl = LBSimulationController(VertTest, Vertical2BlockGeo)
+        ctrl.run(ignore_cmdline=True)
+
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        ae = np.testing.assert_equal
+
+        # No propagation in the first step, but the distributions are stored
+        # in opposite slots.
+        ae(b1[vi(1, -1), 0, 64], np.float32(0.11))
+        ae(b1[vi(0, -1), 0, 64], np.float32(0.12))
+        ae(b1[vi(-1, -1), 0, 64], np.float32(0.13))
+
+    def test_3blocks(self):
+        def ic(self, runner):
+            dbuf = runner._debug_get_dist()
+            dbuf[:] = 0.0
+
+            if runner._block.id == 0:
+                dbuf[vi(1, 1), 128, 128] = 0.11
+                dbuf[vi(0, 1), 128, 128] = 0.12
+                dbuf[vi(1, 0), 128, 128] = 0.13
+                dbuf[vi(1, -1), 128, 128] = 0.14
+                dbuf[vi(-1, 1), 128, 128] = 0.15
+            elif runner._block.id == 1:
+                dbuf[vi(-1, -1), 1, 128] = 0.16
+                dbuf[vi(0, -1), 1, 128] = 0.17
+            elif runner._block.id == 2:
+                dbuf[vi(-1, -1), 129, 1] = 0.18
+                dbuf[vi(-1, -1), 128, 1] = 0.19
+                dbuf[vi(-1, 0), 128, 1] = 0.20
+
+            runner._debug_set_dist(dbuf)
+
+        SimTest = type('SimTest', (AASimulationTest,),
+                {'initial_conditions': ic})
+        ctrl = LBSimulationController(SimTest, ThreeBlocksGeometryTest)
+        ctrl.run(ignore_cmdline=True)
+
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b2 = np.load(io.dists_filename(output, 1, 2, 1))
+        ae = np.testing.assert_equal
+
+        # No propagation in the first step, but the distributions are stored
+        # in opposite slots.
+        ae(b2[vi(-1, -1), 128, 0], np.float32(0.11))
+        ae(b2[vi(-1, 0), 128, 0], np.float32(0.13))
+        ae(b2[vi(-1, 1), 128, 0], np.float32(0.14))
+        ae(b1[vi(1, -1), 0, 128], np.float32(0.15))
+        ae(b1[vi(0, -1), 0, 128], np.float32(0.12))
+
+        # From b1
+        ae(b0[vi(1, 1), 129, 128], np.float32(0.16))
+        ae(b0[vi(0, 1), 129, 128], np.float32(0.17))
+
+        # From b2
+        ae(b0[vi(1, 1), 128, 129], np.float32(0.19))
+        ae(b0[vi(1, 1), 129, 129], np.float32(0.18))
+        ae(b0[vi(1, 0), 128, 129], np.float32(0.20))
 
 
 class PeriodicCornerPropagationTest(unittest.TestCase):

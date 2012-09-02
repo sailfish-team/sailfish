@@ -33,6 +33,9 @@ test_checkpoint:
 	@bash tests/gpu/checkpoint.sh "examples/binary_fluid/sc_rayleigh_taylor_2d.py --seed 123"
 	@bash tests/gpu/checkpoint.sh examples/binary_fluid/fe_viscous_fingering.py
 
+test_access_pattern:
+	@bash tests/gpu/access_pattern.sh
+
 regtest:
 	python regtest/subdomains/2d_propagation.py
 	python regtest/subdomains/2d_ldc.py
@@ -41,6 +44,13 @@ regtest:
 	python regtest/subdomains/3d_ldc.py
 	python regtest/subdomains/binary_pbc.py
 	python regtest/subdomains/2d_binary.py
+
+regtest_aa:
+	python regtest/subdomains/2d_cylinder.py --access_pattern=AA
+	python regtest/subdomains/2d_binary.py --access_pattern=AA
+	python regtest/subdomains/2d_ldc.py --access_pattern=AA
+	python regtest/subdomains/3d_ldc.py --access_pattern=AA
+	python regtest/subdomains/binary_pbc.py --access_pattern=AA
 
 # Necessary to trigger bulk/boundary split code.
 regtest_small_block:
@@ -52,7 +62,7 @@ regtest_small_block:
 	python regtest/subdomains/binary_pbc.py --block_size=16
 	python regtest/subdomains/2d_binary.py --block_size=16
 
-presubmit: test test_gpu test_examples regtest regtest_small_block
+presubmit: test test_gpu test_examples regtest regtest_small_block regtest_aa
 
 clean:
 	rm -f sailfish/*.pyc

@@ -12,7 +12,7 @@ if data_a.files != data_b.files:
     sys.exit(1)
 
 for f in data_a.files:
-    if not np.all(data_a[f] == data_b[f]):
+    if not np.all(np.nan_to_num(data_a[f]) == np.nan_to_num(data_b[f])):
         print >>sys.stderr, 'Difference in field "%s".' % f
         sys.exit(1)
 

@@ -640,6 +640,55 @@ class SingleBlockPeriodicQ15Test(unittest.TestCase):
         ae(b0[vi2(-1, 1, 1), 3, 1, 64], np.float32(0.43))
 
 
+#############################################################################
+
+class FourSubdomainsTest(LBGeometry3D):
+    def subdomains(self, n=None):
+        return [SubdomainSpec3D((0, 0, 0), (32, 32, 32)),
+                SubdomainSpec3D((0, 0, 32), (32, 32, 32)),
+                SubdomainSpec3D((0, 32, 0), (32, 32, 32)),
+                SubdomainSpec3D((0, 32, 32), (32, 32, 32))]
+
+class AASimulationTest(SimulationTest):
+    subdomain = BlockTest
+
+    @classmethod
+    def update_defaults(cls, defaults):
+        SimulationTest.update_defaults(defaults)
+        defaults.update({
+            'access_pattern': 'AA',
+            'lat_nx': 32,
+            'lat_ny': 64,
+            'lat_nz': 64,
+            'save_src': '/tmp/test.cu',
+            })
+
+    def initial_conditions(self, runner):
+        dbuf = runner._debug_get_dist()
+        dbuf[:] = 0.0
+
+        if runner._block.id == 0:
+            dbuf[vi(0, 1, 1), 32, 32, 10] = 0.11
+
+        runner._debug_set_dist(dbuf)
+
+class AAPropagationTest(unittest.TestCase):
+    def test_4subdomains(self):
+        ctrl = LBSimulationController(AASimulationTest, FourSubdomainsTest)
+        ctrl.run(ignore_cmdline=True)
+
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b2 = np.load(io.dists_filename(output, 1, 2, 1))
+        b3 = np.load(io.dists_filename(output, 1, 3, 1))
+        ae = np.testing.assert_equal
+
+        # No propagation in the first step, but the distributions are stored
+        # in opposite slots.
+        ae(b3[vi(0, -1, -1), 0, 0, 10], np.float32(0.11))
+
+
 def setUpModule():
     global tmpdir
     tmpdir = tempfile.mkdtemp()

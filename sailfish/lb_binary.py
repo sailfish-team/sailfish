@@ -65,14 +65,19 @@ class LBBinaryFluidBase(LBSim):
                         runner.get_kernel('ApplyMacroPeriodicBoundaryConditions',
                             [runner.gpu_field(field_pair.buffer), np.uint32(i)], 'Pi'))
 
+        if self.config.access_pattern == 'AB':
+            gpu_dist1 = gpu_dist1b
+            gpu_dist2 = gpu_dist2b
+            kernel = 'ApplyPeriodicBoundaryConditions'
+        else:
+            gpu_dist1 = gpu_dist1a
+            gpu_dist2 = gpu_dist2a
+            kernel = 'ApplyPeriodicBoundaryConditionsWithSwap'
+
         for i in range(0, 3):
             dist_kernels[1][i] = [
-                    runner.get_kernel(
-                        'ApplyPeriodicBoundaryConditions', [gpu_dist1b,
-                            np.uint32(i)], 'Pi'),
-                    runner.get_kernel(
-                        'ApplyPeriodicBoundaryConditions', [gpu_dist2b,
-                            np.uint32(i)], 'Pi')]
+                    runner.get_kernel(kernel, [gpu_dist1, np.uint32(i)], 'Pi'),
+                    runner.get_kernel(kernel, [gpu_dist2, np.uint32(i)], 'Pi')]
 
             # This is the same as above -- for macroscopic fields, there is no
             # distinction between primary and secondary buffers.
@@ -114,8 +119,8 @@ class LBBinaryFluidBase(LBSim):
         macro_args2 = [gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi,
                 options]
 
-        args_signature = 'P' * (len(args1) - 1) + 'i',
-        macro_signature = 'P' * (len(macro_args1) - 1) + 'i',
+        args_signature = 'P' * (len(args1) - 1) + 'i'
+        macro_signature = 'P' * (len(macro_args1) - 1) + 'i'
 
         if runner.gpu_scratch_space is not None:
             macro_args1.append(runner.gpu_scratch_space)
@@ -129,18 +134,28 @@ class LBBinaryFluidBase(LBSim):
         macro_kernels = [
             runner.get_kernel('PrepareMacroFields', macro_args1,
                 macro_signature,
-                needs_iteration=self.config.time_dependence),
-            runner.get_kernel('PrepareMacroFields', macro_args2,
-                macro_signature,
-                needs_iteration=self.config.time_dependence)]
+                needs_iteration=self.config.needs_iteration_num)]
+
+        if self.config.access_pattern == 'AB':
+            macro_kernels.append(
+                runner.get_kernel('PrepareMacroFields', macro_args2,
+                    macro_signature,
+                    needs_iteration=self.config.needs_iteration_num))
+        else:
+            macro_kernels.append(macro_kernels[-1])
 
         sim_kernels = [
             runner.get_kernel('CollideAndPropagate', args1,
                 args_signature,
-                needs_iteration=self.config.time_dependence),
-            runner.get_kernel('CollideAndPropagate', args2,
-                args_signature,
-                needs_iteration=self.config.time_dependence)]
+                needs_iteration=self.config.needs_iteration_num)]
+
+        if self.config.access_pattern == 'AB':
+            sim_kernels.append(
+                runner.get_kernel('CollideAndPropagate', args2,
+                    args_signature,
+                    needs_iteration=self.config.needs_iteration_num))
+        else:
+            sim_kernels.append(sim_kernels[-1])
 
         return zip(macro_kernels, sim_kernels)
 
@@ -158,7 +173,8 @@ class LBBinaryFluidBase(LBSim):
         args2 = [gpu_dist1b, gpu_dist2b] + gpu_v + [gpu_rho, gpu_phi]
 
         runner.exec_kernel('SetInitialConditions', args1, 'P'*len(args1))
-        runner.exec_kernel('SetInitialConditions', args2, 'P'*len(args2))
+        if self.config.access_pattern == 'AB':
+            runner.exec_kernel('SetInitialConditions', args2, 'P'*len(args2))
 
     def update_context(self, ctx):
         super(LBBinaryFluidBase, self).update_context(ctx)
