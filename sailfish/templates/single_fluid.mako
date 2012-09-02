@@ -138,7 +138,7 @@ ${kernel} void CollideAndPropagate(
 		if ((iteration_number & 1) == 0) {
 			getDist(&d0, dist_in, gi);
 		} else {
-			getUnpropagatedDist(&d0, dist_in, gi);
+			getUnpropagatedDistFromOppositeSlots(&d0, dist_in, gi);
 		}
 	%endif
 

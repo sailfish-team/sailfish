@@ -201,9 +201,6 @@ ${device_func} void checkInvalidValues(Dist* d, ${position_decl()}) {
 }
 
 
-
-## Experimental code below
-#############################################################################
 <%
 	def rel_offset(x, y, z=0):
 		if grid.dim == 2:
@@ -220,3 +217,14 @@ ${device_func} inline void getUnpropagatedDist(Dist *dout, ${global_ptr} float *
 	%endfor
 }
 
+// Implements the propagate-on-read scheme for the AA access pattern, where the
+// distributions are not located in their natural slots, but the opposite ones
+// (e.g. fNE is located where fSW normally is). This ensures that within a single
+// timestep, the distributions are read from and written to the exact same places
+// in global memory.
+${device_func} inline void getUnpropagatedDistFromOppositeSlots(
+		Dist *dout, ${global_ptr} float *din, int idx) {
+	%for i, (dname, ei) in enumerate(zip(grid.idx_name, grid.basis)):
+		dout->${dname} = ${get_dist('din', grid.idx_opposite[i], 'idx', offset=rel_offset(*(-ei)))};
+	%endfor
+}

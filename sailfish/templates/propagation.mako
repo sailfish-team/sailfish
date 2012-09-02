@@ -122,7 +122,7 @@
 	%endif
 </%def>
 
-## Same mass fractions directly to global memory without perfoming
+## Save mass fractions directly to global memory without perfoming
 ## propagation.  This is used to implement the propagate-on-read
 ## scheme, which is 10-15% faster on pre-Fermi devices.
 <%def name="propagate_inplace(dist_out, dist_in='fi')">
@@ -130,6 +130,16 @@
 		${get_dist(dist_out, i, 'gi')} = ${dist_in}.${dname};
 	%endfor
 </%def>
+
+## Save mass fractions to the local node in global memory, but store
+## them in the opposite slot to their normal one. This implements the
+## propagate-on-read scheme for the AA access pattern.
+<%def name="propagate_inplace_opposite_slot(dist_out, dist_in='fi')">
+	%for i, dname in enumerate(grid.idx_name):
+		${get_dist(dist_out, grid.idx_opposite[i], 'gi')} = ${dist_in}.${dname};
+	%endfor
+</%def>
+
 
 ## Propagate distributions using a 1D shared memory array to make the propagation
 ## in the X direction more efficient.
@@ -229,7 +239,7 @@
 		if (iteration_number & 1) {
 			${propagate_shared(dist_out, dist_in)}
 		} else {
-			${propagate_inplace(dist_out, dist_in)}
+			${propagate_inplace_opposite_slot(dist_out, dist_in)}
 		}
 	%else:
 		__UNSUPPORTED_PROPAGATTION_PATTERN_${access_pattern}__
