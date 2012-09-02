@@ -54,7 +54,7 @@ class CapillarySCSim(LBBinaryFluidShanChen, LBForcedSim):
                 'G': 1.6,
                 'visc': 1.0 / 6.0,
                 'periodic_x': True,
-                'periodic_y': True,
+                'periodic_y': False,
             })
 
     @classmethod
