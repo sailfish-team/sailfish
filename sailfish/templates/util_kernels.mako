@@ -225,35 +225,36 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 	%if dim == 2:
 		if (axis == 0) {
 			if (idx1 >= ${lat_ny}) { return; }
-			gi_low = getGlobalIdx(0, idx1);
-			gi_high = getGlobalIdx(${lat_nx-2}, idx1);
+			gi_low = getGlobalIdx(0, idx1);				// ghost node
+			gi_high = getGlobalIdx(${lat_nx-2}, idx1);	// read node
 			${pbc_helper(0, lat_ny-2)}
 		} else if (axis == 1) {
 			if (idx1 >= ${lat_nx}) { return; }
-			gi_low = getGlobalIdx(idx1, 0);
-			gi_high = getGlobalIdx(idx1, ${lat_ny-2});
+			gi_low = getGlobalIdx(idx1, 0);				// ghost node
+			gi_high = getGlobalIdx(idx1, ${lat_ny-2});	// real node
 			${pbc_helper(1, lat_nx-2)}
 		}
 	%else:
 		int idx2 = get_global_id(1);
 		if (axis == 0) {
 			if (idx1 >= ${lat_ny} || idx2 >= ${lat_nz}) { return; }
-			gi_low = getGlobalIdx(0, idx1, idx2);
-			gi_high = getGlobalIdx(${lat_nx-2}, idx1, idx2);
+			gi_low = getGlobalIdx(0, idx1, idx2);				// ghost node
+			gi_high = getGlobalIdx(${lat_nx-2}, idx1, idx2);	// real node
 			${pbc_helper(0, lat_ny-2, lat_nz-2)}
 		} else if (axis == 1) {
 			if (idx1 >= ${lat_nx} || idx2 >= ${lat_nz}) { return; }
-			gi_low = getGlobalIdx(idx1, 0, idx2);
-			gi_high = getGlobalIdx(idx1, ${lat_ny-2}, idx2);
+			gi_low = getGlobalIdx(idx1, 0, idx2);				// ghost node
+			gi_high = getGlobalIdx(idx1, ${lat_ny-2}, idx2);	// real node
 			${pbc_helper(1, lat_nx-2, lat_nz-2)}
 		} else {
 			if (idx1 >= ${lat_nx} || idx2 >= ${lat_ny}) { return; }
-			gi_low = getGlobalIdx(idx1, idx2, 0);
-			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});
+			gi_low = getGlobalIdx(idx1, idx2, 0);				// ghost node
+			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});	// real node
 			${pbc_helper(2, lat_nx-2, lat_ny-2)}
 		}
 	%endif
 }
+
 
 <%def name="_copy_field_if_finite(src, dest)">
 	if (isfinite(field[${src}])) {
