@@ -342,6 +342,8 @@ class LBSimulationController(object):
                 'compress data exchanged between subdomains. Can improve '
                 'performance in distributed simulations limited by bandwidth '
                 'available between computational nodes.')
+        group.add_argument('--seed', type=int, default=int(time.time()),
+                help='PRNG seed value')
 
         group = self._config_parser.add_group('Checkpointing')
         group.add_argument('--checkpoint_file', type=str, help='Location of '

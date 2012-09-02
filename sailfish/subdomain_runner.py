@@ -295,6 +295,8 @@ class SubdomainRunner(object):
         if master_addr is not None:
             self._init_network(master_addr, summary_addr)
 
+        np.random.seed(self.config.seed)
+
     def _init_network(self, master_addr, summary_addr):
         self._master_sock = self._ctx.socket(zmq.PAIR)
         self._master_sock.connect(master_addr)

@@ -22,6 +22,7 @@ class TestNodeTypeSetting2D(unittest.TestCase):
 
     def setUp(self):
         config = LBConfig()
+        config.seed = 0
         config.precision = 'single'
         config.block_size = 8
         config.mem_alignment = 8
@@ -63,6 +64,7 @@ class TestNodeTypeSetting3D(unittest.TestCase):
 
     def setUp(self):
         config = LBConfig()
+        config.seed = 0
         config.precision = 'single'
         config.block_size = 8
         config.mem_alignment = 8

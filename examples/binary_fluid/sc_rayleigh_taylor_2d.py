@@ -17,7 +17,6 @@ class RayleighTaylorDomain(Subdomain2D):
                 NTFullBBWall)
 
     def initial_conditions(self, sim, hx, hy):
-        np.random.seed(self.config.seed)
         sim.rho[:] = np.random.rand(*sim.rho.shape) / 100.0
         sim.phi[:] = np.random.rand(*sim.phi.shape) / 100.0
 
@@ -40,14 +39,6 @@ class RayleighTaylorSCSim(LBBinaryFluidShanChen, LBForcedSim):
             'G': 1.2,
             'visc': 1.0 / 6.0,
             'periodic_x': True})
-
-    @classmethod
-    def add_options(cls, group, dim):
-        LBBinaryFluidShanChen.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
-
-        group.add_argument('--seed', type=int, default=int(time.time()),
-                help='PRNG seed value')
 
     @classmethod
     def modify_config(cls, config):
