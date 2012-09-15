@@ -50,7 +50,7 @@ class Fluid2DVis(vis.FluidVis):
 
         self.ax.set_title('Iteration: {0}'.format(curr_iter))
         self.plot.set_data(buffer)
-        self.plot.set_clim(np.min(buffer), np.max(buffer))
+        self.plot.set_clim(np.nanmin(buffer), np.nanmax(buffer))
         self.fig.canvas.draw_idle()
 
     def run(self):
