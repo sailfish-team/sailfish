@@ -11,22 +11,20 @@ import imp
 import logging
 import os
 import platform
-import re
 import shutil
 import socket
 import subprocess
-import stat
 import sys
 import tempfile
 import time
-from collections import namedtuple, defaultdict
+from collections import defaultdict
 from multiprocessing import Process
 
 import execnet
 import zmq
 from sailfish import codegen, config, io, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
-from sailfish.subdomain import SubdomainSpec3D, SubdomainPair
+from sailfish.subdomain import SubdomainPair
 
 def _start_machine_master(config, subdomains, lb_class):
     """Starts a machine master process locally."""
@@ -399,12 +397,13 @@ class LBSimulationController(object):
         """Dimensionality of the simulation: 2 or 3."""
         return self._lb_class.subdomain.dim
 
-    def _init_subdomain_envelope(self, sim, subdomains):
+    def _init_subdomain_envelope(self, sim_class, subdomains):
         """Sets the size of the ghost node envelope for all subdomains."""
-        envelope_size = sim.nonlocality
-        for vec in sim.grid.basis:
+        envelope_size = sim_class.nonlocality
+        grid = util.get_grid_from_config(self.config)
+        for vec in grid.basis:
             for comp in vec:
-                envelope_size = max(sim.nonlocality, abs(comp))
+                envelope_size = max(sim_class.nonlocality, abs(comp))
 
         # Get rid of any Sympy wrapper objects.
         envelope_size = int(envelope_size)
@@ -660,8 +659,7 @@ class LBSimulationController(object):
         assert len(subdomains) > 0, \
                 "Make sure at least one subdomain is returned in geo_class.subdomains()"
 
-        sim = self._lb_class(self.config)
-        self._init_subdomain_envelope(sim, subdomains)
+        self._init_subdomain_envelope(self._lb_class, subdomains)
 
         proc = LBGeometryProcessor(subdomains, self.dim, self.geo)
         subdomains = proc.transform(self.config)
