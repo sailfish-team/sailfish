@@ -13,112 +13,11 @@ import time
 import numpy as np
 import zmq
 from sailfish import codegen, util, io
+from sailfish.subdomain_connection import ConnectionBuffer, MacroConnectionBuffer
 
 # Used to hold a reference to a CUDA kernel and a grid on which it is
 # to be executed.
 KernelGrid = namedtuple('KernelGrid', 'kernel grid')
-
-class MacroConnectionBuffer(object):
-    """Contains buffers needed to transfer a single macroscopic field
-    between two subdomains."""
-
-    def __init__(self, face, cpair, coll_buf, coll_idx, recv_buf, dist_idx,
-            field):
-        """
-        :param face: face ID
-        :param cpair: ConnectionPair, a tuple of two LBConnection objects
-        :param coll_buf: GPUBuffer for information collected on the source
-            subdomain to be sent to the destination subdomain
-        :param coll_idx: GPUBuffer with an array of indices indicating sparse
-            nodes from which data is to be collected; this is only used for
-            connections via the X_LOW and X_HIGH faces
-        :param recv_buf: GPUBuffer for information received from the remote
-            subdomain
-        :param dist_idx: GPUBuffer with an array of indices indicating
-            the position of nodes to which data is to be distributed; this is
-            only used for connections via the X_LOW and X_HIGH faces
-        :param field: ScalarField that is being transferred using this buffer
-        """
-        self.face = face
-        self.cpair = cpair
-        self.coll_buf = coll_buf
-        self.coll_idx = coll_idx
-        self.recv_buf = recv_buf
-        self.dist_idx = dist_idx
-        self.field = field
-
-class ConnectionBuffer(object):
-    """Contains buffers needed to transfer distributions between two
-    subdomains."""
-
-    # TODO: Use a single buffer for dist_full_buf and dist_local_full_buf.
-    def __init__(self, face, cpair, coll_buf, coll_idx, recv_buf,
-            dist_partial_buf, dist_partial_idx, dist_partial_sel,
-            dist_full_buf, dist_full_idx, grid_id=0,
-            coll_idx_opposite=None,
-            dist_full_idx_opposite=None,
-            local_coll_buf=None,
-            local_recv_buf=None):
-        """
-        :param face: face ID
-        :param cpair: ConnectionPair, a tuple of two LBConnection objects
-        :param coll_buf: GPUBuffer for information collected on the source
-            subdomain to be sent to the destination subdomain
-        :param coll_idx: GPUBuffer with an array of indices indicating sparse
-            nodes from which data is to be collected; this is only used for
-            connections via the X_LOW and X_HIGH faces
-        :param recv_buf: page-locked numpy buffer with information
-            received from the remote subdomain
-        :param dist_partial_buf: GPUBuffer, for partial distributions
-        :param dist_partial_idx: GPUBuffer, for indices of the partial distributions
-        :param dist_partial_sel: selector in recv_buf to get the partial
-            distributions
-        :param dist_full_buf: GPUBuffer for information to be distributed; this
-            is used for nodes where a complete set of distributions is available
-            (e.g. not corner or edge nodes)
-        :param dist_full_idx: GPUBuffer with an array of indices indicating
-            the position of nodes to which data is to be distributed; this is
-            only used for connections via the X_LOW and X_HIGH faces
-        :param grid_id: grid ID
-        :param coll_idx_opposite: like coll_idx, buf for the fully local step of
-            the AA access pattern
-        :param dist_full_idx_opposite: like dist_full_idx, but for the fully
-            local step of the AA access pattern
-        :param local_coll_buf: like coll_buf, but for the fully local step of
-            the AA access pattern
-        :param local_recv_buf: like recv_buf, but for the fully local step of
-            the AA access pattern
-        """
-        self.face = face
-        self.cpair = cpair
-        self.coll_buf = coll_buf
-        self.coll_idx = coll_idx
-        self.recv_buf = recv_buf
-        self.dist_partial_buf = dist_partial_buf
-        self.dist_partial_idx = dist_partial_idx
-        self.dist_partial_sel = dist_partial_sel
-        self.dist_full_buf = dist_full_buf
-        self.dist_full_idx = dist_full_idx
-        self.grid_id = grid_id
-        self.coll_idx_opposite = coll_idx_opposite
-        self.dist_full_idx_opposite = dist_full_idx_opposite
-        self.local_coll_buf = local_coll_buf
-        self.local_recv_buf = local_recv_buf
-
-    def distribute(self, backend, stream):
-        # Serialize partial distributions into a contiguous buffer.
-        if self.dist_partial_sel is not None:
-            self.dist_partial_buf.host[:] = self.recv_buf[self.dist_partial_sel]
-            backend.to_buf_async(self.dist_partial_buf.gpu, stream)
-
-        if self.cpair.dst.dst_slice:
-            slc = [slice(0, self.recv_buf.shape[0])] + list(
-                    reversed(self.cpair.dst.dst_full_buf_slice))
-            self.dist_full_buf.host[:] = self.recv_buf[slc]
-            backend.to_buf_async(self.dist_full_buf.gpu, stream)
-
-    def distribute_unpropagated(self, backend, stream):
-        backend.to_buf_async(self.local_recv_buf.gpu, stream)
 
 
 class GPUBuffer(object):
@@ -796,8 +695,6 @@ class SubdomainRunner(object):
         for dist_num, locations in sorted(cpair.dst.dst_partial_map.items()):
             for loc in locations:
                 dst_loc = [x + y for x, y in zip(dst_low, loc)]
-                dst_loc_opp = self._dst_face_loc_to_full_loc(face, dst_loc,
-                        opposite=True)
                 dst_loc = self._dst_face_loc_to_full_loc(face, dst_loc)
 
                 # Reverse 'loc' here to go from natural order (x, y, z) to the
@@ -1728,8 +1625,6 @@ class NNSubdomainRunner(SubdomainRunner):
 
 
     def _init_macro_distrib_kernels(self, cbuf, grid_dim1, block_size):
-        kernels = []
-
         # Sparse data distribution.
         if cbuf.dist_idx.host is not None:
             grid_size = (grid_dim1(cbuf.recv_buf.host.size),)
