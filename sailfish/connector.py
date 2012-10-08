@@ -125,7 +125,6 @@ class ZMQRemoteSubdomainConnector(ZMQSubdomainConnector):
             it to a random port.
         """
         # Import to check if the module is available and fail early if not.
-        import netifaces
         ZMQSubdomainConnector.__init__(self, addr, receiver)
 
     def is_ready(self):

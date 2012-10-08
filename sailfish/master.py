@@ -138,9 +138,6 @@ class LBMachineMaster(object):
         # A set to keep track which connections are already created.
         _subdomain_conns = set()
 
-        # TOOD(michalj): Fix this for multi-grid models.
-        grid = util.get_grid_from_config(self.config)
-
         # IDs of the subdomains that are local to this master.
         local_subdomain_ids = set([b.id for b in self.subdomains])
         local_subdomain_map = dict([(b.id, b) for b in self.subdomains])
@@ -217,7 +214,6 @@ class LBMachineMaster(object):
         vis_config.iteration = -1
         vis_config.field_name = ''
         vis_config.all_blocks = False
-        vis_fields = sim.visualization_fields(sim.dim)
 
         # Start the visualizatione engine.
         vis_class = util.get_visualization_engines().next()

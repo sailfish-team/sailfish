@@ -175,9 +175,6 @@ class FluidSurfaceVis(vis.FluidVis):
         res = numpy.dstack((a, b, c, d))
         vtx = numpy.ravel(res)
 
-        min_ = numpy.min(mesh_z)
-        max_ = numpy.max(mesh_z)
-
         self._minh = min(self._minh, numpy.min(mesh_z))
         self._maxh = max(self._maxh, numpy.max(mesh_z))
 

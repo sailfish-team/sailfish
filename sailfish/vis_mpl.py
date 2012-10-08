@@ -4,14 +4,11 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
-import math
-import os
 import sys
-import time
 
 import numpy as np
 
-from sailfish import lb_base, vis, subdomain, util
+from sailfish import vis
 
 
 class Fluid2DVis(vis.FluidVis):

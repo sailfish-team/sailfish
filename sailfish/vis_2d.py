@@ -6,7 +6,6 @@ __license__ = 'LGPL3'
 
 import math
 import os
-import time
 
 import numpy as np
 import pygame
@@ -367,10 +366,6 @@ class Fluid2DVis(vis.FluidVis):
 
 
     def run(self):
-        t_prev = time.time()
-        avg_mlups = 0.0
-        mlups = 0.0
-
         while 1:
             self._process_events()
             self._update_display()

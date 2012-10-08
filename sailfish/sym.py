@@ -686,15 +686,7 @@ def free_energy_external_force(sim, grid_num=0):
     ret = []
     sum_ = 0
 
-    tau0 = Symbol('tau0')
-
     S = sim.S
-
-    if grid_num == 0:
-        rho = S.rho
-    else:
-        rho = S.phi
-
     for i, ei in enumerate(grid.basis[1:]):
         t = S.wi[i] * (ea.dot(ei) * (1 + 3 * ei.dot(grid.v)) - ea.dot(grid.v))
         sum_ += t

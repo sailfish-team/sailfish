@@ -4,7 +4,6 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
-from collections import defaultdict
 import numpy as np
 
 from sailfish import util
@@ -123,7 +122,6 @@ class GeoEncoderConst(GeoEncoder):
                 # Param is a structured numpy array.
                 elif isinstance(param, np.ndarray):
                     nodes_idx = np.argwhere(param_map == node_key)
-                    v = self._encoded_param_map[param_map == node_key]
 
                     uniques = np.unique(param)
                     for value in uniques:
