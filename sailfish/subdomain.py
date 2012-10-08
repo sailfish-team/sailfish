@@ -129,7 +129,6 @@ def _get_dst_full_slice(b1, b2, src_slice_global, full_map, slice_axes):
         full_max = np.max(full_idxs, 0)
         # Loop over axes.
         for i, (lo, hi) in enumerate(zip(full_min, full_max)):
-            b1_start = b1.location[slice_axes[i]]
             b2_start = b2.location[slice_axes[i]]
             # Offset in the local real coordinate system of the target
             # subdomain (same as dst_low).
@@ -331,6 +330,13 @@ class LBConnection(object):
                 reversed(self.src_macro_slice))
 
 class SubdomainSpec(object):
+    """A lightweight class describing the location of a subdomain and its
+    connections to other subdomains in the simulation.
+
+    This class does not contain any references to the actual GPU or host data
+    structures necessary to run the simulation for this subdomain.
+    """
+
     dim = None
 
     # Face IDs.
@@ -629,7 +635,8 @@ class SubdomainSpec3D(SubdomainSpec):
 
 
 class Subdomain(object):
-    """Abstract class for the geometry of a SubdomainSpec."""
+    """Holds all field and geometry information specific to the subdomain
+    described by the corresponding SubdomainSpec."""
 
     NODE_MISC_MASK = 0
     NODE_MISC_SHIFT = 1
