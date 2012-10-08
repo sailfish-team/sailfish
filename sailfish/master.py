@@ -143,7 +143,7 @@ class LBMachineMaster(object):
         local_subdomain_map = dict([(b.id, b) for b in self.subdomains])
         ipc_files = []
 
-        for i, subdomain in enumerate(self.subdomains):
+        for subdomain in self.subdomains:
             connecting_subdomains = subdomain.connecting_subdomains()
             for face, nbid in connecting_subdomains:
                 if (subdomain.id, nbid) in _subdomain_conns:
