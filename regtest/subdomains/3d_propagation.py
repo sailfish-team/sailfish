@@ -123,7 +123,7 @@ class SimulationTest(LBFluidSim):
 
         # dbuf indices are: dist, z, y, x
         # vec indices are: x, y, z
-        if runner._block.id == 0:
+        if runner._spec.id == 0:
             # All distributions from a single node in the
             # middle of the face
             dbuf[p2(vi(*p1(1, 0, 0)), 32, 32, 64)] = 0.11
@@ -131,7 +131,7 @@ class SimulationTest(LBFluidSim):
             dbuf[p2(vi(*p1(1, -1, 0)), 32, 32, 64)] = 0.13
             dbuf[p2(vi(*p1(1, 0, 1)), 32, 32, 64)] = 0.21
             dbuf[p2(vi(*p1(1, 0, -1)), 32, 32, 64)] = 0.23
-        elif runner._block.id == 1:
+        elif runner._spec.id == 1:
             # Corner
             dbuf[p2(vi(*p1(-1, 0, 0)), 1, 1, 1)] = 0.33
             dbuf[p2(vi(*p1(-1, 1, 0)), 1, 1, 1)] = 0.34
@@ -230,13 +230,13 @@ class MisalignedHorizTest(SimulationTest):
 
         # dbuf indices are: dist, z, y, x
         # vec indices are: x, y, z
-        if runner._block.id == 0:
+        if runner._spec.id == 0:
             dbuf[vi(1, 0, 0),  15, 7, 20] = 0.11
             dbuf[vi(1, 1, 0),  15, 7, 20] = 0.12
             dbuf[vi(1, -1, 0), 15, 7, 20] = 0.13
             dbuf[vi(1, 0, 1),  15, 7, 20] = 0.14
             dbuf[vi(1, 0, -1), 15, 7, 20] = 0.15
-        elif runner._block.id == 1:
+        elif runner._spec.id == 1:
             dbuf[vi(-1, 0, 0),  10, 7, 1] = 0.21
             dbuf[vi(-1, 1, 0),  10, 7, 1] = 0.22
             dbuf[vi(-1, -1, 0), 10, 7, 1] = 0.23
@@ -262,13 +262,13 @@ class MisalignedVertTest(SimulationTest):
 
         # dbuf indices are: dist, z, y, x
         # vec indices are: x, y, z
-        if runner._block.id == 0:
+        if runner._spec.id == 0:
             dbuf[vi(0, 1, 0),  5, 30, 25] = 0.11
             dbuf[vi(1, 1, 0),  5, 30, 25] = 0.12
             dbuf[vi(-1, 1, 0), 5, 30, 25] = 0.13
             dbuf[vi(0, 1, 1),  5, 30, 25] = 0.14
             dbuf[vi(0, 1, -1), 5, 30, 25] = 0.15
-        elif runner._block.id == 1:
+        elif runner._spec.id == 1:
             dbuf[vi(0, -1, 0),  5, 1, 25] = 0.21
             dbuf[vi(1, -1, 0),  5, 1, 25] = 0.22
             dbuf[vi(-1, -1, 0), 5, 1, 25] = 0.23
@@ -358,13 +358,13 @@ class PeriodicSimulationTest(LBFluidSim):
 
         # dbuf indices are: dist, z, y, x
         # vec indices are: x, y, z
-        if runner._block.id == 0:
+        if runner._spec.id == 0:
             dbuf[vi(-1, 0, 0), 32, 32, 1] = 0.11
             dbuf[vi(-1, 1, 0), 32, 32, 1] = 0.12
             dbuf[vi(-1, -1, 0), 32, 32, 1] = 0.13
             dbuf[vi(-1, 0, 1), 32, 32, 1] = 0.14
             dbuf[vi(-1, 0, -1), 32, 32, 1] = 0.15
-        elif runner._block.id == 1:
+        elif runner._spec.id == 1:
             # Corner
             dbuf[vi(1, 0, 0), 1, 1, 64] = 0.21
             dbuf[vi(1, 1, 0), 1, 1, 64] = 0.22
@@ -418,12 +418,12 @@ class PartialPeriodicSimulationTest(PeriodicSimulationTest):
         dbuf = runner._debug_get_dist()
         dbuf[:] = 0.0
 
-        if runner._block.id == 0:
+        if runner._spec.id == 0:
             dbuf[vi(1, 1, 0), 32, 64, 64] = 0.11
             dbuf[vi(1, 0, 1), 66, 32, 64] = 0.12
             dbuf[vi(1, -1, 0), 32, 1, 64] = 0.13
             dbuf[vi(1, 0, -1), 1, 32, 64] = 0.14
-        elif runner._block.id == 1:
+        elif runner._spec.id == 1:
             dbuf[vi(-1, 1, 0), 20, 64, 1] = 0.21
             dbuf[vi(-1, 0, 1), 66, 20, 1] = 0.22
             dbuf[vi(-1, -1, 0), 20, 1, 1] = 0.23
@@ -667,7 +667,7 @@ class AASimulationTest(SimulationTest):
         dbuf = runner._debug_get_dist()
         dbuf[:] = 0.0
 
-        if runner._block.id == 0:
+        if runner._spec.id == 0:
             dbuf[vi(0, 1, 1), 32, 32, 10] = 0.11
 
         runner._debug_set_dist(dbuf)

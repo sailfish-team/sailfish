@@ -1,4 +1,4 @@
-"""Code for controlling a single block of a LB simulation."""
+"""Code for controlling a single subdomain of a LB simulation."""
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
@@ -79,7 +79,7 @@ class TimeProfile(object):
                 recv=self._timings[self.RECV_DISTS] / mi,
                 send=self._timings[self.SEND_DISTS] / mi,
                 total=self._timings[self.STEP] / mi,
-                subdomain_id=self._runner._block.id)
+                subdomain_id=self._runner._spec.id)
 
 
         min_ti = util.TimingInfo(
@@ -91,7 +91,7 @@ class TimeProfile(object):
                 recv=self._min_timings[self.RECV_DISTS],
                 send=self._min_timings[self.SEND_DISTS],
                 total=self._min_timings[self.STEP],
-                subdomain_id=self._runner._block.id)
+                subdomain_id=self._runner._spec.id)
 
         max_ti = util.TimingInfo(
                 comp=(self._max_timings[self.BULK] + self._max_timings[self.BOUNDARY]),
@@ -102,7 +102,7 @@ class TimeProfile(object):
                 recv=self._max_timings[self.RECV_DISTS],
                 send=self._max_timings[self.SEND_DISTS],
                 total=self._max_timings[self.STEP],
-                subdomain_id=self._runner._block.id)
+                subdomain_id=self._runner._spec.id)
 
         self._runner.send_summary_info(ti, min_ti, max_ti)
 
@@ -168,11 +168,11 @@ class SubdomainRunner(object):
 
     An arrow above symbolizes a dependency between the two streams.
     """
-    def __init__(self, simulation, block, output, backend, quit_event,
+    def __init__(self, simulation, spec, output, backend, quit_event,
             summary_addr=None, master_addr=None, summary_channel=None):
         """
         :param simulation: instance of a simulation class, descendant from LBSim
-        :param block: SubdomainSpec that this runner is to handle
+        :param spec: SubdomainSpec that this runner is to handle
         :param backend: instance of a Sailfish backend class to handle
                 GPU interaction
         :param quit_event: multiprocessing Event object; if set, the master is
@@ -187,8 +187,8 @@ class SubdomainRunner(object):
 
         self._ctx = zmq.Context()
 
-        self._block = block
-        block.runner = self
+        self._spec = spec
+        spec.runner = self
 
         self._output = output
         self.backend = backend
@@ -231,11 +231,11 @@ class SubdomainRunner(object):
         # communicated to the master.
         unready = []
         ports = {}
-        for b_id, connector in self._block._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.iteritems():
             if connector.is_ready():
                 connector.init_runner(self._ctx)
                 if connector.port is not None:
-                    ports[(self._block.id, b_id)] = (connector.get_addr(),
+                    ports[(self._spec.id, b_id)] = (connector.get_addr(),
                             connector.port)
             else:
                 unready.append(b_id)
@@ -244,8 +244,8 @@ class SubdomainRunner(object):
         remote_ports = self._master_sock.recv_pyobj()
 
         for b_id in unready:
-            connector = self._block._connectors[b_id]
-            addr, port = remote_ports[(b_id, self._block.id)]
+            connector = self._spec._connectors[b_id]
+            addr, port = remote_ports[(b_id, self._spec.id)]
             connector.port = port
             connector.set_addr(addr)
             connector.init_runner(self._ctx)
@@ -256,11 +256,11 @@ class SubdomainRunner(object):
 
     @property
     def dim(self):
-        return self._block.dim
+        return self._spec.dim
 
     def update_context(self, ctx):
         """Called by the codegen module."""
-        self._block.update_context(ctx)
+        self._spec.update_context(ctx)
         self._subdomain.update_context(ctx)
         ctx.update(self.backend.get_defines())
 
@@ -275,19 +275,19 @@ class SubdomainRunner(object):
         ctx['grid_nx'] = self._grid_nx
         ctx['arr_ny'] = arr_ny
 
-        bnd_limits = list(self._block.actual_size[:])
+        bnd_limits = list(self._spec.actual_size[:])
 
         if self.dim == 3:
             ctx['lat_nz'] = self._lat_size[-3]
             ctx['arr_nz'] = self._physical_size[-3]
-            ctx['block_periodicity'] = [self._block.periodic_x,
-                    self._block.periodic_y, self._block.periodic_z]
+            ctx['block_periodicity'] = [self._spec.periodic_x,
+                    self._spec.periodic_y, self._spec.periodic_z]
         else:
             ctx['lat_nz'] = 1
             ctx['arr_nz'] = 1
             bnd_limits.append(1)
-            ctx['block_periodicity'] = [self._block.periodic_x,
-                    self._block.periodic_y, False]
+            ctx['block_periodicity'] = [self._spec.periodic_x,
+                    self._spec.periodic_y, False]
 
         ctx['boundary_size'] = self._boundary_size
         ctx['lat_linear'] = self.lat_linear
@@ -298,7 +298,7 @@ class SubdomainRunner(object):
         ctx['bnd_limits'] = bnd_limits
         ctx['dist_size'] = self._get_nodes()
         ctx['sim'] = self._sim
-        ctx['block'] = self._block
+        ctx['block'] = self._spec
         ctx['time_dependence'] = self.config.time_dependence
         ctx['check_invalid_values'] = (
                 self.config.check_invalid_results_gpu and
@@ -314,7 +314,7 @@ class SubdomainRunner(object):
                               {-1:  self.config.lat_ny * arr_nx,
                                 1: -self.config.lat_ny * arr_nx}]
 
-        if self._block.dim == 3:
+        if self._spec.dim == 3:
             ctx['pbc_offsets'].append(
                               {-1:  self.config.lat_nz * arr_ny * arr_nx,
                                 1: -self.config.lat_nz * arr_ny * arr_nx})
@@ -355,7 +355,7 @@ class SubdomainRunner(object):
             field[:] = np.inf
 
         assert field.base is buf
-        fview = field[self._block._nonghost_slice]
+        fview = field[self._spec._nonghost_slice]
         assert fview.base is field
 
         # Zero the non-ghost part of the field.
@@ -372,7 +372,7 @@ class SubdomainRunner(object):
         """Allocates several scalar arrays representing a vector field."""
         components = []
 
-        for x in range(0, self._block.dim):
+        for x in range(0, self._spec.dim):
             field = self.make_scalar_field(self.float, register=False, async=async)
             components.append(field)
 
@@ -390,7 +390,7 @@ class SubdomainRunner(object):
     def _init_geometry(self):
         self.config.logger.debug("Initializing geometry.")
         self._init_shape()
-        self._subdomain = self._sim.subdomain(self._global_size, self._block,
+        self._subdomain = self._sim.subdomain(self._global_size, self._spec,
                 self._sim.grid)
         self._subdomain.reset()
         self._output.set_fluid_map(self._subdomain.fluid_map())
@@ -400,12 +400,12 @@ class SubdomainRunner(object):
     def _init_shape(self):
         # Logical size of the lattice (including ghost nodes).
         # X dimension is the last one on the list (nz, ny, nx)
-        self._lat_size = list(reversed(self._block.actual_size))
+        self._lat_size = list(reversed(self._spec.actual_size))
 
         # Physical in-memory size of the lattice, adjusted for optimal memory
         # access from the compute unit.  Size of the X dimension is rounded up
         # to a multiple of block_size.  Order is [nz], ny, nx
-        self._physical_size = list(reversed(self._block.actual_size))
+        self._physical_size = list(reversed(self._spec.actual_size))
         bs = self.config.block_size
         alignment = self.config.mem_alignment
         self._physical_size[-1] = int(math.ceil(float(self._physical_size[-1]) / alignment)) * alignment
@@ -415,7 +415,7 @@ class SubdomainRunner(object):
         # in-memory lattice.
         assert bs >= alignment, ('The block size (--block_size) has to be at '
                 'least as large as --memory_alignment')
-        self._grid_nx = int(math.ceil(float(self._block.actual_size[0]) / bs)) * bs
+        self._grid_nx = int(math.ceil(float(self._spec.actual_size[0]) / bs)) * bs
         grid_nx = self._grid_nx
 
         self.config.logger.debug('Effective lattice size is: {0}'.format(
@@ -423,11 +423,11 @@ class SubdomainRunner(object):
 
         # CUDA block/grid size for standard kernel call.
         self._kernel_block_size = (bs, 1)
-        self._boundary_size = self._block.envelope_size * 2
+        self._boundary_size = self._spec.envelope_size * 2
         bns = self._boundary_size
         assert bns < bs
 
-        if self._block.dim == 2:
+        if self._spec.dim == 2:
             arr_ny, arr_nx = self._physical_size
             lat_ny, lat_nx = self._lat_size
         else:
@@ -435,40 +435,40 @@ class SubdomainRunner(object):
             lat_nz, lat_ny, lat_nx = self._lat_size
 
         padding = grid_nx - lat_nx
-        block = self._block
+        spec = self._spec
 
         x_conns = 0
         # Sometimes, due to misalignment, two blocks might be necessary to
         # cover the right boundary.
-        if block.has_face_conn(block.X_HIGH) or block.periodic_x:
+        if spec.has_face_conn(spec.X_HIGH) or spec.periodic_x:
             if bs - padding < bns:
-                x_conns = 1    # 1 block on the left, 1 block on the right
+                x_conns = 1    # 1 spec on the left, 1 spec on the right
             else:
-                x_conns = 2    # 1 block on the left, 2 blocks on the right
+                x_conns = 2    # 1 spec on the left, 2 specs on the right
 
-        if block.has_face_conn(block.X_LOW) or block.periodic_x:
+        if spec.has_face_conn(spec.X_LOW) or spec.periodic_x:
             x_conns += 1
 
         y_conns = 0        # north-south
-        if block.has_face_conn(block.Y_LOW) or block.periodic_y:
+        if spec.has_face_conn(spec.Y_LOW) or spec.periodic_y:
             y_conns += 1
-        if block.has_face_conn(block.Y_HIGH) or block.periodic_y:
+        if spec.has_face_conn(spec.Y_HIGH) or spec.periodic_y:
             y_conns += 1
 
-        if self._block.dim == 3:
+        if self._spec.dim == 3:
             z_conns = 0        # top-bottom
-            if block.has_face_conn(block.Z_LOW) or block.periodic_z:
+            if spec.has_face_conn(spec.Z_LOW) or spec.periodic_z:
                 z_conns += 1
-            if block.has_face_conn(block.Z_HIGH) or block.periodic_z:
+            if spec.has_face_conn(spec.Z_HIGH) or spec.periodic_z:
                 z_conns += 1
 
-        # Number of blocks to be handled by the boundary kernel.  This is also
+        # Number of specs to be handled by the boundary kernel.  This is also
         # the grid size for boundary kernels.  Note that the number of X-connection
-        # blocks does not have the 'bns' factor to account for the thickness of
+        # specs does not have the 'bns' factor to account for the thickness of
         # the boundary layer, as the X connection is handled by whole compute
-        # device blocks which are assumed to be larger than the boundary layer
+        # device specs which are assumed to be larger than the boundary layer
         # (i.e. bs > bns).
-        if block.dim == 2:
+        if spec.dim == 2:
             self._boundary_blocks = (
                     (bns * grid_nx / bs) * y_conns +      # top & bottom
                     (arr_ny - y_conns * bns) * x_conns)  # left & right (w/o top & bottom rows)
@@ -495,7 +495,7 @@ class SubdomainRunner(object):
         # Special cases: boundary kernels can cover the whole domain or this is
         # the only block participating in the simulation.
         if (0 in self._kernel_grid_bulk or self._kernel_grid_bulk[0] < 0 or
-                self._kernel_grid_bulk[1] < 0 or len(self._block._connectors) == 0 or
+                self._kernel_grid_bulk[1] < 0 or len(self._spec._connectors) == 0 or
                 not self.config.bulk_boundary_split):
             self.config.logger.debug("Disabling bulk/boundary split.")
             # Disable the boundary kernels and ensure that the bulk kernel will
@@ -509,13 +509,13 @@ class SubdomainRunner(object):
                 repr(self._boundary_blocks))
 
         # Global grid size as seen by the simulation class.
-        if self._block.dim == 2:
+        if self._spec.dim == 2:
             self._global_size = (self.config.lat_ny, self.config.lat_nx)
         else:
             self._global_size = (self.config.lat_nz, self.config.lat_ny,
                     self.config.lat_nx)
 
-        evs = self._block.envelope_size
+        evs = self._spec.envelope_size
         # Used so that face values map to the limiting coordinate
         # along a specific axis, e.g. lat_linear[X_LOW] = 0
         self.lat_linear = [0, self._lat_size[-1] - 1, 0, self._lat_size[-2] - 1]
@@ -533,7 +533,7 @@ class SubdomainRunner(object):
         self.lat_linear_macro = [evs, self._lat_size[-1] - 1 - evs, evs,
                 self._lat_size[-2] - 1 - evs]
 
-        if self._block.dim == 3:
+        if self._spec.dim == 3:
             self.lat_linear.extend([0, self._lat_size[-3] - 1])
             self.lat_linear_with_swap.extend([self._lat_size[-3] - 1, 0])
             self.lat_linear_dist.extend([self._lat_size[-3] - 1 - evs, evs])
@@ -606,7 +606,7 @@ class SubdomainRunner(object):
                 and a location suitable for the fully local step in the AA
                 access pattern
         """
-        if face not in (self._block.X_LOW, self._block.X_HIGH):
+        if face not in (self._spec.X_LOW, self._spec.X_HIGH):
             return None
 
         # For the AA access pattern, the locations of the nodes are the same
@@ -629,13 +629,13 @@ class SubdomainRunner(object):
                 and a location suitable for the fully local step in the AA
                 access pattern
         """
-        if face not in (self._block.X_LOW, self._block.X_HIGH):
+        if face not in (self._spec.X_LOW, self._spec.X_HIGH):
             return None
-        es = self._block.envelope_size
+        es = self._spec.envelope_size
         if opposite:
             if not cpair.src.dst_macro_slice:
                 return None
-            gx = self.lat_linear_with_swap[self._block.opposite_face(face)]
+            gx = self.lat_linear_with_swap[self._spec.opposite_face(face)]
             return self._idx_helper(gx, cpair.src.dst_macro_slice,
                     [self._sim.grid.idx_opposite[d] for d in cpair.dst.dists])
         else:
@@ -644,19 +644,19 @@ class SubdomainRunner(object):
             dst_slice = [
                 slice(x.start + es, x.stop + es) for x in
                 cpair.dst.dst_slice]
-            gx = self.lat_linear_dist[self._block.opposite_face(face)]
+            gx = self.lat_linear_dist[self._spec.opposite_face(face)]
             return self._idx_helper(gx, dst_slice, cpair.dst.dists)
 
     def _dst_face_loc_to_full_loc(self, face, face_loc, opposite=False):
         """Expands a location tuple in the (full) face coordinate system into a
         a complete location tuple in the full coordinate system of the subdomain."""
-        axis = self._block.face_to_axis(face)
+        axis = self._spec.face_to_axis(face)
         # In the fully local step of the AA access pattern, the location along
         # the connection axis is different.
         if opposite:
-            missing_loc = self.lat_linear_with_swap[self._block.opposite_face(face)]
+            missing_loc = self.lat_linear_with_swap[self._spec.opposite_face(face)]
         else:
-            missing_loc = self.lat_linear_dist[self._block.opposite_face(face)]
+            missing_loc = self.lat_linear_dist[self._spec.opposite_face(face)]
 
         if axis == 0:
             return [missing_loc] + face_loc
@@ -689,7 +689,7 @@ class SubdomainRunner(object):
         buf = self.backend.alloc_async_host_buf(cpair.dst.partial_nodes,
                 dtype=self.float)
         idx = np.zeros(cpair.dst.partial_nodes, dtype=np.uint32)
-        dst_low = [x + self._block.envelope_size for x in cpair.dst.dst_low]
+        dst_low = [x + self._spec.envelope_size for x in cpair.dst.dst_low]
         sel = []
         i = 0
         for dist_num, locations in sorted(cpair.dst.dst_partial_map.items()):
@@ -720,8 +720,8 @@ class SubdomainRunner(object):
         # typically contain just 1 element, unless periodic boundary conditions
         # are used.
         self._block_to_connbuf = defaultdict(list)
-        for face, block_id in self._block.connecting_subdomains():
-            cpairs = self._block.get_connections(face, block_id)
+        for face, block_id in self._spec.connecting_subdomains():
+            cpairs = self._spec.get_connections(face, block_id)
             for cpair in cpairs:
                 coll_idx = self._get_src_slice_indices(face, cpair)
                 coll_idx = GPUBuffer(coll_idx, self.backend)
@@ -777,7 +777,7 @@ class SubdomainRunner(object):
                             local_recv_buf)
 
                     self.config.logger.debug('adding buffer for conn: {0} -> {1} '
-                            '(face {2})'.format(self._block.id, block_id, face))
+                            '(face {2})'.format(self._spec.id, block_id, face))
                     self._block_to_connbuf[block_id].append(cbuf)
 
         # Explicitly sort connection buffers by their face ID.  Create a
@@ -787,7 +787,7 @@ class SubdomainRunner(object):
         for subdomain_id, cbufs in self._block_to_connbuf.iteritems():
             cbufs.sort(key=lambda x: (x.face, x.grid_id))
             recv_bufs = list(cbufs)
-            recv_bufs.sort(key=lambda x: (self._block.opposite_face(x.face),
+            recv_bufs.sort(key=lambda x: (self._spec.opposite_face(x.face),
                 x.grid_id))
             self._recv_block_to_connbuf[subdomain_id] = recv_bufs
 
@@ -895,23 +895,23 @@ class SubdomainRunner(object):
         ls = self._lat_size
         bs = self.config.block_size
 
-        if self._block.periodic_x:
-            if self._block.dim == 2:
+        if self._spec.periodic_x:
+            if self._spec.dim == 2:
                 grid_size = (int(ceil(ls[0] / float(bs))), 1)
             else:
                 grid_size = (int(ceil(ls[1] / float(bs))), ls[0])
             for kernel in kernels[base][0]:
                 self.backend.run_kernel(kernel, grid_size, self._calc_stream)
 
-        if self._block.periodic_y:
-            if self._block.dim == 2:
+        if self._spec.periodic_y:
+            if self._spec.dim == 2:
                 grid_size = (int(ceil(ls[1] / float(bs))), 1)
             else:
                 grid_size = (int(ceil(ls[2] / float(bs))), ls[0])
             for kernel in kernels[base][1]:
                 self.backend.run_kernel(kernel, grid_size, self._calc_stream)
 
-        if self._block.dim == 3 and self._block.periodic_z:
+        if self._spec.dim == 3 and self._spec.periodic_z:
             grid_size = (int(ceil(ls[2] / float(bs))), ls[1])
             for kernel in kernels[base][2]:
                 self.backend.run_kernel(kernel, grid_size, self._calc_stream)
@@ -971,13 +971,13 @@ class SubdomainRunner(object):
         else:
             buf = 'coll_buf'
 
-        for b_id, connector in self._block._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
             for x in conn_bufs:
                 self.backend.from_buf_async(getattr(x, buf).gpu, self._data_stream)
 
         self._data_stream.synchronize()
-        for b_id, connector in self._block._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
 
             if len(conn_bufs) > 1:
@@ -1001,7 +1001,7 @@ class SubdomainRunner(object):
         else:
             get_buf = operator.attrgetter('recv_buf')
 
-        for b_id, connector in self._block._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.iteritems():
             conn_bufs = self._recv_block_to_connbuf[b_id]
             if len(conn_bufs) > 1:
                 dest = np.hstack([np.ravel(get_buf(x)) for x in conn_bufs])
@@ -1156,7 +1156,7 @@ class SubdomainRunner(object):
             secondary.append(KernelGrid(
                     self.get_kernel('DistributeContinuousDataWithSwap',
                             [self.gpu_dist(cbuf.grid_id, 0),
-                             self._block.opposite_face(cbuf.face)] +
+                             self._spec.opposite_face(cbuf.face)] +
                             min_max + [cbuf.local_recv_buf.gpu],
                             signature, (block_size,)),
                             grid_size))
@@ -1206,7 +1206,7 @@ class SubdomainRunner(object):
             # Continuous indexing.
             elif cbuf.cpair.dst.dst_slice:
                 # [X, Z * dists] or [X, Y * dists]
-                min_max = ([y.start + self._block.envelope_size
+                min_max = ([y.start + self._spec.envelope_size
                             for y in cbuf.cpair.dst.dst_slice] +
                            list(reversed(cbuf.dist_full_buf.host.shape[1:])))
                 min_max[-1] = min_max[-1] * len(cbuf.cpair.dst.dists)
@@ -1223,7 +1223,7 @@ class SubdomainRunner(object):
                     return KernelGrid(
                             self.get_kernel('DistributeContinuousData',
                             [self.gpu_dist(cbuf.grid_id, i),
-                             self._block.opposite_face(cbuf.face)] +
+                             self._spec.opposite_face(cbuf.face)] +
                             min_max + [cbuf.dist_full_buf.gpu],
                             signature, (block_size,)),
                             grid_size)
@@ -1310,11 +1310,11 @@ class SubdomainRunner(object):
     def save_checkpoint(self):
         if self.config.single_checkpoint:
             fname = io.checkpoint_filename(self.config.checkpoint_file,
-                    1, self._block.id, 0)
+                    1, self._spec.id, 0)
         else:
             fname = io.checkpoint_filename(self.config.checkpoint_file,
                     io.filename_iter_digits(self.config.max_iters),
-                    self._block.id, self._sim.iteration)
+                    self._spec.id, self._sim.iteration)
 
         sim_state = pickle.dumps(self._sim.get_state(), -1)
         data = { 'state': sim_state }
@@ -1492,7 +1492,7 @@ class NNSubdomainRunner(SubdomainRunner):
 
     @profile(TimeProfile.RECV_MACRO)
     def _recv_macro(self):
-        for b_id, connector in self._block._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.iteritems():
             conn_bufs = self._recv_block_to_macrobuf[b_id]
             if len(conn_bufs) > 1:
                 dest = np.hstack([np.ravel(x.recv_buf.host) for x in conn_bufs])
@@ -1517,13 +1517,13 @@ class NNSubdomainRunner(SubdomainRunner):
 
     @profile(TimeProfile.SEND_MACRO)
     def _send_macro(self):
-        for b_id, connector in self._block._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.iteritems():
             conn_bufs = self._block_to_macrobuf[b_id]
             for x in conn_bufs:
                 self.backend.from_buf_async(x.coll_buf.gpu, self._data_stream)
 
         self._data_stream.synchronize()
-        for b_id, connector in self._block._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.iteritems():
             conn_bufs = self._block_to_macrobuf[b_id]
             if len(conn_bufs) > 1:
                 connector.send(np.hstack(
@@ -1540,14 +1540,14 @@ class NNSubdomainRunner(SubdomainRunner):
             return self._get_global_idx((gx, idx[1], idx[0])).astype(np.uint32)
 
     def _get_src_macro_indices(self, face, cpair):
-        if face in (self._block.X_LOW, self._block.X_HIGH):
+        if face in (self._spec.X_LOW, self._spec.X_HIGH):
             gx = self.lat_linear_macro[face]
         else:
             return None
         return self._macro_idx_helper(gx, cpair.src.src_macro_slice)
 
     def _get_dst_macro_indices(self, face, cpair):
-        if face in (self._block.X_LOW, self._block.X_HIGH):
+        if face in (self._spec.X_LOW, self._spec.X_HIGH):
             gx = self.lat_linear[face]
         else:
             return None
@@ -1560,8 +1560,8 @@ class NNSubdomainRunner(SubdomainRunner):
         self._block_to_macrobuf = defaultdict(list)
         self._num_nn_fields = sum((1 for fpair in self._sim._scalar_fields if
             fpair.abstract.need_nn))
-        for face, block_id in self._block.connecting_subdomains():
-            cpairs = self._block.get_connections(face, block_id)
+        for face, block_id in self._spec.connecting_subdomains():
+            cpairs = self._spec.get_connections(face, block_id)
             for cpair in cpairs:
                 coll_idx = GPUBuffer(self._get_src_macro_indices(face, cpair), self.backend)
                 dist_idx = GPUBuffer(self._get_dst_macro_indices(face, cpair), self.backend)
@@ -1588,7 +1588,7 @@ class NNSubdomainRunner(SubdomainRunner):
         for subdomain_id, cbufs in self._block_to_macrobuf.iteritems():
             cbufs.sort(key=lambda x:(x.face))
             recv_bufs = list(cbufs)
-            recv_bufs.sort(key=lambda x: self._block.opposite_face(x.face))
+            recv_bufs.sort(key=lambda x: self._spec.opposite_face(x.face))
             self._recv_block_to_macrobuf[subdomain_id] = recv_bufs
 
     def _init_macro_collect_kernels(self, cbuf, grid_dim1, block_size):

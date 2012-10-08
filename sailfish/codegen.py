@@ -82,7 +82,7 @@ class BlockCodeGenerator(object):
     def get_code(self, subdomain_runner, target_type):
         if self.config.use_src:
             source_fn = sailfish.io.source_filename(self.config.use_src,
-                    subdomain_runner._block.id)
+                    subdomain_runner._spec.id)
             self.config.logger.debug(
                     "Using code from '{0}'.".format(source_fn))
             with open(source_fn, 'r') as f:
@@ -127,7 +127,7 @@ class BlockCodeGenerator(object):
         if self.config.save_src:
             self.save_code(src,
                     sailfish.io.source_filename(self.config.save_src,
-                        subdomain_runner._block.id),
+                        subdomain_runner._spec.id),
                     self.config.format_src)
 
         return src

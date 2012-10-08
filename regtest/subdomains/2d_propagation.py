@@ -106,11 +106,11 @@ class SimulationTest(LBFluidSim):
 
         # dbuf indices are: dist, y, x
         # vec indices are: x, y
-        if runner._block.id == 0:
+        if runner._spec.id == 0:
             dbuf[vi(1, 1), 128, 128] = 0.11
-        elif runner._block.id == 1:
+        elif runner._spec.id == 1:
             dbuf[vi(1, -1), 1, 128] = 0.22
-        elif runner._block.id == 2:
+        elif runner._spec.id == 2:
             dbuf[vi(-1, 1), 128, 1] = 0.33
         else:
             dbuf[vi(-1, -1), 1, 1] = 0.44
@@ -133,12 +133,12 @@ class MixedPeriodicPropagationTest(unittest.TestCase):
             dbuf = runner._debug_get_dist()
             dbuf[:] = 0.0
 
-            if runner._block.id == 1:
+            if runner._spec.id == 1:
                 # At the top
                 dbuf[vi(-1, 0), 256, 1] = 0.31
                 dbuf[vi(-1, 1), 256, 1] = 0.32
                 dbuf[vi(-1, -1), 256, 1] = 0.33
-            elif runner._block.id == 0:
+            elif runner._spec.id == 0:
                 # At the bottom
                 dbuf[vi(1, 0), 1, 128] = 0.41
                 dbuf[vi(1, 1), 1, 128] = 0.42
@@ -181,7 +181,7 @@ class AAPropagationTest(unittest.TestCase):
             dbuf = runner._debug_get_dist()
             dbuf[:] = 0.0
 
-            if runner._block.id == 0:
+            if runner._spec.id == 0:
                 dbuf[vi(1, 0), 64, 128] = 0.11
                 dbuf[vi(1, 1), 64, 128] = 0.12
                 dbuf[vi(1, -1), 64, 128] = 0.13
@@ -209,7 +209,7 @@ class AAPropagationTest(unittest.TestCase):
             dbuf = runner._debug_get_dist()
             dbuf[:] = 0.0
 
-            if runner._block.id == 0:
+            if runner._spec.id == 0:
                 dbuf[vi(-1, 1), 128, 64] = 0.11
                 dbuf[vi(0, 1), 128, 64] = 0.12
                 dbuf[vi(1, 1), 128, 64] = 0.13
@@ -237,16 +237,16 @@ class AAPropagationTest(unittest.TestCase):
             dbuf = runner._debug_get_dist()
             dbuf[:] = 0.0
 
-            if runner._block.id == 0:
+            if runner._spec.id == 0:
                 dbuf[vi(1, 1), 128, 128] = 0.11
                 dbuf[vi(0, 1), 128, 128] = 0.12
                 dbuf[vi(1, 0), 128, 128] = 0.13
                 dbuf[vi(1, -1), 128, 128] = 0.14
                 dbuf[vi(-1, 1), 128, 128] = 0.15
-            elif runner._block.id == 1:
+            elif runner._spec.id == 1:
                 dbuf[vi(-1, -1), 1, 128] = 0.16
                 dbuf[vi(0, -1), 1, 128] = 0.17
-            elif runner._block.id == 2:
+            elif runner._spec.id == 2:
                 dbuf[vi(-1, -1), 129, 1] = 0.18
                 dbuf[vi(-1, -1), 128, 1] = 0.19
                 dbuf[vi(-1, 0), 128, 1] = 0.20
@@ -293,7 +293,7 @@ class PeriodicCornerPropagationTest(unittest.TestCase):
             dbuf = runner._debug_get_dist()
             dbuf[:] = 0.0
 
-            if runner._block.id == 1:
+            if runner._spec.id == 1:
                 dbuf[vi(1, 0), 1, 128] = 0.11
                 dbuf[vi(1, 1), 1, 128] = 0.12
                 dbuf[vi(1, -1), 1, 128] = 0.13
@@ -303,7 +303,7 @@ class PeriodicCornerPropagationTest(unittest.TestCase):
                 dbuf[vi(1, 1), 256, 128] = 0.32
                 dbuf[vi(1, -1), 256, 128] = 0.33
 
-            elif runner._block.id == 0:
+            elif runner._spec.id == 0:
                 dbuf[vi(-1, 0), 256, 1] = 0.21
                 dbuf[vi(-1, 1), 256, 1] = 0.22
                 dbuf[vi(-1, -1), 256, 1] = 0.23
@@ -354,7 +354,7 @@ class PeriodicPropagationTest(unittest.TestCase):
             dbuf = runner._debug_get_dist()
             dbuf[:] = 0.0
 
-            if runner._block.id == 1:
+            if runner._spec.id == 1:
                 dbuf[vi(1, 0), 128, 128] = 0.11
                 dbuf[vi(1, 1), 128, 128] = 0.12
                 dbuf[vi(1, -1), 128, 128] = 0.13
@@ -365,7 +365,7 @@ class PeriodicPropagationTest(unittest.TestCase):
                 dbuf[vi(1, -1), 256, 128] = 0.33
 
                 dbuf[vi(-1, -1), 256, 128] = 0.66   # should not be overwritten
-            elif runner._block.id == 0:
+            elif runner._spec.id == 0:
                 dbuf[vi(-1, 0), 128, 1] = 0.21
                 dbuf[vi(-1, 1), 128, 1] = 0.22
                 dbuf[vi(-1, -1), 128, 1] = 0.23
@@ -522,7 +522,7 @@ class TestCornerPropagation(unittest.TestCase):
             dbuf = runner._debug_get_dist()
             dbuf[:] = 0.0
 
-            if runner._block.id == 0:
+            if runner._spec.id == 0:
                 # Top right corner
                 dbuf[vi(1, 1), 128, 128] = 0.11
                 dbuf[vi(0, 1), 128, 128] = 0.01
@@ -536,7 +536,7 @@ class TestCornerPropagation(unittest.TestCase):
                 dbuf[vi(1, 1), 1, 128] = 0.50
                 dbuf[vi(1, -1), 1, 128] = 0.51
                 dbuf[vi(1, 0), 1, 128] = 0.52
-            elif runner._block.id == 1:
+            elif runner._spec.id == 1:
                 dbuf[vi(1, 0), 127, 128] = 0.60
                 dbuf[vi(1, 1), 127, 128] = 0.61
                 dbuf[vi(1, -1), 127, 128] = 0.62
@@ -604,15 +604,15 @@ class ThreeBlocksSimulationTest(LBFluidSim):
 
         # dbuf indices are: dist, y, x
         # vec indices are: x, y
-        if runner._block.id == 0:
+        if runner._spec.id == 0:
             dbuf[vi(1, 1), 128, 128] = 0.11
             dbuf[vi(1, 0), 64, 128] = 0.12
             dbuf[vi(0, 1), 128, 64] = 0.13
-        elif runner._block.id == 1:
+        elif runner._spec.id == 1:
             dbuf[vi(1, -1), 1, 128] = 0.22
             dbuf[vi(0, -1), 1, 64] = 0.21
             dbuf[vi(1, 0), 64, 128] = 0.23
-        elif runner._block.id == 2:
+        elif runner._spec.id == 2:
             dbuf[vi(-1, 0), 64, 1] = 0.31
 
         runner._debug_set_dist(dbuf)
