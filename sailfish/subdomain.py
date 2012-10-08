@@ -387,12 +387,12 @@ class SubdomainSpec(object):
 
     @property
     def periodic_x(self):
-        """X-axis periodicity within this block."""
+        """X-axis periodicity within this subdomain."""
         return self._periodicity[0]
 
     @property
     def periodic_y(self):
-        """Y-axis periodicity within this block."""
+        """Y-axis periodicity within this subdomain."""
         return self._periodicity[1]
 
     def update_context(self, ctx):
@@ -408,7 +408,7 @@ class SubdomainSpec(object):
         ctx['periodic_z'] = 0 #periodic_z
 
     def enable_local_periodicity(self, axis):
-        """Makes the block locally periodic along a given axis."""
+        """Makes the subdomain locally periodic along a given axis."""
         assert axis <= self.dim-1
         self._periodicity[axis] = True
         # TODO: As an optimization, we could drop the ghost node layer in this
@@ -425,30 +425,30 @@ class SubdomainSpec(object):
     def _clear_connectors(self):
         self._connectors = {}
 
-    def add_connector(self, block_id, connector):
-        assert block_id not in self._connectors
-        self._connectors[block_id] = connector
+    def add_connector(self, subdomain_id, connector):
+        assert subdomain_id not in self._connectors
+        self._connectors[subdomain_id] = connector
 
-    def get_connection(self, face, block_id):
-        """Returns a LBConnection object describing the connection to 'block_id'
+    def get_connection(self, face, subdomain_id):
+        """Returns a LBConnection object describing the connection to 'subdomain_id'
         via 'face'."""
         try:
             for pair in self._connections[face]:
-                if pair.dst.block_id == block_id:
+                if pair.dst.block_id == subdomain_id:
                     return pair
         except KeyError:
             pass
 
-    def get_connections(self, face, block_id):
+    def get_connections(self, face, subdomain_id):
         ret = []
         for pair in self._connections[face]:
-            if pair.dst.block_id == block_id:
+            if pair.dst.block_id == subdomain_id:
                 ret.append(pair)
         return ret
 
     def connecting_subdomains(self):
-        """Returns a list of pairs: (face, block ID) representing connections
-        to different blocks."""
+        """Returns a list of pairs: (face, subdomain ID) representing connections
+        to different subdomains."""
         ids = set([])
         for face, v in self._connections.iteritems():
             for pair in v:
@@ -460,7 +460,7 @@ class SubdomainSpec(object):
 
     def set_actual_size(self, envelope_size):
         # TODO: It might be possible to optimize this a little by avoiding
-        # having buffers on the sides which are not connected to other blocks.
+        # having buffers on the sides which are not connected to other subdomains.
         self.actual_size = [x + 2 * envelope_size for x in self.size]
         self.envelope_size = envelope_size
 
@@ -521,9 +521,9 @@ class SubdomainSpec(object):
                 return cls.Z_HIGH
 
     def connect(self, pair, grid=None):
-        """Creates a connection between this block and another block.
+        """Creates a connection between this subdomain and another subdomain.
 
-        A connection can only be created when the blocks are next to each
+        A connection can only be created when the subdomains are next to each
         other.
 
         :returns: True if the connection was successful
@@ -592,7 +592,7 @@ class SubdomainSpec2D(SubdomainSpec):
         self.nx, self.ny = size
         self.ex = self.ox + self.nx
         self.ey = self.oy + self.ny
-        self.end_location = [self.ex, self.ey]  # first node outside the block
+        self.end_location = [self.ex, self.ey]  # first node outside the subdomain
         SubdomainSpec.__init__(self, location, size, envelope_size, *args, **kwargs)
 
     @property
@@ -612,7 +612,7 @@ class SubdomainSpec3D(SubdomainSpec):
         self.ex = self.ox + self.nx
         self.ey = self.oy + self.ny
         self.ez = self.oz + self.nz
-        self.end_location = [self.ex, self.ey, self.ez]  # first node outside the block
+        self.end_location = [self.ex, self.ey, self.ez]  # first node outside the subdomain
         self._periodicity = [False, False, False]
         SubdomainSpec.__init__(self, location, size, envelope_size, *args, **kwargs)
 
@@ -624,7 +624,7 @@ class SubdomainSpec3D(SubdomainSpec):
 
     @property
     def periodic_z(self):
-        """Z-axis periodicity within this block."""
+        """Z-axis periodicity within this subdomain."""
         return self._periodicity[2]
 
 
@@ -639,25 +639,25 @@ class Subdomain(object):
     def add_options(cls, group):
         pass
 
-    def __init__(self, grid_shape, block, grid, *args, **kwargs):
+    def __init__(self, grid_shape, spec, grid, *args, **kwargs):
         """
         :param grid_shape: size of the lattice for the subdomain, including
                 ghost nodes; X dimension is the last element in the tuple
-        :param block SubdomainSpec for this subdomain
+        :param spec: SubdomainSpec for this subdomain
         :param grid: grid object specifying the connectivity of the lattice
         """
-        self.spec = block
+        self.spec = spec
         self.grid_shape = grid_shape
         self.grid = grid
         # The type map allocated by the subdomain runner already includes
         # ghost nodes, and is formatted in a way that makes it suitable
         # for copying to the compute device.  The entries in this array are
         # node type IDs.
-        self._type_map = block.runner.make_scalar_field(np.uint32, register=False)
-        self._type_vis_map = np.zeros(list(reversed(block.size)),
+        self._type_map = spec.runner.make_scalar_field(np.uint32, register=False)
+        self._type_vis_map = np.zeros(list(reversed(spec.size)),
                 dtype=np.uint8)
         self._type_map_encoded = False
-        self._param_map = block.runner.make_scalar_field(dtype=np.int_,
+        self._param_map = spec.runner.make_scalar_field(dtype=np.int_,
                 register=False)
         self._params = {}
         self._encoder = None
@@ -787,9 +787,9 @@ class Subdomain(object):
 class Subdomain2D(Subdomain):
     dim = 2
 
-    def __init__(self, grid_shape, block, *args, **kwargs):
+    def __init__(self, grid_shape, spec, *args, **kwargs):
         self.gy, self.gx = grid_shape
-        Subdomain.__init__(self, grid_shape, block, *args, **kwargs)
+        Subdomain.__init__(self, grid_shape, spec, *args, **kwargs)
 
     def _get_mgrid(self):
         return reversed(np.mgrid[self.spec.oy:self.spec.oy + self.spec.ny,
@@ -825,9 +825,9 @@ class Subdomain2D(Subdomain):
 class Subdomain3D(Subdomain):
     dim = 3
 
-    def __init__(self, grid_shape, block, *args, **kwargs):
+    def __init__(self, grid_shape, spec, *args, **kwargs):
         self.gz, self.gy, self.gx = grid_shape
-        Subdomain.__init__(self, grid_shape, block, *args, **kwargs)
+        Subdomain.__init__(self, grid_shape, spec, *args, **kwargs)
 
     def _get_mgrid(self):
         return reversed(np.mgrid[self.spec.oz:self.spec.oz + self.spec.nz,
