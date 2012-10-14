@@ -78,6 +78,7 @@ Contents
    testcases
    api
    about
+   release
 
 Indices and tables
 ==================
