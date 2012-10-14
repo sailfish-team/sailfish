@@ -111,6 +111,28 @@ values to these, make sure that you set elements within the numpy array instead 
 overriding it, i.e. you need to provide an indexing expression on the left hand side
 of the assignment, e.g. ``sim.rho[:] = 1.0``.
 
+Estimating memory usage
+-----------------------
+Sailfish defaults to the AB lattice access pattern, in which two copies of the simulation
+domain are kept in memory at the same time. To estimate the memory needed for a simulation
+in bytes you can use the following formula, which ignores space necessary for internal
+buffers:
+
+.. math:: (2 * Q + N_f) * 4
+
+where :math:`Q` is the lattice connectivity constant which can be read as :math:`y`
+from the lattice name (DxQy) and :math:`N_f` is the number of scalar fields. :math:`N_f`
+will typically be 4 (density, geometry, two components of velocity) for 2D simulations and
+5 for 3D simulations. For binary fluid simulations, add an additional scalar field
+representing the order parameter or density of the second phase, and multiply :math:`Q` by 2.
+For simulations in double precision, replace the factor 4 with 8 (number of bytes in
+a floating-point number).
+
+In order to save memory, the AA lattice access pattern can be enabled by passing
+the ``--access_pattern=AA`` option.  When this option is enabled, only a single
+copy of the lattice is kept in memory, and the factor 2 should be removed from the
+formula above.
+
 Mapping physical quantities to simulation parameters
 ----------------------------------------------------
 
