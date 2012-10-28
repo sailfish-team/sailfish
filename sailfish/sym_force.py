@@ -109,18 +109,23 @@ def bgk_external_force(grid, grid_num=0):
 
     return ret
 
-def bgk_external_force_pref(grid_num=0):
-    # FIXME: This includes a factor of c_s^2.
-    rho = getattr(S, 'g%sm0' % grid_num)
+def bgk_external_force_pref(grid, grid_num=0):
+    """Builds an expression for the BGK force prefactor.
 
+    :param grid: grid object corresponding to grid_num:
+    :param grid_num: grid number
+    """
     if grid_num == 0:
-        rho = 'rho'
+        rho = S.rho
+    elif grid_num == 1:
+        rho = S.phi
     else:
-        rho = 'phi'
+        rho = S.densities[grid_num]
+    tau = S.relaxation_times[grid_num]
 
     # This includes a density factor as the device code always computes
     # accelerations, not forces.
-    return '%s * 3.0f * (1.0f - 1.0f/(2.0f * tau%s))' % (rho, grid_num)
+    return rho / grid.cssq * (1 - 1/(2 * tau))
 
 def free_energy_external_force(sim, grid_num=0):
     """Creates expressions for the external body force term in the free-energy model.

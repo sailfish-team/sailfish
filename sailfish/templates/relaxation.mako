@@ -364,7 +364,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 
 			%if simtype == 'shan-chen':
 			{
-				float pref = ${sym_force.bgk_external_force_pref(grid_num=i)};
+				float pref = ${cex(sym_force.bgk_external_force_pref(grids[i], grid_num=i))};
 				%for val, idx in sym_force.bgk_external_force(grid, grid_num=i):
 					d${i}->${idx} += ${cex(val, vectors=True)};
 				%endfor
@@ -375,7 +375,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 				%endfor
 			%else:
 			{
-				float pref = ${sym_force.bgk_external_force_pref(grid_num=i)};
+				float pref = ${cex(sym_force.bgk_external_force_pref(grids[i], grid_num=i))};
 				%for val, idx in sym_force.bgk_external_force(grid, grid_num=i):
 					d${i}->${idx} += ${cex(val, vectors=True)};
 				%endfor

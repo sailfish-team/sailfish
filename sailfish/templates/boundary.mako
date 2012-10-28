@@ -8,7 +8,7 @@
 
 %if time_dependence:
 	${device_func} inline float get_time_from_iteration(unsigned int iteration) {
-		return iteration * ${dt_per_lattice_time_unit};
+		return iteration * ${cex(dt_per_lattice_time_unit)};
 	}
 %endif
 

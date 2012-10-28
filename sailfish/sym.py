@@ -8,6 +8,7 @@ import copy
 from collections import namedtuple
 from operator import itemgetter
 import math
+import re
 import numpy
 import sympy
 from sympy import Matrix, Rational, Symbol, Poly, Eq
@@ -19,7 +20,6 @@ except ImportError:
     NegativeOne = basic.S.NegativeOne
 from sympy.printing.ccode import CCodePrinter
 from sympy.printing.precedence import precedence
-import re
 
 TargetDist = namedtuple('TargetDist', 'var idx')
 
@@ -1038,10 +1038,12 @@ def use_vectors(str):
     return ret
 
 def make_float(t):
-    return re.sub(r'((^|[^a-zA-Z])[0-9]+\.[0-9]*(e(\+|-)[0-9]*)?)', r'\1f', str(t))
+    return re.sub(r'((^|[^a-zA-Z])[0-9]+\.[0-9]*(e(\+|-)[0-9]*)?)',
+                  r'\1f', str(t))
 
 def int2float(t):
-    return re.sub(r'([0-9]+) ', r'\1.0 ', str(t))
+    return re.sub(r'([^eE]|^)([\(\+\-\*/ ]|^)([0-9]+)([\+\-\*/\) ]|$)',
+                  r'\1\2\3.0\4', str(t))
 
 class KernelCodePrinter(CCodePrinter):
 
@@ -1114,7 +1116,7 @@ def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False,
     if vectors:
         t = use_vectors(t)
 
-    t = make_float(t)
+    t = make_float(int2float(t))
     return t
 
 def _gcd(a,b):
@@ -1278,11 +1280,18 @@ class SlfSymbol(Symbol):
 def _prepare_symbols():
     comp_map = {0: 'x', 1: 'y', 2: 'z'}
 
+    # Grid ID -> relaxation time symbol.
+    S.relaxation_times = []
+    S.densities = []
+
     # Up to 9 grids.
     for grid_num in range(0, 9):
         # 0th moment
         name = 'g%sm0' % grid_num
-        setattr(S, name, Symbol(name))
+        s = Symbol(name)
+        setattr(S, name, s)
+        S.densities.append(s)
+
         # Laplacian.
         name = 'g%sd2m0' % grid_num
         setattr(S, name, Symbol(name))
@@ -1308,11 +1317,19 @@ def _prepare_symbols():
         for comp in ('x', 'y', 'z'):
             setattr(S, name + comp, Symbol(name + comp))
 
+        # Relaxation time.
+        name = 'tau%d' % grid_num
+        t = Symbol(name)
+        setattr(S, name, t)
+        S.relaxation_times.append(t)
+
+
     # Commonly used aliases.
     S.alias('vx', S.g0m1x)
     S.alias('vy', S.g0m1y)
     S.alias('vz', S.g0m1z)
     S.alias('rho', S.g0m0)
+    S.alias('phi', S.g1m0)
 
     S.alias('eax', S.g0eax)
     S.alias('eay', S.g0eay)
