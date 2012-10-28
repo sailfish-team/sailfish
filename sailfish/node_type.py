@@ -4,8 +4,9 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
-import numpy as np
 from collections import namedtuple
+import numpy as np
+from sympy.core import expr
 
 ScratchSize = namedtuple('ScratchSize', ('dim2', 'dim3'))
 
@@ -223,6 +224,15 @@ class DynamicValue(object):
             return len(self.params)
         else:
             return 1
+
+    def __getitem__(self, i):
+        return self.params[i]
+
+    def has_symbol(self, symbol):
+        for param in self.params:
+            if isinstance(param, expr.Expr) and symbol in param:
+                return True
+        return False
 
 # Maps node type IDs to their classes.
 _NODE_TYPES = __init_node_type_list()

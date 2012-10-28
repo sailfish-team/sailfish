@@ -45,6 +45,7 @@ ${const_var} float tau1 = ${tau_phi}f;
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 <%namespace file="propagation.mako" import="*"/>
+<%namespace file="utils.mako" import="*"/>
 
 <%include file="finite_difference_optimized.mako"/>
 

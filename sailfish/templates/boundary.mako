@@ -5,6 +5,7 @@
 
 <%namespace file="code_common.mako" import="*"/>
 <%namespace file="propagation.mako" import="rel_offset,get_odist"/>
+<%namespace file="utils.mako" import="*"/>
 
 %if time_dependence:
 	${device_func} inline float get_time_from_iteration(unsigned int iteration) {
@@ -28,45 +29,6 @@
 		break;
 </%def>
 
-## Provides declarations of the arguments required for functions using
-## dynamically evaluated node parameters.
-<%def name="time_dep_args_decl()">
-	%if time_dependence:
-		, unsigned int iteration_number,
-		int gx,
-		int gy
-		%if dim == 3:
-			, int gz
-		%endif
-	%endif
-</%def>
-
-
-## Provides values of the arguments required for functions using dynamically
-## evaluated node parameters.
-<%def name="time_dep_args()">
-	%if time_dependence:
-		, iteration_number, gx, gy
-		%if dim == 3:
-			, gz
-		%endif
-	%endif
-</%def>
-
-## Use to render arguments to the first call of a function using dynamically
-## evaluated node paramters.  Takes care of calculating the node's logical
-## global position.
-<%def name="time_dep_call_args()">
-	%if time_dependence:
-		, iteration_number,
-		gx + ${x_local_device_to_global_offset},
-		gy + ${y_local_device_to_global_offset}
-		%if dim == 3:
-			, gz + ${z_local_device_to_global_offset}
-		%endif
-	%endif
-</%def>
-
 %for i, expressions in symbol_idx_map.iteritems():
 	${device_func} inline void time_dep_param_${i}(float *out ${time_dep_args_decl()}) {
 		float phys_time = get_time_from_iteration(iteration_number);
@@ -79,7 +41,7 @@
 // Returns a node parameter which is a vector (in 'out').
 ${device_func} inline void node_param_get_vector(const int idx, float *out
 		${time_dep_args_decl()}) {
-	%if time_dependence:
+	%if time_dependence and  symbol_idx_map:
 		if (idx >= ${non_symbolic_idxs}) {
 			switch (idx) {
 				%for key, val in symbol_idx_map.iteritems():
@@ -103,7 +65,7 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
 
 // Returns a node parameter which is a scalar.
 ${device_func} inline float node_param_get_scalar(const int idx ${time_dep_args_decl()}) {
-	%if time_dependence:
+	%if time_dependence and symbol_idx_map:
 		if (idx >= ${non_symbolic_idxs}) {
 			float out;
 			switch (idx) {

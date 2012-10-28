@@ -5,6 +5,7 @@
 
 <%page args="bgk_args_decl"/>
 <%namespace file="code_common.mako" import="*"/>
+<%namespace file="utils.mako" import="*"/>
 
 <%def name="fluid_momentum(igrid)">
 	%if forces is not UNDEFINED:
@@ -24,19 +25,22 @@
 	%endif
 </%def>
 
-<%def name="body_force(accel=True, need_vars_declaration=True, grid_id=None)">
-	%if forces is not UNDEFINED:
+
+## Defines the actual force/acceleration vectors.
+<%def name="body_force(accel=True)">
+	%if forces is not UNDEFINED and (forces.numeric or forces.symbolic):
+		%if accel:
+			// Body force acceleration.
+		%else:
+			// Body force.
+		%endif
+		%if forces.symbolic and time_dependence:
+			float phys_time = get_time_from_iteration(iteration_number);
+		%endif
 		%for i in range(0, len(grids)):
-			%if (grid_id is None or grid_id == i) and sym_force.needs_accel(i, forces, {}):
-				%if accel:
-					// Body force acceleration.
-				%else:
-					// Body force.
-				%endif
+			%if sym_force.needs_accel(i, forces, {}):
 				%if not sym_force.needs_coupling_accel(i, force_couplings):
-					%if need_vars_declaration:
-						float ea${i}[${dim}];
-					%endif
+					float ea${i}[${dim}];
 					%for j in range(0, dim):
 						ea${i}[${j}] = ${cex(sym_force.body_force_accel(i, j, forces, accel=accel), vectors=True)};
 					%endfor
@@ -44,7 +48,7 @@
 					## If the current grid has a Shan-Chen force acting on it, the acceleration vector
 					## is already externally defined in the Shan-Chen code.
 					%for j in range(0, dim):
-						%if i in forces:
+						%if i in forces.symbolic or i in forces.numeric:
 							ea${i}[${j}] += ${cex(sym_force.body_force_accel(i, j, forces, accel=accel), vectors=True)};
 						%endif
 					%endfor
@@ -60,7 +64,7 @@
 //
 // Relaxation in moment space.
 //
-${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
+${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0 ${time_dep_args_decl()})
 {
 	DistM fm, feq;
 
@@ -225,7 +229,8 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 %for i in range(0, len(grids)):
 	Dist *d${i},
 %endfor
-	int node_type)
+	int node_type
+	${time_dep_args_decl()})
 {
 	${bgk_relaxation_preamble()}
 
@@ -263,6 +268,7 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 <%include file="entropic.mako"/>
 
 ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
+	${time_dep_args_decl()}
 %if alpha_output:
 	, int options,
 	${global_ptr} float* alpha_out
@@ -328,7 +334,8 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 %for i in range(0, len(grids)):
 	Dist *d${i},
 %endfor
-	int node_type, int ncode)
+	int node_type, int ncode
+	${time_dep_args_decl()})
 {
 	${bgk_relaxation_preamble()}
 
@@ -415,21 +422,20 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 %for i in range(0, len(grids)):
 	&d${i},
 %endfor
-	type, ncode);
+	type, ncode ${time_dep_call_args()});
 	%elif model == 'mrt' and simtype == 'free-energy':
 		FE_MRT_relaxate(${bgk_args()},
 %for i in range(0, len(grids)):
 	&d${i},
 %endfor
-	type);
+	type ${time_dep_call_args()});
 	%elif model == 'elbm':
-		ELBM_relaxate(${bgk_args()}, &d0 ${cond(alpha_output, ', options, alpha + gi')});
+		ELBM_relaxate(${bgk_args()}, &d0 ${time_dep_call_args()} ${cond(alpha_output, ', options, alpha + gi')});
 	%else:
-		MS_relaxate(&d0, type, v);
+		MS_relaxate(&d0, type, v ${time_dep_call_args()});
 	%endif
 </%def>
 
-## TODO: This could be optimized.
 <%def name="relaxate(bgk_args)">
 	%if relaxation_enabled:
 		if (isWetNode(type)) {

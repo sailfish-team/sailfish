@@ -2,17 +2,17 @@
 
 from collections import namedtuple
 from sailfish import sym, util
+from sailfish import node_type as nt
 
 import numpy as np
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL'
-__version__ = '0.3-alpha1'
 
 
 FieldPair = namedtuple('FieldPair', 'abstract buffer')
-
+ForcePair = namedtuple('ForcePair', 'numeric symbolic')
 
 class LBSim(object):
     """Describes a specific type of a lattice Boltzmann simulation."""
@@ -182,9 +182,14 @@ class LBForcedSim(LBSim):
 
     def __init__(self, config):
         super(LBForcedSim, self).__init__(config)
-        self._forces = {}
         self._force_couplings = {}
         self._force_term_for_eq = {}
+
+        # grid_id -> accel (bool) -> numpy force vector
+        self._forces = {}
+
+        # grid_id -> accel (bool) -> list of nt.DynamicValue objects
+        self._symbolic_forces = {}
 
     @classmethod
     def add_options(cls, group, dim):
@@ -204,18 +209,23 @@ class LBForcedSim(LBSim):
         :param accel: if ``True``, the added field is an acceleration field, otherwise
             it is an actual force field
         """
-        dim = self.grids[0].dim
-        assert len(force) == dim
+        if isinstance(force, nt.DynamicValue):
+            self._symbolic_forces.setdefault(grid, {}).setdefault(accel, []).append(force)
+            if force.has_symbol(sym.S.time):
+                self.config.time_dependence = True
+        else:
+            dim = self.grids[0].dim
+            assert len(force) == dim
 
-        # Create an empty force vector.  Use numpy so that we can easily compute
-        # sums.
-        self._forces.setdefault(grid, {}).setdefault(accel, np.zeros(dim, np.float64))
-        a = self._forces[grid][accel] + np.float64(force)
-        self._forces[grid][accel] = a
+            # Create an empty force vector.  Use numpy so that we can easily compute
+            # sums.
+            self._forces.setdefault(grid, {}).setdefault(accel, np.zeros(dim, np.float64))
+            a = self._forces[grid][accel] + np.float64(force)
+            self._forces[grid][accel] = a
 
     def update_context(self, ctx):
         super(LBForcedSim, self).update_context(ctx)
-        ctx['forces'] = self._forces
+        ctx['forces'] = ForcePair(self._forces, self._symbolic_forces)
         ctx['force_couplings'] = self._force_couplings
         ctx['force_for_eq'] = self._force_term_for_eq
 

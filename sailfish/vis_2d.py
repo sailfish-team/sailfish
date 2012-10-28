@@ -179,7 +179,7 @@ class Fluid2DVis(vis.FluidVis):
         self.resize()
 
         pygame.key.set_repeat(100,50)
-        pygame.display.set_caption('Sailfish v%s' % lb_base.__version__)
+        pygame.display.set_caption('Sailfish')
         return
 
     def set_mode(self, width, height):

@@ -33,7 +33,9 @@ def needs_accel(i, forces, force_couplings):
     if type(forces) is Undefined:
         return False
 
-    return (i in forces) or needs_coupling_accel(i, force_couplings)
+    # TODO: handle symbolic forces here
+    return ((i in forces.numeric or i in forces.symbolic)
+            or needs_coupling_accel(i, force_couplings))
 
 def accel_vector(grid, grid_num):
     eax = getattr(S, 'g%seax' % grid_num)
@@ -49,48 +51,74 @@ def accel_vector(grid, grid_num):
     return ea
 
 def fluid_accel(sim, i, axis, forces, force_couplings):
-    """
+    """Returns a sympy object representing a component of the acceleration
+    vector.
+
     :param sim: simulation object
     :param i: grid ID
-    :param axis: base axis for the output vector
+    :param axis: component of the acceleration vector to return
     :param forces: dict: grid ID -> dict(accel -> value); accel is a boolean
         indicating whether value is a force or acceleration
     :param force_couplings: dict mapping pairs of grid IDs to the name of a
         Shan-Chen coupling constant
     """
-    if forces is not Undefined and needs_accel(i, forces, force_couplings):
+    if needs_accel(i, forces, force_couplings):
         ea = accel_vector(sim.grid, i)
         return ea[axis]
     else:
         return 0.0
 
-def body_force_accel(i, dim, forces, accel=True):
-    """
+def body_force_accel(i, comp, forces, accel=True):
+    """Returns the comp-th component (value / expression) of the acceleration vector.
+
     :param i: grid number
+    :param comp: component of the acceleration vector to return
     :param forces: forces dictionary (see lbm.py)
     :param accel: if True, returns an acceleration expression; returns a force
             expresssion otherwise
     """
     t = 0
 
-    if i in forces:
+    density = S.densities[i]
+
+    if i in forces.numeric:
+        force = forces.numeric[i]
+
         # Force
-        if False in forces[i]:
+        if False in force:
             if accel:
-                t += forces[i][False][dim] / Symbol('g%dm0' % i)
+                t += force[False][comp] / density
             else:
-                t += forces[i][False][dim]
+                t += force[False][comp]
         # Acceleration
-        if True in forces[i]:
+        if True in force:
             if accel:
-                t += forces[i][True][dim]
+                t += force[True][comp]
             else:
-                t += forces[i][True][dim] * Symbol('g%dm0' % i)
+                t += force[True][comp] * density
+
+    if i in forces.symbolic:
+        # Force
+        if False in forces.symbolic[i]:
+            # f is a DynamicValue object
+            for f in forces.symbolic[i][False]:
+                if accel:
+                    t += f[comp] / density
+                else:
+                    t += f[comp]
+        # Acceleration
+        if True in forces.symbolic[i]:
+            # f is a DynamicValue object
+            for f in forces.symbolic[i][True]:
+                if accel:
+                    t += f[comp]
+                else:
+                    t += f[comp] * density
 
     return t
 
 def bgk_external_force(grid, grid_num=0):
-    """Get expressions for the external body force correction in the BGK model.
+    """Gets expressions for the external body force correction in the BGK model.
 
     This implements the external force as in Eq. 20 from PhysRevE 65, 046308.
 

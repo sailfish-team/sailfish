@@ -9,6 +9,7 @@ import inspect
 import operator
 import numpy as np
 from sailfish import util
+from sailfish import sym
 import sailfish.node_type as nt
 from sailfish.subdomain_connection import LBConnection
 
@@ -394,7 +395,7 @@ class Subdomain(object):
                         "have exactly as many nodes as there are True values "
                         "in the 'where' array.  Use node_util.multifield() to "
                         "generate the array in an easy way.")
-            elif isinstance(param, nt.DynamicValue):
+            elif isinstance(param, nt.DynamicValue) and param.has_symbol(sym.S.time):
                 self.config.time_dependence = True
                 # TODO: Ensure that time is a parameter in the expression.
                 continue
