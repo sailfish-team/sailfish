@@ -1,5 +1,5 @@
 <%!
-  from sailfish import sym
+  from sailfish import sym, sym_force
   import sailfish.node_type as nt
 %>
 
@@ -9,16 +9,16 @@
 <%def name="fluid_momentum(igrid)">
 	%if forces is not UNDEFINED:
 		%if igrid in force_for_eq and equilibrium:
-			fm.mx += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 0, forces, force_couplings), vectors=True)};
-			fm.my += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 1, forces, force_couplings), vectors=True)};
+			fm.mx += ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], 0, forces, force_couplings), vectors=True)};
+			fm.my += ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], 1, forces, force_couplings), vectors=True)};
 			%if dim == 3:
-				fm.mz += ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], 2, forces, force_couplings), vectors=True)};
+				fm.mz += ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], 2, forces, force_couplings), vectors=True)};
 			%endif
 		%else:
-			fm.mx += ${cex(0.5 * sym.fluid_accel(sim, igrid, 0, forces, force_couplings), vectors=True)};
-			fm.my += ${cex(0.5 * sym.fluid_accel(sim, igrid, 1, forces, force_couplings), vectors=True)};
+			fm.mx += ${cex(0.5 * sym_force.fluid_accel(sim, igrid, 0, forces, force_couplings), vectors=True)};
+			fm.my += ${cex(0.5 * sym_force.fluid_accel(sim, igrid, 1, forces, force_couplings), vectors=True)};
 			%if dim == 3:
-				fm.mz += ${cex(0.5 * sym.fluid_accel(sim, igrid, 2, forces, force_couplings), vectors=True)};
+				fm.mz += ${cex(0.5 * sym_force.fluid_accel(sim, igrid, 2, forces, force_couplings), vectors=True)};
 			%endif
 		%endif
 	%endif
@@ -27,25 +27,25 @@
 <%def name="body_force(accel=True, need_vars_declaration=True, grid_id=None)">
 	%if forces is not UNDEFINED:
 		%for i in range(0, len(grids)):
-			%if (grid_id is None or grid_id == i) and sym.needs_accel(i, forces, {}):
+			%if (grid_id is None or grid_id == i) and sym_force.needs_accel(i, forces, {}):
 				%if accel:
 					// Body force acceleration.
 				%else:
 					// Body force.
 				%endif
-				%if not sym.needs_coupling_accel(i, force_couplings):
+				%if not sym_force.needs_coupling_accel(i, force_couplings):
 					%if need_vars_declaration:
 						float ea${i}[${dim}];
 					%endif
 					%for j in range(0, dim):
-						ea${i}[${j}] = ${cex(sym.body_force_accel(i, j, forces, accel=accel), vectors=True)};
+						ea${i}[${j}] = ${cex(sym_force.body_force_accel(i, j, forces, accel=accel), vectors=True)};
 					%endfor
 				%else:
 					## If the current grid has a Shan-Chen force acting on it, the acceleration vector
 					## is already externally defined in the Shan-Chen code.
 					%for j in range(0, dim):
 						%if i in forces:
-							ea${i}[${j}] += ${cex(sym.body_force_accel(i, j, forces, accel=accel), vectors=True)};
+							ea${i}[${j}] += ${cex(sym_force.body_force_accel(i, j, forces, accel=accel), vectors=True)};
 						%endif
 					%endfor
 				%endif
@@ -134,14 +134,14 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0)
 			## components and grids used.  If this assumption is ever changed, the code
 			## below will have to be extended appropriately.
 			%for j in range(0, dim):
-				iv0[${j}] += ${cex(0.5 * sym.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
+				iv0[${j}] += ${cex(0.5 * sym_force.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
 			%endfor
 		%else:
 			%for j in range(0, dim):
 				%if igrid in force_for_eq and equilibrium:
-					v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, force_for_eq[igrid], j, forces, force_couplings), vectors=True)};
+					v0[${j}] = iv0[${j}] + ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], j, forces, force_couplings), vectors=True)};
 				%else:
-					v0[${j}] = iv0[${j}] + ${cex(0.5 * sym.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
+					v0[${j}] = iv0[${j}] + ${cex(0.5 * sym_force.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
 				%endif
 			%endfor
 		%endif
@@ -246,10 +246,10 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 
 	%for i in range(0, len(grids)):
 		## Is there a force acting on the current grid?
-		%if sym.needs_accel(i, forces, force_couplings):
+		%if sym_force.needs_accel(i, forces, force_couplings):
 			${fluid_velocity(i)};
 
-			%for val, idx in sym.free_energy_external_force(sim, grid_num=i):
+			%for val, idx in sym_force.free_energy_external_force(sim, grid_num=i):
 				d${i}->${idx} += ${cex(val, vectors=True)};
 			%endfor
 		%endif
@@ -357,26 +357,26 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 		%endif
 
 		## Is there a force acting on the current grid?
-		%if sym.needs_accel(i, forces, force_couplings):
+		%if sym_force.needs_accel(i, forces, force_couplings):
 			// Body force implementation follows Guo's method, eqs. 19 and 20 from
 			// 10.1103/PhysRevE.65.046308.
 			${fluid_velocity(i)};
 
 			%if simtype == 'shan-chen':
 			{
-				float pref = ${sym.bgk_external_force_pref(grid_num=i)};
-				%for val, idx in sym.bgk_external_force(grid, grid_num=i):
+				float pref = ${sym_force.bgk_external_force_pref(grid_num=i)};
+				%for val, idx in sym_force.bgk_external_force(grid, grid_num=i):
 					d${i}->${idx} += ${cex(val, vectors=True)};
 				%endfor
 			}
 			%elif simtype == 'free-energy':
-				%for val, idx in sym.free_energy_external_force(sim, grid_num=i):
+				%for val, idx in sym_force.free_energy_external_force(sim, grid_num=i):
 					d${i}->${idx} += ${cex(val, vectors=True)};
 				%endfor
 			%else:
 			{
-				float pref = ${sym.bgk_external_force_pref(grid_num=i)};
-				%for val, idx in sym.bgk_external_force(grid, grid_num=i):
+				float pref = ${sym_force.bgk_external_force_pref(grid_num=i)};
+				%for val, idx in sym_force.bgk_external_force(grid, grid_num=i):
 					d${i}->${idx} += ${cex(val, vectors=True)};
 				%endfor
 			}
