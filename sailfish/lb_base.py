@@ -195,8 +195,6 @@ class LBForcedSim(LBSim):
     def add_options(cls, group, dim):
         pass
 
-    # TODO(michalj): Add support for dynamical forces via sympy expressions
-    # and for global force fields via numpy arrays.
     def add_body_force(self, force, grid=0, accel=True):
         """Adds a constant global force field acting on the fluid.
 
@@ -204,19 +202,21 @@ class LBForcedSim(LBSim):
         previously set value.  Forces and accelerations are processed separately
         and are never mixed in this addition process.
 
-        :param force: n-vector representing the force value
+        :param force: n-vector representing the force value; this can be a
+            vector of basic Python types, a numpy vector, or a DynamicValue
+            object
         :param grid: grid number on which this force is acting
         :param accel: if ``True``, the added field is an acceleration field, otherwise
             it is an actual force field
         """
+        dim = self.grids[0].dim
+        assert len(force) == dim
+
         if isinstance(force, nt.DynamicValue):
             self._symbolic_forces.setdefault(grid, {}).setdefault(accel, []).append(force)
             if force.has_symbol(sym.S.time):
                 self.config.time_dependence = True
         else:
-            dim = self.grids[0].dim
-            assert len(force) == dim
-
             # Create an empty force vector.  Use numpy so that we can easily compute
             # sums.
             self._forces.setdefault(grid, {}).setdefault(accel, np.zeros(dim, np.float64))

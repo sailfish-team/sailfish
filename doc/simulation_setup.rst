@@ -57,7 +57,8 @@ In order to select the nodes you want to modify, you need to formulate an expres
 using these arrays.  For instance, if you want nodes where the X coordinate is
 lower than 5, you would use `hx < 5`. You can combine multiple conditions with
 numpy logical functions (`np.logical_and`, `np.logical_or`, etc), for instance
-`np.logical_and(hx < 5, hy == 8)`.
+`np.logical_and(hx < 5, hy == 8)` or using binary operators (take care to put
+expressions in parentheses), e.g. `(hx < 5) & (hy == 8)`.
 
 Boundary conditions
 -------------------
@@ -94,8 +95,10 @@ in several ways:
   provide that indexing expression as the second argument.
 * To set a time-dependent parameter: instantiate a
   :class:`node_type.DynamicValue` object.  The constructor takes
-  sympy expressions that will be evaluated on every step on the device.  Use
-  :attr:`sym.S.gx`, :attr:`sym.S.gy`, :attr:`sym.S.gz` in the
+  sympy expressions that will be evaluated on every step on the device.
+  You can provide multiple arguments to the constructor in order to make the
+  parameter vector-valued.
+  Use :attr:`sym.S.gx`, :attr:`sym.S.gy`, :attr:`sym.S.gz` in the
   expression to get the node position in the global lattice coordinate system,
   and :attr:`sym.S.time` to reference the *physical* time.  Note that in order
   for the time to have a meaningful value, you will need to provide the
@@ -110,6 +113,25 @@ can be accessed via ``sim.rho``, ``sim.vx``, ``sim.vy`` and ``sim.vz``.  When as
 values to these, make sure that you set elements within the numpy array instead of
 overriding it, i.e. you need to provide an indexing expression on the left hand side
 of the assignment, e.g. ``sim.rho[:] = 1.0``.
+
+Body forces
+-----------
+Sailfish supports an unlimited number of body forces/accelerations, and offers
+fine-grained control over force-grid coupling in case of multiphase models. In order
+to add a body force, inherit your simulation class from :class:`lb_base.LBForcedSim`
+and call :func:`add_body_force` in its `__init__` method. Note that by default
+this function creates a body acceleration (suitable e.g. to model a gravitational
+field), not a body force. In order to use an actual force, set `accel=False`
+when calling :func:`add_body_force`.
+
+You can create dynamic forces using the :class:`node_type.DynamicValue` class.
+Similarly to boundary conditions, you can use the usual symbols for global position and time. You can
+also use :attr:`sym.S.rho` for density, :attr:`sym.S.phi` for density of the second
+component (in multiphase models), and :attr:`sym.S.ivx`, :attr:`sym.S.ivy`, :attr:`sym.S.ivz`
+for the components of velocity. Note that the final velocity will be shifted due to
+the acceleration created by a body force. The components of velocity available when
+using a dynamic force do not take this shift into account.
+
 
 Estimating memory usage
 -----------------------
