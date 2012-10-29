@@ -53,7 +53,7 @@ copyright = u'2009-2012, Michał Januszewski'
 # built documents.
 #
 # The short X.Y version.
-version = '2012.1'
+version = '2012.2'
 # The full version, including alpha/beta/rc tags.
 release = version
 
