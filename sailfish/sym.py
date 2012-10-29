@@ -1346,6 +1346,12 @@ def _prepare_symbols():
     S.visc = Symbol('visc')
     S.gravity = Symbol('gravity')
 
+    # Initial velocity. Use these symbols to refer to the initial velocity
+    # (without acceleration correction) in relaxation code.
+    S.ivx = Symbol('iv0[0]')
+    S.ivy = Symbol('iv0[1]')
+    S.ivz = Symbol('iv0[2]')
+
     # Node coordinate in the global coordinate system.
     S.gx = SlfSymbol('gx', 'X node location in the global coordinate system')
     S.gy = SlfSymbol('gy', 'Y node location in the global coordinate system')
