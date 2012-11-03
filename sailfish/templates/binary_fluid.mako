@@ -311,7 +311,7 @@ ${kernel} void CollideAndPropagate(
 	float g0m0, v[${dim}], g1m0;
 
 	%if simtype == 'free-energy':
-		getMacro(&d0, ncode, type, orientation, &g0m0, v ${time_dep_call_args()});
+		getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
 		// TODO(michalj): Is this really needed?
 		get0thMoment(&d1, type, orientation, &g1m0);
 	%elif simtype == 'shan-chen':

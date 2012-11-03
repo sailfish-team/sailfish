@@ -62,7 +62,14 @@ class LBConfigParser(object):
         # Additional internal config options, not settable via
         # command line parameters.
         self.config.relaxation_enabled = True
+
+        # Indicates whether the simulation has any DynamicValues which are
+        # time-dependent.
         self.config.time_dependence = False
+
+        # Indicates whether the simulation has any DynamicValues which are
+        # location-dependent.
+        self.config.space_dependence = False
         self.config.unit_test = False
         return self.config
 

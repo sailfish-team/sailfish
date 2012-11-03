@@ -64,7 +64,7 @@
 //
 // Relaxation in moment space.
 //
-${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0 ${time_dep_args_decl()})
+${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0 ${dynamic_val_args_decl()})
 {
 	DistM fm, feq;
 
@@ -230,7 +230,7 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 	Dist *d${i},
 %endfor
 	int node_type
-	${time_dep_args_decl()})
+	${dynamic_val_args_decl()})
 {
 	${bgk_relaxation_preamble()}
 
@@ -268,7 +268,7 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 <%include file="entropic.mako"/>
 
 ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
-	${time_dep_args_decl()}
+	${dynamic_val_args_decl()}
 %if alpha_output:
 	, int options,
 	${global_ptr} float* alpha_out
@@ -335,7 +335,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 	Dist *d${i},
 %endfor
 	int node_type, int ncode
-	${time_dep_args_decl()})
+	${dynamic_val_args_decl()})
 {
 	${bgk_relaxation_preamble()}
 
@@ -422,17 +422,17 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 %for i in range(0, len(grids)):
 	&d${i},
 %endfor
-	type, ncode ${time_dep_call_args()});
+	type, ncode ${dynamic_val_call_args()});
 	%elif model == 'mrt' and simtype == 'free-energy':
 		FE_MRT_relaxate(${bgk_args()},
 %for i in range(0, len(grids)):
 	&d${i},
 %endfor
-	type ${time_dep_call_args()});
+	type ${dynamic_val_call_args()});
 	%elif model == 'elbm':
-		ELBM_relaxate(${bgk_args()}, &d0 ${time_dep_call_args()} ${cond(alpha_output, ', options, alpha + gi')});
+		ELBM_relaxate(${bgk_args()}, &d0 ${dynamic_val_call_args()} ${cond(alpha_output, ', options, alpha + gi')});
 	%else:
-		MS_relaxate(&d0, type, v ${time_dep_call_args()});
+		MS_relaxate(&d0, type, v ${dynamic_val_call_args()});
 	%endif
 </%def>
 

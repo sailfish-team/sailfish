@@ -30,7 +30,7 @@
 </%def>
 
 %for i, expressions in symbol_idx_map.iteritems():
-	${device_func} inline void time_dep_param_${i}(float *out ${time_dep_args_decl()}) {
+	${device_func} inline void time_dep_param_${i}(float *out ${dynamic_val_args_decl()}) {
 		float phys_time = get_time_from_iteration(iteration_number);
 		%for j, expr in enumerate(expressions):
 			out[${j}] = ${cex(expr)};
@@ -40,14 +40,14 @@
 
 // Returns a node parameter which is a vector (in 'out').
 ${device_func} inline void node_param_get_vector(const int idx, float *out
-		${time_dep_args_decl()}) {
-	%if time_dependence and  symbol_idx_map:
+		${dynamic_val_args_decl()}) {
+	%if (time_dependence or space_dependence) and symbol_idx_map:
 		if (idx >= ${non_symbolic_idxs}) {
 			switch (idx) {
 				%for key, val in symbol_idx_map.iteritems():
 					%if len(val) == dim:
 						case ${key}:
-							time_dep_param_${key}(out ${time_dep_args()});
+							time_dep_param_${key}(out ${dynamic_val_args()});
 							return;
 					%endif
 				%endfor
@@ -64,15 +64,15 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
 }
 
 // Returns a node parameter which is a scalar.
-${device_func} inline float node_param_get_scalar(const int idx ${time_dep_args_decl()}) {
-	%if time_dependence and symbol_idx_map:
+${device_func} inline float node_param_get_scalar(const int idx ${dynamic_val_args_decl()}) {
+	%if (time_dependence or space_dependence) and symbol_idx_map:
 		if (idx >= ${non_symbolic_idxs}) {
 			float out;
 			switch (idx) {
 				%for key, val in symbol_idx_map.iteritems():
 					%if len(val) == 1:
 						case ${key}:
-							time_dep_param_${key}(&out ${time_dep_args()});
+							time_dep_param_${key}(&out ${dynamic_val_args()});
 							return out;
 					%endif
 				%endfor
@@ -205,7 +205,7 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 	int node_param_idx = decodeNodeParamIdx(ncode);
 	${fill_missing_distributions()}
 	*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-	float par_rho = node_param_get_scalar(node_param_idx ${time_dep_args()});
+	float par_rho = node_param_get_scalar(node_param_idx ${dynamic_val_args()});
 
 	switch (orientation) {
 		%for i in range(1, grid.dim*2+1):
@@ -225,7 +225,7 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 //
 ${device_func} inline void getMacro(
 		Dist *fi, int ncode, int node_type, int orientation, float *rho,
-		float *v0 ${time_dep_args_decl()})
+		float *v0 ${dynamic_val_args_decl()})
 {
 	if (NTUsesStandardMacro(node_type) || orientation == ${nt_dir_other}) {
 		compute_macro_quant(fi, rho, v0);
@@ -247,7 +247,7 @@ ${device_func} inline void getMacro(
 			// distributions.
 			${fill_missing_distributions()}
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			node_param_get_vector(node_param_idx, v0 ${time_dep_args()});
+			node_param_get_vector(node_param_idx, v0 ${dynamic_val_args()});
 
 			switch (orientation) {
 				%for i in range(1, grid.dim*2+1):
@@ -262,7 +262,7 @@ ${device_func} inline void getMacro(
 		else if (isNTZouHeVelocity(node_type)) {
 			int node_param_idx = decodeNodeParamIdx(ncode);
 			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			node_param_get_vector(node_param_idx, v0 ${time_dep_args()});
+			node_param_get_vector(node_param_idx, v0 ${dynamic_val_args()});
 			zouhe_bb(fi, orientation, rho, v0);
 		}
 	%endif

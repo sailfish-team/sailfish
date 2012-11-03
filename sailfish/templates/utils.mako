@@ -157,10 +157,12 @@
 
 ## Provides declarations of the arguments required for functions using
 ## dynamically evaluated node parameters.
-<%def name="time_dep_args_decl()">
+<%def name="dynamic_val_args_decl()">
 	%if time_dependence:
-		, unsigned int iteration_number,
-		int gx,
+		, unsigned int iteration_number
+	%endif
+	%if space_dependence:
+		, int gx,
 		int gy
 		%if dim == 3:
 			, int gz
@@ -171,9 +173,12 @@
 
 ## Provides values of the arguments required for functions using dynamically
 ## evaluated node parameters.
-<%def name="time_dep_args()">
+<%def name="dynamic_val_args()">
 	%if time_dependence:
-		, iteration_number, gx, gy
+		, iteration_number
+	%endif
+	%if space_dependence:
+		, gx, gy
 		%if dim == 3:
 			, gz
 		%endif
@@ -181,11 +186,13 @@
 </%def>
 
 ## Use to render arguments to the first call of a function using dynamically
-## evaluated node paramters.  Takes care of calculating the node's logical
+## evaluated node paramters. Takes care of calculating the node's logical
 ## global position.
-<%def name="time_dep_call_args()">
+<%def name="dynamic_val_call_args()">
 	%if time_dependence:
 		, iteration_number,
+	%endif
+	%if space_dependence:
 		gx + ${x_local_device_to_global_offset},
 		gy + ${y_local_device_to_global_offset}
 		%if dim == 3:
@@ -193,5 +200,3 @@
 		%endif
 	%endif
 </%def>
-
-

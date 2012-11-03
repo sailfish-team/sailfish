@@ -228,10 +228,13 @@ class DynamicValue(object):
     def __getitem__(self, i):
         return self.params[i]
 
-    def has_symbol(self, symbol):
-        for param in self.params:
-            if isinstance(param, expr.Expr) and symbol in param:
-                return True
+    def has_symbols(self, *args):
+        """Returns True if any of the expressions used for this DynamicValue
+        depends on at least one of the symbols provided as arguments."""
+        for symbol in args:
+            for param in self.params:
+                if isinstance(param, expr.Expr) and symbol in param:
+                    return True
         return False
 
 # Maps node type IDs to their classes.

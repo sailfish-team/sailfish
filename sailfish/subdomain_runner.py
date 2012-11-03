@@ -181,6 +181,7 @@ class SubdomainRunner(object):
         ctx['sim'] = self._sim
         ctx['block'] = self._spec
         ctx['time_dependence'] = self.config.time_dependence
+        ctx['space_dependence'] = self.config.space_dependence
         ctx['check_invalid_values'] = (
                 self.config.check_invalid_results_gpu and
                 self.backend.supports_printf)

@@ -144,7 +144,7 @@ ${kernel} void CollideAndPropagate(
 	%if simtype == 'shan-chen':
 		${sc_macro_fields()}
 	%else:
-		getMacro(&d0, ncode, type, orientation, &g0m0, v ${time_dep_call_args()});
+		getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
 	%endif
 
 	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);

@@ -395,9 +395,11 @@ class Subdomain(object):
                         "have exactly as many nodes as there are True values "
                         "in the 'where' array.  Use node_util.multifield() to "
                         "generate the array in an easy way.")
-            elif isinstance(param, nt.DynamicValue) and param.has_symbol(sym.S.time):
-                self.config.time_dependence = True
-                # TODO: Ensure that time is a parameter in the expression.
+            elif isinstance(param, nt.DynamicValue):
+                if param.has_symbols(sym.S.time):
+                    self.config.time_dependence = True
+                if param.has_symbols(sym.S.gx, sym.S.gy, sym.S.gz):
+                    self.config.space_dependence = True
                 continue
             else:
                 raise ValueError("Unrecognized node param: {0} (type {1})".

@@ -214,8 +214,10 @@ class LBForcedSim(LBSim):
 
         if isinstance(force, nt.DynamicValue):
             self._symbolic_forces.setdefault(grid, {}).setdefault(accel, []).append(force)
-            if force.has_symbol(sym.S.time):
+            if force.has_symbols(sym.S.time):
                 self.config.time_dependence = True
+            if force.has_symbols(sym.S.gx, sym.S.gy, sym.S.gz):
+                self.config.space_dependence = True
         else:
             # Create an empty force vector.  Use numpy so that we can easily compute
             # sums.
