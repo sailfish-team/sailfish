@@ -354,7 +354,7 @@
 #define DT 1.0f
 
 %if backend == 'cuda':
-extern int printf (__const char *__restrict __format, ...);
+#include <stdio.h>
 %endif
 
 %for name, val in constants.iteritems():

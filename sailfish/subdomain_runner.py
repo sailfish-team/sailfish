@@ -64,7 +64,7 @@ class SubdomainRunner(object):
         """
 
         self._summary_sender = None
-        self._ppid = os.getppid()
+        self._ppid = os.getppid() if os.name != 'nt' else 0
 
         self._ctx = zmq.Context()
 
@@ -1268,7 +1268,7 @@ class SubdomainRunner(object):
             self.config.logger.info("Simulation termination requested.")
             return True
 
-        if self._ppid != os.getppid():
+        if os.name != 'nt' and self._ppid != os.getppid():
             self.config.logger.info("Master process is dead -- terminating simulation.")
             return True
 
