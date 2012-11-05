@@ -1,3 +1,4 @@
+# # -*- coding: utf-8 -*-
 """Supporting code for different node types."""
 
 __author__ = 'Michal Januszewski'
@@ -138,6 +139,62 @@ class NTGradFreeflow(LBNodeType):
     standard_macro = True
     scratch_space = ScratchSize(dim2=3, dim3=6)
 
+class NTCopy(LBNodeType):
+    """Copies distributions from another node.
+
+    This can be used to implement a crude vanishing gradient
+    boundary condition."""
+    wet_node = True
+    standard_macro = True
+
+    def __init__(self, normal):
+        """
+        :param normal: direction number corresponding to the normal vector
+            pointing outward (i.e. outside of the domain); direction numbers
+            can be generated using grid.vec_to_dir.
+        """
+        self.params = {'normal': normal}
+
+class NTYuOutflow(LBNodeType):
+    """Implements the open boundary condition described in:
+
+    Yu, D., Mei, R. and Shyy, W. (2005) 'Improved treatment of
+    the open boundary in the method of lattice Boltzmann
+    equation', page 5.
+
+    This is an extrapolation based method, using data from next-nearest
+    neighbors.
+    """
+    wet_node = True
+    standard_macro = True
+
+    def __init__(self, normal):
+        """
+        :param normal: direction number corresponding to the normal vector
+            pointing outward (i.e. outside of the domain); direction numbers
+            can be generated using grid.vec_to_dir.
+        """
+        self.params = {'normal': normal}
+
+class NTNeumann(LBNodeType):
+    """Implements a Neumann boundary condition.
+
+    This is a nonlocal boundary condition accessing the nearest neighbors.
+    Note that this condition requires a layer of ghost nodes to be present
+    in the direction pointed to by the normal vector.
+
+    Based on the NBC description in:
+    Junk M, Yang Z, Outflow boundary conditions for the lattice
+    Boltzmann method, Progress in Computational Fluid Dynamics,
+    Vol. 8, Nos. 1–4, 2008
+    """
+    def __init__(self, normal):
+        """
+        :param normal: direction number corresponding to the normal vector
+            pointing outward (i.e. outside of the domain); direction numbers
+            can be generated using grid.vec_to_dir.
+        """
+        self.params = {'normal': normal}
 
 def __init_node_type_list():
     """Assigns IDs to classes descendant from LBNodeType."""
