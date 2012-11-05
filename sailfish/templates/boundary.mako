@@ -282,6 +282,53 @@ ${device_func} inline void getMacro(
 	%endif
 }
 
+// Uses extrapolation to compute missing distributions for some implementations
+// of boundary condtitions.
+${device_func} inline void fixMissingDistributions(
+		Dist *fi, ${global_ptr} float *dist_in, int node_type, int orientation, int gi) {
+	## These boundary conditions are non-local and can thus be implemented in
+	## this way only with the AB access pattern. In the AA access pattern,
+	## their implementation requires a separate kernel call.
+	%if access_pattern == 'AB':
+		if (0) {}
+		%if nt.NTCopy in node_types
+			else if (isNTCopy(node_type)) {
+				switch (orientation) {
+				%for o in range(1, grid.dim*2+1):
+					case ${o}: {
+						<%
+							offset = rel_offset(*(-grid.dir_to_vec(o)))
+						%>
+						%for dist_idx in sym.get_missing_dists(grid, o):
+							fi->${grid.idx_name[dist_idx]} = ${get_dist('dist_in', dist_idx, 'gi', offset)};
+						%endfor
+						break;
+					}
+				%endfor
+			}
+		%endif
+		%if nt.NTYuOutflow in node_types:
+			else if (isNTYuOutflow(node_type)) {
+				switch (orientation) {
+				%for o in range(1, grid.dim*2+1):
+					case ${o}: {
+						<%
+							offset1 = rel_offset(*(-grid.dir_to_vec(o)))
+							offset2 = rel_offset(*(2 * -grid.dir_to_vec(o)))
+						%>
+						%for dist_idx in sym.get_missing_dists(grid, o):
+						fi->${grid.idx_name[dist_idx]} =
+							2.0f * ${get_dist('dist_in', dist_idx, 'gi', offset1)} -
+							${get_dist('dist_in', dist_idx, 'gi', offset2)};
+						%endfor
+						break;
+					}
+				%endfor
+			}
+		%endif
+	%endif
+}
+
 // TODO: Check whether it is more efficient to actually recompute
 // node_type and orientation instead of passing them as variables.
 ${device_func} inline void postcollisionBoundaryConditions(

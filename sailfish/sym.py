@@ -612,6 +612,17 @@ def _get_known_dists(grid, normal):
 
     return known, unknown
 
+def get_missing_dists(grid, orientation):
+    """Returns an iterable of missing distribution indices.
+
+    :param grid: grid object
+    :param orientation: orientation code
+    """
+    # Normal vector points outside of the simulation domain.
+    normal = -grid.dir_to_vec(orientation)
+    _, unknown = _get_known_dists(grid, normal)
+    return unknown
+
 def noneq_bb(grid, orientation):
     normal = grid.dir_to_vec(orientation)
     known, unknown = _get_known_dists(grid, normal)

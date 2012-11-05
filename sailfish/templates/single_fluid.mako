@@ -189,6 +189,8 @@ ${kernel} void CollideAndPropagate(
 		Dist d1;
 		getDist(&d1, dist_in, gi);
 	%endif
+	fixMissingDistributions(&d0, dist_in, ncode, orientation, gi);
+
 	%if simtype == 'shan-chen':
 		${sc_calculate_accel()}
 	%endif
