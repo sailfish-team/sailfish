@@ -163,7 +163,9 @@ class NTYuOutflow(LBNodeType):
     equation', page 5.
 
     This is an extrapolation based method, using data from next-nearest
-    neighbors.
+    neighbors:
+
+    f_i(x_j) = 2 f_i(x_j - n) - f_i(x_j - 2n)
     """
     wet_node = True
     standard_macro = True
@@ -187,6 +189,20 @@ class NTNeumann(LBNodeType):
     Junk M, Yang Z, Outflow boundary conditions for the lattice
     Boltzmann method, Progress in Computational Fluid Dynamics,
     Vol. 8, Nos. 1–4, 2008
+
+    Implements:
+      \partial u / \partial n (t, x_j) = \phi(t, x_j)
+    via:
+      f_i(t+1, j_0) = f_iopp^c(t, j_o + c_i) +
+                      6 feq_i (u(t, x_j1) + 2\phi(t, x_j)) \cdot c_i
+    with:
+      j_0: ghost node
+      x_j: actual boundary node
+      x_j1: fluid node at x_j - normal
+      c_i: incoming distributions
+      iopp: direction opposite to i
+      feq_i: f_eq(1, 0)
+      f_i^c: distribution after collision (prior to streaming)
     """
     def __init__(self, normal):
         """
