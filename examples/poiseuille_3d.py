@@ -5,7 +5,7 @@ import numpy as np
 
 from sailfish.geo import EqualSubdomainsGeometry3D
 from sailfish.subdomain import Subdomain3D
-from sailfish.node_type import NTFullBBWall
+from sailfish.node_type import NTFullBBWall, NTEquilibriumDensity
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
 from sailfish.lb_base import LBForcedSim
@@ -16,6 +16,38 @@ class PoiseuilleSubdomain(Subdomain3D):
 
     max_v = 0.02
     wall_bc = NTFullBBWall
+
+    @property
+    def channel_length(self):
+        if self.config.flow_direction == 'x':
+            return self.config.lat_nx - 1
+        elif self.config.flow_direction == 'y':
+            return self.config.lat_ny - 1
+        else:
+            return self.config.lat_nz - 1
+
+    @property
+    def pressure_delta(self):
+        return (self.max_v * (16.0 * self.config.visc) * self.channel_length /
+                (self.channel_width(self.config)**2))
+
+    def _set_pressure_bc(self, hx, hy, hz, wall_map):
+        pressure_bc = NTEquilibriumDensity
+        not_wall = np.logical_not(wall_map)
+
+        if self.config.flow_direction == 'z':
+            inlet_map = (hz == 0) & not_wall
+            outlet_map = (hz == self.gz - 1) & not_wall
+        elif self.config.flow_direction == 'y':
+            inlet_map = (hy == 0) & not_wall
+            outlet_map = (hy == self.gy - 1) & not_wall
+        else:
+            inlet_map = (hx == 0) & not_wall
+            outlet_map = (hx == self.gx - 1) & not_wall
+
+        pressure = self.pressure_delta
+        self.set_node(inlet_map, pressure_bc(1.0 + 3.0 * pressure / 2.0))
+        self.set_node(outlet_map, pressure_bc(1.0 - 3.0 * pressure / 2.0))
 
     def boundary_conditions(self, hx, hy, hz):
         radiussq = (self.channel_width(self.config) / 2.0)**2
@@ -29,6 +61,9 @@ class PoiseuilleSubdomain(Subdomain3D):
 
         self.set_node(wall_map, self.wall_bc)
 
+        if self.config.drive == 'pressure':
+            self._set_pressure_bc(hx, hy, hz, wall_map)
+
     def initial_conditions(self, sim, hx, hy, hz):
         sim.rho[:] = 1.0
 
@@ -36,10 +71,7 @@ class PoiseuilleSubdomain(Subdomain3D):
             return
 
         if self.config.drive == 'pressure':
-            # Start with correct pressure profile.
-            pressure = (self.max_v * (16.0 * self.config.visc) /
-                    (self.channel_width(self.config)**2))
-
+            pressure = self.pressure_delta
             if self.config.flow_direction == 'x':
                 sim.rho[:] = 1.0 + 3.0 * pressure * (self.gx / 2.0 - hx)
             elif self.config.flow_direction == 'y':
@@ -140,11 +172,10 @@ class PoiseuilleSim(LBFluidSim, LBForcedSim):
         group.add_argument('--flow_direction', type=str, default='x',
                 choices=['x', 'y', 'z'],
                 help='direction along which the fluid is to flow')
-        group.add_argument('--stationary', type=bool, default=False,
+        group.add_argument('--stationary', action='store_true', default=False,
                 help='start with the correct velocity profile in the whole domain')
         group.add_argument('--drive', type=str, default='force',
                 choices=['force', 'pressure'])
-
 
     @classmethod
     def modify_config(cls, config):
@@ -152,7 +183,6 @@ class PoiseuilleSim(LBFluidSim, LBForcedSim):
             config.periodic_x = config.flow_direction == 'x'
             config.periodic_y = config.flow_direction == 'y'
             config.periodic_z = config.flow_direction == 'z'
-
 
     def __init__(self, config):
         super(PoiseuilleSim, self).__init__(config)
