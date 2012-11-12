@@ -38,6 +38,9 @@ class LBNodeType(object):
     scratch_space = 0
 
     def __init__(self, **params):
+        if 'orientation' in params:
+            self.orientation = params['orientation']
+            del params['orientation']
         self.params = params
 
     @classmethod
@@ -97,8 +100,9 @@ class NTEquilibriumVelocity(LBNodeType):
     needs_orientation = True
     wet_node = True
 
-    def __init__(self, velocity):
+    def __init__(self, velocity, orientation=None):
         self.params = {'velocity': velocity}
+        self.orientation = None
 
 
 class NTEquilibriumDensity(LBNodeType):
@@ -106,24 +110,27 @@ class NTEquilibriumDensity(LBNodeType):
     needs_orientation = True
     wet_node = True
 
-    def __init__(self, density):
+    def __init__(self, density, orientation=None):
         self.params = {'density': density}
+        self.orientation = orientation
 
 
 class NTZouHeVelocity(LBNodeType):
     """Zou-he velocity."""
     needs_orientation = True
 
-    def __init__(self, velocity):
+    def __init__(self, velocity, orientation=None):
         self.params = {'velocity': velocity}
+        self.orientation = orientation
 
 
 class NTZouHeDensity(LBNodeType):
     """Zou-He density."""
     needs_orientation = True
 
-    def __init__(self, density):
+    def __init__(self, density, orientation=None):
         self.params = {'density': density}
+        self.orientation = orientation
 
 
 class NTGuoDensity(LBNodeType):

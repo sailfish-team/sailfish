@@ -351,7 +351,7 @@ class Subdomain(object):
         self.grid = grid
         # The type map allocated by the subdomain runner already includes
         # ghost nodes, and is formatted in a way that makes it suitable
-        # for copying to the compute device.  The entries in this array are
+        # for copying to the compute device. The entries in this array are
         # node type IDs.
         self._type_map = spec.runner.make_scalar_field(np.uint32, register=False)
         self._type_vis_map = np.zeros(list(reversed(spec.size)),
@@ -362,6 +362,9 @@ class Subdomain(object):
         self._params = {}
         self._encoder = None
         self._seen_types = set([0])
+        self._needs_orientation = False
+        self._orientation = spec.runner.make_scalar_field(np.uint32,
+                register=False)
 
     @property
     def config(self):
@@ -427,6 +430,11 @@ class Subdomain(object):
         self._params[key] = node_type
         self._seen_types.add(node_type.id)
 
+        if hasattr(node_type, 'orientation') and node_type.orientation is not None:
+            self._orientation[where] = node_type.orientation
+        elif node_type.needs_orientation:
+            self._needs_orientation = True
+
     def reset(self):
         self.config.logger.debug('Setting subdomain geometry...')
         self._type_map_encoded = False
@@ -469,7 +477,7 @@ class Subdomain(object):
 
     def encoded_map(self):
         if not self._type_map_encoded:
-            self._encoder.encode()
+            self._encoder.encode(self._orientation.base, self._needs_orientation)
             self._type_map_encoded = True
 
         return self._type_map.base

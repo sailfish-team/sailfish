@@ -69,6 +69,7 @@ class GeoEncoderConst(GeoEncoder):
         self.config = subdomain.spec.runner.config
         self.scratch_space_size = 0
 
+    # TODO(michalj): Consider merging this funtionality into encode().
     def prepare_encode(self, type_map, param_map, param_dict):
         """
         :param type_map: uint32 array of NodeType.ids
@@ -192,31 +193,27 @@ class GeoEncoderConst(GeoEncoder):
             self._bits_scratch = 0
 
 
-    def encode(self):
+    def encode(self, orientation, detect_orientation):
+        """
+        :param orientation: numpy array with the same layout as _type_map,
+            indicating the orientation of different nodes; this array will be
+            modified if detect_orientation is True.
+        :param orientation_autodetection: if True, will try to auto-detect the
+            orientation of boundary nodes
+        """
         assert self._type_map is not None
 
-        orientation = np.zeros_like(self._type_map)
-        cnt = np.zeros_like(self._type_map)
+        if detect_orientation:
+            # Limit dry and wet types to these that are actually used in the simulation.
+            uniq_types = set(np.unique(self._type_map.base))
+            dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
+            orient_types = list(set(nt.get_orientation_node_type_ids()) & uniq_types)
 
-        # Limit dry and wet types to these that are actually used in the simulation.
-        uniq_types = set(np.unique(self._type_map.base))
-        dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
-        wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
-        orient_types = list(set(nt.get_orientation_node_type_ids()) & uniq_types)
+            # Convert to a numpy array.
+            dry_types = self._type_map.dtype.type(dry_types)
+            orient_types = self._type_map.dtype.type(orient_types)
 
-        # Convert to a numpy array.
-        dry_types = self._type_map.dtype.type(dry_types)
-        wet_types = self._type_map.dtype.type(wet_types)
-        orient_types = self._type_map.dtype.type(orient_types)
-
-        # Check if there are any node types that need the orientation vector.
-        needs_orientation = False
-        for nt_code in uniq_types:
-            if nt._NODE_TYPES[nt_code].needs_orientation:
-                needs_orientation = True
-                break
-
-        if needs_orientation:
+            cnt = np.zeros_like(self._type_map)
             for i, vec in enumerate(self.subdomain.grid.basis):
                 l = len(list(vec)) - 1
                 shifted_map = self._type_map
@@ -227,9 +224,9 @@ class GeoEncoderConst(GeoEncoder):
                 # FIXME: we're currently only processing the primary directions
                 # here
                 if vec.dot(vec) == 1:
-                    idx = np.logical_and(
-                            util.in_anyd_fast(self._type_map, orient_types),
-                            shifted_map == 0)
+                    # Only set orientation where it's not already defined (=0).
+                    idx = (util.in_anyd_fast(self._type_map, orient_types) &
+                            (shifted_map == 0) & (orientation == 0))
                     orientation[idx] = self.subdomain.grid.vec_to_dir(list(vec))
 
         # Remap type IDs.

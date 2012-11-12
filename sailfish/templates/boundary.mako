@@ -291,7 +291,7 @@ ${device_func} inline void fixMissingDistributions(
 	## their implementation requires a separate kernel call.
 	%if access_pattern == 'AB':
 		if (0) {}
-		%if nt.NTCopy in node_types
+		%if nt.NTCopy in node_types:
 			else if (isNTCopy(node_type)) {
 				switch (orientation) {
 				%for o in range(1, grid.dim*2+1):
