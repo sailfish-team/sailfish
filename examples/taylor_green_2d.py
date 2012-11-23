@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env/python
 
 import math
 import numpy as np
@@ -21,11 +21,16 @@ class TaylorGreenSubdomain(Subdomain2D):
         sim.vy[:] = vy
 
     @classmethod
-    def solution(cls, config, hx, hy, gx, gy, t, Ma):
-        """Returns the analytical solution of the 2D Taylor Green flow for time t."""
+    def get_k(cls, config, gx, gy):
         kx = np.pi * 2.0 / (config.lambda_x * gx)
         ky = np.pi * 2.0 / (config.lambda_y * gy)
         ksq = np.square(kx) + np.square(ky)
+        return kx, ky, ksq
+
+    @classmethod
+    def solution(cls, config, hx, hy, gx, gy, t, Ma):
+        """Returns the analytical solution of the 2D Taylor Green flow for time t."""
+        kx, ky, ksq = cls.get_k(config, gx, gy)
         f = np.exp(-config.visc * ksq * t)
 
         vx = -config.max_v * ky / np.sqrt(ksq) * f * np.sin(ky * hy) * np.cos(kx * hx)
@@ -58,8 +63,11 @@ class TaylorGreenSim(LBFluidSim):
         group.add_argument('--lambda_y', type=int, default=1)
         group.add_argument('--err_every', type=int, default=100)
 
-    def __init__(self, config):
-        super(TaylorGreenSim, self).__init__(config)
+    # This is factored out into a separate method so that it can be easily
+    # overridden in four_rolls_mill.
+    def reference_solution(self, hx, hy, nx, ny, iteration, Ma):
+        return self.subdomain.solution(self.config, hx, hy, nx, ny,
+                                       iteration, Ma)
 
     def after_step(self, runner):
         if self.iteration % self.config.err_every == self.config.err_every - 1:
@@ -72,8 +80,7 @@ class TaylorGreenSim(LBFluidSim):
             hy, hx = np.mgrid[0:ny, 0:nx]
 
             Ma = self.config.max_v / math.sqrt(runner._sim.grid.cssq)
-            _, ref_ux, ref_uy = self.subdomain.solution(self.config, hx, hy,
-                                                        nx, ny,
+            _, ref_ux, ref_uy = self.reference_solution(hx, hy, nx, ny,
                                                         self.iteration, Ma)
             top_v = np.max(np.sqrt(np.square(vx) + np.square(vy)))
             top_ref_v = np.max(np.sqrt(np.square(ref_ux) + np.square(ref_uy)))
