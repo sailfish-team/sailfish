@@ -190,10 +190,10 @@
 ## global position.
 <%def name="dynamic_val_call_args()">
 	%if time_dependence:
-		, iteration_number,
+		, iteration_number
 	%endif
 	%if space_dependence:
-		gx + ${x_local_device_to_global_offset},
+		, gx + ${x_local_device_to_global_offset},
 		gy + ${y_local_device_to_global_offset}
 		%if dim == 3:
 			, gz + ${z_local_device_to_global_offset}
