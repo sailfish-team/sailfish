@@ -1,4 +1,23 @@
 #!/usr/bin/env/python
+"""
+2D Taylor-Green vortex flow.
+
+This is a well-known decaying vortex flow with an exact closed form solution:
+
+    u_x = -u_0 cos(x) sin(y) exp(-2 nu t)
+    u_y =  u_0 sin(x) cos(y) exp(-2 nu t)
+    p = rho / 4 (cos(2x) + cos(2y)) * exp(-4 nu t)
+
+and can be used to test accuracy of LB models e.g. as a function of viscosity
+or maximum velocity in the simulation (Mach number).
+
+Compared to the formulas above, the code introduces additional factors kx, ky
+which result from the LB -> physical parameter scaling.
+
+While running, the simulation prints to stdout:
+    iteration, relative velocity error (simulation result / reference solution),
+    max velocity in the simulation, max velocity in the reference solution
+"""
 
 import math
 import numpy as np
@@ -22,22 +41,25 @@ class TaylorGreenSubdomain(Subdomain2D):
 
     @classmethod
     def get_k(cls, config, gx, gy):
+        """Returns scaling factors that transform LB coordinates into
+        coordinates from the range [0:2*pi]."""
         kx = np.pi * 2.0 / (config.lambda_x * gx)
         ky = np.pi * 2.0 / (config.lambda_y * gy)
-        ksq = np.square(kx) + np.square(ky)
-        return kx, ky, ksq
+        ksq = kx**2 + ky**2
+        k = sqrt(ksq)
+        return kx, ky, ksq, k
 
     @classmethod
     def solution(cls, config, hx, hy, gx, gy, t, Ma):
         """Returns the analytical solution of the 2D Taylor Green flow for time t."""
-        kx, ky, ksq = cls.get_k(config, gx, gy)
+        kx, ky, ksq, k = cls.get_k(config, gx, gy)
         f = np.exp(-config.visc * ksq * t)
 
-        vx = -config.max_v * ky / np.sqrt(ksq) * f * np.sin(ky * hy) * np.cos(kx * hx)
-        vy =  config.max_v * kx / np.sqrt(ksq) * f * np.sin(kx * hx) * np.cos(ky * hy)
+        vx = -config.max_v * ky / k * f * np.sin(ky * hy) * np.cos(kx * hx)
+        vy =  config.max_v * kx / k * f * np.sin(kx * hx) * np.cos(ky * hy)
         rho = 1.0 - Ma**2 / (ksq * 2.0) * (
             ky**2 * np.cos(2 * kx * hx) +
-            kx**2 * np.cos(2 * ky * hy))
+            kx**2 * np.cos(2 * ky * hy)) * f * f
         return rho, vx, vy
 
 
@@ -58,10 +80,12 @@ class TaylorGreenSim(LBFluidSim):
     def add_options(cls, group, dim):
         LBFluidSim.add_options(group, dim)
 
-        group.add_argument('--max_v', type=float, default=0.01)
+        group.add_argument('--max_v', type=float, default=0.01,
+                           help='Maximum velocity in LB units.')
         group.add_argument('--lambda_x', type=int, default=1)
         group.add_argument('--lambda_y', type=int, default=1)
-        group.add_argument('--err_every', type=int, default=100)
+        group.add_argument('--err_every', type=int, default=100,
+                           help='How often to evaluate the error.')
 
     # This is factored out into a separate method so that it can be easily
     # overridden in four_rolls_mill.
