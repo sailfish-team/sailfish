@@ -21,7 +21,7 @@ class LDCSimUnorm(LDCSim):
         every_n = 523
 
         # Request the velocity field one step before actual processing.
-        if self.iteration % (every_n - 1) == 0:
+        if self.iteration % every_n == every_n - 1:
             self.need_sync_flag = True
 
         # Calculate and save the norm of valocity field.
