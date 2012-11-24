@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 """A low Reynolds number flow of a drop through a capillary channel."""
 
 import numpy as np

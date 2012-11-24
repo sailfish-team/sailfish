@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 from sailfish.geo import LBGeometry2D
 from sailfish.subdomain import Subdomain2D

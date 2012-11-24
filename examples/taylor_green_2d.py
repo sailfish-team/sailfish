@@ -1,4 +1,4 @@
-#!/usr/bin/env/python
+#!/usr/bin/env python
 """
 2D Taylor-Green vortex flow.
 
@@ -43,8 +43,8 @@ class TaylorGreenSubdomain(Subdomain2D):
     def get_k(cls, config, gx, gy):
         """Returns scaling factors that transform LB coordinates into
         coordinates from the range [0:2*pi]."""
-        kx = np.pi * 2.0 / (config.lambda_x * gx)
-        ky = np.pi * 2.0 / (config.lambda_y * gy)
+        kx = np.pi * 2.0 * config.lambda_x / gx
+        ky = np.pi * 2.0 * config.lambda_y / gy
         ksq = kx**2 + ky**2
         k = math.sqrt(ksq)
         return kx, ky, ksq, k

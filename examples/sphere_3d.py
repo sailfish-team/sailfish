@@ -1,4 +1,4 @@
-#!/usr/bin/python -u
+#!/usr/bin/env python -u
 
 import numpy as np
 from sailfish.geo import EqualSubdomainsGeometry3D

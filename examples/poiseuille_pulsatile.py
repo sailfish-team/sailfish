@@ -1,4 +1,4 @@
-#!/usr/bin/python -u
+#!/usr/bin/env python -u
 
 from sailfish.geo import LBGeometry2D
 from sailfish.node_type import NTFullBBWall, NTEquilibriumDensity, DynamicValue

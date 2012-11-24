@@ -1,4 +1,4 @@
-#!/usr/bin/python -u
+#!/usr/bin/env python -u
 """Demonstrates how to load geometry from a boolean numpy array."""
 
 import numpy as np

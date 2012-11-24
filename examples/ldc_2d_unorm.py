@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import numpy as np
 from sailfish.controller import LBSimulationController
