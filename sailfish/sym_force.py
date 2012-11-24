@@ -132,9 +132,8 @@ def bgk_external_force(grid, grid_num=0):
     ret = []
 
     for i, ei in enumerate(grid.basis):
-        t = pref * grid.weights[i] * poly_factorize((ei - grid.v + ei.dot(grid.v)*ei*3).dot(ea))
-        ret.append((t, grid.idx_name[i]))
-
+        ret.append(pref * grid.weights[i] *
+                   poly_factorize((ei - grid.v + ei.dot(grid.v)*ei*3).dot(ea)))
     return ret
 
 def bgk_external_force_pref(grid, grid_num=0):
@@ -172,7 +171,7 @@ def free_energy_external_force(sim, grid_num=0):
     for i, ei in enumerate(grid.basis[1:]):
         t = S.wi[i] * (ea.dot(ei) * (1 + 3 * ei.dot(grid.v)) - ea.dot(grid.v))
         sum_ += t
-        ret.append((t, grid.idx_name[i+1]))
+        ret.append(t)
 
-    ret = [(sympy.simplify(-sum_), grid.idx_name[0])] + ret
+    ret = [sympy.simplify(-sum_)] + ret
     return ret

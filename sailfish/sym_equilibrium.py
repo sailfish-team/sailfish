@@ -4,9 +4,12 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+from collections import namedtuple
 import sympy
 from sympy import Rational, Symbol, Eq
 from sailfish.sym import poly_factorize, S
+
+EqDef = namedtuple('EqDef', 'expr local_vars')
 
 # Form of the equilibrium function taken from Phys Rev E 78, 056709.
 def free_energy_binary_liquid_equilibrium(sim):
@@ -41,10 +44,10 @@ def free_energy_binary_liquid_equilibrium(sim):
                        S.wxz[i] * S.g1d1m0x * S.g1d1m0z))
 
         t_sum += t
-        out.append((t, grid.idx_name[i+1]))
+        out.append(t)
 
     # The first term is chosen so that rho is conserved.
-    out1 = [(sympy.simplify(S.rho - t_sum), grid.idx_name[0])] + out
+    out1 = [sympy.simplify(S.rho - t_sum)] + out
 
     out = []
     t_sum = 0
@@ -53,11 +56,11 @@ def free_energy_binary_liquid_equilibrium(sim):
                 -Rational(1,3) * grid.v.dot(grid.v) + (ei.dot(grid.v))**2))
 
         t_sum += t
-        out.append((t, grid.idx_name[i+1]))
+        out.append(t)
 
     # The first term is chosen so that the order parameter is conserved.
-    out = [(sympy.simplify(S.phi - t_sum), grid.idx_name[0])] + out
-    return ([out1, out], lvars)
+    out = [sympy.simplify(S.phi - t_sum)] + out
+    return EqDef([out1, out], lvars)
 
 def shallow_water_equilibrium(grid):
     """Get expressions for the BGK equilibrium distribution for the shallow
@@ -66,28 +69,20 @@ def shallow_water_equilibrium(grid):
     if grid.dim != 2 or grid.Q != 9:
         raise TypeError('Shallow water equation requires the D2Q9 grid.')
 
-    out = []
-    out.append((S.rho - grid.weights[0] * S.rho * (Rational(15, 8) *
-        S.gravity * S.rho - 3 * grid.v.dot(grid.v)), grid.idx_name[0]))
+    out = [S.rho - grid.weights[0] * S.rho * (
+        Rational(15, 8) * S.gravity * S.rho - 3 * grid.v.dot(grid.v))]
 
-    for i, ei in enumerate(grid.basis):
-        if i == 0:
-            continue
-
-        t = (grid.weights[i] * (
+    for ei, weight in zip(grid.basis[1:], grid.weights[1:]):
+        out.append(weight * (
                 S.rho * poly_factorize(Rational(3,2) * S.rho * S.gravity + 3*ei.dot(grid.v) +
                     Rational(9,2) * (ei.dot(grid.v))**2 - Rational(3, 2) * grid.v.dot(grid.v))))
 
-        out.append((t, grid.idx_name[i]))
-
-    return ([out], [])
+    return EqDef([out], local_vars=[])
 
 def bgk_equilibrium(grid, rho=None, rho0=None):
     """Get expressions for the BGK equilibrium distribution.
 
     :param grid: the grid class to be used
-
-    :rtype: list of sympy epxressions representing the equilibrium distribution functions
     """
     out = []
 
@@ -97,16 +92,12 @@ def bgk_equilibrium(grid, rho=None, rho0=None):
     if rho0 is None:
         rho0 = S.rho0
 
-    for i, ei in enumerate(grid.basis):
-        t = (grid.weights[i] * (
-                    (rho + rho0 * poly_factorize(
-                        3*ei.dot(grid.v) +
-                        Rational(9, 2) * (ei.dot(grid.v))**2 -
-                        Rational(3, 2) * grid.v.dot(grid.v)))))
+    for ei, weight in zip(grid.basis, grid.weights):
+        out.append(weight * (rho + rho0 * poly_factorize(
+            3 * ei.dot(grid.v) + Rational(9, 2) * (ei.dot(grid.v))**2 -
+            Rational(3, 2) * grid.v.dot(grid.v))))
 
-        out.append((t, grid.idx_name[i]))
-
-    return ([out], [])
+    return EqDef([out], local_vars=[])
 
 
 def elbm_equilibrium(grid, rho=None):
@@ -138,13 +129,13 @@ def elbm_equilibrium(grid, rho=None):
     lvars.append(Eq(coeff2, coeffs[1]))
     cfs = [coeff1, coeff2]
 
-    for i, ei in enumerate(grid.basis):
-        t = prefactor * grid.entropic_weights[i]
+    for ei, weight in zip(grid.basis, grid.entropic_weights):
+        t = prefactor * weight
         for j, comp in enumerate(ei):
             t *= cfs[j]**(comp / (sqrt(3) * sqrt(grid.cssq)))
-        out.append((t, grid.idx_name[i]))
+        out.append(t)
 
-    return ([out], lvars)
+    return EqDef([out], lvars)
 
 def elbm_d3q15_equilibrium(grid, rho=None):
     """
@@ -199,10 +190,10 @@ def elbm_d3q15_equilibrium(grid, rho=None):
         lvars.append(Eq(coeff, poly_factorize(tmp)))
 
     out = []
-    for i, ei in enumerate(grid.basis):
-        t = prefactor * grid.entropic_weights[i]
+    for ei, weight in zip(grid.basis, grid.entropic_weights):
+        t = prefactor * weight
         for j, comp in enumerate(ei):
             t *= cfs[j]**comp
-        out.append((t, grid.idx_name[i]))
+        out.append(t)
 
-    return ([out], lvars)
+    return EqDef([out], lvars)

@@ -46,7 +46,7 @@ class TaylorGreenSubdomain(Subdomain2D):
         kx = np.pi * 2.0 / (config.lambda_x * gx)
         ky = np.pi * 2.0 / (config.lambda_y * gy)
         ksq = kx**2 + ky**2
-        k = sqrt(ksq)
+        k = math.sqrt(ksq)
         return kx, ky, ksq, k
 
     @classmethod

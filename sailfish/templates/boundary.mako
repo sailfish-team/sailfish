@@ -320,7 +320,7 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, i
 		%endfor
 		if (is_NTEquilibriumNode(node_type)) {
 			%for eq in bgk_equilibrium:
-				%for feq, idx in eq:
+				%for feq, idx in zip(eq, grid.idx_name):
 					fi->${idx} = ${cex(feq, pointers=True)};
 				%endfor
 			%endfor

@@ -183,7 +183,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0 ${dynamic_va
 	%for i, eq in enumerate(bgk_equilibrium):
 		${fluid_velocity(i, equilibrium=True)};
 
-		%for feq, idx in eq:
+		%for feq, idx in zip(eq, grid.idx_name):
 			feq${i}.${idx} = ${cex(feq, vectors=True)};
 		%endfor
 	%endfor
@@ -254,7 +254,7 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 		%if sym_force.needs_accel(i, forces, force_couplings):
 			${fluid_velocity(i)};
 
-			%for val, idx in sym_force.free_energy_external_force(sim, grid_num=i):
+			%for val, idx in zip(sym_force.free_energy_external_force(sim, grid_num=i), grid.idx_name):
 				d${i}->${idx} += ${cex(val, vectors=True)};
 			%endfor
 		%endif
@@ -296,7 +296,7 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 	%endfor
 
 	%for i, eq in enumerate(elbm_eq):
-		%for feq, idx in eq:
+		%for feq, idx in zip(eq, grid.idx_name):
 			fneq${i}.${idx} = ${cex(feq, vectors=True)} - d0->${idx};
 		%endfor
 	%endfor
@@ -371,19 +371,19 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 
 			%if simtype == 'shan-chen':
 			{
-				float pref = ${cex(sym_force.bgk_external_force_pref(grids[i], grid_num=i))};
-				%for val, idx in sym_force.bgk_external_force(grid, grid_num=i):
+				const float pref = ${cex(sym_force.bgk_external_force_pref(grids[i], grid_num=i))};
+				%for val, idx in zip(sym_force.bgk_external_force(grid, grid_num=i), grid.idx_name):
 					d${i}->${idx} += ${cex(val, vectors=True)};
 				%endfor
 			}
 			%elif simtype == 'free-energy':
-				%for val, idx in sym_force.free_energy_external_force(sim, grid_num=i):
+				%for val, idx in zip(sym_force.free_energy_external_force(sim, grid_num=i), grid.idx_name):
 					d${i}->${idx} += ${cex(val, vectors=True)};
 				%endfor
 			%else:
 			{
-				float pref = ${cex(sym_force.bgk_external_force_pref(grids[i], grid_num=i))};
-				%for val, idx in sym_force.bgk_external_force(grid, grid_num=i):
+				const float pref = ${cex(sym_force.bgk_external_force_pref(grids[i], grid_num=i))};
+				%for val, idx in zip(sym_force.bgk_external_force(grid, grid_num=i), grid.idx_name):
 					d${i}->${idx} += ${cex(val, vectors=True)};
 				%endfor
 			}
@@ -399,13 +399,13 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			float par_phi = 1.0f;
 
 			%for local_var in bgk_equilibrium_vars:
-				float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True, rho='par_rho', phi='par_phi')};
+				const float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True, rho='par_rho', phi='par_phi')};
 			%endfor
 
 			tau0 = tau_a;
 
 			%for i, eq in enumerate(bgk_equilibrium):
-				%for feq, idx in eq:
+				%for feq, idx in zip(eq, grid.idx_name):
 					d${i}->${idx} += ${cex(feq, vectors=True, rho='par_rho', phi='par_phi')};
 				%endfor
 			%endfor

@@ -63,11 +63,11 @@ ${const_var} float tau1 = ${tau_phi}f;
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
 	%endfor
 
-	%for i, (feq, idx) in enumerate(bgk_equilibrium[0]):
+	%for i, feq in enumerate(bgk_equilibrium[0]):
 		${get_odist('dist1_in', i)} = ${cex(feq, vectors=True)};
 	%endfor
 
-	%for i, (feq, idx) in enumerate(bgk_equilibrium[1]):
+	%for i, feq in enumerate(bgk_equilibrium[1]):
 		${get_odist('dist2_in', i)} = ${cex(feq, vectors=True)};
 	%endfor
 </%def>
