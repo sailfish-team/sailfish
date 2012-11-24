@@ -7,7 +7,7 @@ __license__ = 'LGPLv3'
 from collections import defaultdict, namedtuple
 import numpy as np
 
-from sailfish import subdomain_runner, sym
+from sailfish import subdomain_runner, sym, sym_equilibrium
 from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField
 
 
@@ -39,7 +39,7 @@ class LBFluidSim(LBSim):
 
     def __init__(self, config):
         super(LBFluidSim, self).__init__(config)
-        self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
+        self.equilibrium, self.equilibrium_vars = sym_equilibrium.bgk_equilibrium(self.grid)
 
     def update_context(self, ctx):
         super(LBFluidSim, self).update_context(ctx)
@@ -193,7 +193,7 @@ class LBFreeSurface(LBFluidSim):
 
     def __init__(self, config):
         super(LBFreeSurface, self).__init__(config)
-        self.equilibrium, self.equilibrium_vars = sym.shallow_water_equilibrium(self.grid)
+        self.equilibrium, self.equilibrium_vars = sym_equilibrium.shallow_water_equilibrium(self.grid)
 
     @classmethod
     def modify_config(cls, config):

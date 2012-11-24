@@ -6,7 +6,7 @@ __license__ = 'LGPL3'
 
 from collections import defaultdict
 import numpy as np
-from sailfish import subdomain_runner, sym
+from sailfish import subdomain_runner, sym, sym_equilibrium
 from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField
 from sailfish.lb_single import MacroKernels
 
@@ -192,7 +192,7 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
 
     def __init__(self, config):
         super(LBBinaryFluidFreeEnergy, self).__init__(config)
-        self.equilibrium, self.equilibrium_vars = sym.free_energy_binary_liquid_equilibrium(self)
+        self.equilibrium, self.equilibrium_vars = sym_equilibrium.free_energy_binary_liquid_equilibrium(self)
 
     def constants(self):
         ret = super(LBBinaryFluidFreeEnergy, self).constants()
@@ -326,8 +326,8 @@ class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
 
     def __init__(self, config):
         super(LBBinaryFluidShanChen, self).__init__(config)
-        self.equilibrium, self.equilibrium_vars = sym.bgk_equilibrium(self.grid)
-        eq2, _ = sym.bgk_equilibrium(self.grid, self.S.phi, self.S.phi)
+        self.equilibrium, self.equilibrium_vars = sym_equilibrium.bgk_equilibrium(self.grid)
+        eq2, _ = sym_equilibrium.bgk_equilibrium(self.grid, self.S.phi, self.S.phi)
         self.equilibrium.append(eq2[0])
         self.add_force_coupling(0, 1, 'SCG')
 
