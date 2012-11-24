@@ -144,7 +144,8 @@ class Fluid2DVis(vis.FluidVis):
         group.add_argument('--scr_w', help='screen width', type=int, default=0)
         group.add_argument('--scr_h', help='screen height', type=int, default=0)
         group.add_argument('--scr_scale', help='screen scale', type=float, default=3.0)
-        group.add_argument('--scr_depth', help='screen color depth', type=int, default=0)
+        group.add_argument('--scr_depth', help='screen color depth', type=int,
+                           default=24)
 
     def __init__(self, config, blocks, quit_event, sim_quit_event, vis_config):
         pygame.init()
