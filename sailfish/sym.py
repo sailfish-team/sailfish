@@ -713,6 +713,38 @@ def get_interblock_dists(grid, direction, opposite=False):
 
 def relaxation_time(viscosity):
     return (6.0 * viscosity + 1.0) / 2.0
+
+def grad_approx(grid):
+    out = []
+    if grid.dim == 2:
+	    press_dim = 3
+    else:
+        press_dim=6
+    press = [Symbol('press%d' % i) for i in range(press_dim)] 	    		  	
+    for i, ei in enumerate(grid.basis):
+        Ma = sympy.ones(grid.dim)
+        Mb = sympy.ones(grid.dim)
+        l = 0
+        for j in range(grid.dim):
+            for k in range(j, grid.dim):
+                Ma[j, k] = press[l]             
+                Mb[j, k] = ei[j] * ei[k]
+                if j!=k:
+                    Ma[k, j] = press[l]             
+                    Mb[k, j] = ei[k] * ei[j]
+                l+=1
+        Ma -= sympy.eye(grid.dim) * S.rho * Rational(1, 3)		
+        Mb -= sympy.eye(grid.dim) * Rational(1, 3)		
+        t = 0
+        for j in range(grid.dim):
+            for k in range(grid.dim):
+                t += Ma[j, k] * Mb[j, k] 
+        t *= Rational(9, 2)        
+        t += S.rho + S.rho * 3*ei.dot(grid.v)
+        t *= grid.weights[i]
+        out.append(t)      
+    return (out)
+
 #
 # Shan-Chen model.
 #

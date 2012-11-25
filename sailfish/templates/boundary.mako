@@ -304,11 +304,84 @@ ${device_func} inline void postcollisionBoundaryConditions(
 	%endif
 }
 
-${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
+%if nt.NTGradFreeflow in node_types:
+	${device_func} inline void press_calc(Dist * fi, float *press)
+	{
+		<%  k=0
+		%>
+		%for i in range(grid.dim):
+			%for j in range(i, grid.dim):
+				<%  
+				expr = sym.ex_flux(grid, "fi", i, j)
+				k=k+1
+				%>
+				press[${k-1}] = ${cex(expr, rho="rho", pointers=True, vectors=True)};
+			%endfor
+		%endfor
+	}
+
+	${device_func} inline void fill_fi(Dist * fi, Dist *grad, int idx)
+	{
+	%for i, ve in enumerate(grid.basis):
+		if (isinf(fi->${grid.idx_name[i]}))
+		{
+			fi->${grid.idx_name[i]}=grad->${grid.idx_name[i]};
+		}
+	%endfor
+	
+	}
+	
+${device_func} inline void grad_calc(Dist * fi, float *rho, float *iv0, float *press)
+{
+	float v0 [${dim*dim}];	
+	%for j in range(dim):
+		v0[${j}] = iv0[${j}];
+	%endfor
+	%if dim ==2:
+		<% press_dim=3
+%>
+	%else:
+		<%press_dim=6 %>
+	%endif
+	%for j in range(press_dim):
+		float press${j} = press[${j}];
+	%endfor
+	%for i, ve in enumerate(grid.basis):
+		float t${grid.idx_name[i]};
+		
+	%endfor
+	
+	%for i, expr in enumerate(sym.grad_approx(grid)):
+		t${grid.idx_name[i]} = ${cex(expr, rho="rho", pointers=True, vectors=True)};
+		
+	%endfor
+       %for i, ve in enumerate(grid.basis):
+		fi->${grid.idx_name[i]}=t${grid.idx_name[i]};
+		
+	%endfor
+
+
+}
+%endif
+
+%if nt.NTGradFreeflow in node_types:
+	${device_func} inline void precollisionBoundaryConditions(Dist * fi, int ncode, int node_type, int orientation, float *rho,
+						      float *v0, Dist * dist_grad, float *rho_grad, float *v_grad, float *press, int gi)
+%else:	
+	${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
+%endif
+
 {
 	%if nt.NTFullBBWall in node_types:
 		if (isNTFullBBWall(node_type)) {
 			bounce_back(fi);
+		}
+	%endif
+
+	%if nt.NTGradFreeflow in node_types:
+		if(isNTGradFreeflow(node_type)){
+			grad_calc(dist_grad, rho_grad, v_grad, press);
+			fill_fi(fi, dist_grad, gi);
 		}
 	%endif
 

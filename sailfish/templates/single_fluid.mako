@@ -1,5 +1,6 @@
 <%!
     from sailfish import sym
+    import sailfish.node_type as nt
 %>
 
 %if 'gravity' in context.keys():
@@ -54,10 +55,17 @@ ${kernel_common.body(bgk_args_decl)}
 
 // A kernel to set the node distributions using the equilibrium distributions
 // and the macroscopic fields.
-${kernel} void SetInitialConditions(
+%if nt.NTGradFreeflow in node_types:
+	${kernel} void SetInitialConditions(
+	${global_ptr} float *dist1_in,
+	${kernel_args_1st_moment('iv')}
+	${global_ptr} float *irho, int *map, float *node_scratch_space)
+%else:	
+	${kernel} void SetInitialConditions(
 	${global_ptr} float *dist1_in,
 	${kernel_args_1st_moment('iv')}
 	${global_ptr} float *irho)
+%endif
 {
 	${local_indices()}
 
@@ -72,6 +80,63 @@ ${kernel} void SetInitialConditions(
 	%endif
 
 	${init_dist_with_eq()}
+%if nt.NTGradFreeflow in node_types:
+	int ncode = map[gi];
+	int type = decodeNodeType(ncode);
+
+	if (!isNTGradFreeflow(type)) {
+		return;
+	}
+	int scratch_id = decodeNodeScratchId(ncode);
+	%if dim==2:
+		<% press_dim=3 %>
+	%else:
+		<% press_dim=6 %>
+	%endif
+	float buf[${press_dim}];
+	Dist d00;
+	getDist(&d00, dist1_in, gi);
+	Dist * d0= &d00;
+	<%  k=0
+	%>
+	%for i in range(grid.dim):
+		%for j in range(i, grid.dim):
+			<%  
+			expr = sym.ex_flux(grid, "d0", i, j)
+			k=k+1
+			%>
+			buf[${k-1}] = ${cex(expr, rho="rho", pointers=True, vectors=True)};
+		%endfor
+	%endfor
+	storeNodeScratchSpace(scratch_id, type, buf, node_scratch_space);
+	int gx_n;
+	int gy_n;
+	%if dim>2:
+		int gz_n;
+	%endif
+	int gi_n;
+	int ncode_n;
+	int type_n;
+	%for i, ve in enumerate(grid.basis):
+		gx_n = gx+1*(${ve[0]});
+		gy_n = gy+1*(${ve[1]});
+		%if dim>2:
+			gz_n = gz+1*(${ve[2]});
+		%endif	
+		%if dim==2:
+			gi_n = getGlobalIdx(gx_n, gy_n);
+		%else:
+			gi_n = getGlobalIdx(gx_n, gy_n, gz_n);
+		%endif	
+		
+		ncode_n = map[gi_n];
+		type_n = decodeNodeType(ncode_n);
+		if (!(isWetNode(type_n)||isNTFullBBWall(type_n))){
+				dist1_in[gi + DIST_SIZE*${i} + 0]=1/0.;
+				
+			}
+	%endfor
+%endif
 }
 
 ${kernel} void PrepareMacroFields(
@@ -135,7 +200,10 @@ ${kernel} void CollideAndPropagate(
 	// Cache the distributions in local variables
 	Dist d0;
 	getDist(&d0, dist_in, gi ${iteration_number_arg_if_required()});
-
+ 	%if nt.NTGradFreeflow in node_types:
+		Dist d1;
+		getDist(&d1, dist_in, gi);
+	%endif
 	%if simtype == 'shan-chen':
 		${sc_calculate_accel()}
 	%endif
@@ -143,22 +211,65 @@ ${kernel} void CollideAndPropagate(
 	// Macroscopic quantities for the current cell
 	float g0m0, v[${dim}];
 
+	%if nt.NTGradFreeflow in node_types:
+		float g0m01, v1[${dim}];
+		g0m01 =gg0m0[gi];
+		v1[0]=ovx[gi];
+		v1[1]=ovy[gi];
+		%if dim>2:
+			v1[2]=ovz[gi];
+		%endif
+	%endif
 	%if simtype == 'shan-chen':
 		${sc_macro_fields()}
 	%else:
 		getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
 	%endif
 
-	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
+
+	%if nt.NTGradFreeflow in node_types:
+		%if dim==2:
+			<%press_dim =3 %>
+		%else:
+			<%press_dim =6 %>
+		%endif
+		float press[${press_dim}];
+		if (isNTGradFreeflow(type)) {
+			int scratch_id = decodeNodeScratchId(ncode);
+			loadNodeScratchSpace(scratch_id, type, node_scratch_space, press);
+		}
+	%endif
+	%if nt.NTGradFreeflow in node_types:
+		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, &d1, &g0m01, v1, press, gi);
+		getMacro(&d0, ncode, type, orientation, &g0m0, v);
+	%else:
+		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
+	%endif
 	${relaxate(bgk_args)}
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out);
-
+	%if nt.NTGradFreeflow in node_types:
+	if (isNTGradFreeflow(type)) {
+		int scratch_id = decodeNodeScratchId(ncode);
+		%if dim==2:
+			<%press_dim =3 %>
+		%else:
+			<%press_dim =6 %>
+		%endif
+		float press_out[${press_dim}];
+		press_calc(&d0, press_out);
+		storeNodeScratchSpace(scratch_id, type, press_out, node_scratch_space);
+	}
+	%endif
 	if (isWetNode(type)) {
 		checkInvalidValues(&d0, ${position()});
 	}
 
 	// Only save the macroscopic quantities if requested to do so.
+	%if nt.NTGradFreeflow in node_types:
+	if ((options & OPTION_SAVE_MACRO_FIELDS)||isNTGradFreeflow(type)) {
+	%else:
 	if (options & OPTION_SAVE_MACRO_FIELDS) {
+	%endif
 		gg0m0[gi] = g0m0;
 		ovx[gi] = v[0];
 		ovy[gi] = v[1];
