@@ -59,8 +59,8 @@ class LBFluidSim(LBSim):
         gpu_dist1b = runner.gpu_dist(0, 1)
         gpu_map = runner.gpu_geo_map()
 
-        args1 = [gpu_dist1a] + gpu_v + [gpu_rho]+ [gpu_map]
-        args2 = [gpu_dist1b] + gpu_v + [gpu_rho]+ [gpu_map]
+        args1 = [gpu_dist1a] + gpu_v + [gpu_rho, gpu_map]
+        args2 = [gpu_dist1b] + gpu_v + [gpu_rho, gpu_map]
         if runner.gpu_scratch_space is not None:
             args1.append(runner.gpu_scratch_space)
             args2.append(runner.gpu_scratch_space)

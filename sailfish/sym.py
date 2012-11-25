@@ -715,35 +715,32 @@ def relaxation_time(viscosity):
     return (6.0 * viscosity + 1.0) / 2.0
 
 def grad_approx(grid):
+    """Returns expressions for the Grad distributions as defined by Eq. 11 in
+    EPL 74 (2), pp. 215-221 (2006).
+
+    :param grid: a grid object
+    """
     out = []
-    if grid.dim == 2:
-	    press_dim = 3
-    else:
-        press_dim=6
-    press = [Symbol('press%d' % i) for i in range(press_dim)] 	    		  	
-    for i, ei in enumerate(grid.basis):
-        Ma = sympy.ones(grid.dim)
-        Mb = sympy.ones(grid.dim)
-        l = 0
-        for j in range(grid.dim):
-            for k in range(j, grid.dim):
-                Ma[j, k] = press[l]             
-                Mb[j, k] = ei[j] * ei[k]
-                if j!=k:
-                    Ma[k, j] = press[l]             
-                    Mb[k, j] = ei[k] * ei[j]
-                l+=1
-        Ma -= sympy.eye(grid.dim) * S.rho * Rational(1, 3)		
-        Mb -= sympy.eye(grid.dim) * Rational(1, 3)		
-        t = 0
-        for j in range(grid.dim):
-            for k in range(grid.dim):
-                t += Ma[j, k] * Mb[j, k] 
-        t *= Rational(9, 2)        
-        t += S.rho + S.rho * 3*ei.dot(grid.v)
-        t *= grid.weights[i]
-        out.append(t)      
-    return (out)
+    press_dim = 3 if grid.dim == 2 else 6
+    press = [Symbol('press%d' % i) for i in range(press_dim)]
+    for ei, weight in zip(grid.basis, grid.weights):
+        Ma = sympy.ones(grid.dim)  # P_ab - rho cs^2 \delta_ab
+        k = 0
+        for i in range(grid.dim):
+            for j in range(i, grid.dim):
+                Ma[i, j] = press[k]
+                Ma[j, i] = press[k]
+                k += 1
+        Ma -= sympy.eye(grid.dim) * S.rho * grid.cssq
+
+        # e_ia e_ib - cs^2 \delta_ab
+        Mb = ei.transpose().multiply(ei) - sympy.eye(grid.dim) * grid.cssq
+        t = Ma.dot(Mb)
+        t *= 1 / (grid.cssq**2 * 2)
+        t += S.rho + S.rho * ei.dot(grid.v) / grid.cssq
+        t *= weight
+        out.append(t)
+    return out
 
 #
 # Shan-Chen model.
