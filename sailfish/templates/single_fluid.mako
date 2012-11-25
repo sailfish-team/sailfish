@@ -41,7 +41,7 @@ ${kernel_common.body(bgk_args_decl)}
 <%namespace file="utils.mako" import="*"/>
 
 <%def name="init_dist_with_eq()">
-	<% eq = equilibria[0](grid) %>
+	<% eq = equilibria[0](grid, config) %>
 
 	%for local_var in eq.local_vars:
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};

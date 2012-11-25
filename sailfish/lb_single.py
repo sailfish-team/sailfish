@@ -29,7 +29,7 @@ class LBFluidSim(LBSim):
         group.add_argument('--incompressible',
                 action='store_true', default=False,
                 help='use the incompressible model of Luo and He')
-        group.add_argument('--model', help='LB model to use',
+        group.add_argument('--model', help='LB collision model to use',
                 type=str, choices=['bgk', 'mrt', 'elbm'],
                 default='bgk')
         group.add_argument('--subgrid', default='none', type=str,

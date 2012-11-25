@@ -166,7 +166,7 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			float par_phi = 1.0f;
 			tau0 = tau_a;
 
-			%for i, eq in enumerate([f(g) for f, g, in zip(equilibria, grids)]):
+			%for i, eq in enumerate([f(g, config) for f, g, in zip(equilibria, grids)]):
 				%for local_var in eq.local_vars:
 					const float ${cex(local_var.lhs)} =
 						${cex(local_var.rhs, rho='par_rho', phi='par_phi')};

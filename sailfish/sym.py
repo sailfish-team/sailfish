@@ -1,3 +1,5 @@
+# coding=utf-8
+
 """Helper code for symbolic processing and RTCG."""
 
 __author__ = 'Michal Januszewski'
@@ -497,11 +499,13 @@ def ex_rho(grid, distp, incompressible, missing_dir=None):
     else:
         return S.rho / (1 - grid.dir_to_vec(missing_dir).dot(grid.v))
 
-def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=None):
+def ex_velocity(grid, distp, comp, config, momentum=False, missing_dir=None,
+                par_rho=None):
     """Express velocity as a function of the distributions.
 
     :param distp: name of the pointer to the distribution structure
     :param comp: velocity component number: 0, 1 or 2 (for 3D lattices)
+    :param config: LBConfig object
     :param momentum: if ``True``, an expression for momentum is returned instead
         of for velocity
     :param missing_dir: direction number specified if an expression for
@@ -510,6 +514,8 @@ def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=Non
         fluid (i.e. the distributions in this direction are unknown).
     :param par_rho: name of the variable (a string) containing the externally
         imposed density (e.g. from a boundary condition)
+    :param roundoff: if True, the round-off optimization model is used and
+        rho should be replaced by (1.0 + rho) in calculations.
 
     :rtype: sympy expression for the velocity in a given direction
     """
@@ -520,8 +526,15 @@ def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=Non
         for i, sym in enumerate(syms):
             ret += grid.basis[i][comp] * sym
 
+        if config.incompressible:
+            rho = S.rho0
+        elif config.minimize_roundoff:
+            rho = S.rho + 1.0
+        else:
+            rho = S.rho
+
         if not momentum:
-            ret = ret / S.rho0
+            ret = ret / rho
     else:
         prho = Symbol(par_rho)
 
@@ -530,19 +543,27 @@ def ex_velocity(grid, distp, comp, momentum=False, missing_dir=None, par_rho=Non
             if sp <= 0:
                 ret = 1
 
-        ret = ret * (S.rho - prho)
+        rho = S.rho
+        if config.minimize_roundoff:
+            rho += 1
+
+        ret = ret * (rho - prho)
         ret *= -grid.dir_to_vec(missing_dir)[comp]
         if not momentum:
             ret = ret / prho
 
     return ret
 
-def ex_flux(grid, distp, comp_a, comp_b):
+def ex_flux(grid, distp, comp_a, comp_b, config):
     syms = [Symbol('%s->%s' % (distp, x)) for x in grid.idx_name]
     ret = 0
 
     for i, sym in enumerate(syms):
         ret += grid.basis[i][comp_a] * grid.basis[i][comp_b] * sym
+
+    # rho_0 c_s^2 δ_αβ
+    if config.minimize_roundoff and comp_a == comp_b:
+        ret += grid.cssq  # rho_0 == 1
 
     return ret
 
@@ -828,7 +849,6 @@ def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=True,
         acceleration) will be replaced by references to C arrays
     :param rho: density symbol (sympy Symbol, string).  If ``None`` the
         standard rho symbol for the grid will be used.
-
     :rtype: string representing the C code
     """
 

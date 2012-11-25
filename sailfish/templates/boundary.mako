@@ -119,11 +119,11 @@ ${device_func} inline void compute_1st_moment(Dist *fi, float *out, int add, flo
 {
 	if (add) {
 		%for d in range(0, grid.dim):
-			out[${d}] += factor * (${cex(sym.ex_velocity(grid, 'fi', d, momentum=True), pointers=True)});
+			out[${d}] += factor * (${cex(sym.ex_velocity(grid, 'fi', d, config, momentum=True), pointers=True)});
 		%endfor
 	} else {
 		%for d in range(0, grid.dim):
-			out[${d}] = factor * (${cex(sym.ex_velocity(grid, 'fi', d, momentum=True), pointers=True)});
+			out[${d}] = factor * (${cex(sym.ex_velocity(grid, 'fi', d, config, momentum=True), pointers=True)});
 		%endfor
 	}
 }
@@ -134,7 +134,7 @@ ${device_func} inline void compute_1st_moment(Dist *fi, float *out, int add, flo
 ${device_func} inline void compute_2nd_moment(Dist *fi, float *out)
 {
 	%for i, (a, b) in enumerate([(x,y) for x in range(0, dim) for y in range(x, dim)]):
-		out[${i}] = ${cex(sym.ex_flux(grid, 'fi', a, b), pointers=True)};
+		out[${i}] = ${cex(sym.ex_flux(grid, 'fi', a, b, config), pointers=True)};
 	%endfor
 }
 
@@ -143,7 +143,7 @@ ${device_func} inline void compute_2nd_moment(Dist *fi, float *out)
 ${device_func} inline void compute_1st_div_0th(Dist *fi, float *out, float zero)
 {
 	%for d in range(0, grid.dim):
-		out[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d), pointers=True, rho='zero')};
+		out[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, config), pointers=True, rho='zero')};
 	%endfor
 }
 
@@ -172,10 +172,10 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v0)
 	%endif
 
 	// Compute new macroscopic variables.
-	nvx = ${cex(sym.ex_velocity(grid, 'fi', 0, momentum=True))};
-	nvy = ${cex(sym.ex_velocity(grid, 'fi', 1, momentum=True))};
+	nvx = ${cex(sym.ex_velocity(grid, 'fi', 0, config, momentum=True))};
+	nvy = ${cex(sym.ex_velocity(grid, 'fi', 1, config, momentum=True))};
 	%if dim == 3:
-		nvz = ${cex(sym.ex_velocity(grid, 'fi', 2, momentum=True))};
+		nvz = ${cex(sym.ex_velocity(grid, 'fi', 2, config, momentum=True))};
 	%endif
 
 	// Compute momentum difference.
@@ -211,7 +211,7 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 		%for i in range(1, grid.dim*2+1):
 			case ${i}: {
 				%for d in range(0, grid.dim):
-					v0[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, missing_dir=i, par_rho='par_rho'), pointers=True)};
+					v0[${d}] = ${cex(sym.ex_velocity(grid, 'fi', d, config, missing_dir=i, par_rho='par_rho'), pointers=True)};
 				%endfor
 				break;
 			 }
@@ -316,7 +316,7 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, i
 		## Additional variables required for the evaluation of the
 		## equilibrium distribution function.
 		if (is_NTEquilibriumNode(node_type)) {
-			<% eq = equilibria[0](grid) %>
+			<% eq = equilibria[0](grid, config) %>
 			%for local_var in eq.local_vars:
 				float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
 			%endfor

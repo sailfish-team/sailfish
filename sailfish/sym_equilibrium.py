@@ -11,7 +11,7 @@ from sailfish.sym import poly_factorize, S
 
 EqDef = namedtuple('EqDef', 'expression local_vars')
 
-def free_energy_equilibrium_fluid(grid):
+def free_energy_equilibrium_fluid(grid, config):
     """Returns the equilibrium for the fluid field in the binary fluid
     free energy model.
 
@@ -46,7 +46,7 @@ def free_energy_equilibrium_fluid(grid):
     out = [sympy.simplify(S.rho - t_sum)] + out
     return EqDef(out, lvars)
 
-def free_energy_equilibrium_order_param(grid):
+def free_energy_equilibrium_order_param(grid, config):
     """Returns the equilibrium for the order parameter field in the binary fluid
     free energy model. See free_energy_equilibrium_fluid for more
     information."""
@@ -65,7 +65,7 @@ def free_energy_equilibrium_order_param(grid):
     out = [sympy.simplify(S.phi - t_sum)] + out
     return EqDef(out, lvars)
 
-def shallow_water_equilibrium(grid):
+def shallow_water_equilibrium(grid, config):
     """Get expressions for the BGK equilibrium distribution for the shallow
     water equation."""
 
@@ -82,7 +82,7 @@ def shallow_water_equilibrium(grid):
 
     return EqDef(out, local_vars=[])
 
-def bgk_equilibrium(grid, rho=None, rho0=None):
+def bgk_equilibrium(grid, config, rho=None, rho0=None):
     """Get expressions for the BGK equilibrium distribution.
 
     :param grid: the grid class to be used
@@ -93,7 +93,12 @@ def bgk_equilibrium(grid, rho=None, rho0=None):
         rho = S.rho
 
     if rho0 is None:
-        rho0 = S.rho0
+        if config.incompressible:
+            rho0 = S.rho0
+        elif config.minimize_roundoff:
+            rho0 = rho + 1.0
+        else:
+            rho0 = rho
 
     for ei, weight in zip(grid.basis, grid.weights):
         out.append(weight * (rho + rho0 * poly_factorize(
@@ -103,7 +108,7 @@ def bgk_equilibrium(grid, rho=None, rho0=None):
     return EqDef(out, local_vars=[])
 
 
-def elbm_equilibrium(grid, rho=None):
+def elbm_equilibrium(grid):
     """
     Form of the equilibrium defined in Europhys. Lett., 63 (6) pp. 798-804
     (2003).
@@ -111,9 +116,7 @@ def elbm_equilibrium(grid, rho=None):
     prefactor = Symbol('prefactor')
     coeff1 = Symbol('coeff1')
     coeff2 = Symbol('coeff2')
-
-    if rho is None:
-        rho = S.rho
+    rho = S.rho
 
     out = []
     lvars = []
@@ -140,12 +143,11 @@ def elbm_equilibrium(grid, rho=None):
 
     return EqDef(out, lvars)
 
-def elbm_d3q15_equilibrium(grid, rho=None):
+def elbm_d3q15_equilibrium(grid):
     """
     Form of equilibrium defined in PRL 97, 010201 (2006).
     """
-    if rho is None:
-        rho = S.rho
+    rho = S.rho
 
     prefactor = Symbol('prefactor')
     coeff1 = Symbol('coeff1')

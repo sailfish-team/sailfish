@@ -1,5 +1,5 @@
 <%!
-  from sailfish import sym_force
+  from sailfish import sym, sym_force
 %>
 
 <%namespace file="code_common.mako" import="*"/>
@@ -45,7 +45,7 @@
 <%def name="edm_force(i)">
 {
 	// Exact difference method.
-	%for feq_shifted, idx in zip(sym_force.edm_shift_velocity(equilibria[i](grids[i]).expression), grid.idx_name):
+	%for feq_shifted, idx in zip(sym_force.edm_shift_velocity(equilibria[i](grids[i], config).expression), grid.idx_name):
 		d${i}->${idx} += ${cex(feq_shifted)} - feq${i}.${idx};
 	%endfor
 }
@@ -135,7 +135,7 @@
 				// Off-diagonal components, count twice for symmetry reasons.
 				%for a in range(0, dim):
 					%for b in range(a+1, dim):
-						 tmp = ${cex(sym.ex_flux(grid, 'd%d' % i, a, b), pointers=True)} -
+						 tmp = ${cex(sym.ex_flux(grid, 'd%d' % i, a, b, config), pointers=True)} -
 							   ${cex(sym.S.rho * grid.v[a] * grid.v[b])};
 						 strain += 2.0f * tmp * tmp;
 					%endfor
@@ -143,7 +143,7 @@
 
 				// Diagonal components.
 				%for a in range(0, dim):
-					tmp = ${cex(sym.ex_flux(grid, 'd%d' % i, a, a), pointers=True)} -
+					tmp = ${cex(sym.ex_flux(grid, 'd%d' % i, a, a, config), pointers=True)} -
 						  ${cex(sym.S.rho * (grid.v[a] * grid.v[b] + grid.cssq))};
 					strain += tmp * tmp;
 				%endfor
@@ -161,7 +161,7 @@
 	float v0[${dim}];
 	${body_force()}
 
-	%for i, eq in enumerate([f(g) for f, g in zip(equilibria, grids)]):
+	%for i, eq in enumerate([f(g, config) for f, g in zip(equilibria, grids)]):
 		Dist feq${i};
 		${fluid_velocity(i, equilibrium=True)};
 

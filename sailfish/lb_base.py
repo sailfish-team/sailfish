@@ -43,6 +43,11 @@ class LBSim(object):
                 choices=['AB', 'AA'], help='Lattice access pattern. Valid '
                 'values are: AB (two copies of the whole domain in memory,'
                 ' faster), AA (single copy of the domain in memory)')
+        group.add_argument('--minimize_roundoff', action='store_true',
+                           default=False, help='Tries to minimize round-off '
+                           'errors by using a model that avoids adding O(1) '
+                           'and O(Ma) quantities. This currently only works '
+                           'for BGK-like models.')
 
     @classmethod
     def modify_config(cls, config):
@@ -83,6 +88,7 @@ class LBSim(object):
         ctx['access_pattern'] = self.config.access_pattern
         ctx['needs_iteration_num'] = self.config.needs_iteration_num
         ctx['equilibria'] = self.equilibria
+        ctx['config'] = self.config
 
     def init_fields(self, runner):
         suffixes = ['x', 'y', 'z']
