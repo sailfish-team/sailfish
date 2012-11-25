@@ -26,6 +26,11 @@ class LBSim(object):
     #: How many layers of nearest neighbors nodes are required by the model.
     nonlocality = 0
 
+    #: Tuple of functions to call to get a list of expressions for the equilibrium
+    #  distribution function. The i-th element represents the EDF for the i-th
+    #  grid.
+    equilibria = None
+
     @classmethod
     def add_options(cls, group, dim):
         group.add_argument('--dt_per_lattice_time_unit',
@@ -77,6 +82,7 @@ class LBSim(object):
         ctx['dt_per_lattice_time_unit'] = self.config.dt_per_lattice_time_unit
         ctx['access_pattern'] = self.config.access_pattern
         ctx['needs_iteration_num'] = self.config.needs_iteration_num
+        ctx['equilibria'] = self.equilibria
 
     def init_fields(self, runner):
         suffixes = ['x', 'y', 'z']
@@ -104,7 +110,7 @@ class LBSim(object):
 
     def __init__(self, config):
         self.config = config
-        self.S = sym.S()
+        self.S = sym.S
         self.iteration = 0
         self.need_sync_flag = False
 
@@ -193,7 +199,11 @@ class LBForcedSim(LBSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        pass
+        group.add_argument('--force_implementation',
+                           type=str, choices=['guo', 'edm'], default='guo',
+                           help='Selects how body forces are introduced into '
+                           'the simulation. Available choices are: guo and '
+                           'EDM (Exact Difference Method')
 
     def add_body_force(self, force, grid=0, accel=True):
         """Adds a constant global force field acting on the fluid.
@@ -230,6 +240,7 @@ class LBForcedSim(LBSim):
         ctx['forces'] = ForcePair(self._forces, self._symbolic_forces)
         ctx['force_couplings'] = self._force_couplings
         ctx['force_for_eq'] = self._force_term_for_eq
+        ctx['force_implementation'] = self.config.force_implementation
 
     def use_force_for_equilibrium(self, force_grid, target_grid):
         """Makes it possible to use acceleration from force_grid when calculating

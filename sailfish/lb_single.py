@@ -19,6 +19,7 @@ class LBFluidSim(LBSim):
 
     kernel_file = "single_fluid.mako"
     alpha_output = False
+    equilibria = sym_equilibrium.bgk_equilibrium,
 
     @classmethod
     def add_options(cls, group, dim):
@@ -37,10 +38,6 @@ class LBFluidSim(LBSim):
         group.add_argument('--smagorinsky_const',
                 help='Smagorinsky constant', type=float, default=0.03)
 
-    def __init__(self, config):
-        super(LBFluidSim, self).__init__(config)
-        self.equilibrium, self.equilibrium_vars = sym_equilibrium.bgk_equilibrium(self.grid)
-
     def update_context(self, ctx):
         super(LBFluidSim, self).update_context(ctx)
         if self.config.model == 'elbm':
@@ -50,8 +47,6 @@ class LBFluidSim(LBSim):
         ctx['visc'] = self.config.visc
         ctx['model'] = self.config.model
         ctx['simtype'] = 'lbm'
-        ctx['bgk_equilibrium'] = self.equilibrium
-        ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
         ctx['subgrid'] = self.config.subgrid
         ctx['smagorinsky_const'] = self.config.smagorinsky_const
         ctx['entropy_tolerance'] = 1e-6 if self.config.precision == 'single' else 1e-10
@@ -191,9 +186,7 @@ class LBEntropicFluidSim(LBFluidSim):
 class LBFreeSurface(LBFluidSim):
     """Free surface lattice Boltzmann model."""
 
-    def __init__(self, config):
-        super(LBFreeSurface, self).__init__(config)
-        self.equilibrium, self.equilibrium_vars = sym_equilibrium.shallow_water_equilibrium(self.grid)
+    equilibria = sym_equilibrium.shallow_water_equilibrium,
 
     @classmethod
     def modify_config(cls, config):
@@ -225,6 +218,7 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
     @classmethod
     def add_options(cls, group, dim):
         LBFluidSim.add_options(group, dim)
+        LBForcedSim.add_options(group, dim)
         group.add_argument('--G', type=float, default=1.0,
                 help='Shan-Chen interaction strength constant')
         group.add_argument('--sc_potential', type=str,

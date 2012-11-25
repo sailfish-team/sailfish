@@ -367,7 +367,17 @@ class LBSimulationController(object):
                 'steps of the simulation have been completed.')
 
         group = self._config_parser.add_group('Simulation-specific settings')
+
         lb_class.add_options(group, self.dim)
+        # If the simulation class does not define an add_options method
+        # explicitly and inherits from multiple base classes, call add_options
+        # from additional bases.
+        if ('add_options' not in lb_class.__dict__ and
+            len(lb_class.__bases__) > 1):
+            first_base = lb_class.__bases__[0]
+            for base_class in lb_class.__bases__[1:]:
+                if base_class not in first_base.mro():
+                    base_class.add_options(group, self.dim)
 
         group = self._config_parser.add_group('Geometry settings')
         lb_geo.add_options(group)

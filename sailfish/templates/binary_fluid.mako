@@ -59,16 +59,14 @@ ${const_var} float tau1 = ${tau_phi}f;
 		%endif
 	%endif
 
-	%for local_var in bgk_equilibrium_vars:
-		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
-	%endfor
+	%for eq, dist_name in zip([f(g) for f, g in zip(equilibria, grids)], ['dist1_in', 'dist2_in']):
+		%for local_var in eq.local_vars:
+			float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
+		%endfor
 
-	%for i, feq in enumerate(bgk_equilibrium[0]):
-		${get_odist('dist1_in', i)} = ${cex(feq, vectors=True)};
-	%endfor
-
-	%for i, feq in enumerate(bgk_equilibrium[1]):
-		${get_odist('dist2_in', i)} = ${cex(feq, vectors=True)};
+		%for i, feq in enumerate(eq.expression):
+			${get_odist(dist_name, i)} = ${cex(feq, vectors=True)};
+		%endfor
 	%endfor
 </%def>
 

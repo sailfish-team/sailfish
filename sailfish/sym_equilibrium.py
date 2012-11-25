@@ -9,28 +9,24 @@ import sympy
 from sympy import Rational, Symbol, Eq
 from sailfish.sym import poly_factorize, S
 
-EqDef = namedtuple('EqDef', 'expr local_vars')
+EqDef = namedtuple('EqDef', 'expression local_vars')
 
-# Form of the equilibrium function taken from Phys Rev E 78, 056709.
-def free_energy_binary_liquid_equilibrium(sim):
-    grid = sim.grid
+def free_energy_equilibrium_fluid(grid):
+    """Returns the equilibrium for the fluid field in the binary fluid
+    free energy model.
+
+    Form of the equilibrium function taken from Phys Rev E 78, 056709."""
     if (grid.dim == 3 and grid.Q != 19) or (grid.dim == 2 and grid.Q != 9):
         raise TypeError('The binary liquid model requires the D2Q9 or D3Q19 grid.')
 
-    S = sim.S
     pb = Symbol('pb')
-    mu = Symbol('mu')
 
     # This is zero for grids with square of sound speed = 1/3.
     lambda_ = S.visc * (1 - grid.cssq * 3)
 
     out = []
-    lvars = []
-    lvars.append(Eq(pb, S.rho / 3 + S.A * (- (S.phi**2) / 2 + Rational(3,4) * S.phi**4)))
-    lvars.append(Eq(mu, S.A * (-S.phi + S.phi**3) - S.kappa * S.g1d2m0))
-
+    lvars = [Eq(pb, S.rho / 3 + S.A * (- (S.phi**2) / 2 + Rational(3,4) * S.phi**4))]
     t_sum = 0
-
     for i, ei in enumerate(grid.basis[1:]):
         t = (S.wi[i] * (pb - S.kappa * S.phi * S.g1d2m0 + S.rho * ei.dot(grid.v) +
             Rational(3,2) * (
@@ -47,8 +43,15 @@ def free_energy_binary_liquid_equilibrium(sim):
         out.append(t)
 
     # The first term is chosen so that rho is conserved.
-    out1 = [sympy.simplify(S.rho - t_sum)] + out
+    out = [sympy.simplify(S.rho - t_sum)] + out
+    return EqDef(out, lvars)
 
+def free_energy_equilibrium_order_param(grid):
+    """Returns the equilibrium for the order parameter field in the binary fluid
+    free energy model. See free_energy_equilibrium_fluid for more
+    information."""
+    mu = Symbol('mu')
+    lvars = [Eq(mu, S.A * (-S.phi + S.phi**3) - S.kappa * S.g1d2m0)]
     out = []
     t_sum = 0
     for i, ei in enumerate(grid.basis[1:]):
@@ -60,7 +63,7 @@ def free_energy_binary_liquid_equilibrium(sim):
 
     # The first term is chosen so that the order parameter is conserved.
     out = [sympy.simplify(S.phi - t_sum)] + out
-    return EqDef([out1, out], lvars)
+    return EqDef(out, lvars)
 
 def shallow_water_equilibrium(grid):
     """Get expressions for the BGK equilibrium distribution for the shallow
@@ -77,7 +80,7 @@ def shallow_water_equilibrium(grid):
                 S.rho * poly_factorize(Rational(3,2) * S.rho * S.gravity + 3*ei.dot(grid.v) +
                     Rational(9,2) * (ei.dot(grid.v))**2 - Rational(3, 2) * grid.v.dot(grid.v))))
 
-    return EqDef([out], local_vars=[])
+    return EqDef(out, local_vars=[])
 
 def bgk_equilibrium(grid, rho=None, rho0=None):
     """Get expressions for the BGK equilibrium distribution.
@@ -97,7 +100,7 @@ def bgk_equilibrium(grid, rho=None, rho0=None):
             3 * ei.dot(grid.v) + Rational(9, 2) * (ei.dot(grid.v))**2 -
             Rational(3, 2) * grid.v.dot(grid.v))))
 
-    return EqDef([out], local_vars=[])
+    return EqDef(out, local_vars=[])
 
 
 def elbm_equilibrium(grid, rho=None):
@@ -135,7 +138,7 @@ def elbm_equilibrium(grid, rho=None):
             t *= cfs[j]**(comp / (sqrt(3) * sqrt(grid.cssq)))
         out.append(t)
 
-    return EqDef([out], lvars)
+    return EqDef(out, lvars)
 
 def elbm_d3q15_equilibrium(grid, rho=None):
     """
@@ -196,4 +199,4 @@ def elbm_d3q15_equilibrium(grid, rho=None):
             t *= cfs[j]**comp
         out.append(t)
 
-    return EqDef([out], lvars)
+    return EqDef(out, lvars)

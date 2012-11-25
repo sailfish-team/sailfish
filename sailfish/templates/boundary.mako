@@ -315,14 +315,13 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, i
 	%if (nt.NTEquilibriumVelocity in node_types) or (nt.NTEquilibriumDensity in node_types):
 		## Additional variables required for the evaluation of the
 		## equilibrium distribution function.
-		%for local_var in bgk_equilibrium_vars:
-			float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
-		%endfor
 		if (is_NTEquilibriumNode(node_type)) {
-			%for eq in bgk_equilibrium:
-				%for feq, idx in zip(eq, grid.idx_name):
-					fi->${idx} = ${cex(feq, pointers=True)};
-				%endfor
+			<% eq = equilibria[0](grid) %>
+			%for local_var in eq.local_vars:
+				float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
+			%endfor
+			%for feq, idx in zip(eq.expression, grid.idx_name):
+				fi->${idx} = ${cex(feq, pointers=True)};
 			%endfor
 		}
 	%endif

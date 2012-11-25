@@ -5,6 +5,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 from collections import defaultdict
+from functools import partial
 import numpy as np
 from sailfish import subdomain_runner, sym, sym_equilibrium
 from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField
@@ -179,8 +180,6 @@ class LBBinaryFluidBase(LBSim):
     def update_context(self, ctx):
         super(LBBinaryFluidBase, self).update_context(ctx)
         ctx['tau_phi'] = self.config.tau_phi
-        ctx['bgk_equilibrium'] = self.equilibrium
-        ctx['bgk_equilibrium_vars'] = self.equilibrium_vars
         ctx['model'] = 'bgk'
 
     def _prepare_symbols(self):
@@ -190,9 +189,8 @@ class LBBinaryFluidBase(LBSim):
 class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
     """Binary fluid mixture using the free-energy model."""
 
-    def __init__(self, config):
-        super(LBBinaryFluidFreeEnergy, self).__init__(config)
-        self.equilibrium, self.equilibrium_vars = sym_equilibrium.free_energy_binary_liquid_equilibrium(self)
+    equilibria = (sym_equilibrium.free_energy_equilibrium_fluid,
+                  sym_equilibrium.free_energy_equilibrium_order_param)
 
     def constants(self):
         ret = super(LBBinaryFluidFreeEnergy, self).constants()
@@ -324,11 +322,12 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
 class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
     """Binary fluid mixture using the Shan-Chen model."""
 
+    equilibria = (sym_equilibrium.bgk_equilibrium,
+                  partial(sym_equilibrium.bgk_equilibrium, rho=sym.S.phi,
+                          rho0=sym.S.phi))
+
     def __init__(self, config):
         super(LBBinaryFluidShanChen, self).__init__(config)
-        self.equilibrium, self.equilibrium_vars = sym_equilibrium.bgk_equilibrium(self.grid)
-        eq2, _ = sym_equilibrium.bgk_equilibrium(self.grid, self.S.phi, self.S.phi)
-        self.equilibrium.append(eq2[0])
         self.add_force_coupling(0, 1, 'SCG')
 
     def constants(self):
@@ -344,6 +343,7 @@ class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
 
     @classmethod
     def add_options(cls, group, dim):
+        LBForcedSim.add_options(group, dim)
         LBBinaryFluidBase.add_options(group, dim)
 
         group.add_argument('--visc', type=float, default=1.0, help='numerical viscosity')

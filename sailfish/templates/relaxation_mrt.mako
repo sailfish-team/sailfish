@@ -8,7 +8,7 @@
 <%namespace file="relaxation_common.mako" import="*"/>
 
 ## TODO: support multiple grids with MRT?
-<%def name="fluid_momentum(igrid)">
+<%def name="fluid_momentum(igrid=0)">
 	%if forces is not UNDEFINED:
 		%if igrid in force_for_eq and equilibrium:
 			fm.mx += ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], 0, forces, force_couplings), vectors=True)};
@@ -38,7 +38,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0 ${dynamic_va
 	%endfor
 
 	${body_force()}
-	${fluid_momentum(0)}
+	${fluid_momentum()}
 
 	#define mx fm.mx
 	#define my fm.my
@@ -82,11 +82,11 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0 ${dynamic_va
 	#undef my
 	#undef mz
 
-	${fluid_momentum(0)}
+	${fluid_momentum()}
 
 	%for bgk, val in sym.mrt_to_bgk(grid, 'fi', 'fm'):
 		${bgk} = ${val};
 	%endfor
 
-	${fluid_velocity(0, save=True)}
+	${fluid_output_velocity()}
 }

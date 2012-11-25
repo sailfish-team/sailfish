@@ -117,7 +117,7 @@ def body_force_accel(i, comp, forces, accel=True):
 
     return t
 
-def bgk_external_force(grid, grid_num=0):
+def guo_external_force(grid, grid_num=0):
     """Gets expressions for the external body force correction in the BGK model.
 
     This implements the external force as in Eq. 20 from PhysRevE 65, 046308.
@@ -136,8 +136,8 @@ def bgk_external_force(grid, grid_num=0):
                    poly_factorize((ei - grid.v + ei.dot(grid.v)*ei*3).dot(ea)))
     return ret
 
-def bgk_external_force_pref(grid, grid_num=0):
-    """Builds an expression for the BGK force prefactor.
+def guo_external_force_pref(grid, grid_num=0):
+    """Builds an expression for the BGK force prefactor in Guo's method.
 
     :param grid: grid object corresponding to grid_num:
     :param grid_num: grid number
@@ -174,4 +174,14 @@ def free_energy_external_force(sim, grid_num=0):
         ret.append(t)
 
     ret = [sympy.simplify(-sum_)] + ret
+    return ret
+
+def edm_shift_velocity(expressions):
+    ret = []
+    for feq in expressions:
+        ret.append(sympy.simplify(feq.subs({
+            S.vx: S.vx + S.eax,
+            S.vy: S.vy + S.eay,
+            S.vz: S.vz + S.eaz
+        })))
     return ret

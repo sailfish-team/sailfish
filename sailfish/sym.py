@@ -31,9 +31,6 @@ TargetDist = namedtuple('TargetDist', 'var idx')
 #
 
 class DxQy(object):
-    vx = Symbol('vx')
-    vy = Symbol('vy')
-    vz = Symbol('vz')
     mx = Symbol('mx')
     my = Symbol('my')
     mz = Symbol('mz')
@@ -827,6 +824,8 @@ def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False,
     :param pointers: if ``True``, macroscopic variables (density and velocities)
         will be converted to pointers in the output
     :param ex: the sympy expression to convert
+    :param vectors: if ``True``, references to vector components (velocity,
+        acceleration) will be replaced by references to C arrays
     :param rho: density symbol (sympy Symbol, string).  If ``None`` the
         standard rho symbol for the grid will be used.
 
@@ -919,6 +918,10 @@ def _prepare_grids():
             1:  Rational(1,6)}
 
     for grid in KNOWN_GRIDS:
+        grid.vx = S.vx
+        grid.vy = S.vy
+        grid.vz = S.vz
+
         if len(grid.basis) != len(grid.weights):
             raise TypeError('Grid %s is ill-defined: not all BGK weights have been specified.' % grid.__name__)
 
@@ -1004,6 +1007,7 @@ def _prepare_grids():
 
             grid.mrt_matrix = Matrix([x.transpose().tolist()[0] for x in orthogonalize(*grid.mrt_basis)])
             grid._init_mrt_equilibrium()
+
 
 # A container class for all commonly used sympy symbols.
 class S(object):

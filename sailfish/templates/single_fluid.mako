@@ -41,11 +41,13 @@ ${kernel_common.body(bgk_args_decl)}
 <%namespace file="utils.mako" import="*"/>
 
 <%def name="init_dist_with_eq()">
-	%for local_var in bgk_equilibrium_vars:
+	<% eq = equilibria[0](grid) %>
+
+	%for local_var in eq.local_vars:
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
 	%endfor
 
-	%for i, feq in enumerate(bgk_equilibrium[0]):
+	%for i, feq in enumerate(eq.expression):
 		${get_odist('dist1_in', i)} = ${cex(feq, vectors=True)};
 	%endfor
 </%def>

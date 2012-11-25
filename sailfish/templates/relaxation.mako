@@ -49,7 +49,7 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 		%endif
 	%endfor
 
-	${fluid_velocity(0, save=True)}
+	${fluid_output_velocity()}
 }
 %endif  ## model == mrt && simtype == 'free-energy'
 
@@ -77,9 +77,9 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 
 	float v0[${dim}];
 	${body_force()}
+	${fluid_velocity(0)};
 
-	${fluid_velocity(0, save=True)};
-
+	## Local variables used by the equilibrium.
 	%for local_var in elbm_eq_vars:
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
 	%endfor
@@ -91,7 +91,6 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 	%endfor
 
 	float alpha;
-
 	if (SmallEquilibriumDeviation(d0, &fneq0)) {
 		alpha = EstimateAlphaSeries(d0, &fneq0);
 	} else {
@@ -110,7 +109,7 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 		d0->${idx} += alpha * fneq0.${idx};
 	%endfor
 
-	${fluid_velocity(0, save=True)}
+	${fluid_output_velocity()}
 }
 %endif  ## model == elbm
 
@@ -154,29 +153,8 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 
 		## Is there a force acting on the current grid?
 		%if sym_force.needs_accel(i, forces, force_couplings):
-			// Body force implementation follows Guo's method, eqs. 19 and 20 from
-			// 10.1103/PhysRevE.65.046308.
 			${fluid_velocity(i)};
-
-			%if simtype == 'shan-chen':
-			{
-				const float pref = ${cex(sym_force.bgk_external_force_pref(grids[i], grid_num=i))};
-				%for val, idx in zip(sym_force.bgk_external_force(grid, grid_num=i), grid.idx_name):
-					d${i}->${idx} += ${cex(val, vectors=True)};
-				%endfor
-			}
-			%elif simtype == 'free-energy':
-				%for val, idx in zip(sym_force.free_energy_external_force(sim, grid_num=i), grid.idx_name):
-					d${i}->${idx} += ${cex(val, vectors=True)};
-				%endfor
-			%else:
-			{
-				const float pref = ${cex(sym_force.bgk_external_force_pref(grids[i], grid_num=i))};
-				%for val, idx in zip(sym_force.bgk_external_force(grid, grid_num=i), grid.idx_name):
-					d${i}->${idx} += ${cex(val, vectors=True)};
-				%endfor
-			}
-			%endif
+			${apply_body_force(i)};
 		%endif
 	%endfor
 
@@ -186,22 +164,21 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			int node_param_idx = decodeNodeParamIdx(ncode);
 			float par_rho = node_params[node_param_idx];
 			float par_phi = 1.0f;
-
-			%for local_var in bgk_equilibrium_vars:
-				const float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True, rho='par_rho', phi='par_phi')};
-			%endfor
-
 			tau0 = tau_a;
 
-			%for i, eq in enumerate(bgk_equilibrium):
-				%for feq, idx in zip(eq, grid.idx_name):
+			%for i, eq in enumerate([f(g) for f, g, in zip(equilibria, grids)]):
+				%for local_var in eq.local_vars:
+					const float ${cex(local_var.lhs)} =
+						${cex(local_var.rhs, vectors=True, rho='par_rho', phi='par_phi')};
+				%endfor
+				%for feq, idx in zip(eq.expression, grid.idx_name):
 					d${i}->${idx} += ${cex(feq, vectors=True, rho='par_rho', phi='par_phi')};
 				%endfor
 			%endfor
 		}
 	%endif
 
-	${fluid_velocity(0, save=True)}
+	${fluid_output_velocity()}
 }
 %endif
 
