@@ -48,24 +48,62 @@ ${kernel_common.body(bgk_args_decl)}
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
 	%endfor
 
-	%for i, feq in enumerate(eq.expression):
+	%if nt.NTGradFreeflow in node_types:
+		Dist d0;
+	%endif
+
+	%for i, (feq, idx) in enumerate(zip(eq.expression, grid.idx_name)):
 		${get_odist('dist1_in', i)} = ${cex(feq)};
+		%if nt.NTGradFreeflow in node_types:
+			d0.${idx} = ${cex(feq)};
+		%endif
 	%endfor
+</%def>
+
+<%def name="prepare_grad_node()">
+	int ncode = map[gi];
+	int type = decodeNodeType(ncode);
+
+	if (isNTGradFreeflow(type)) {
+		int scratch_id = decodeNodeScratchId(ncode);
+		float flux[${3 if dim == 2 else 6 }];
+		compute_2nd_moment(&d0, flux);
+		storeNodeScratchSpace(scratch_id, type, flux, node_scratch_space);
+
+		// Iterate over all neighbours, mark all distributions coming from ghost
+		// nodes with an invalid value (infinity).
+		int gx_n, gy_n;
+		%if dim > 2:
+			int gz_n;
+		%endif
+		int gi_n, ncode_n, type_n;
+		%for i, ve in enumerate(grid.basis):
+			gx_n = gx + (${ve[0]});
+			gy_n = gy + (${ve[1]});
+			%if dim > 2:
+				gz_n = gz + (${ve[2]});
+			%endif
+			%if dim == 2:
+				gi_n = getGlobalIdx(gx_n, gy_n);
+			%else:
+				gi_n = getGlobalIdx(gx_n, gy_n, gz_n);
+			%endif
+			ncode_n = map[gi_n];
+			type_n = decodeNodeType(ncode_n);
+			if (is_NTGhostNode(type_n)) {
+				dist1_in[gi + DIST_SIZE * ${grid.idx_opposite[i]} + 0] = 1 / 0.;
+			}
+		%endfor
+	}
 </%def>
 
 // A kernel to set the node distributions using the equilibrium distributions
 // and the macroscopic fields.
-%if nt.NTGradFreeflow in node_types:
-	${kernel} void SetInitialConditions(
+${kernel} void SetInitialConditions(
 	${global_ptr} float *dist1_in,
 	${kernel_args_1st_moment('iv')}
-	${global_ptr} float *irho, int *map, float *node_scratch_space)
-%else:	
-	${kernel} void SetInitialConditions(
-	${global_ptr} float *dist1_in,
-	${kernel_args_1st_moment('iv')}
-	${global_ptr} float *irho)
-%endif
+	${global_ptr} float *irho, int *map
+	${scratch_space_if_required()})
 {
 	${local_indices()}
 
@@ -80,63 +118,10 @@ ${kernel_common.body(bgk_args_decl)}
 	%endif
 
 	${init_dist_with_eq()}
-%if nt.NTGradFreeflow in node_types:
-	int ncode = map[gi];
-	int type = decodeNodeType(ncode);
 
-	if (!isNTGradFreeflow(type)) {
-		return;
-	}
-	int scratch_id = decodeNodeScratchId(ncode);
-	%if dim==2:
-		<% press_dim=3 %>
-	%else:
-		<% press_dim=6 %>
+	%if nt.NTGradFreeflow in node_types:
+		${prepare_grad_nodes()}
 	%endif
-	float buf[${press_dim}];
-	Dist d00;
-	getDist(&d00, dist1_in, gi);
-	Dist * d0= &d00;
-	<%  k=0
-	%>
-	%for i in range(grid.dim):
-		%for j in range(i, grid.dim):
-			<%  
-			expr = sym.ex_flux(grid, "d0", i, j)
-			k=k+1
-			%>
-			buf[${k-1}] = ${cex(expr, rho="rho", pointers=True, vectors=True)};
-		%endfor
-	%endfor
-	storeNodeScratchSpace(scratch_id, type, buf, node_scratch_space);
-	int gx_n;
-	int gy_n;
-	%if dim>2:
-		int gz_n;
-	%endif
-	int gi_n;
-	int ncode_n;
-	int type_n;
-	%for i, ve in enumerate(grid.basis):
-		gx_n = gx+1*(${ve[0]});
-		gy_n = gy+1*(${ve[1]});
-		%if dim>2:
-			gz_n = gz+1*(${ve[2]});
-		%endif	
-		%if dim==2:
-			gi_n = getGlobalIdx(gx_n, gy_n);
-		%else:
-			gi_n = getGlobalIdx(gx_n, gy_n, gz_n);
-		%endif	
-		
-		ncode_n = map[gi_n];
-		type_n = decodeNodeType(ncode_n);
-		if (!(isWetNode(type_n)||isNTFullBBWall(type_n))){
-				dist1_in[gi + DIST_SIZE*${i} + 0]=1/0.;
-				
-			}
-	%endfor
-%endif
 }
 
 ${kernel} void PrepareMacroFields(
