@@ -66,8 +66,9 @@ class CUDABackend(object):
         group.add_argument('--cuda-fermi-highprec', dest='cuda_fermi_highprec',
                 help='use high precision division on Compute Capability 2.0+ '
                      ' devices', action='store_true', default=False)
-        group.add_argument('--cuda_cache', type=bool, default=True,
-                help='if True, use the pycuda compiler cache.')
+        group.add_argument('--nocuda_cache', dest='cuda_cache',
+                           action='store_false', default=True,
+                           help='Disable the use of the pycuda compiler cache.')
         return 1
 
     def __init__(self, options, gpu_id):

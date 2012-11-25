@@ -307,9 +307,11 @@ class LBSimulationController(object):
                 help='name of the file to which data is to be logged')
         group.add_argument('--loglevel', type=int, default=logging.INFO,
                 help='minimum log level for the file logger')
-        group.add_argument('--bulk_boundary_split', type=bool, default=True,
-                help='if True, bulk and boundary nodes will be handled '
-                'separately (increases parallelism)')
+        group.add_argument('--nobulk_boundary_split',
+                           dest='bulk_boundary_split', action='store_false',
+                           default=True,
+                           help='Disable separate handling of bulk and '
+                           'boundary nodes (increases parallelism)')
         group.add_argument('--cluster_spec', type=str, default='',
                 help='path of a Python module with the cluster specification')
         group.add_argument('--cluster_sync', type=str, default='',
