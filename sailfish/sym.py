@@ -815,7 +815,7 @@ class KernelCodePrinter(CCodePrinter):
         else:
             return super(KernelCodePrinter, self)._print_Function(expr)
 
-def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=False,
+def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=True,
           phi=None):
     """Convert a SymPy expression into a string containing valid C code.
 

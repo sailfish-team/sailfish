@@ -16,14 +16,14 @@
 				%if not sym_force.needs_coupling_accel(i, force_couplings):
 					float ea${i}[${dim}];
 					%for j in range(0, dim):
-						ea${i}[${j}] = ${cex(sym_force.body_force_accel(i, j, forces, accel=True), vectors=True)};
+						ea${i}[${j}] = ${cex(sym_force.body_force_accel(i, j, forces, accel=True))};
 					%endfor
 				%else:
 					## If the current grid has a Shan-Chen force acting on it, the acceleration vector
 					## is already externally defined in the Shan-Chen code.
 					%for j in range(0, dim):
 						%if i in forces.symbolic or i in forces.numeric:
-							ea${i}[${j}] += ${cex(sym_force.body_force_accel(i, j, forces, accel=True), vectors=True)};
+							ea${i}[${j}] += ${cex(sym_force.body_force_accel(i, j, forces, accel=True))};
 						%endif
 					%endfor
 				%endif
@@ -37,7 +37,7 @@
 	// Guo's method, eqs. 19 and 20 from 10.1103/PhysRevE.65.046308.
 	const float pref = ${cex(sym_force.guo_external_force_pref(grids[i], grid_num=i))};
 	%for val, idx in zip(sym_force.guo_external_force(grid, grid_num=i), grid.idx_name):
-		d${i}->${idx} += ${cex(val, vectors=True)};
+		d${i}->${idx} += ${cex(val)};
 	%endfor
 }
 </%def>
@@ -46,7 +46,7 @@
 {
 	// Exact difference method.
 	%for feq_shifted, idx in zip(sym_force.edm_shift_velocity(equilibria[i](grids[i]).expression), grid.idx_name):
-		d${i}->${idx} += ${cex(feq_shifted, vectors=True)} - feq${i}.${idx};
+		d${i}->${idx} += ${cex(feq_shifted)} - feq${i}.${idx};
 	%endfor
 }
 </%def>
@@ -57,7 +57,7 @@
 <%def name="apply_body_force(i)">
 	%if simtype == 'free-energy':
 		%for val, idx in zip(sym_force.free_energy_external_force(sim, grid_num=i), grid.idx_name):
-			d${i}->${idx} += ${cex(val, vectors=True)};
+			d${i}->${idx} += ${cex(val)};
 		%endfor
 	%else:
 		%if force_implementation == 'guo':
@@ -78,9 +78,9 @@
 		## The half time-step velocity shift is only used in Guo's method.
 		%for j in range(0, dim):
 			%if igrid in force_for_eq and equilibrium:
-				v0[${j}] = iv0[${j}] + ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], j, forces, force_couplings), vectors=True)};
+				v0[${j}] = iv0[${j}] + ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], j, forces, force_couplings))};
 			%else:
-				v0[${j}] = iv0[${j}] + ${cex(0.5 * sym_force.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
+				v0[${j}] = iv0[${j}] + ${cex(0.5 * sym_force.fluid_accel(sim, igrid, j, forces, force_couplings))};
 			%endif
 		%endfor
 	%else:
@@ -99,7 +99,7 @@
 		## components and grids used. If this assumption is ever changed, the code
 		## below will have to be extended appropriately.
 		%for j in range(0, dim):
-			iv0[${j}] += ${cex(sym_force.fluid_accel(sim, igrid, j, forces, force_couplings), vectors=True)};
+			iv0[${j}] += ${cex(sym_force.fluid_accel(sim, igrid, j, forces, force_couplings))};
 		%endfor
 	%endif
 </%def>
@@ -136,7 +136,7 @@
 				%for a in range(0, dim):
 					%for b in range(a+1, dim):
 						 tmp = ${cex(sym.ex_flux(grid, 'd%d' % i, a, b), pointers=True)} -
-							   ${cex(sym.S.rho * grid.v[a] * grid.v[b], vectors=True)};
+							   ${cex(sym.S.rho * grid.v[a] * grid.v[b])};
 						 strain += 2.0f * tmp * tmp;
 					%endfor
 				%endfor
@@ -144,7 +144,7 @@
 				// Diagonal components.
 				%for a in range(0, dim):
 					tmp = ${cex(sym.ex_flux(grid, 'd%d' % i, a, a), pointers=True)} -
-						  ${cex(sym.S.rho * (grid.v[a] * grid.v[b] + grid.cssq), vectors=True)};
+						  ${cex(sym.S.rho * (grid.v[a] * grid.v[b] + grid.cssq))};
 					strain += tmp * tmp;
 				%endfor
 
@@ -166,11 +166,11 @@
 		${fluid_velocity(i, equilibrium=True)};
 
 		%for local_var in eq.local_vars:
-			float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
+			float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
 		%endfor
 
 		%for feq, idx in zip(eq.expression, grid.idx_name):
-			feq${i}.${idx} = ${cex(feq, vectors=True)};
+			feq${i}.${idx} = ${cex(feq)};
 		%endfor
 	%endfor
 

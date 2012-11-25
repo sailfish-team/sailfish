@@ -61,11 +61,11 @@ ${const_var} float tau1 = ${tau_phi}f;
 
 	%for eq, dist_name in zip([f(g) for f, g in zip(equilibria, grids)], ['dist1_in', 'dist2_in']):
 		%for local_var in eq.local_vars:
-			float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
+			float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
 		%endfor
 
 		%for i, feq in enumerate(eq.expression):
-			${get_odist(dist_name, i)} = ${cex(feq, vectors=True)};
+			${get_odist(dist_name, i)} = ${cex(feq)};
 		%endfor
 	%endfor
 </%def>

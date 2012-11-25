@@ -44,7 +44,7 @@ ${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
 			${fluid_velocity(i)};
 
 			%for val, idx in zip(sym_force.free_energy_external_force(sim, grid_num=i), grid.idx_name):
-				d${i}->${idx} += ${cex(val, vectors=True)};
+				d${i}->${idx} += ${cex(val)};
 			%endfor
 		%endif
 	%endfor
@@ -81,12 +81,12 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 
 	## Local variables used by the equilibrium.
 	%for local_var in elbm_eq_vars:
-		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
+		float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
 	%endfor
 
 	%for i, eq in enumerate(elbm_eq):
 		%for feq, idx in zip(eq, grid.idx_name):
-			fneq${i}.${idx} = ${cex(feq, vectors=True)} - d0->${idx};
+			fneq${i}.${idx} = ${cex(feq)} - d0->${idx};
 		%endfor
 	%endfor
 
@@ -169,10 +169,10 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			%for i, eq in enumerate([f(g) for f, g, in zip(equilibria, grids)]):
 				%for local_var in eq.local_vars:
 					const float ${cex(local_var.lhs)} =
-						${cex(local_var.rhs, vectors=True, rho='par_rho', phi='par_phi')};
+						${cex(local_var.rhs, rho='par_rho', phi='par_phi')};
 				%endfor
 				%for feq, idx in zip(eq.expression, grid.idx_name):
-					d${i}->${idx} += ${cex(feq, vectors=True, rho='par_rho', phi='par_phi')};
+					d${i}->${idx} += ${cex(feq, rho='par_rho', phi='par_phi')};
 				%endfor
 			%endfor
 		}

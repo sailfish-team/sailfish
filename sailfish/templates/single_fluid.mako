@@ -44,11 +44,11 @@ ${kernel_common.body(bgk_args_decl)}
 	<% eq = equilibria[0](grid) %>
 
 	%for local_var in eq.local_vars:
-		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, vectors=True)};
+		float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
 	%endfor
 
 	%for i, feq in enumerate(eq.expression):
-		${get_odist('dist1_in', i)} = ${cex(feq, vectors=True)};
+		${get_odist('dist1_in', i)} = ${cex(feq)};
 	%endfor
 </%def>
 

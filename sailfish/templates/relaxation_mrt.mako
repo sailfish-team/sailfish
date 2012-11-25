@@ -11,16 +11,16 @@
 <%def name="fluid_momentum(igrid=0)">
 	%if forces is not UNDEFINED:
 		%if igrid in force_for_eq and equilibrium:
-			fm.mx += ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], 0, forces, force_couplings), vectors=True)};
-			fm.my += ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], 1, forces, force_couplings), vectors=True)};
+			fm.mx += ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], 0, forces, force_couplings))};
+			fm.my += ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], 1, forces, force_couplings))};
 			%if dim == 3:
-				fm.mz += ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], 2, forces, force_couplings), vectors=True)};
+				fm.mz += ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], 2, forces, force_couplings))};
 			%endif
 		%else:
-			fm.mx += ${cex(0.5 * sym_force.fluid_accel(sim, igrid, 0, forces, force_couplings), vectors=True)};
-			fm.my += ${cex(0.5 * sym_force.fluid_accel(sim, igrid, 1, forces, force_couplings), vectors=True)};
+			fm.mx += ${cex(0.5 * sym_force.fluid_accel(sim, igrid, 0, forces, force_couplings))};
+			fm.my += ${cex(0.5 * sym_force.fluid_accel(sim, igrid, 1, forces, force_couplings))};
 			%if dim == 3:
-				fm.mz += ${cex(0.5 * sym_force.fluid_accel(sim, igrid, 2, forces, force_couplings), vectors=True)};
+				fm.mz += ${cex(0.5 * sym_force.fluid_accel(sim, igrid, 2, forces, force_couplings))};
 			%endif
 		%endif
 	%endif
