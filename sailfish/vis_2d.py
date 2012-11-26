@@ -221,22 +221,26 @@ class Fluid2DVis(vis.FluidVis):
         # TODO(michalj): Add support for tracer particles.
         return ret
 
-    def _draw_geometry(self, tg_buffer, width, height, block):
+    def _get_geo_map(self, width, height, block):
         geo_map = np.zeros((height, width), dtype=np.uint8)
         geo_map.reshape(width * height)[:] = block.vis_geo_buffer[:]
+        return geo_map
 
-        geo_map = np.rot90(geo_map, 3)
+    def _draw_geometry(self, tg_buffer, width, height, block):
+        geo_map = np.rot90(self._get_geo_map(width, height, block), 3)
         dry_types = geo_map.dtype.type(node_type.get_dry_node_type_ids())
         tg_buffer[util.in_anyd_fast(geo_map, dry_types)] = self._color_wall
 
-    def _draw_field(self, srf, width, height, block):
-        a = pygame.surfarray.pixels3d(srf)
-
+    def _get_field(self, width, height, block):
         # FIXME(michalj): This is horribly inefficient.  We should only recreate
         # the array if the data has been updated.
         tmp = np.zeros((height, width), dtype=np.float32)
         tmp.reshape(width * height)[:] = block.vis_buffer[:]
+        return tmp
 
+    def _draw_field(self, srf, width, height, block):
+        a = pygame.surfarray.pixels3d(srf)
+        tmp = self._get_field(width, height, block)
         v_max = np.nanmax(tmp)
         v_min = np.nanmin(tmp)
 
@@ -367,7 +371,7 @@ class Fluid2DVis(vis.FluidVis):
 
 
     def run(self):
-        while 1:
+        while True:
             self._process_events()
             self._update_display()
             pygame.time.wait(50)

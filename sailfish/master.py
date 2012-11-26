@@ -216,7 +216,14 @@ class LBMachineMaster(object):
         vis_config.all_blocks = False
 
         # Start the visualizatione engine.
-        vis_class = util.get_visualization_engines().next()
+        vis_class = None
+        for engine in util.get_visualization_engines():
+            if engine.name == self.config.vis_engine:
+                vis_class = engine
+                break
+
+        if vis_class is None:
+            engine = util.get_visualization_engines()
 
         # Event to signal that the visualization process should be terminated.
         self._vis_quit_event = Event()

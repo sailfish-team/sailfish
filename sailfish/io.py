@@ -14,8 +14,9 @@ from ctypes import Structure, c_uint16, c_int32, c_uint8, c_bool
 class VisConfig(Structure):
     MAX_NAME_SIZE = 64
     _fields_ = [('iteration', c_int32), ('block', c_uint16), ('field', c_uint8),
-            ('all_blocks', c_bool), ('fields', c_uint8), ('field_name',
-                type(ctypes.create_string_buffer(MAX_NAME_SIZE)))]
+                ('all_blocks', c_bool), ('fields', c_uint8),
+                ('field_name',
+                 type(ctypes.create_string_buffer(MAX_NAME_SIZE)))]
 
 class LBOutput(object):
     def __init__(self, config, subdomain_id, *args, **kwargs):

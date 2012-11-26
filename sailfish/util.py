@@ -49,7 +49,7 @@ def get_backends(backends=['cuda', 'opencl']):
             pass
 
 def get_visualization_engines():
-    for engine in ['2d', 'mpl']:
+    for engine in ['2d', 'mpl', '3dcutplane']:
         try:
             module = 'sailfish.vis_{0}'.format(engine)
             __import__('sailfish', fromlist=['vis_{0}'.format(engine)])

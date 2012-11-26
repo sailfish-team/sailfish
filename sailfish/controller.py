@@ -287,8 +287,8 @@ class LBSimulationController(object):
             type=str, default='cuda,opencl',
             help='computational backends to use; multiple backends '
                  'can be separated by a comma')
-        group.add_argument('--visualize',
-            type=str, default='2d',
+        group.add_argument('--vis_engine',
+            type=str, default='pygame',
             help='visualization engine to use')
         group.add_argument('--gpus', nargs='+', default=0, type=int,
             help='which GPUs to use')
