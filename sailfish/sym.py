@@ -870,7 +870,7 @@ class KernelCodePrinter(CCodePrinter):
                                               self.parenthesize(expr.exp, PREC)))
 
     def _print_Function(self, expr):
-        if expr.func.__name__ in ('log', 'exp', 'sin', 'cos'):
+        if expr.func.__name__ in ('log', 'exp', 'sin', 'cos', 'tanh'):
             return '{0}f({1})'.format(expr.func.__name__,
                     self.stringify(expr.args, ', '))
         else:

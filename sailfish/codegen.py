@@ -30,6 +30,7 @@ def _remove_math_function_suffix(t):
     t = t.replace('powf(', 'pow(')
     t = t.replace('sinf(', 'sin(')
     t = t.replace('cosf(', 'cos(')
+    t = t.replace('tanhf(', 'tan(')
     return t
 
 class BlockCodeGenerator(object):
