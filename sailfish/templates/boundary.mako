@@ -358,8 +358,8 @@ ${device_func} inline void postcollisionBoundaryConditions(
 		%>
 		%for i in range(grid.dim):
 			%for j in range(i, grid.dim):
-				<%  
-				expr = sym.ex_flux(grid, "fi", i, j)
+				<%
+				expr = sym.ex_flux(grid, "fi", i, j, config)
 				k=k+1
 				%>
 				press[${k-1}] = ${cex(expr, rho="rho", pointers=True, vectors=True)};

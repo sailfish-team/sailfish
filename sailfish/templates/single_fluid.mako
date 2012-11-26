@@ -90,7 +90,7 @@ ${kernel_common.body(bgk_args_decl)}
 			%endif
 			ncode_n = map[gi_n];
 			type_n = decodeNodeType(ncode_n);
-			if (is_NTGhostNode(type_n)) {
+			if (is_NTGhost(type_n)) {
 				dist1_in[gi + DIST_SIZE * ${grid.idx_opposite[i]} + 0] = 1 / 0.;
 			}
 		%endfor
@@ -120,7 +120,7 @@ ${kernel} void SetInitialConditions(
 	${init_dist_with_eq()}
 
 	%if nt.NTGradFreeflow in node_types:
-		${prepare_grad_nodes()}
+		${prepare_grad_node()}
 	%endif
 }
 
@@ -187,7 +187,7 @@ ${kernel} void CollideAndPropagate(
 	getDist(&d0, dist_in, gi ${iteration_number_arg_if_required()});
  	%if nt.NTGradFreeflow in node_types:
 		Dist d1;
-		getDist(&d1, dist_in, gi);
+		getDist(&d1, dist_in, gi ${iteration_number_arg_if_required()});
 	%endif
 	fixMissingDistributions(&d0, dist_in, ncode, orientation, gi);
 
@@ -228,7 +228,7 @@ ${kernel} void CollideAndPropagate(
 	%endif
 	%if nt.NTGradFreeflow in node_types:
 		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, &d1, &g0m01, v1, press, gi);
-		getMacro(&d0, ncode, type, orientation, &g0m0, v);
+		getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
 	%else:
 		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
 	%endif
@@ -248,7 +248,12 @@ ${kernel} void CollideAndPropagate(
 	}
 	%endif
 	if (isWetNode(type)) {
-		checkInvalidValues(&d0, ${position()});
+		%if nt.NTGradFreeflow in node_types:
+			if (!isNTGradFreeflow(type))
+		%endif
+		{
+			checkInvalidValues(&d0, ${position()});
+		}
 	}
 
 	// Only save the macroscopic quantities if requested to do so.
