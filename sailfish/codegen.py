@@ -38,10 +38,10 @@ class BlockCodeGenerator(object):
 
     #: The command to use to automatically format the compute unit source code.
     _format_cmd = (
-        r"sed -i -e '{{:s;N;\#//#{{p ;d}}; \!#!{{p;d}} ; s/\n//g;t s}}' {path} ; "
-        r"sed -i -e 's/}}/}}\n\n/g' {path} ; {indent} -linux -sob -l120 {path} ; "
-        r"sed -i -e '/^$/{{N; s/\n\([\t ]*}}\)$/\1/}}' "
-                r"-e '/{{$/{{N; s/{{\n$/{{/}}' {path}")
+        r"{sed} -i -e '{{:s;N;\#//#{{p ;d}}; \!#!{{p;d}} ; s/\n//g;t s}}' {path} ; "
+        r"{sed} -i -e 's/}}/}}\n\n/g' {path} ; {indent} -linux -sob -l120 {path} ; "
+        r"{sed} -i -e '/^$/{{N; s/\n\([\t ]*}}\)$/\1/}}' "
+        r"-e '/{{$/{{N; s/{{\n$/{{/}}' {path}")
     # The first sed call removes all newline characters except for those terminating lines
     # that are preprocessor directives (starting with #) or single line comments (//).
 
@@ -72,6 +72,8 @@ class BlockCodeGenerator(object):
                 'the nearest multiple of this value')
         group.add_argument('--indent', type=str, default='indent',
                 help='path to the GNU indent program')
+        group.add_argument('--sed', type=str, default='sed',
+                           help='path to the GNU sed program')
 
     def __init__(self, simulation):
         self._sim = simulation
@@ -138,8 +140,10 @@ class BlockCodeGenerator(object):
             print >>fsrc, code
 
         if reformat:
-            os.system(self._format_cmd.format(path=dest_path,
-                indent=self.config.indent))
+            os.system(self._format_cmd.format(
+                path=dest_path,
+                indent=self.config.indent,
+                sed=self.config.sed))
 
     def is_double_precision(self):
         return self.config.precision == 'double'
