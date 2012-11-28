@@ -42,6 +42,8 @@ class KidaSim(LBFluidSim):
             'lat_nz': 110,
             'grid': 'D3Q15',
             'visc': 0.001375,
+            'access_pattern': 'AA',
+            'minimize_roundoff': True
             })
 
     @classmethod
