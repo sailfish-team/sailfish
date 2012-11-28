@@ -53,6 +53,11 @@ class LBConfigParser(object):
         config = ConfigParser.ConfigParser()
         config.read(['/etc/sailfishrc', os.path.expanduser('~/.sailfishrc'),
                 '.sailfishrc'])
+
+        # Located here for convenience, so that this attribute can be referenced in
+        # the symbolic expressions module even for LB models where this option is not
+        # supported.
+        self.config.incompressible = False
         try:
             self._parser.set_defaults(**dict(config.items('main')))
         except ConfigParser.NoSectionError:
