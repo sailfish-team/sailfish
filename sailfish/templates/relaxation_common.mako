@@ -35,7 +35,7 @@
 <%def name="guo_force(i)">
 {
 	// Guo's method, eqs. 19 and 20 from 10.1103/PhysRevE.65.046308.
-	const float pref = ${cex(sym_force.guo_external_force_pref(grids[i], grid_num=i))};
+	const float pref = ${cex(sym_force.guo_external_force_pref(grids[i], config, grid_num=i))};
 	%for val, idx in zip(sym_force.guo_external_force(grid, grid_num=i), grid.idx_name):
 		d${i}->${idx} += ${cex(val)};
 	%endfor

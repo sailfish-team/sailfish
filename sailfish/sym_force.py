@@ -136,7 +136,7 @@ def guo_external_force(grid, grid_num=0):
                    poly_factorize((ei - grid.v + ei.dot(grid.v)*ei*3).dot(ea)))
     return ret
 
-def guo_external_force_pref(grid, grid_num=0):
+def guo_external_force_pref(grid, config, grid_num=0):
     """Builds an expression for the BGK force prefactor in Guo's method.
 
     :param grid: grid object corresponding to grid_num:
@@ -148,6 +148,10 @@ def guo_external_force_pref(grid, grid_num=0):
         rho = S.phi
     else:
         rho = S.densities[grid_num]
+
+    if config.minimize_roundoff:
+        rho += 1
+
     tau = S.relaxation_times[grid_num]
 
     # This includes a density factor as the device code always computes
