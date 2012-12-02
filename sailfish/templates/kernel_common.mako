@@ -23,7 +23,13 @@
 
 <%def name="scratch_space_if_required()">
 	%if scratch_space:
-		, float* node_scratch_space
+		, ${global_ptr} float *node_scratch_space
+	%endif
+</%def>
+
+<%def name="scratch_space_arg_if_required()">
+	%if scratch_space:
+		, node_scratch_space
 	%endif
 </%def>
 

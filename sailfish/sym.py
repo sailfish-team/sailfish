@@ -732,8 +732,7 @@ def grad_approx(grid):
     :param grid: a grid object
     """
     out = []
-    press_dim = 3 if grid.dim == 2 else 6
-    press = [Symbol('press%d' % i) for i in range(press_dim)]
+    press = [Symbol('flux[%d]' % i) for i in range(grid.dim * (grid.dim + 1) / 2)]
     for ei, weight in zip(grid.basis, grid.weights):
         Ma = sympy.ones(grid.dim)  # P_ab - rho cs^2 \delta_ab
         k = 0

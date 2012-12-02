@@ -6,6 +6,7 @@
 <%namespace file="code_common.mako" import="*"/>
 <%namespace file="propagation.mako" import="rel_offset,get_odist"/>
 <%namespace file="utils.mako" import="*"/>
+<%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
 
 %if time_dependence:
 	${device_func} inline float get_time_from_iteration(unsigned int iteration) {
@@ -285,7 +286,10 @@ ${device_func} inline void getMacro(
 // Uses extrapolation to compute missing distributions for some implementations
 // of boundary condtitions.
 ${device_func} inline void fixMissingDistributions(
-		Dist *fi, ${global_ptr} float *dist_in, int node_type, int orientation, int gi) {
+		Dist *fi, ${global_ptr} float *dist_in, int ncode, int node_type, int orientation, int gi,
+		${kernel_args_1st_moment('iv')}
+		${global_ptr} float *gg0m0
+		${scratch_space_if_required()}) {
 	## These boundary conditions are non-local and can thus be implemented in
 	## this way only with the AB access pattern. In the AA access pattern,
 	## their implementation requires a separate kernel call.
@@ -307,6 +311,7 @@ ${device_func} inline void fixMissingDistributions(
 				%endfor
 			}
 		%endif
+
 		%if nt.NTYuOutflow in node_types:
 			else if (isNTYuOutflow(node_type)) {
 				switch (orientation) {
@@ -317,11 +322,30 @@ ${device_func} inline void fixMissingDistributions(
 							offset2 = rel_offset(*(2 * -grid.dir_to_vec(o)))
 						%>
 						%for dist_idx in sym.get_missing_dists(grid, o):
-						fi->${grid.idx_name[dist_idx]} =
-							2.0f * ${get_dist('dist_in', dist_idx, 'gi', offset1)} -
-							${get_dist('dist_in', dist_idx, 'gi', offset2)};
+							fi->${grid.idx_name[dist_idx]} =
+								2.0f * ${get_dist('dist_in', dist_idx, 'gi', offset1)} -
+								${get_dist('dist_in', dist_idx, 'gi', offset2)};
 						%endfor
 						break;
+					}
+				%endfor
+			}
+		%endif
+
+		%if nt.NTGradFreeflow in node_types:
+			else if (isNTGradFreeflow(node_type)) {
+				// Load values for velocity and density from the previous step.
+				float rho = gg0m0[gi];
+				float vx = ivx[gi];
+				float vy = ivy[gi];
+				${'float vz = ivz[gi];' if dim == 3 else ''}
+				float flux[${flux_components}];
+				int scratch_id = decodeNodeScratchId(ncode);
+				loadNodeScratchSpace(scratch_id, node_type, node_scratch_space, flux);
+				%for idx, grad_approx in zip(grid.idx_name, sym.grad_approx(grid)):
+					// Fill undefined distributions from the Grad aproximation.
+					if (!isfinite(fi->${idx})) {
+						fi->${idx} = ${cex(grad_approx, vectors=False)};
 					}
 				%endfor
 			}
@@ -333,12 +357,13 @@ ${device_func} inline void fixMissingDistributions(
 // node_type and orientation instead of passing them as variables.
 ${device_func} inline void postcollisionBoundaryConditions(
 		Dist *fi, int ncode, int node_type, int orientation,
-		float *rho, float *v0, int gi, ${global_ptr} float *dist_out)
+		float *rho, float *v0, int gi, ${global_ptr} float *dist_out
+		${scratch_space_if_required()})
 {
 	%if nt.NTHalfBBWall in node_types:
 		if (isNTHalfBBWall(node_type)) {
 			switch (orientation) {
-			%for i in range(1, grid.dim*2+1):
+			%for i in range(1, grid.dim * 2 + 1):
 				case ${i}: {
 					%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
 						${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
@@ -349,86 +374,25 @@ ${device_func} inline void postcollisionBoundaryConditions(
 			}
 		}
 	%endif
-}
 
-%if nt.NTGradFreeflow in node_types:
-	${device_func} inline void press_calc(Dist * fi, float *press)
-	{
-		<%  k=0
-		%>
-		%for i in range(grid.dim):
-			%for j in range(i, grid.dim):
-				<%
-				expr = sym.ex_flux(grid, "fi", i, j, config)
-				k=k+1
-				%>
-				press[${k-1}] = ${cex(expr, rho="rho", pointers=True, vectors=True)};
-			%endfor
-		%endfor
-	}
-
-	${device_func} inline void fill_fi(Dist * fi, Dist *grad, int idx)
-	{
-	%for i, ve in enumerate(grid.basis):
-		if (isinf(fi->${grid.idx_name[i]}))
-		{
-			fi->${grid.idx_name[i]}=grad->${grid.idx_name[i]};
+	%if nt.NTGradFreeflow in node_types:
+		// Store the flux tensor so that it can be used to compute the Grad approximation
+		// in the next iteration.
+		if (isNTGradFreeflow(node_type)) {
+			int scratch_id = decodeNodeScratchId(ncode);
+			float flux[${flux_components}];
+			compute_2nd_moment(fi, flux);
+			storeNodeScratchSpace(scratch_id, node_type, flux, node_scratch_space);
 		}
-	%endfor
-	
-	}
-	
-${device_func} inline void grad_calc(Dist * fi, float *rho, float *iv0, float *press)
-{
-	float v0 [${dim*dim}];	
-	%for j in range(dim):
-		v0[${j}] = iv0[${j}];
-	%endfor
-	%if dim ==2:
-		<% press_dim=3
-%>
-	%else:
-		<%press_dim=6 %>
 	%endif
-	%for j in range(press_dim):
-		float press${j} = press[${j}];
-	%endfor
-	%for i, ve in enumerate(grid.basis):
-		float t${grid.idx_name[i]};
-		
-	%endfor
-	
-	%for i, expr in enumerate(sym.grad_approx(grid)):
-		t${grid.idx_name[i]} = ${cex(expr, rho="rho", pointers=True, vectors=True)};
-		
-	%endfor
-       %for i, ve in enumerate(grid.basis):
-		fi->${grid.idx_name[i]}=t${grid.idx_name[i]};
-		
-	%endfor
-
-
 }
-%endif
 
-%if nt.NTGradFreeflow in node_types:
-	${device_func} inline void precollisionBoundaryConditions(Dist * fi, int ncode, int node_type, int orientation, float *rho,
-						      float *v0, Dist * dist_grad, float *rho_grad, float *v_grad, float *press, int gi)
-%else:	
-	${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
-%endif
 
+${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
 {
 	%if nt.NTFullBBWall in node_types:
 		if (isNTFullBBWall(node_type)) {
 			bounce_back(fi);
-		}
-	%endif
-
-	%if nt.NTGradFreeflow in node_types:
-		if(isNTGradFreeflow(node_type)){
-			grad_calc(dist_grad, rho_grad, v_grad, press);
-			fill_fi(fi, dist_grad, gi);
 		}
 	%endif
 
@@ -445,6 +409,7 @@ ${device_func} inline void grad_calc(Dist * fi, float *rho, float *iv0, float *p
 			%endfor
 		}
 	%endif
+
 	%if nt.NTSlip in node_types:
 		%if grid.dim == 3 and grid.Q == 13:
 			__SLIP_BOUNDARY_CONDITION_UNSUPPORTED_IN_D3Q13__

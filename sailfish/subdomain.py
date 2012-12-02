@@ -96,6 +96,8 @@ class SubdomainSpec(object):
 
     def update_context(self, ctx):
         ctx['dim'] = self.dim
+        # The flux tensor is a symmetric matrix.
+        ctx['flux_components'] = self.dim * (self.dim + 1) / 2
         ctx['envelope_size'] = self.envelope_size
         # TODO(michalj): Fix this.
         # This requires support for ghost nodes in the periodicity code

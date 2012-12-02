@@ -66,7 +66,7 @@ ${kernel_common.body(bgk_args_decl)}
 
 	if (isNTGradFreeflow(type)) {
 		int scratch_id = decodeNodeScratchId(ncode);
-		float flux[${3 if dim == 2 else 6 }];
+		float flux[${flux_components}];
 		compute_2nd_moment(&d0, flux);
 		storeNodeScratchSpace(scratch_id, type, flux, node_scratch_space);
 
@@ -189,7 +189,9 @@ ${kernel} void CollideAndPropagate(
 		Dist d1;
 		getDist(&d1, dist_in, gi ${iteration_number_arg_if_required()});
 	%endif
-	fixMissingDistributions(&d0, dist_in, ncode, orientation, gi);
+	fixMissingDistributions(&d0, dist_in, ncode, type, orientation, gi,
+							ovx, ovy ${', ovz' if dim == 3 else ''}, gg0m0
+							${scratch_space_arg_if_required()});
 
 	%if simtype == 'shan-chen':
 		${sc_calculate_accel()}
@@ -198,70 +200,28 @@ ${kernel} void CollideAndPropagate(
 	// Macroscopic quantities for the current cell
 	float g0m0, v[${dim}];
 
-	%if nt.NTGradFreeflow in node_types:
-		float g0m01, v1[${dim}];
-		g0m01 =gg0m0[gi];
-		v1[0]=ovx[gi];
-		v1[1]=ovy[gi];
-		%if dim>2:
-			v1[2]=ovz[gi];
-		%endif
-	%endif
 	%if simtype == 'shan-chen':
 		${sc_macro_fields()}
 	%else:
 		getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
 	%endif
 
-
-	%if nt.NTGradFreeflow in node_types:
-		%if dim==2:
-			<%press_dim =3 %>
-		%else:
-			<%press_dim =6 %>
-		%endif
-		float press[${press_dim}];
-		if (isNTGradFreeflow(type)) {
-			int scratch_id = decodeNodeScratchId(ncode);
-			loadNodeScratchSpace(scratch_id, type, node_scratch_space, press);
-		}
-	%endif
-	%if nt.NTGradFreeflow in node_types:
-		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, &d1, &g0m01, v1, press, gi);
-		getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
-	%else:
-		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
-	%endif
+	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
 	${relaxate(bgk_args)}
-	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out);
-	%if nt.NTGradFreeflow in node_types:
-	if (isNTGradFreeflow(type)) {
-		int scratch_id = decodeNodeScratchId(ncode);
-		%if dim==2:
-			<%press_dim =3 %>
-		%else:
-			<%press_dim =6 %>
-		%endif
-		float press_out[${press_dim}];
-		press_calc(&d0, press_out);
-		storeNodeScratchSpace(scratch_id, type, press_out, node_scratch_space);
-	}
-	%endif
-	if (isWetNode(type)) {
-		%if nt.NTGradFreeflow in node_types:
-			if (!isNTGradFreeflow(type))
-		%endif
-		{
-			checkInvalidValues(&d0, ${position()});
-		}
+	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out
+									${scratch_space_arg_if_required()});
+
+	## Grad outflow nodes use invalid values to tag directions lacking distribution
+	## data.
+	if (isWetNode(type) ${'&& !isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
+		checkInvalidValues(&d0, ${position()});
 	}
 
 	// Only save the macroscopic quantities if requested to do so.
-	%if nt.NTGradFreeflow in node_types:
-	if ((options & OPTION_SAVE_MACRO_FIELDS)||isNTGradFreeflow(type)) {
-	%else:
-	if (options & OPTION_SAVE_MACRO_FIELDS) {
-	%endif
+	if ((options & OPTION_SAVE_MACRO_FIELDS)
+		## Nodes using the Grad approximation use the velocity from the
+		## previous time step to compute the approximated distributions.
+		${'|| isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
 		gg0m0[gi] = g0m0;
 		ovx[gi] = v[0];
 		ovy[gi] = v[1];
