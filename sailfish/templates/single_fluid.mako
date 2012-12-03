@@ -185,10 +185,6 @@ ${kernel} void CollideAndPropagate(
 	// Cache the distributions in local variables
 	Dist d0;
 	getDist(&d0, dist_in, gi ${iteration_number_arg_if_required()});
- 	%if nt.NTGradFreeflow in node_types:
-		Dist d1;
-		getDist(&d1, dist_in, gi ${iteration_number_arg_if_required()});
-	%endif
 	fixMissingDistributions(&d0, dist_in, ncode, type, orientation, gi,
 							ovx, ovy ${', ovz' if dim == 3 else ''}, gg0m0
 							${scratch_space_arg_if_required()});
