@@ -69,7 +69,10 @@ int main(int argc, char **argv)
 	       << geometry.max(2) - geometry.min(2) << std::endl;
 
 	voxelize(geometry, voxels, voxel_size, 1 /* pad */, (char)0 /* inside */, (char)1 /*outside */);
-	std::cout << "Total nodes: " << voxels.size() << std::endl;
+
+	int fluid = count(voxels.begin(), voxels.end(), 0);
+	std::cout << "Nodes total: " << voxels.size() << " active: "
+		<< round(fluid / (double)voxels.size() * 10000) / 100.0 << "%" << std::endl;
 
 	const std::size_t *ext = voxels.extents();
 	std::cout << "Lattice size: " << ext[0] << " " << ext[1]
