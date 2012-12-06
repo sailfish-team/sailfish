@@ -202,6 +202,7 @@ class GeoEncoderConst(GeoEncoder):
             orientation of boundary nodes
         """
         assert self._type_map is not None
+        self.config.logger.debug('Node type encoding...')
 
         if detect_orientation:
             # Limit dry and wet types to these that are actually used in the simulation.
@@ -228,6 +229,7 @@ class GeoEncoderConst(GeoEncoder):
                     idx = (util.in_anyd_fast(self._type_map, orient_types) &
                             (shifted_map == 0) & (orientation == 0))
                     orientation[idx] = self.subdomain.grid.vec_to_dir(list(vec))
+            self.config.logger.debug('... orientation done.')
 
         # Remap type IDs.
         max_type_code = max(self._type_id_remap.keys())
@@ -239,6 +241,7 @@ class GeoEncoderConst(GeoEncoder):
                 self._encoded_param_map,
                 np.choose(np.int32(self._type_map), type_choice_map),
                 self._scratch_map)
+        self.config.logger.debug('... type map done.')
 
         # Drop the reference to the map array.
         self._type_map = None
