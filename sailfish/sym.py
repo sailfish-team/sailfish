@@ -623,18 +623,16 @@ def get_missing_dists(grid, orientation):
     _, unknown = _get_known_dists(grid, normal)
     return unknown
 
-def noneq_bb(grid, orientation):
+def noneq_bb(grid, orientation, eq):
     normal = grid.dir_to_vec(orientation)
     known, unknown = _get_known_dists(grid, normal)
     ret = []
-
-    eq = bgk_equilibrium(grid)[0][0]
 
     # Bounce-back of the non-equilibrium parts.
     for i in unknown:
         oi = grid.idx_opposite[i]
         ret.append((Symbol('fi->%s' % grid.idx_name[i]),
-                    Symbol('fi->%s' % grid.idx_name[oi]) - eq[oi][0] + eq[i][0]))
+                    Symbol('fi->%s' % grid.idx_name[oi]) - eq[oi] + eq[i]))
 
     for i in range(0, len(ret)):
         t = poly_factorize(ret[i][1])

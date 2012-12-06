@@ -118,6 +118,7 @@ class NTEquilibriumDensity(LBNodeType):
 class NTZouHeVelocity(LBNodeType):
     """Zou-he velocity."""
     needs_orientation = True
+    wet_node = True
 
     def __init__(self, velocity, orientation=None):
         self.params = {'velocity': velocity}
@@ -127,6 +128,7 @@ class NTZouHeVelocity(LBNodeType):
 class NTZouHeDensity(LBNodeType):
     """Zou-He density."""
     needs_orientation = True
+    wet_node = True
 
     def __init__(self, density, orientation=None):
         self.params = {'density': density}

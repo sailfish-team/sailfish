@@ -16,7 +16,7 @@
 
 <%def name="noneq_bb(orientation)">
 	case ${orientation}:
-		%for arg, val in sym.noneq_bb(grid, orientation):
+		%for arg, val in sym.noneq_bb(grid, orientation, equilibria[0](grid, config).expression):
 			${cex(arg, pointers=True)} = ${cex(val, pointers=True)};
 		%endfor
 		break;
@@ -25,7 +25,7 @@
 <%def name="zouhe_fixup(orientation)">
 	case ${orientation}:
 		%for arg, val in sym.zouhe_fixup(grid, orientation):
-			${str(arg)} = ${cex(val)};
+			${str(arg)} = ${cex(val, vectors=False)};
 		%endfor
 		break;
 </%def>
