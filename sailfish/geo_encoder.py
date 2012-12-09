@@ -47,6 +47,30 @@ class GeoEncoder(object):
             # that x < <val> always evaluates true.
             return 0xfffffffe
 
+    def detect_orientation(self, orientation):
+        # Limit dry and wet types to these that are actually used in the simulation.
+        uniq_types = set(np.unique(self._type_map.base))
+        dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
+        orient_types = list(set(nt.get_orientation_node_type_ids()) & uniq_types)
+
+        # Convert to a numpy array.
+        dry_types = self._type_map.dtype.type(dry_types)
+        orient_types = self._type_map.dtype.type(orient_types)
+
+        cnt = np.zeros_like(self._type_map)
+        for i, vec in enumerate(self.subdomain.grid.basis):
+            l = len(list(vec)) - 1
+            shifted_map = self._type_map
+            for j, shift in enumerate(vec):
+                shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
+
+            cnt[util.in_anyd_fast(shifted_map, dry_types)] += 1
+            # FIXME: we're currently only process the primary directions
+            if vec.dot(vec) == 1:
+                # Only set orientation where it's not already defined (=0).
+                idx = (util.in_anyd_fast(self._type_map, orient_types) &
+                        (shifted_map == 0) & (orientation == 0))
+                orientation[idx] = self.subdomain.grid.vec_to_dir(list(vec))
 
 class GeoEncoderConst(GeoEncoder):
     """Encodes node type and parameters into a single uint32.
@@ -205,30 +229,7 @@ class GeoEncoderConst(GeoEncoder):
         self.config.logger.debug('Node type encoding...')
 
         if detect_orientation:
-            # Limit dry and wet types to these that are actually used in the simulation.
-            uniq_types = set(np.unique(self._type_map.base))
-            dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
-            orient_types = list(set(nt.get_orientation_node_type_ids()) & uniq_types)
-
-            # Convert to a numpy array.
-            dry_types = self._type_map.dtype.type(dry_types)
-            orient_types = self._type_map.dtype.type(orient_types)
-
-            cnt = np.zeros_like(self._type_map)
-            for i, vec in enumerate(self.subdomain.grid.basis):
-                l = len(list(vec)) - 1
-                shifted_map = self._type_map
-                for j, shift in enumerate(vec):
-                    shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
-
-                cnt[util.in_anyd_fast(shifted_map, dry_types)] += 1
-                # FIXME: we're currently only processing the primary directions
-                # here
-                if vec.dot(vec) == 1:
-                    # Only set orientation where it's not already defined (=0).
-                    idx = (util.in_anyd_fast(self._type_map, orient_types) &
-                            (shifted_map == 0) & (orientation == 0))
-                    orientation[idx] = self.subdomain.grid.vec_to_dir(list(vec))
+            self.detect_orientation(orientation)
             self.config.logger.debug('... orientation done.')
 
         # Remap type IDs.

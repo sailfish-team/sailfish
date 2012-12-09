@@ -455,8 +455,8 @@ class Subdomain(object):
         # TODO: At this point, we should decide which GeoEncoder class to use.
         from sailfish import geo_encoder
         self._encoder = geo_encoder.GeoEncoderConst(self)
-        self._encoder.prepare_encode(self._type_map.base,
-                self._param_map.base, self._params)
+        self._encoder.prepare_encode(self._type_map.base, self._param_map.base,
+                                     self._params)
 
         self.config.logger.debug('... encoder done.')
 

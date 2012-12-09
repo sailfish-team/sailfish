@@ -1,14 +1,10 @@
 import numpy as np
 import unittest
-from sailfish.backend_dummy import DummyBackend
-from sailfish.config import LBConfig
-from sailfish.lb_base import LBSim
 from sailfish.node_type import NTEquilibriumVelocity, multifield
 from sailfish.subdomain import Subdomain2D, Subdomain3D, SubdomainSpec2D, SubdomainSpec3D
 from sailfish.subdomain_runner import SubdomainRunner
 from sailfish.sym import D2Q9, D3Q19
-from dummy import *
-
+from common import TestCase2D, TestCase3D
 
 class SubdomainTest2D(Subdomain2D):
     def boundary_conditions(self, hx, hy):
@@ -17,23 +13,7 @@ class SubdomainTest2D(Subdomain2D):
                 NTEquilibriumVelocity(
                     multifield((0.01 * (hx - self.gy / 2)**2, 0.0), where)))
 
-class TestNodeTypeSetting2D(unittest.TestCase):
-    lattice_size = 64, 64
-
-    def setUp(self):
-        config = LBConfig()
-        config.seed = 0
-        config.precision = 'single'
-        config.block_size = 8
-        config.mem_alignment = 8
-        # Does not affect behaviour of any of the functions tested here.
-        config.lat_nx, config.lat_ny = self.lattice_size
-        config.logger = DummyLogger()
-        config.grid = 'D2Q9'
-        self.sim = LBSim(config)
-        self.config = config
-        self.backend = DummyBackend()
-
+class TestNodeTypeSetting2D(TestCase2D):
     def test_array_setting(self):
         envelope = 1
         spec = SubdomainSpec2D((0, 0), self.lattice_size,
@@ -59,22 +39,7 @@ class SubdomainTest3D(Subdomain3D):
                     multifield((0.01 * (hy - self.gy / 2)**2,
                         0.03 * (hz - self.gz / 2)**2, 0.0), where)))
 
-class TestNodeTypeSetting3D(unittest.TestCase):
-    lattice_size = 32, 32, 16
-
-    def setUp(self):
-        config = LBConfig()
-        config.seed = 0
-        config.precision = 'single'
-        config.block_size = 8
-        config.mem_alignment = 8
-        # Does not affect behaviour of any of the functions tested here.
-        config.lat_nx, config.lat_ny, config.lat_nz = self.lattice_size
-        config.logger = DummyLogger()
-        config.grid = 'D3Q19'
-        self.sim = LBSim(config)
-        self.backend = DummyBackend()
-
+class TestNodeTypeSetting3D(TestCase3D):
     def test_array_setting(self):
         envelope = 1
         spec = SubdomainSpec3D((0, 0, 0), self.lattice_size,

@@ -19,6 +19,7 @@ test:
 	python tests/sim.py
 	python tests/sym.py
 	python tests/util.py
+	python tests/encoder.py
 
 test_examples:
 	@bash tests/run_examples.sh
