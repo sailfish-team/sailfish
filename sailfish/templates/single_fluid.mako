@@ -108,7 +108,7 @@ ${kernel} void SetInitialConditions(
 	${local_indices()}
 
 	// Cache macroscopic fields in local variables.
-	float rho = irho[gi];
+	float rho = irho[gi] ${' -1.0f' if config.minimize_roundoff else ''};
 	float v0[${dim}];
 
 	v0[0] = ivx[gi];
@@ -218,7 +218,7 @@ ${kernel} void CollideAndPropagate(
 		## Nodes using the Grad approximation use the velocity from the
 		## previous time step to compute the approximated distributions.
 		${'|| isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
-		gg0m0[gi] = g0m0;
+		gg0m0[gi] = g0m0 ${' +1.0f' if config.minimize_roundoff else ''};
 		ovx[gi] = v[0];
 		ovy[gi] = v[1];
 		%if dim == 3:

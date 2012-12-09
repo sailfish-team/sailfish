@@ -14,22 +14,6 @@
 	}
 %endif
 
-<%def name="noneq_bb(orientation)">
-	case ${orientation}:
-		%for arg, val in sym.noneq_bb(grid, orientation, equilibria[0](grid, config).expression):
-			${cex(arg, pointers=True)} = ${cex(val, pointers=True)};
-		%endfor
-		break;
-</%def>
-
-<%def name="zouhe_fixup(orientation)">
-	case ${orientation}:
-		%for arg, val in sym.zouhe_fixup(grid, orientation):
-			${str(arg)} = ${cex(val, vectors=False)};
-		%endfor
-		break;
-</%def>
-
 %for i, expressions in symbol_idx_map.iteritems():
 	${device_func} inline void time_dep_param_${i}(float *out ${dynamic_val_args_decl()}) {
 		float phys_time = get_time_from_iteration(iteration_number);
@@ -155,11 +139,36 @@ ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 }
 
 %if nt.NTZouHeVelocity in node_types or nt.NTZouHeDensity in node_types:
+<%def name="noneq_bb(orientation)">
+	case ${orientation}:
+		<%
+			import copy
+			tmp_config = copy.copy(config)
+
+			# When this function is called, rho is the node parameter, and therefore
+			# the full density, not the density delta. We turn off the round-off
+			# minimization locally so that the standard form of equilibrium is used.
+			tmp_config.minimize_roundoff = False
+		%>
+		%for arg, val in sym.noneq_bb(grid, orientation, equilibria[0](grid, tmp_config).expression):
+			${cex(arg, pointers=True)} = ${cex(val, pointers=True)};
+		%endfor
+		break;
+</%def>
+
+<%def name="zouhe_fixup(orientation)">
+	case ${orientation}:
+		%for arg, val in sym.zouhe_fixup(grid, orientation):
+			${str(arg)} = ${cex(val, vectors=False)};
+		%endfor
+		break;
+</%def>
+
 ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v0)
 {
-	// Bounce-back of the non-equilibrium parts.
+	// Bounce-back of the non-equilibrium `parts.
 	switch (orientation) {
-		%for i in range(1, grid.dim*2+1):
+		%for i in range(1, grid.dim * 2 + 1):
 			${noneq_bb(i)}
 		%endfor
 		case ${nt_dir_other}:
@@ -179,7 +188,7 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v0)
 		nvz = ${cex(sym.ex_velocity(grid, 'fi', 2, config, momentum=True))};
 	%endif
 
-	// Compute momentum difference.
+	// Compute momentum difference. rho here needs to be the full density.
 	nvx = *rho * v0[0] - nvx;
 	nvy = *rho * v0[1] - nvy;
 	%if dim == 3:
@@ -187,7 +196,7 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v0)
 	%endif
 
 	switch (orientation) {
-		%for i in range(1, grid.dim*2+1):
+		%for i in range(1, grid.dim * 2 + 1):
 			${zouhe_fixup(i)}
 		%endfor
 	}
@@ -272,13 +281,13 @@ ${device_func} inline void getMacro(
 			${_macro_density_bc_common()}
 			zouhe_bb(fi, orientation, &par_rho, v0);
 			compute_macro_quant(fi, rho, v0);
-			*rho = par_rho;
+			*rho = par_rho ${' -1.0f' if config.minimize_roundoff else ''};
 		}
 	%endif
 	%if nt.NTEquilibriumDensity in node_types:
 		else if (isNTEquilibriumDensity(node_type)) {
 			${_macro_density_bc_common()}
-			*rho = par_rho;
+			*rho = par_rho ${' -1.0f' if config.minimize_roundoff else ''};
 		}
 	%endif
 }
