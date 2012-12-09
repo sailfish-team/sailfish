@@ -5,6 +5,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 from collections import defaultdict, namedtuple
+import logging
 import random
 import socket
 import sys
@@ -167,6 +168,29 @@ def linpoints(i, min_=1., max_=.1, n=10):
         return max_
 
     return min_ + i * (max_ - min_) / (n - 1)
+
+def setup_logger(config):
+    logger = logging.getLogger('saifish')
+    formatter = logging.Formatter("[%(relativeCreated)6d %(levelname)5s %(processName)s] %(message)s")
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    if config.verbose:
+        stream_handler.setLevel(logging.DEBUG)
+    elif config.quiet:
+        stream_handler.setLevel(logging.WARNING)
+    else:
+        stream_handler.setLevel(logging.INFO)
+
+    logger.addHandler(stream_handler)
+
+    if config.log:
+        handler = logging.FileHandler(config.log)
+        handler.setFormatter(formatter)
+        handler.setLevel(config.loglevel)
+        logger.addHandler(handler)
+
+    logger.setLevel(logging.DEBUG)
+    return logger
 
 
 def energy_spectrum(velocity, buckets=None, density=True):

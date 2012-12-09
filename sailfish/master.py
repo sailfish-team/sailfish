@@ -93,26 +93,8 @@ class LBMachineMaster(object):
             self._iface = iface
         else:
             self._iface = '*'
-        self.config.logger = logging.getLogger('saifish')
-        formatter = logging.Formatter("[%(relativeCreated)6d %(levelname)5s %(processName)s] %(message)s")
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(formatter)
-        if config.verbose:
-            stream_handler.setLevel(logging.DEBUG)
-        elif config.quiet:
-            stream_handler.setLevel(logging.WARNING)
-        else:
-            stream_handler.setLevel(logging.INFO)
 
-        self.config.logger.addHandler(stream_handler)
-
-        if self.config.log:
-            handler = logging.FileHandler(self.config.log)
-            handler.setFormatter(formatter)
-            handler.setLevel(config.loglevel)
-            self.config.logger.addHandler(handler)
-
-        self.config.logger.setLevel(logging.DEBUG)
+        self.config.logger = util.setup_logger(self.config)
 
     def _assign_subdomains_to_gpus(self):
         subdomain2gpu = {}
