@@ -8,6 +8,8 @@ from collections import defaultdict, namedtuple
 import inspect
 import operator
 import numpy as np
+from scipy.ndimage import filters
+
 from sailfish import util
 from sailfish import sym
 import sailfish.node_type as nt
@@ -533,7 +535,6 @@ class Subdomain2D(Subdomain):
 
         self._type_map.base[(cnt == self.grid.Q)] = nt._NTUnused.id
 
-
 class Subdomain3D(Subdomain):
     dim = 3
 
@@ -564,15 +565,14 @@ class Subdomain3D(Subdomain):
         dry_types = self._type_map.dtype.type(dry_types)
 
         # Find nodes which are walls themselves and are completely surrounded by
-        # walls.  These nodes are marked as unused, as they do not contribute to
+        # walls. These nodes are marked as unused, as they do not contribute to
         # the dynamics of the fluid in any way.
-        cnt = np.zeros_like(self._type_map.base).astype(np.uint32)
-        for i, vec in enumerate(self.grid.basis):
-            a = np.roll(self._type_map.base, int(-vec[0]), axis=2)
-            a = np.roll(a, int(-vec[1]), axis=1)
-            a = np.roll(a, int(-vec[2]), axis=0)
-            cnt[util.in_anyd_fast(a, dry_types)] += 1
+        dry_map = util.in_anyd_fast(self._type_map.base,
+                                    dry_types).astype(np.uint8)
+        neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
+        neighbors[1,1,1] = 1
+        for ei in self.grid.basis:
+            neighbors[1 + ei[2], 1 + ei[1], 1 + ei[0]] = 1
 
-        self._type_map.base[(cnt == self.grid.Q)] = nt._NTUnused.id
-
-
+        where = (filters.convolve(dry_map, neighbors, mode='wrap') == self.grid.Q)
+        self._type_map.base[where] = nt._NTUnused.id

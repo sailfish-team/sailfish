@@ -56,21 +56,21 @@ class GeoEncoder(object):
         # Convert to a numpy array.
         dry_types = self._type_map.dtype.type(dry_types)
         orient_types = self._type_map.dtype.type(orient_types)
-
-        cnt = np.zeros_like(self._type_map)
-        for i, vec in enumerate(self.subdomain.grid.basis):
-            l = len(list(vec)) - 1
+        orient_map = util.in_anyd_fast(self._type_map, orient_types)
+        l = len(list(self.subdomain.grid.basis[0])) - 1
+        for vec in self.subdomain.grid.basis:
+            # FIXME: we currently only process the primary directions
+            if vec.dot(vec) != 1:
+                continue
             shifted_map = self._type_map
             for j, shift in enumerate(vec):
+                if shift == 0:
+                    continue
                 shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
 
-            cnt[util.in_anyd_fast(shifted_map, dry_types)] += 1
-            # FIXME: we're currently only process the primary directions
-            if vec.dot(vec) == 1:
-                # Only set orientation where it's not already defined (=0).
-                idx = (util.in_anyd_fast(self._type_map, orient_types) &
-                        (shifted_map == 0) & (orientation == 0))
-                orientation[idx] = self.subdomain.grid.vec_to_dir(list(vec))
+            # Only set orientation where it's not already defined (=0).
+            idx = orient_map & (shifted_map == 0) & (orientation == 0)
+            orientation[idx] = self.subdomain.grid.vec_to_dir(list(vec))
 
 class GeoEncoderConst(GeoEncoder):
     """Encodes node type and parameters into a single uint32.
