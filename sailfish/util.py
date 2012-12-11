@@ -193,13 +193,41 @@ def setup_logger(config):
     return logger
 
 
-def energy_spectrum(velocity, buckets=None, density=True):
+def kinetic_energy(velocity):
+    """Computes the mean kinetic energy of the fluid."""
+    return np.sum(np.square(velocity)) / (2.0 * velocity.size)
+
+def vorticity(velocity):
+    """Computes the vorticity array from a 3D velocity vector array."""
+    dz_ux, dy_ux, dz_ux = np.gradient(velocity[0])
+    dz_uy, dy_uy, dz_uy = np.gradient(velocity[1])
+    dz_uz, dy_uz, dz_uz = np.gradient(velocity[2])
+    v = (dy_uz - dz_uy, dz_ux - dx_uz, dx_uy - dy_ux)
+    return np.vstack((v[0][np.newaxis, ...], v[1][np.newaxis, ...], v[2][np.newaxis, ...]))
+
+def enstrophy(velocity):
+    """Computes the enstrophy (mean square vorticity)."""
+    return np.sum(np.square(vorticity(velocity))) / (2.0 * velocity.size)
+
+def skewness_factor(ux, n):
+    """Computes the longitudinal skewness factor.
+
+    :param ux: x component of velocity
+    :param n: order of the skewness factor
+    """
+    _, _, dx_ux = np.gradient(ux)
+    return np.mean(np.power(dx_ux, n)) * np.mean(np.square(dx_ux))**(-n/2.0) * (-1.0)**n
+
+def structure_function(ux, r, n):
+    return np.mean(np.power(ux - np.roll(ux, r, 2), n))
+
+def energy_spectrum(velocity, buckets=None, density=False):
     """Calculates the energy spectrum E(k).
 
     :param velocity: velocity field
     :param buckets: if not None, an iterable of wavenumber buckets; if n values
         are provided here, the energy spectrum will contain n-1 values
-    :param density: if True, a energy density spectrum in k-space will be
+    :param density: if True, an energy density spectrum in k-space will be
         calculated; if False the energy will simply be integrated
     :rvalue: numpy array with the energy spectrum
     """
