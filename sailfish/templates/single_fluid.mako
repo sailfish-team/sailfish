@@ -203,6 +203,13 @@ ${kernel} void CollideAndPropagate(
 	%endif
 
 	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
+
+	%if initialization:
+		v[0] = ovx[gi];
+		v[1] = ovy[gi];
+		${'v[2] = ovz[gi];' if dim == 3 else ''}
+	%endif
+
 	${relaxate(bgk_args)}
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out
 									${scratch_space_arg_if_required()});
@@ -219,10 +226,13 @@ ${kernel} void CollideAndPropagate(
 		## previous time step to compute the approximated distributions.
 		${'|| isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
 		gg0m0[gi] = g0m0 ${' +1.0f' if config.minimize_roundoff else ''};
-		ovx[gi] = v[0];
-		ovy[gi] = v[1];
-		%if dim == 3:
-			ovz[gi] = v[2];
+
+		%if not initialization:
+			ovx[gi] = v[0];
+			ovy[gi] = v[1];
+			%if dim == 3:
+				ovz[gi] = v[2];
+			%endif
 		%endif
 	}
 

@@ -277,6 +277,10 @@ class LBSimulationController(object):
         group.add_argument('--max_iters',
             help='number of iterations to run; use 0 to run indefinitely',
             type=int, default=0)
+        group.add_argument('--init_iters',
+                           help='number of iterations to use for the '
+                           'initialization phase. If <= 0, no initialization '
+                           'phase is run.', type=int, default=0)
         group.add_argument('--output',
             help='save simulation results to FILE', metavar='FILE',
             type=str, default='')

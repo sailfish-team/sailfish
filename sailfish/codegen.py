@@ -34,7 +34,7 @@ def _remove_math_function_suffix(t):
     return t
 
 class BlockCodeGenerator(object):
-    """Generates CUDA/OpenCL code for a simulation."""
+    """Generates CUDA/OpenCL code for a simulation of a subdomain."""
 
     #: The command to use to automatically format the compute unit source code.
     _format_cmd = (

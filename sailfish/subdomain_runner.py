@@ -96,6 +96,7 @@ class SubdomainRunner(object):
             self._init_network(master_addr, summary_addr)
 
         np.random.seed(self.config.seed)
+        self._initialization = self.config.init_iters > 0
 
     def _init_network(self, master_addr, summary_addr):
         self._master_sock = self._ctx.socket(zmq.PAIR)
@@ -201,6 +202,7 @@ class SubdomainRunner(object):
                               {-1:  self.config.lat_nz * arr_ny * arr_nx,
                                 1: -self.config.lat_nz * arr_ny * arr_nx})
 
+        ctx['initialization'] = self._initialization
 
     def add_visualization_field(self, field_cb, name):
         self._output.register_field(field_cb, name, visualization=True)
@@ -440,9 +442,6 @@ class SubdomainRunner(object):
            distributions for the whole simulation domain."""
         return self._get_nodes() * grid.Q * self.float().nbytes
 
-    def _get_compute_code(self):
-        return self._bcg.get_code(self, self.backend.name)
-
     def _get_global_idx(self, location, dist_num=0):
         """Returns a global index (in the distributions array).
 
@@ -673,12 +672,14 @@ class SubdomainRunner(object):
                 x.grid_id))
             self._recv_block_to_connbuf[subdomain_id] = recv_bufs
 
+    def _update_compute_code(self):
+        code = self._bcg.get_code(self, self.backend.name)
+        self.config.logger.debug("... compute code prepared.")
+        self.module = self.backend.build(code)
 
     def _init_compute(self):
         self.config.logger.debug("Initializing compute unit...")
-        code = self._get_compute_code()
-        self.config.logger.debug("... compute code prepared.")
-        self.module = self.backend.build(code)
+        self._update_compute_code()
         self.config.logger.debug("... compute code compiled.")
         self._init_streams()
         self.config.logger.debug("... done.")
@@ -1223,6 +1224,16 @@ class SubdomainRunner(object):
 
             self._debug_set_dist(v, is_primary, dist_num)
 
+    def _prepare_compute_kernels(self, initial=False):
+        self._kernels_bulk_full = self._sim.get_compute_kernels(self, True,
+                                                                True)
+        self._kernels_bulk_none = self._sim.get_compute_kernels(self, False,
+                                                                True)
+        self._kernels_bnd_full = self._sim.get_compute_kernels(self, True,
+                                                               False)
+        self._kernels_bnd_none = self._sim.get_compute_kernels(self, False,
+                                                               False)
+
     def run(self):
         self.config.logger.info("Initializing subdomain.")
         self.config.logger.debug(self.backend.info)
@@ -1237,10 +1248,7 @@ class SubdomainRunner(object):
         self.config.logger.debug("Applying initial conditions.")
 
         self._init_interblock_kernels()
-        self._kernels_bulk_full = self._sim.get_compute_kernels(self, True, True)
-        self._kernels_bulk_none = self._sim.get_compute_kernels(self, False, True)
-        self._kernels_bnd_full = self._sim.get_compute_kernels(self, True, False)
-        self._kernels_bnd_none = self._sim.get_compute_kernels(self, False, False)
+        self._prepare_compute_kernels()
         self._pbc_kernels = self._sim.get_pbc_kernels(self)
 
         self._initial_conditions()
@@ -1248,14 +1256,16 @@ class SubdomainRunner(object):
         if self.config.output:
             self._output.save(self._sim.iteration)
 
-        self.config.logger.info("Starting simulation.")
-
         if not self.config.max_iters:
             self.config.logger.warning("Running infinite simulation.")
 
         if self.config.restore_from:
             self.restore_checkpoint(self.config.restore_from)
 
+        if self._initialization:
+            self.initialize()
+
+        self.config.logger.info("Starting simulation.")
         self.main()
 
         self.config.logger.info(
@@ -1273,6 +1283,31 @@ class SubdomainRunner(object):
             return True
 
         return False
+
+    def initialize(self):
+        self.config.logger.info("Consistent intialization started.")
+        try:
+            for init_it in xrange(0, self.config.init_iters):
+                self.step(False)
+                self._data_stream.synchronize()
+                self._calc_stream.synchronize()
+                self._sim.iteration = 0
+                # TODO: Add an option to stop when:
+                # ||rho(t) - rho(t-1)|| < eps
+        except self.backend.FatalError:
+            self.config.logger.exception("Fatal on-device error at iteration "
+                    "{0}.".format(self._sim.iteration))
+            self.config.logger.error("Requesting quit.")
+            self._quit_event.set()
+
+        self.config.logger.info("Initialization phase complete.")
+        self._sim.iteration = 0
+
+        # TODO: Make it possible to cache all fields and distributions here.
+        # Rebuild the compute code for the real run.
+        self._initialization = False
+        self._prepare_compute_kernels()
+        self._init_compute()
 
     def main(self):
         is_quit = False
