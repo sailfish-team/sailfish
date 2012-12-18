@@ -195,19 +195,19 @@ def setup_logger(config):
 
 def kinetic_energy(velocity):
     """Computes the mean kinetic energy of the fluid."""
-    return np.sum(np.square(velocity)) / (2.0 * velocity.size)
+    return np.sum(np.square(velocity)) / (2.0 * velocity[0].size)
 
-def vorticity(velocity):
+def vorticity(velocity, dx=1.0):
     """Computes the vorticity array from a 3D velocity vector array."""
-    dz_ux, dy_ux, dz_ux = np.gradient(velocity[0])
-    dz_uy, dy_uy, dz_uy = np.gradient(velocity[1])
-    dz_uz, dy_uz, dz_uz = np.gradient(velocity[2])
+    dz_ux, dy_ux, dx_ux = np.gradient(velocity[0], dx, dx, dx)
+    dz_uy, dy_uy, dx_uy = np.gradient(velocity[1], dx, dx, dx)
+    dz_uz, dy_uz, dx_uz = np.gradient(velocity[2], dx, dx, dx)
     v = (dy_uz - dz_uy, dz_ux - dx_uz, dx_uy - dy_ux)
     return np.vstack((v[0][np.newaxis, ...], v[1][np.newaxis, ...], v[2][np.newaxis, ...]))
 
-def enstrophy(velocity):
+def enstrophy(velocity, dx):
     """Computes the enstrophy (mean square vorticity)."""
-    return np.sum(np.square(vorticity(velocity))) / (2.0 * velocity.size)
+    return np.sum(np.square(vorticity(velocity, dx))) / (2.0 * velocity[0].size)
 
 def skewness_factor(ux, n):
     """Computes the longitudinal skewness factor.
