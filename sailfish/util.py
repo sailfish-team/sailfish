@@ -200,10 +200,12 @@ def kinetic_energy(velocity):
 def vorticity(velocity, dx=1.0):
     """Computes the vorticity array from a 3D velocity vector array."""
     dz_ux, dy_ux, dx_ux = np.gradient(velocity[0], dx, dx, dx)
+    del dx_ux
     dz_uy, dy_uy, dx_uy = np.gradient(velocity[1], dx, dx, dx)
+    del dy_uy
     dz_uz, dy_uz, dx_uz = np.gradient(velocity[2], dx, dx, dx)
-    v = (dy_uz - dz_uy, dz_ux - dx_uz, dx_uy - dy_ux)
-    return np.vstack((v[0][np.newaxis, ...], v[1][np.newaxis, ...], v[2][np.newaxis, ...]))
+    del dz_uz
+    return np.array((dy_uz - dz_uy, dz_ux - dx_uz, dx_uy - dy_ux))
 
 def enstrophy(velocity, dx):
     """Computes the enstrophy (mean square vorticity)."""
