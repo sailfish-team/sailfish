@@ -82,6 +82,61 @@ ${device_func} inline float node_param_get_scalar(const int idx ${dynamic_val_ar
 	}
 </%def>
 
+// Add comments for the Guo density implementation.
+<%def name="guo_density_node_index_shift_intro()">
+	%if nt.NTGuoDensity in node_types:
+		int orig_gi = gi;
+		if (isNTGuoDensity(type)) {
+			switch (orientation) {
+				%for dir_ in grid.dir2vecidx.keys():
+					case (${dir_}): {
+						## TODO: add a function to calculate the local indices from gi
+						%if dim == 2:
+							gi += ${rel_offset(*(list(grid.dir_to_vec(dir_)) + [0]))};
+							gx += ${grid.dir_to_vec(dir_)[0]};
+							gy += ${grid.dir_to_vec(dir_)[1]};
+						%else:
+							gi += ${rel_offset(*(grid.dir_to_vec(dir_)))};
+							gx += ${grid.dir_to_vec(dir_)[0]};
+							gy += ${grid.dir_to_vec(dir_)[1]};
+							gz += ${grid.dir_to_vec(dir_)[2]};
+						%endif
+						break;
+					}
+				%endfor
+			}
+		}
+	%endif
+</%def>
+
+<%def name="guo_density_restore_index()">
+	%if nt.NTGuoDensity in node_types:
+		if (isNTGuoDensity(type)) {
+			gi = orig_gi;
+		}
+	%endif
+</%def>
+
+<%def name="guo_density_node_index_shift_final()">
+	%if nt.NTGuoDensity in node_types:
+		if (isNTGuoDensity(type)) {
+			switch (orientation) {
+				%for dir_ in grid.dir2vecidx.keys():
+					case (${dir_}): {
+						## TODO: add a function to calculate the local indices from gi
+						gx -= ${grid.dir_to_vec(dir_)[0]};
+						gy -= ${grid.dir_to_vec(dir_)[1]};
+						%if dim == 3:
+							gz -= ${grid.dir_to_vec(dir_)[2]};
+						%endif
+						break;
+					}
+				%endfor
+			}
+		}
+	%endif
+</%def>
+
 ${device_func} inline void bounce_back(Dist *fi)
 {
 	float t;

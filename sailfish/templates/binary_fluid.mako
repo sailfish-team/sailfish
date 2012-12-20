@@ -126,16 +126,11 @@ ${kernel} void PrepareMacroFields(
 
 	// Do not not update the fields for pressure nodes, where by definition
 	// they are constant.
-	%if nt.NTGuoDensity in node_types:
-		if (isNTGuoDensity(type)) {
-			return;
-		}
-	%endif
-	%if nt.NTEquilibriumDensity in node_types:
-		if (isNTEquilibriumDensity(type)) {
-			return;
-		}
-	%endif
+	%for node_type in (nt.NTGuoDensity, nt.NTEquilibriumDensity, nt.NTZouHeDensity):
+		%if node_type in node_types:
+			if (is${node_type.__name__}(type)) { return; }
+		%endif
+	%endfor
 
 	Dist fi;
 	float out;
@@ -153,11 +148,11 @@ ${kernel} void PrepareMacroFields(
 			ophi[gi] = out;
 		}
 
-		// Assume neutral wetting for all walls by adjusting the phase gradient
-		// near the wall.
-		//
-		// This wetting boundary condition implementation is as in option 2 in
-		// Halim Kusumaatmaja's PhD thesis, p.18.
+		## Assume neutral wetting for all walls by adjusting the phase gradient
+		## near the wall.
+		##
+		## This wetting boundary condition implementation is as in option 2 in
+		## Halim Kusumaatmaja's PhD thesis, p.18.
 
 		## Symbols used on the schematics below:
 		##
@@ -255,30 +250,7 @@ ${kernel} void CollideAndPropagate(
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);
-
-	%if nt.NTGuoDensity in node_types:
-		int orig_gi = gi;
-		if (isNTGuoDensity(type)) {
-			switch (orientation) {
-				%for dir_ in grid.dir2vecidx.keys():
-					case (${dir_}): {
-						## TODO: add a function to calculate the local indices from gi
-						%if dim == 2:
-							gi += ${rel_offset(*(list(grid.dir_to_vec(dir_)) + [0]))};
-							gx += ${grid.dir_to_vec(dir_)[0]};
-							gy += ${grid.dir_to_vec(dir_)[1]};
-						%else:
-							gi += ${rel_offset(*(grid.dir_to_vec(dir_)))};
-							gx += ${grid.dir_to_vec(dir_)[0]};
-							gy += ${grid.dir_to_vec(dir_)[1]};
-							gz += ${grid.dir_to_vec(dir_)[2]};
-						%endif
-						break;
-					}
-				%endfor
-			}
-		}
-	%endif
+	${guo_density_node_index_shift_intro()}
 
 	%if simtype == 'free-energy':
 		float lap1, grad1[${dim}];
@@ -299,11 +271,7 @@ ${kernel} void CollideAndPropagate(
 	getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
 	getDist(&d1, dist2_in, gi ${iteration_number_arg_if_required()});
 
-	%if nt.NTGuoDensity in node_types:
-		if (isNTGuoDensity(type)) {
-			gi = orig_gi;
-		}
-	%endif
+	${guo_density_restore_index()}
 
 	// macroscopic quantities for the current cell
 	float g0m0, v[${dim}], g1m0;
@@ -330,23 +298,7 @@ ${kernel} void CollideAndPropagate(
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist1_out);
 	postcollisionBoundaryConditions(&d1, ncode, type, orientation, &g1m0, v, gi, dist2_out);
 
-	%if nt.NTGuoDensity in node_types:
-		if (isNTGuoDensity(type)) {
-			switch (orientation) {
-				%for dir_ in grid.dir2vecidx.keys():
-					case (${dir_}): {
-						## TODO: add a function to calculate the local indices from gi
-						gx -= ${grid.dir_to_vec(dir_)[0]};
-						gy -= ${grid.dir_to_vec(dir_)[1]};
-						%if dim == 3:
-							gz -= ${grid.dir_to_vec(dir_)[2]};
-						%endif
-						break;
-					}
-				%endfor
-			}
-		}
-	%endif
+	${guo_density_node_index_shift_final()}
 
 	checkInvalidValues(&d0, ${position()});
 	checkInvalidValues(&d1, ${position()});
