@@ -14,43 +14,44 @@ ${mrt.body()}
 %endif
 
 %if model == 'mrt' and simtype == 'free-energy':
-${device_func} inline void FE_MRT_relaxate(${bgk_args_decl()},
-%for i in range(0, len(grids)):
-	Dist *d${i},
-%endfor
+%for grid_idx in range(0, len(grids)):
+${device_func} inline void FE_MRT_relaxate${grid_idx}(${bgk_args_decl(grid_idx)}, Dist *d0,
 	int node_type
 	${dynamic_val_args_decl()})
 {
-	${bgk_relaxation_preamble()}
+	${body_force(force_for_eq.get(grid_idx, grid_idx))}
+	${bgk_relaxation_preamble(grid_idx)}
+	## The acceleration vector needs to declared if no force was set in the
+	## previous call to body_force().
+	${body_force(grid_idx, vector_decl=(force_for_eq.get(grid_idx, -1) is None))}
 
-	%for i in range(0, len(grids)):
-		%for idx in grid.idx_name:
-			## Use the BGK approximation for the relaxation of the order parameter field.
-			%if i == 1:
-				d${i}->${idx} += (feq${i}.${idx} - d${i}->${idx}) / tau${i};
-			%else:
-				feq${i}.${idx} = d${i}->${idx} - feq${i}.${idx};
-			%endif
-		%endfor
-	%endfor
-
-	%for dst, src in sym.free_energy_mrt(sim.grid, 'd0', 'feq0'):
-		${dst} -= ${sym.make_float(src)};
-	%endfor
-
-	%for i in range(0, len(grids)):
-		## Is there a force acting on the current grid?
-		%if sym_force.needs_accel(i, forces, force_couplings):
-			${fluid_velocity(i)};
-
-			%for val, idx in zip(sym_force.free_energy_external_force(sim, grid_num=i), grid.idx_name):
-				d${i}->${idx} += ${cex(val)};
-			%endfor
+	%for idx in grid.idx_name:
+		## Use the BGK approximation for the relaxation of the order parameter field.
+		%if grid_idx == 1:
+			d0->${idx} += (feq0.${idx} - d0->${idx}) / tau1;
+		%else:
+			feq0.${idx} = d0->${idx} - feq0.${idx};
 		%endif
 	%endfor
 
-	${fluid_output_velocity()}
+	%if grid_idx == 0:
+		%for dst, src in sym.free_energy_mrt(sim.grid, 'd0', 'feq0'):
+			${dst} -= ${sym.make_float(src)};
+		%endfor
+	%endif
+
+	## Is there a force acting on the current grid?
+	%if sym_force.needs_accel(grid_idx, forces, force_couplings):
+		${fluid_velocity(grid_idx)};
+
+		%for val, idx in zip(sym_force.free_energy_external_force(sim, grid_num=grid_idx), grid.idx_name):
+			d0->${idx} += ${cex(val)};
+		%endfor
+	%endif
+
+	${fluid_output_velocity(grid_idx)}
 }
+%endfor
 %endif  ## model == mrt && simtype == 'free-energy'
 
 %if model == 'elbm':
@@ -76,7 +77,7 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 	%>
 
 	float v0[${dim}];
-	${body_force()}
+	${body_force(grid_idx=0)}
 	${fluid_velocity(0)};
 
 	## Local variables used by the equilibrium.
@@ -109,7 +110,7 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 		d0->${idx} += alpha * fneq0.${idx};
 	%endfor
 
-	${fluid_output_velocity()}
+	${fluid_output_velocity(0)}
 }
 %endif  ## model == elbm
 
@@ -117,46 +118,42 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 //
 // Performs the relaxation step in the BGK model given the density rho,
 // the velocity v and the distribution fi.
-//
-${device_func} inline void BGK_relaxate(${bgk_args_decl()},
-%for i in range(0, len(grids)):
-	Dist *d${i},
-%endfor
-	int node_type, int ncode
+%for grid_idx in range(len(grids)):
+${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
+	Dist *d0, int node_type, int ncode
 	${dynamic_val_args_decl()})
 {
-	${bgk_relaxation_preamble()}
+	${body_force(grid_idx)}
+	${bgk_relaxation_preamble(grid_idx)}
 
-	%for i in range(0, len(grids)):
-		%for idx in grid.idx_name:
-			d${i}->${idx} += (feq${i}.${idx} - d${i}->${idx}) / tau${i};
-		%endfor
-
-		%if nt.NTGuoDensity in node_types:
-			// The total form of the postcollision boundary node distribution value
-			// with the Guo boundary conditions is as follows:
-			//
-			// f_post(O) = f_eq(O) + f(B) - f_eq(B) + omega * (f_eq(B) - f(B))
-			//
-			// where O is the boundary node and B is the fluid node pointed to by the
-			// boundary node normal vector.  The Guo boudary condtiions are implemented
-			// so that all the standard processing proceeds for node B first, and the
-			// correction for node O is added as a postcollision boundary condition.
-			//
-			// The code below takes care of the -f_eq(B) of the formula.
-			if (isNTGuoDensity(node_type)) {
-				%for idx in grid.idx_name:
-					d${i}->${idx} -= feq${i}.${idx};
-				%endfor
-			}
-		%endif
-
-		## Is there a force acting on the current grid?
-		%if sym_force.needs_accel(i, forces, force_couplings):
-			${fluid_velocity(i)};
-			${apply_body_force(i)};
-		%endif
+	%for idx in grid.idx_name:
+		d0->${idx} += (feq0.${idx} - d0->${idx}) / tau${grid_idx};
 	%endfor
+
+	%if nt.NTGuoDensity in node_types:
+		// The total form of the postcollision boundary node distribution value
+		// with the Guo boundary conditions is as follows:
+		//
+		// f_post(O) = f_eq(O) + f(B) - f_eq(B) + omega * (f_eq(B) - f(B))
+		//
+		// where O is the boundary node and B is the fluid node pointed to by the
+		// boundary node normal vector.  The Guo boudary condtiions are implemented
+		// so that all the standard processing proceeds for node B first, and the
+		// correction for node O is added as a postcollision boundary condition.
+		//
+		// The code below takes care of the -f_eq(B) of the formula.
+		if (isNTGuoDensity(node_type)) {
+			%for idx in grid.idx_name:
+				d0->${idx} -= feq0.${idx};
+			%endfor
+		}
+	%endif
+
+	## Is there a force acting on the current grid?
+	%if sym_force.needs_accel(grid_idx, forces, force_couplings):
+		${fluid_velocity(grid_idx)};
+		${apply_body_force(grid_idx)};
+	%endif
 
 	// FIXME: This should be moved to postcollision boundary conditions.
 	%if nt.NTGuoDensity in node_types:
@@ -166,35 +163,27 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 			float par_phi = 1.0f;
 			tau0 = tau_a;
 
-			%for i, eq in enumerate([f(g, config) for f, g, in zip(equilibria, grids)]):
-				%for local_var in eq.local_vars:
-					const float ${cex(local_var.lhs)} =
-						${cex(local_var.rhs, rho='par_rho', phi='par_phi')};
-				%endfor
-				%for feq, idx in zip(eq.expression, grid.idx_name):
-					d${i}->${idx} += ${cex(feq, rho='par_rho', phi='par_phi')};
-				%endfor
+			<% eq = equilibria[grid_idx](grids[grid_idx], config) %>
+			%for local_var in eq.local_vars:
+				const float ${cex(local_var.lhs)} =
+					${cex(local_var.rhs, rho='par_rho', phi='par_phi')};
+			%endfor
+			%for feq, idx in zip(eq.expression, grid.idx_name):
+				d0->${idx} += ${cex(feq, rho='par_rho', phi='par_phi')};
 			%endfor
 		}
 	%endif
 
-	${fluid_output_velocity()}
+	${fluid_output_velocity(grid_idx)}
 }
+%endfor
 %endif
 
-<%def name="_relaxate(bgk_args)">
+<%def name="_relaxate(bgk_args, grid_idx)">
 	%if model == 'bgk':
-		BGK_relaxate(${bgk_args()},
-%for i in range(0, len(grids)):
-	&d${i},
-%endfor
-	type, ncode ${dynamic_val_call_args()});
+		BGK_relaxate${grid_idx}(${bgk_args(grid_idx)}, &d0, type, ncode ${dynamic_val_call_args()});
 	%elif model == 'mrt' and simtype == 'free-energy':
-		FE_MRT_relaxate(${bgk_args()},
-%for i in range(0, len(grids)):
-	&d${i},
-%endfor
-	type ${dynamic_val_call_args()});
+		FE_MRT_relaxate${grid_idx}(${bgk_args(grid_idx)}, &d0, type ${dynamic_val_call_args()});
 	%elif model == 'elbm':
 		ELBM_relaxate(${bgk_args()}, &d0 ${dynamic_val_call_args()} ${cond(alpha_output, ', options, alpha + gi')});
 	%else:
@@ -202,10 +191,10 @@ ${device_func} inline void BGK_relaxate(${bgk_args_decl()},
 	%endif
 </%def>
 
-<%def name="relaxate(bgk_args)">
+<%def name="relaxate(bgk_args, grid_idx=0)">
 	%if relaxation_enabled:
 		if (isWetNode(type)) {
-			${_relaxate(bgk_args)}
+			${_relaxate(bgk_args, grid_idx)}
 		}
 	%endif
 </%def>

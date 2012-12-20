@@ -3,29 +3,38 @@
     import sailfish.node_type as nt
     import sympy
 %>
+<%
+	# Necessary to support force reassignment in the free energy MRT model.
+    phi_needs_rho = (force_for_eq is not UNDEFINED and force_for_eq.get(1) == 0)
+%>
 
-<%def name="bgk_args_decl_sc()">
-	float rho, float phi, float *iv0, float *ea0, float *ea1
+<%def name="bgk_args_decl_sc(grid_idx)">
+	%if grid_idx == 0:
+		float rho, float *iv0, float *ea${grid_idx}
+	%else:
+		float phi, float *iv0, float *ea${grid_idx}
+	%endif
 </%def>
 
-<%def name="bgk_args_decl_fe()">
-	float rho, float phi, float lap1, float *iv0, float *grad1
+<%def name="bgk_args_decl_fe(grid_idx)">
+	%if grid_idx == 0:
+		float rho, float phi, float lap1, float *iv0, float *grad1
+	%else:
+		${'float rho, ' if phi_needs_rho else ''} float phi, float lap1, float *iv0
+	%endif
 </%def>
 
-<%def name="bgk_args_sc()">
-	g0m0, g1m0, v, sca0, sca1
+<%def name="bgk_args_fe(grid_idx)">
+	%if grid_idx == 0:
+		g0m0, g1m0, lap1, v, grad1
+	%else:
+		${'g0m0, ' if phi_needs_rho else ''} g1m0, lap1, v
+	%endif
 </%def>
 
-<%def name="bgk_args_fe()">
-	g0m0, g1m0, lap1, v, grad1
-</%def>
-
-// In the free-energy model, the relaxation time is a local quantity.
 %if simtype == 'shan-chen':
+	## In the free-energy model, the relaxation time is a local quantity.
 	${const_var} float tau0 = ${tau}f;		// relaxation time
-%endif
-
-%if simtype == 'shan-chen':
 	// Relaxation time for the 2nd fluid component.
 %else:
 	// Relaxation time for the order parameter field.
@@ -47,7 +56,9 @@ ${const_var} float tau1 = ${tau_phi}f;
 <%namespace file="propagation.mako" import="*"/>
 <%namespace file="utils.mako" import="*"/>
 
+%if simtype == 'free-energy':
 <%include file="finite_difference_optimized.mako"/>
+%endif
 
 <%def name="init_dist_with_eq()">
 	%if simtype == 'free-energy':
@@ -95,7 +106,8 @@ ${kernel} void SetInitialConditions(
 	${init_dist_with_eq()}
 }
 
-${kernel} void PrepareMacroFields(
+%if simtype == 'free-energy':
+${kernel} void FreeEnergyPrepareMacroFields(
 	${global_ptr} int *map,
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *dist2_in,
@@ -106,23 +118,7 @@ ${kernel} void PrepareMacroFields(
 	${iteration_number_if_required()})
 {
 	${local_indices_split()}
-
-	int ncode = map[gi];
-	int type = decodeNodeType(ncode);
-
-	// Unused nodes do not participate in the simulation.
-	if (isExcludedNode(type))
-		return;
-
-	int orientation = decodeNodeOrientation(ncode);
-
-	%if simtype == 'shan-chen':
-		// Do not update the macroscopic fields for nodes which do not
-		// represent any fluid.
-		if (!isWetNode(type)) {
-			return;
-		}
-	%endif
+	${load_node_type()}
 
 	// Do not not update the fields for pressure nodes, where by definition
 	// they are constant.
@@ -135,99 +131,86 @@ ${kernel} void PrepareMacroFields(
 	Dist fi;
 	float out;
 
-	%if sim._fields['rho'].abstract.need_nn:
-		getDist(&fi, dist1_in, gi ${iteration_number_arg_if_required()});
-		get0thMoment(&fi, type, orientation, &out);
-		orho[gi] = out;
-	%endif
-
-	%if simtype == 'free-energy':
-		if (isWetNode(type)) {
-			getDist(&fi, dist2_in, gi ${iteration_number_arg_if_required()});
-			get0thMoment(&fi, type, orientation, &out);
-			ophi[gi] = out;
-		}
-
-		## Assume neutral wetting for all walls by adjusting the phase gradient
-		## near the wall.
-		##
-		## This wetting boundary condition implementation is as in option 2 in
-		## Halim Kusumaatmaja's PhD thesis, p.18.
-
-		## Symbols used on the schematics below:
-		##
-		## W: wall node (current node, pointed to by 'gi')
-		## F: fluid node
-		## |: actual location of the wall
-		## .: space between fluid nodes
-		## x: node from which data is read
-		## y: node to which data is being written
-		##
-		## The schematics assume a bc_wall_grad_order of 2.
-		%if nt.NTFullBBWall in node_types:
-			int helper_idx = gi;
-			## Full BB: F . F | W
-			##          x ----> y
-			if (isNTFullBBWall(type)) {
-				switch (orientation) {
-					%for dir in grid.dir2vecidx.keys():
-						case ${dir}: {  // ${grid.dir_to_vec(dir)}
-							%if dim == 3:
-								helper_idx += ${rel_offset(*(bc_wall_grad_order*grid.dir_to_vec(dir)))};
-							%else:
-								## rel_offset() needs a 3-vector, so make the z-coordinate 0
-								helper_idx += ${rel_offset(*(list(bc_wall_grad_order*grid.dir_to_vec(dir)) + [0]))};
-							%endif
-							break;
-						}
-					%endfor
-				}
-				getDist(&fi, dist2_in, helper_idx ${iteration_number_arg_if_required()});
-				get0thMoment(&fi, type, orientation, &out);
-				ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-			}
-		%endif  ## NTFullBBWall
-		%if nt.NTHalfBBWall in node_types:
-			%if bc_wall_grad_order != 1:
-				__ONLY_FIRST_ORDER_GRADIENTS_ARE_SUPPORTED_FOR_HALF_BB_WETTING_WALLS__
-			%endif
-			int helper_idx = gi;
-
-			## Half-way  BB: F . W | U
-			##               x ----> y
-			if (isNTHalfBBWall(type)) {
-				switch (orientation) {
-					%for dir in grid.dir2vecidx.keys():
-						case ${dir}: {  // ${grid.dir_to_vec(dir)}
-							%if dim == 3:
-								helper_idx -= ${rel_offset(*(grid.dir_to_vec(dir)))};
-							%else:
-								helper_idx -= ${rel_offset(*(list(grid.dir_to_vec(dir)) + [0]))};
-							%endif
-							break;
-						}
-					%endfor
-				}
-
-				ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
-			}
-		%endif
-	%else:	## shan-chen
+	if (isWetNode(type)) {
 		getDist(&fi, dist2_in, gi ${iteration_number_arg_if_required()});
 		get0thMoment(&fi, type, orientation, &out);
 		ophi[gi] = out;
+	}
+
+	## Assume neutral wetting for all walls by adjusting the phase gradient
+	## near the wall.
+	##
+	## This wetting boundary condition implementation is as in option 2 in
+	## Halim Kusumaatmaja's PhD thesis, p.18.
+
+	## Symbols used on the schematics below:
+	##
+	## W: wall node (current node, pointed to by 'gi')
+	## F: fluid node
+	## |: actual location of the wall
+	## .: space between fluid nodes
+	## x: node from which data is read
+	## y: node to which data is being written
+	##
+	## The schematics assume a bc_wall_grad_order of 2.
+	%if nt.NTFullBBWall in node_types:
+		int helper_idx = gi;
+		## Full BB: F . F | W
+		##          x ----> y
+		if (isNTFullBBWall(type)) {
+			switch (orientation) {
+				%for dir in grid.dir2vecidx.keys():
+					case ${dir}: {  // ${grid.dir_to_vec(dir)}
+						%if dim == 3:
+							helper_idx += ${rel_offset(*(bc_wall_grad_order*grid.dir_to_vec(dir)))};
+						%else:
+							## rel_offset() needs a 3-vector, so make the z-coordinate 0
+							helper_idx += ${rel_offset(*(list(bc_wall_grad_order*grid.dir_to_vec(dir)) + [0]))};
+						%endif
+						break;
+					}
+				%endfor
+			}
+			getDist(&fi, dist2_in, helper_idx ${iteration_number_arg_if_required()});
+			get0thMoment(&fi, type, orientation, &out);
+			ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+		}
+	%endif  ## NTFullBBWall
+	%if nt.NTHalfBBWall in node_types:
+		%if bc_wall_grad_order != 1:
+			__ONLY_FIRST_ORDER_GRADIENTS_ARE_SUPPORTED_FOR_HALF_BB_WETTING_WALLS__
+		%endif
+		int helper_idx = gi;
+
+		## Half-way  BB: F . W | U
+		##               x ----> y
+		if (isNTHalfBBWall(type)) {
+			switch (orientation) {
+				%for dir in grid.dir2vecidx.keys():
+					case ${dir}: {  // ${grid.dir_to_vec(dir)}
+						%if dim == 3:
+							helper_idx -= ${rel_offset(*(grid.dir_to_vec(dir)))};
+						%else:
+							helper_idx -= ${rel_offset(*(list(grid.dir_to_vec(dir)) + [0]))};
+						%endif
+						break;
+					}
+				%endfor
+			}
+
+			ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
+		}
 	%endif
 }
 
-${kernel} void CollideAndPropagate(
+${kernel} void FreeEnergyCollideAndPropagateFluid(
 	${global_ptr} int *map,
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *dist1_out,
-	${global_ptr} float *dist2_in,
-	${global_ptr} float *dist2_out,
 	${global_ptr} float *gg0m0,
 	${global_ptr} float *gg1m0,
 	${kernel_args_1st_moment('ov')}
+	${global_ptr} float *gg1laplacian,
 	int options
 	${scratch_space_if_required()}
 	${iteration_number_if_required()})
@@ -237,74 +220,83 @@ ${kernel} void CollideAndPropagate(
 	${load_node_type()}
 	${guo_density_node_index_shift_intro()}
 
-	%if simtype == 'free-energy':
-		float lap1, grad1[${dim}];
+	float lap1, grad1[${dim}];
+	if (isWetNode(type)) {
+		laplacian_and_grad(gg1m0, 1, gi, &lap1, grad1, gx, gy ${', gz' if dim == 3 else ''});
+	}
 
-		if (isWetNode(type)) {
-			%if dim == 2:
-				laplacian_and_grad(gg1m0, 1, gi, &lap1, grad1, gx, gy);
-			%else:
-				laplacian_and_grad(gg1m0, 1, gi, &lap1, grad1, gx, gy, gz);
-			%endif
-		}
-	%elif simtype == 'shan-chen':
-		${sc_calculate_accel()}
-	%endif
-
-	// cache the distributions in local variables
-	Dist d0, d1;
-	getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
-	getDist(&d1, dist2_in, gi ${iteration_number_arg_if_required()});
-
-	${guo_density_restore_index()}
-
-	// macroscopic quantities for the current cell
+	// Macroscopic quantities for the current cell.
 	float g0m0, v[${dim}], g1m0;
 
-	%if simtype == 'free-energy':
-		getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
-		// TODO(michalj): Is this really needed?
-		get0thMoment(&d1, type, orientation, &g1m0);
-	%elif simtype == 'shan-chen':
-		${sc_macro_fields()}
+	// Cache the distributions in local variables.
+	Dist d0;
+	getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
+	g1m0 = gg1m0[gi];
+	${guo_density_restore_index()}
+
+	getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
+
+	// Save laplacian and velocity to global memory so that they can be reused
+	// in the relaxation of the order parameter field.
+	ovx[gi] = v[0];
+	ovy[gi] = v[1];
+	${'ovz[gi] = v[2]' if dim == 3 else ''};
+	gg1laplacian[gi] = lap1;
+
+	%if phi_needs_rho:
+		gg0m0[gi] = g0m0;
 	%endif
 
 	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
-	precollisionBoundaryConditions(&d1, ncode, type, orientation, &g1m0, v);
-
-	%if simtype == 'shan-chen':
-		${relaxate(bgk_args_sc)}
-	%elif simtype == 'free-energy':
-		${relaxate(bgk_args_fe)}
-	%endif
-
-	// FIXME: In order for the half-way bounce back boundary condition to work, a layer of unused
-	// nodes currently has to be placed behind the wall layer.
+	${relaxate(bgk_args_fe, 0)}
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist1_out);
-	postcollisionBoundaryConditions(&d1, ncode, type, orientation, &g1m0, v, gi, dist2_out);
-
 	${guo_density_node_index_shift_final()}
-
-	checkInvalidValues(&d0, ${position()});
-	checkInvalidValues(&d1, ${position()});
-
-	// Only save the macroscopic quantities if requested to do so.
-	if (options & OPTION_SAVE_MACRO_FIELDS) {
-		%if simtype == 'shan-chen':
-			if (isWetNode(type))
-		%endif
-		{
-			ovx[gi] = v[0];
-			ovy[gi] = v[1];
-			%if dim == 3:
-				ovz[gi] = v[2];
-			%endif
-		}
-	}
-
+	${check_invalid_values()}
+	${save_macro_fields(velocity=False)}
 	${propagate('dist1_out', 'd0')}
-	${barrier()}
-	${propagate('dist2_out', 'd1')}
 }
+
+${kernel} void FreeEnergyCollideAndPropagateOrderParam(
+	${global_ptr} int *map,
+	${global_ptr} float *dist1_in,
+	${global_ptr} float *dist1_out,
+	${global_ptr + ' float *gg0m0,' if phi_needs_rho else ''}
+	${global_ptr} float *gg1m0,
+	${kernel_args_1st_moment('ov')}
+	${global_ptr} float *gg1laplacian,
+	int options
+	${scratch_space_if_required()}
+	${iteration_number_if_required()})
+{
+	${local_indices_split()}
+	${shared_mem_propagation_vars()}
+	${load_node_type()}
+	${guo_density_node_index_shift_intro()}
+	// Cache the distributions in local variables.
+	Dist d0;
+	getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
+	${guo_density_restore_index()}
+	float lap1 = gg1laplacian[gi];
+	float g1m0, v[${dim}];
+	${'float g0m0 = gg0m0[gi];' if phi_needs_rho else ''}
+
+	v[0] = ovx[gi];
+	v[1] = ovy[gi];
+	${'v[2] = ovz[gi]' if dim == 3 else ''};
+	g1m0 = gg1m0[gi];
+
+	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v);
+	${relaxate(bgk_args_fe, 1)}
+	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v, gi, dist1_out);
+	${guo_density_node_index_shift_final()}
+	${check_invalid_values()}
+	${propagate('dist1_out', 'd0')}
+}
+
+%endif  ## free-energy
+
+%if simtype == 'shan-chen':
+<%include file="binary_shan_chen.mako"/>
+%endif  ## shan-chen
 
 <%include file="util_kernels.mako"/>

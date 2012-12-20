@@ -1,5 +1,6 @@
 <%!
-    from sailfish import sym
+  from sailfish import sym
+  import sailfish.node_type as nt
 %>
 
 <%page args="bgk_args_decl"/>
@@ -122,6 +123,30 @@
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);
+</%def>
+
+<%def name="check_invalid_values()">
+	## Grad outflow nodes use invalid values to tag directions lacking distribution
+	## data.
+	if (isWetNode(type) ${'&& !isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
+		checkInvalidValues(&d0, ${position()});
+	}
+</%def>
+
+<%def name="save_macro_fields(density=True, velocity=True)">
+	// Only save the macroscopic quantities if requested to do so.
+	if ((options & OPTION_SAVE_MACRO_FIELDS) && isWetNode(type)
+		## Nodes using the Grad approximation use the velocity from the
+		## previous time step to compute the approximated distributions.
+		${'|| isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
+		gg0m0[gi] = g0m0 ${' +1.0f' if config.minimize_roundoff else ''};
+
+		%if not initialization and velocity:
+			ovx[gi] = v[0];
+			ovy[gi] = v[1];
+			${'ovz[gi] = v[2]' if dim == 3 else ''};
+		%endif
+	}
 </%def>
 
 ## Defines local indices for bulk kernels.
@@ -410,10 +435,10 @@
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 %endif
 
-<%def name="position_decl()">
-	int gx, int gy
+<%def name="position_decl(prefix='g')">
+	int ${prefix}x, int ${prefix}y
 	%if dim == 3:
-		, int gz
+		, int ${prefix}z
 	%endif
 </%def>
 

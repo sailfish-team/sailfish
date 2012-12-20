@@ -5,30 +5,30 @@
 <%namespace file="code_common.mako" import="*"/>
 
 ## Defines the actual acceleration vectors.
-<%def name="body_force()">
+<%def name="body_force(grid_idx, vector_decl=True)">
 	%if forces is not UNDEFINED and (forces.numeric or forces.symbolic):
-		// Body force acceleration.
-		%if forces.symbolic and time_dependence:
-			float phys_time = get_time_from_iteration(iteration_number);
-		%endif
-		%for i in range(0, len(grids)):
-			%if sym_force.needs_accel(i, forces, {}):
-				%if not sym_force.needs_coupling_accel(i, force_couplings):
-					float ea${i}[${dim}];
-					%for j in range(0, dim):
-						ea${i}[${j}] = ${cex(sym_force.body_force_accel(i, j, forces, accel=True))};
-					%endfor
-				%else:
-					## If the current grid has a Shan-Chen force acting on it, the acceleration vector
-					## is already externally defined in the Shan-Chen code.
-					%for j in range(0, dim):
-						%if i in forces.symbolic or i in forces.numeric:
-							ea${i}[${j}] += ${cex(sym_force.body_force_accel(i, j, forces, accel=True))};
-						%endif
-					%endfor
-				%endif
+		%if sym_force.needs_accel(grid_idx, forces, {}):
+			%if forces.symbolic and time_dependence:
+				float phys_time = get_time_from_iteration(iteration_number);
 			%endif
-		%endfor
+			// Body force acceleration.
+			%if not sym_force.needs_coupling_accel(grid_idx, force_couplings):
+				%if vector_decl:
+					float ea${grid_idx}[${dim}];
+				%endif
+				%for j in range(0, dim):
+					ea${grid_idx}[${j}] = ${cex(sym_force.body_force_accel(grid_idx, j, forces, accel=True))};
+				%endfor
+			%else:
+				## If the current grid has a Shan-Chen force acting on it, the acceleration vector
+				## is already externally defined in the Shan-Chen code.
+				%for j in range(0, dim):
+					%if grid_idx in forces.symbolic or grid_idx in forces.numeric:
+						ea${grid_idx}[${j}] += ${cex(sym_force.body_force_accel(grid_idx, j, forces, accel=True))};
+					%endif
+				%endfor
+			%endif
+		%endif
 	%endif
 </%def>
 
@@ -37,7 +37,7 @@
 	// Guo's method, eqs. 19 and 20 from 10.1103/PhysRevE.65.046308.
 	const float pref = ${cex(sym_force.guo_external_force_pref(grids[i], config, grid_num=i))};
 	%for val, idx in zip(sym_force.guo_external_force(grid, grid_num=i), grid.idx_name):
-		d${i}->${idx} += ${cex(val)};
+		d0->${idx} += ${cex(val)};
 	%endfor
 }
 </%def>
@@ -46,7 +46,7 @@
 {
 	// Exact difference method.
 	%for feq_shifted, idx in zip(sym_force.edm_shift_velocity(equilibria[i](grids[i], config).expression), grid.idx_name):
-		d${i}->${idx} += ${cex(feq_shifted)} - feq${i}.${idx};
+		d0->${idx} += ${cex(feq_shifted)} - feq${i}.${idx};
 	%endfor
 }
 </%def>
@@ -57,7 +57,7 @@
 <%def name="apply_body_force(i)">
 	%if simtype == 'free-energy':
 		%for val, idx in zip(sym_force.free_energy_external_force(sim, grid_num=i), grid.idx_name):
-			d${i}->${idx} += ${cex(val)};
+			d0->${idx} += ${cex(val)};
 		%endfor
 	%else:
 		%if force_implementation == 'guo':
@@ -104,10 +104,10 @@
 	%endif
 </%def>
 
-<%def name="update_relaxation_time()">
+<%def name="update_relaxation_time(grid_idx)">
 	## In models where the relaxation time is constant everywhere, tau0 is a global
 	## constant and does not need to be declared here.
-	%if simtype == 'free-energy':
+	%if simtype == 'free-energy' and grid_idx == 0:
 		// Linear interpolation of relaxation time.
 		float tau0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) / 2.0f;
 		if (phi < -1.0f) {
@@ -119,60 +119,54 @@
 
 	%if subgrid == 'les-smagorinsky':
 		// Compute relaxation time using the standard viscosity-relaxation time relation.
-		%for i in range(0, len(grids)):
-			float tau${i} = 0.5f + 3.0f * visc;
-		%endfor
+		float tau0 = 0.5f + 3.0f * visc;
 
-		## FIXME: This will not work properly for multifluid models.
+		// TODO(michalj): Fix this for multifluid models.
 		// Modify the relaxation time proportionally to the modulus of the local strain rate tensor.
 		// The 2nd order tensor formed from the equilibrium distributions is rho / 3 * \delta_{ab} + rho u_a u_b
 		{
 			float tmp, strain;
 
-			%for i in range(0, len(grids)):
-				strain = 0.0f;
+			strain = 0.0f;
 
-				// Off-diagonal components, count twice for symmetry reasons.
-				%for a in range(0, dim):
-					%for b in range(a+1, dim):
-						 tmp = ${cex(sym.ex_flux(grid, 'd%d' % i, a, b, config), pointers=True)} -
-							   ${cex(sym.S.rho * grid.v[a] * grid.v[b])};
-						 strain += 2.0f * tmp * tmp;
-					%endfor
+			// Off-diagonal components, count twice for symmetry reasons.
+			%for a in range(0, dim):
+				%for b in range(a+1, dim):
+					 tmp = ${cex(sym.ex_flux(grid, 'd0', a, b, config), pointers=True)} -
+						   ${cex(sym.S.rho * grid.v[a] * grid.v[b])};
+					 strain += 2.0f * tmp * tmp;
 				%endfor
-
-				// Diagonal components.
-				%for a in range(0, dim):
-					tmp = ${cex(sym.ex_flux(grid, 'd%d' % i, a, a, config), pointers=True)} -
-						  ${cex(sym.S.rho * (grid.v[a] * grid.v[b] + grid.cssq))};
-					strain += tmp * tmp;
-				%endfor
-
-				// Form of the relaxation time correction as in comp-gas/9401004v1.
-				tau${i} += (sqrtf(visc*visc + 18.0f * ${cex(smagorinsky_const**2)} *
-							sqrtf(strain)) - visc) / 2.0f;
 			%endfor
+
+			// Diagonal components.
+			%for a in range(0, dim):
+				tmp = ${cex(sym.ex_flux(grid, 'd0', a, a, config), pointers=True)} -
+					  ${cex(sym.S.rho * (grid.v[a] * grid.v[b] + grid.cssq))};
+				strain += tmp * tmp;
+			%endfor
+
+			// Form of the relaxation time correction as in comp-gas/9401004v1.
+			tau0 += (sqrtf(visc*visc + 18.0f * ${cex(smagorinsky_const**2)} *
+					  sqrtf(strain)) - visc) / 2.0f;
 		}
 	%endif
 </%def>
 
 ## Code common to all BGK-like relaxation models.
-<%def name="bgk_relaxation_preamble()">
+<%def name="bgk_relaxation_preamble(grid_idx=0)">
 	float v0[${dim}];
-	${body_force()}
 
-	%for i, eq in enumerate([f(g, config) for f, g in zip(equilibria, grids)]):
-		Dist feq${i};
-		${fluid_velocity(i, equilibrium=True)};
+	<% eq = equilibria[grid_idx](grids[grid_idx], config) %>
+	Dist feq0;
+	${fluid_velocity(grid_idx, equilibrium=True)};
 
-		%for local_var in eq.local_vars:
-			float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
-		%endfor
-
-		%for feq, idx in zip(eq.expression, grid.idx_name):
-			feq${i}.${idx} = ${cex(feq)};
-		%endfor
+	%for local_var in eq.local_vars:
+		float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
 	%endfor
 
-	${update_relaxation_time()}
+	%for feq, idx in zip(eq.expression, grid.idx_name):
+		feq0.${idx} = ${cex(feq)};
+	%endfor
+
+	${update_relaxation_time(grid_idx)}
 </%def>

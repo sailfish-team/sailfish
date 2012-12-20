@@ -199,6 +199,7 @@ class CUDABackend(object):
 
         if needs_iteration:
             args_format += 'i'
+            args = list(args)
             args.append(0)
             self._iteration_kernels.append(kern)
 

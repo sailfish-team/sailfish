@@ -8,7 +8,7 @@ from collections import defaultdict
 from functools import partial
 import numpy as np
 from sailfish import subdomain_runner, sym, sym_equilibrium
-from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField
+from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField, KernelPair
 from sailfish.lb_single import MacroKernels
 
 
@@ -92,74 +92,6 @@ class LBBinaryFluidBase(LBSim):
         ret = MacroKernels(macro=macro_kernels, distributions=dist_kernels)
         return ret
 
-    def get_compute_kernels(self, runner, full_output, bulk):
-        gpu_rho = runner.gpu_field(self.rho)
-        gpu_phi = runner.gpu_field(self.phi)
-        gpu_v = runner.gpu_field(self.v)
-        gpu_map = runner.gpu_geo_map()
-
-        gpu_dist1a = runner.gpu_dist(0, 0)
-        gpu_dist1b = runner.gpu_dist(0, 1)
-        gpu_dist2a = runner.gpu_dist(1, 0)
-        gpu_dist2b = runner.gpu_dist(1, 1)
-
-        options = 0
-        if full_output:
-            options |= 1
-        if bulk:
-            options |= 2
-
-        options = np.uint32(options)
-        args1 = [gpu_map, gpu_dist1a, gpu_dist1b, gpu_dist2a, gpu_dist2b,
-                gpu_rho, gpu_phi] + gpu_v + [options]
-        args2 = [gpu_map, gpu_dist1b, gpu_dist1a, gpu_dist2b, gpu_dist2a,
-                gpu_rho, gpu_phi] + gpu_v + [options]
-
-        macro_args1 = [gpu_map, gpu_dist1a, gpu_dist2a, gpu_rho, gpu_phi,
-                options]
-        macro_args2 = [gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi,
-                options]
-
-        args_signature = 'P' * (len(args1) - 1) + 'i'
-        macro_signature = 'P' * (len(macro_args1) - 1) + 'i'
-
-        if runner.gpu_scratch_space is not None:
-            macro_args1.append(runner.gpu_scratch_space)
-            macro_args2.append(runner.gpu_scratch_space)
-            macro_signature += 'P'
-
-            args1.append(runner.gpu_scratch_space)
-            args2.append(runner.gpu_scratch_space)
-            args_signature += 'P'
-
-        macro_kernels = [
-            runner.get_kernel('PrepareMacroFields', macro_args1,
-                macro_signature,
-                needs_iteration=self.config.needs_iteration_num)]
-
-        if self.config.access_pattern == 'AB':
-            macro_kernels.append(
-                runner.get_kernel('PrepareMacroFields', macro_args2,
-                    macro_signature,
-                    needs_iteration=self.config.needs_iteration_num))
-        else:
-            macro_kernels.append(macro_kernels[-1])
-
-        sim_kernels = [
-            runner.get_kernel('CollideAndPropagate', args1,
-                args_signature,
-                needs_iteration=self.config.needs_iteration_num)]
-
-        if self.config.access_pattern == 'AB':
-            sim_kernels.append(
-                runner.get_kernel('CollideAndPropagate', args2,
-                    args_signature,
-                    needs_iteration=self.config.needs_iteration_num))
-        else:
-            sim_kernels.append(sim_kernels[-1])
-
-        return zip(macro_kernels, sim_kernels)
-
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
         gpu_phi = runner.gpu_field(self.phi)
@@ -203,7 +135,8 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
 
     @classmethod
     def fields(cls):
-        return [ScalarField('rho'), ScalarField('phi', need_nn=True), VectorField('v')]
+        return [ScalarField('rho'), ScalarField('phi', need_nn=True),
+                VectorField('v'), ScalarField('phi_laplacian')]
 
     @classmethod
     def add_options(cls, group, dim):
@@ -318,6 +251,101 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
                     self.S.wxx.append(-Rational(1, 24))
                     self.S.wyy.append(-Rational(1, 24))
 
+    def get_compute_kernels(self, runner, full_output, bulk):
+        gpu_rho = runner.gpu_field(self.rho)
+        gpu_phi = runner.gpu_field(self.phi)
+        gpu_lap = runner.gpu_field(self.phi_laplacian)
+        gpu_v = runner.gpu_field(self.v)
+        gpu_map = runner.gpu_geo_map()
+
+        gpu_dist1a = runner.gpu_dist(0, 0)
+        gpu_dist1b = runner.gpu_dist(0, 1)
+        gpu_dist2a = runner.gpu_dist(1, 0)
+        gpu_dist2b = runner.gpu_dist(1, 1)
+
+        options = 0
+        if full_output:
+            options |= 1
+        if bulk:
+            options |= 2
+
+        if hasattr(self, '_force_term_for_eq') and self._force_term_for_eq.get(1) == 0:
+            phi_args = [gpu_rho, gpu_phi]
+        else:
+            phi_args = [gpu_phi]
+
+        options = np.uint32(options)
+        # Primary.
+        args1a = ([gpu_map, gpu_dist1a, gpu_dist1b, gpu_rho, gpu_phi] +
+                  gpu_v + [gpu_lap, options])
+        args1b = ([gpu_map, gpu_dist2a, gpu_dist2b] + phi_args +
+                  gpu_v + [gpu_lap, options])
+        # Secondary.
+        args2a = ([gpu_map, gpu_dist1b, gpu_dist1a, gpu_rho, gpu_phi] +
+                  gpu_v + [gpu_lap, options])
+        args2b = ([gpu_map, gpu_dist2b, gpu_dist2a] + phi_args +
+                  gpu_v + [gpu_lap, options])
+
+        macro_args1 = [gpu_map, gpu_dist1a, gpu_dist2a, gpu_rho, gpu_phi,
+                       options]
+        macro_args2 = [gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi,
+                       options]
+
+        args_a_signature = 'P' * (len(args1a) - 1) + 'i'
+        args_b_signature = 'P' * (len(args1b) - 1) + 'i'
+        macro_signature = 'P' * (len(macro_args1) - 1) + 'i'
+
+        if runner.gpu_scratch_space is not None:
+            macro_args1.append(runner.gpu_scratch_space)
+            macro_args2.append(runner.gpu_scratch_space)
+            macro_signature += 'P'
+
+            args1a.append(runner.gpu_scratch_space)
+            args2a.append(runner.gpu_scratch_space)
+            args1b.append(runner.gpu_scratch_space)
+            args2b.append(runner.gpu_scratch_space)
+            args_a_signature += 'P'
+            args_b_signature += 'P'
+
+        macro = runner.get_kernel('FreeEnergyPrepareMacroFields', macro_args1,
+                                  macro_signature,
+                                  needs_iteration=self.config.needs_iteration_num)
+
+        if self.config.access_pattern == 'AB':
+            macro_secondary = runner.get_kernel('FreeEnergyPrepareMacroFields',
+                                                macro_args2,
+                                                macro_signature,
+                                                needs_iteration=self.config.needs_iteration_num)
+            macro_pair = KernelPair(macro, macro_secondary)
+        else:
+            macro_pair = KernelPair(macro, macro)
+
+        # Note: these two kernels need to be executed in order.
+        primary = [
+            runner.get_kernel('FreeEnergyCollideAndPropagateFluid', args1a,
+                              args_a_signature,
+                              needs_iteration=self.config.needs_iteration_num),
+            runner.get_kernel('FreeEnergyCollideAndPropagateOrderParam', args1b,
+                              args_b_signature,
+                              needs_iteration=self.config.needs_iteration_num)
+        ]
+
+        if self.config.access_pattern == 'AB':
+            secondary = [
+                runner.get_kernel('FreeEnergyCollideAndPropagateFluid', args2a,
+                                  args_a_signature,
+                                  needs_iteration=self.config.needs_iteration_num),
+                runner.get_kernel('FreeEnergyCollideAndPropagateOrderParam',
+                                  args2b,
+                                  args_b_signature,
+                                  needs_iteration=self.config.needs_iteration_num)
+            ]
+            sim_pair = KernelPair(primary, secondary)
+        else:
+            sim_pair = KernelPair(primary, primary)
+
+        return zip(macro_pair, sim_pair)
+
 
 class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
     """Binary fluid mixture using the Shan-Chen model."""
@@ -359,3 +387,90 @@ class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
         ctx['sc_potential'] = self.config.sc_potential
         ctx['tau'] = sym.relaxation_time(self.config.visc)
         ctx['visc'] = self.config.visc
+
+    def get_compute_kernels(self, runner, full_output, bulk):
+        gpu_rho = runner.gpu_field(self.rho)
+        gpu_phi = runner.gpu_field(self.phi)
+        gpu_v = runner.gpu_field(self.v)
+        gpu_map = runner.gpu_geo_map()
+
+        gpu_dist1a = runner.gpu_dist(0, 0)
+        gpu_dist1b = runner.gpu_dist(0, 1)
+        gpu_dist2a = runner.gpu_dist(1, 0)
+        gpu_dist2b = runner.gpu_dist(1, 1)
+
+        options = 0
+        if full_output:
+            options |= 1
+        if bulk:
+            options |= 2
+
+        options = np.uint32(options)
+        # Primary.
+        args1a = ([gpu_map, gpu_dist1a, gpu_dist1b, gpu_rho, gpu_phi] +
+                  gpu_v + [options])
+        args1b = ([gpu_map, gpu_dist2a, gpu_dist2b, gpu_rho, gpu_phi] +
+                  gpu_v + [options])
+        # Secondary.
+        args2a = ([gpu_map, gpu_dist1b, gpu_dist1a, gpu_rho, gpu_phi] +
+                  gpu_v + [options])
+        args2b = ([gpu_map, gpu_dist2b, gpu_dist2a, gpu_rho, gpu_phi] +
+                  gpu_v + [options])
+
+        macro_args1 = ([gpu_map, gpu_dist1a, gpu_dist2a, gpu_rho, gpu_phi] +
+                       gpu_v + [options])
+        macro_args2 = ([gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi] +
+                       gpu_v + [options])
+
+        args_a_signature = 'P' * (len(args1a) - 1) + 'i'
+        args_b_signature = 'P' * (len(args1b) - 1) + 'i'
+        macro_signature = 'P' * (len(macro_args1) - 1) + 'i'
+
+        if runner.gpu_scratch_space is not None:
+            macro_args1.append(runner.gpu_scratch_space)
+            macro_args2.append(runner.gpu_scratch_space)
+            macro_signature += 'P'
+
+            args1a.append(runner.gpu_scratch_space)
+            args2a.append(runner.gpu_scratch_space)
+            args1b.append(runner.gpu_scratch_space)
+            args2b.append(runner.gpu_scratch_space)
+            args_a_signature += 'P'
+            args_b_signature += 'P'
+
+        macro = runner.get_kernel('ShanChenPrepareMacroFields', macro_args1,
+                                  macro_signature,
+                                  needs_iteration=self.config.needs_iteration_num)
+
+        if self.config.access_pattern == 'AB':
+            macro_secondary = runner.get_kernel('ShanChenPrepareMacroFields', macro_args2,
+                                                macro_signature,
+                                                needs_iteration=self.config.needs_iteration_num)
+            macro_pair = KernelPair(macro, macro_secondary)
+        else:
+            macro_pair = KernelPair(macro, macro)
+
+        # TODO(michalj): These kernels can actually run in parallel.
+        primary = [
+            runner.get_kernel('ShanChenCollideAndPropagate0', args1a,
+                              args_a_signature,
+                              needs_iteration=self.config.needs_iteration_num),
+            runner.get_kernel('ShanChenCollideAndPropagate1', args1b,
+                              args_b_signature,
+                              needs_iteration=self.config.needs_iteration_num)
+        ]
+
+        if self.config.access_pattern == 'AB':
+            secondary = [
+                runner.get_kernel('ShanChenCollideAndPropagate0', args2a,
+                                  args_a_signature,
+                                  needs_iteration=self.config.needs_iteration_num),
+                runner.get_kernel('ShanChenCollideAndPropagate1', args2b,
+                                  args_b_signature,
+                                  needs_iteration=self.config.needs_iteration_num)
+            ]
+            sim_pair = KernelPair(primary, secondary)
+        else:
+            sim_pair = KernelPair(primary, primary)
+
+        return zip(macro_pair, sim_pair)

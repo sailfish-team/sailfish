@@ -24,7 +24,7 @@ class SCSim(LBSingleFluidShanChen):
         defaults.update({
             'lat_nx': 256,
             'lat_ny': 256,
-            'G': 5.0,
+            'G': -5.0,
             'visc': 1.0 / 6.0,
             'periodic_x': True,
             'periodic_y': True,

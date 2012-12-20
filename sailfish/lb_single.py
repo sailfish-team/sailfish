@@ -8,7 +8,7 @@ from collections import defaultdict, namedtuple
 import numpy as np
 
 from sailfish import subdomain_runner, sym, sym_equilibrium
-from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField
+from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField, KernelPair
 
 
 MacroKernels = namedtuple('MacroKernels', 'distributions macro')
@@ -71,13 +71,6 @@ class LBFluidSim(LBSim):
             runner.exec_kernel('SetInitialConditions', args2, 'P'*len(args2))
 
     def get_compute_kernels(self, runner, full_output, bulk):
-        """
-        :param runner: SubdomainRunner object
-        :param full_output: if True, returns kernels that prepare fields for
-                visualization or saving into a file
-        :param bulk: if True, returns kernels that process the bulk domain,
-                otherwise returns kernels that process the subdomain boundary
-        """
         gpu_rho = runner.gpu_field(self.rho)
         gpu_v = runner.gpu_field(self.v)
         gpu_dist1a = runner.gpu_dist(0, 0)
@@ -109,21 +102,18 @@ class LBFluidSim(LBSim):
             args2.append(runner.gpu_field(self.alpha))
             signature += 'P'
 
-        kernels = []
-
-        kernels.append(runner.get_kernel(
-                'CollideAndPropagate', args1, signature,
-                needs_iteration=self.config.needs_iteration_num))
+        cnp_primary = runner.get_kernel(
+            'CollideAndPropagate', args1, signature,
+            needs_iteration=self.config.needs_iteration_num)
 
         if self.config.access_pattern == 'AB':
             secondary_args = args2 if self.config.access_pattern == 'AB' else args1
-            kernels.append(runner.get_kernel(
-                    'CollideAndPropagate', secondary_args, signature,
-                    needs_iteration=self.config.needs_iteration_num))
+            cnp_secondary = runner.get_kernel(
+                'CollideAndPropagate', secondary_args, signature,
+                needs_iteration=self.config.needs_iteration_num)
+            return KernelPair([cnp_primary], [cnp_secondary])
         else:
-            kernels.append(kernels[-1])
-
-        return kernels
+            return KernelPair([cnp_primary], [cnp_primary])
 
     def get_pbc_kernels(self, runner):
         gpu_dist1a = runner.gpu_dist(0, 0)

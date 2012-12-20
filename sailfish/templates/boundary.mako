@@ -52,13 +52,14 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
 ${device_func} inline float node_param_get_scalar(const int idx ${dynamic_val_args_decl()}) {
 	%if (time_dependence or space_dependence) and symbol_idx_map:
 		if (idx >= ${non_symbolic_idxs}) {
-			float out;
 			switch (idx) {
 				%for key, val in symbol_idx_map.iteritems():
 					%if len(val) == 1:
-						case ${key}:
+						case ${key}: {
+							float out;
 							time_dep_param_${key}(&out ${dynamic_val_args()});
 							return out;
+						}
 					%endif
 				%endfor
 				default:

@@ -766,9 +766,9 @@ class SubdomainRunner(object):
 
     def _get_bulk_kernel(self, sync_req):
         if sync_req:
-            kernel = self._kernels_bulk_full[self._sim.iteration & 1]
+            kernel = self._kernels_bulk_full[self._sim.iteration & 1][0]
         else:
-            kernel = self._kernels_bulk_none[self._sim.iteration & 1]
+            kernel = self._kernels_bulk_none[self._sim.iteration & 1][0]
 
         return kernel, self._kernel_grid_bulk
 
@@ -824,9 +824,9 @@ class SubdomainRunner(object):
 
         if self._boundary_blocks is not None:
             if sync_req:
-                kernel = self._kernels_bnd_full[self._sim.iteration & 1]
+                kernel = self._kernels_bnd_full[self._sim.iteration & 1][0]
             else:
-                kernel = self._kernels_bnd_none[self._sim.iteration & 1]
+                kernel = self._kernels_bnd_none[self._sim.iteration & 1][0]
             grid = self._boundary_blocks
         else:
             kernel, grid = self._get_bulk_kernel(sync_req)
@@ -1224,15 +1224,13 @@ class SubdomainRunner(object):
 
             self._debug_set_dist(v, is_primary, dist_num)
 
-    def _prepare_compute_kernels(self, initial=False):
-        self._kernels_bulk_full = self._sim.get_compute_kernels(self, True,
-                                                                True)
-        self._kernels_bulk_none = self._sim.get_compute_kernels(self, False,
-                                                                True)
-        self._kernels_bnd_full = self._sim.get_compute_kernels(self, True,
-                                                               False)
-        self._kernels_bnd_none = self._sim.get_compute_kernels(self, False,
-                                                               False)
+    def _prepare_compute_kernels(self):
+        gck = self._sim.get_compute_kernels
+
+        self._kernels_bulk_full = gck(self, True, True)
+        self._kernels_bulk_none = gck(self, False, True)
+        self._kernels_bnd_full = gck(self, True, False)
+        self._kernels_bnd_none = gck(self, False, False)
 
     def run(self):
         self.config.logger.info("Initializing subdomain.")
@@ -1676,9 +1674,11 @@ class NNSubdomainRunner(SubdomainRunner):
         # Actual simulation step.
         record_gpu_start(TimeProfile.BOUNDARY, str_calc)
         if has_boundary_split:
-            run(bnd_kernel_sim, grid_bnd, str_calc)
+            for k in bnd_kernel_sim:
+                run(k, grid_bnd, str_calc)
         else:
-            run(bulk_kernel_sim, grid_bulk, str_calc)
+            for k in bulk_kernel_sim:
+                run(k, grid_bulk, str_calc)
         ev = record_gpu_end(TimeProfile.BOUNDARY, str_calc)
         str_data.wait_for_event(ev)
 
@@ -1689,7 +1689,8 @@ class NNSubdomainRunner(SubdomainRunner):
 
         record_gpu_start(TimeProfile.BULK, str_calc)
         if has_boundary_split:
-            run(bulk_kernel_sim, grid_bulk, str_calc)
+            for k in bulk_kernel_sim:
+                run(k, grid_bulk, str_calc)
         self._apply_pbc(self._pbc_kernels.distributions)
         record_gpu_end(TimeProfile.BULK, str_calc)
 

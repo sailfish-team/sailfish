@@ -13,6 +13,7 @@ __license__ = 'LGPL'
 
 FieldPair = namedtuple('FieldPair', 'abstract buffer')
 ForcePair = namedtuple('ForcePair', 'numeric symbolic')
+KernelPair = namedtuple('KernelPair', 'primary secondary')
 
 class LBSim(object):
     """Describes a specific type of a lattice Boltzmann simulation."""
@@ -173,7 +174,14 @@ class LBSim(object):
         pass
 
     def get_compute_kernels(self, runner, full_output, bulk):
-        return []
+        """
+        :param runner: SubdomainRunner object
+        :param full_output: if True, returns kernels that prepare fields for
+                visualization or saving into a file
+        :param bulk: if True, returns kernels that process the bulk domain,
+                otherwise returns kernels that process the subdomain boundary
+        """
+        return KernelPair(None, None)
 
     def get_pbc_kernels(self, runner):
         return []
@@ -257,6 +265,9 @@ class LBForcedSim(LBSim):
 
         To disable acceleration on a grid, pass an invalid grid ID in force_grid
         (e.g. None or -1).
+
+        Note: this is currently only supported in the free-energy MRT model.
+        The force reassignment will be silently ignored in other models.
 
         :param force_grid: grid ID from which the acceleration will be used
         :param target_grid: grid ID on which the acceleration will act

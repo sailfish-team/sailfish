@@ -33,7 +33,6 @@ def needs_accel(i, forces, force_couplings):
     if type(forces) is Undefined:
         return False
 
-    # TODO: handle symbolic forces here
     return ((i in forces.numeric or i in forces.symbolic)
             or needs_coupling_accel(i, force_couplings))
 

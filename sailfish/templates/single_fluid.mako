@@ -7,14 +7,14 @@
 	${const_var} float gravity = ${gravity}f;
 %endif
 
-<%def name="bgk_args_decl()">
+<%def name="bgk_args_decl(grid_idx=0)">
 	float rho, float *iv0
 	%if simtype == 'shan-chen':
 		, float *ea0
 	%endif
 </%def>
 
-<%def name="bgk_args()">
+<%def name="bgk_args(grid_idx=0)">
 	g0m0, v
 	%if simtype == 'shan-chen':
 		, sca0
@@ -174,17 +174,12 @@ ${kernel} void CollideAndPropagate(
 							ovx, ovy ${', ovz' if dim == 3 else ''}, gg0m0
 							${scratch_space_arg_if_required()});
 
-	%if simtype == 'shan-chen':
-		${sc_calculate_accel()}
-	%endif
-
 	// Macroscopic quantities for the current cell
 	float g0m0, v[${dim}];
+	getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
 
 	%if simtype == 'shan-chen':
-		${sc_macro_fields()}
-	%else:
-		getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
+		${sc_calculate_force()}
 	%endif
 
 	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
@@ -198,29 +193,8 @@ ${kernel} void CollideAndPropagate(
 	${relaxate(bgk_args)}
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out
 									${scratch_space_arg_if_required()});
-
-	## Grad outflow nodes use invalid values to tag directions lacking distribution
-	## data.
-	if (isWetNode(type) ${'&& !isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
-		checkInvalidValues(&d0, ${position()});
-	}
-
-	// Only save the macroscopic quantities if requested to do so.
-	if ((options & OPTION_SAVE_MACRO_FIELDS)
-		## Nodes using the Grad approximation use the velocity from the
-		## previous time step to compute the approximated distributions.
-		${'|| isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
-		gg0m0[gi] = g0m0 ${' +1.0f' if config.minimize_roundoff else ''};
-
-		%if not initialization:
-			ovx[gi] = v[0];
-			ovy[gi] = v[1];
-			%if dim == 3:
-				ovz[gi] = v[2];
-			%endif
-		%endif
-	}
-
+	${check_invalid_values()}
+	${save_macro_fields()}
 	${propagate('dist_out', 'd0')}
 }
 
