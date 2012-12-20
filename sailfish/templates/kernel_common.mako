@@ -1,3 +1,7 @@
+<%!
+    from sailfish import sym
+%>
+
 <%page args="bgk_args_decl"/>
 <%namespace file="code_common.mako" import="cex"/>
 
@@ -97,6 +101,27 @@
 		${local_indices()}
 	%endif
 
+</%def>
+
+<%def name="shared_mem_propagation_vars()">
+	// Shared variables for in-block propagation
+	%for i in sym.get_prop_dists(grid, 1):
+		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
+	%endfor
+	%for i in sym.get_prop_dists(grid, 1):
+		#define prop_${grid.idx_name[grid.idx_opposite[i]]} prop_${grid.idx_name[i]}
+	%endfor
+</%def>
+
+<%def name="load_node_type()">
+	int ncode = map[gi];
+	int type = decodeNodeType(ncode);
+
+	// Unused nodes do not participate in the simulation.
+	if (isExcludedNode(type))
+		return;
+
+	int orientation = decodeNodeOrientation(ncode);
 </%def>
 
 ## Defines local indices for bulk kernels.

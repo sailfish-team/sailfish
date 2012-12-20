@@ -164,23 +164,8 @@ ${kernel} void CollideAndPropagate(
 	)
 {
 	${local_indices_split()}
-
-	// Shared variables for in-block propagation
-	%for i in sym.get_prop_dists(grid, 1):
-		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
-	%endfor
-	%for i in sym.get_prop_dists(grid, 1):
-		#define prop_${grid.idx_name[grid.idx_opposite[i]]} prop_${grid.idx_name[i]}
-	%endfor
-
-	int ncode = map[gi];
-	int type = decodeNodeType(ncode);
-
-	// Unused nodes do not participate in the simulation.
-	if (isExcludedNode(type))
-		return;
-
-	int orientation = decodeNodeOrientation(ncode);
+	${shared_mem_propagation_vars()}
+	${load_node_type()}
 
 	// Cache the distributions in local variables
 	Dist d0;

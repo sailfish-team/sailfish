@@ -233,23 +233,8 @@ ${kernel} void CollideAndPropagate(
 	${iteration_number_if_required()})
 {
 	${local_indices_split()}
-
-	// shared variables for in-block propagation
-	%for i in sym.get_prop_dists(grid, 1):
-		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
-	%endfor
-	%for i in sym.get_prop_dists(grid, 1):
-		#define prop_${grid.idx_name[grid.idx_opposite[i]]} prop_${grid.idx_name[i]}
-	%endfor
-
-	int ncode = map[gi];
-	int type = decodeNodeType(ncode);
-
-	// Unused nodes do not participate in the simulation.
-	if (isExcludedNode(type))
-		return;
-
-	int orientation = decodeNodeOrientation(ncode);
+	${shared_mem_propagation_vars()}
+	${load_node_type()}
 	${guo_density_node_index_shift_intro()}
 
 	%if simtype == 'free-energy':
