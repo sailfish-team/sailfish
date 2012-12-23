@@ -1,3 +1,5 @@
+# coding=utf-8
+
 """Simulation controller."""
 
 __author__ = 'Michal Januszewski'
@@ -372,6 +374,13 @@ class LBSimulationController(object):
                 metavar='N', help='Starts generating checkpoints after N '
                 'steps of the simulation have been completed.')
 
+        group = self._config_parser.add_group('Benchmarking')
+        group.add_argument('--benchmark_sample_from', type=int, default=1000,
+                           metavar='N', help='Start sampling performance '
+                           'data at N-th iteration.')
+        group.add_argument('--benchmark_minibatch', type=int, default=50,
+                           help='Number of simulation steps used for batching '
+                           'for purposes of standard deviation calculation.')
         group = self._config_parser.add_group('Simulation-specific settings')
 
         lb_class.add_options(group, self.dim)
@@ -646,12 +655,26 @@ class LBSimulationController(object):
 
             for ti in timing_infos:
                 subdomain = subdomains[ti.subdomain_id]
-                mlups_total += subdomain.num_nodes / ti.total * 1e-6
-                mlups_comp += subdomain.num_nodes / ti.comp * 1e-6
+                total = subdomain.num_nodes / ti.total * 1e-6
+                comp = subdomain.num_nodes / ti.comp * 1e-6
+                mlups_total += total
+                mlups_comp += comp
+
+                stdev = math.sqrt(ti.total_sq - ti.total**2)
+                low = ti.total - stdev
+                high = ti.total + stdev
+
+                low = subdomain.num_nodes / low * 1e-6 - total
+                high = subdomain.num_nodes / high * 1e-6 - total
+
+                if not self.config.quiet:
+                    print ('Subdomain {0}: MLUPS eff:{1:.2f} +{2:.2f} -{3:.2f}  '
+                           'comp:{4:.2f}'.format(ti.subdomain_id, total,
+                                                 abs(high), abs(low), comp))
 
             if not self.config.quiet:
                 print ('Total MLUPS: eff:{0:.2f}  comp:{1:.2f}'.format(
-                        mlups_total, mlups_comp))
+                        mlups_total,  mlups_comp))
             return timing_infos, min_timings, max_timings, subdomains
 
         return None, None

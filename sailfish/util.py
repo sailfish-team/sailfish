@@ -16,7 +16,8 @@ from math import exp, log, ceil
 from sailfish import config
 from sailfish import sym
 
-TimingInfo = namedtuple('TimingInfo', 'comp bulk bnd coll net_wait recv send total subdomain_id')
+TimingInfo = namedtuple('TimingInfo',
+                        'comp bulk bnd coll net_wait recv send total total_sq subdomain_id')
 
 
 class GridError(Exception):
