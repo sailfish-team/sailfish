@@ -3,10 +3,9 @@
 import numpy as np
 
 from sailfish.geo import LBGeometry3D
-from sailfish.geo_block import Subdomain3D
+from sailfish.subdomain import Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_binary import LBBinaryFluidShanChen
-from sailfish.lb_single import LBForcedSim
 
 class SeparationDomain(Subdomain3D):
     def initial_conditions(self, sim, hx, hy, hz):
@@ -17,7 +16,7 @@ class SeparationDomain(Subdomain3D):
         pass
 
 
-class SeparationSCSim(LBBinaryFluidShanChen, LBForcedSim):
+class SeparationSCSim(LBBinaryFluidShanChen):
     subdomain = SeparationDomain
 
     @classmethod
