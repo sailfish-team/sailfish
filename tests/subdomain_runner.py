@@ -26,6 +26,7 @@ class BasicFunctionalityTest(unittest.TestCase):
 
     def setUp(self):
         config = LBConfig()
+        config.init_iters = 0
         config.seed = 0
         config.access_pattern = 'AA'
         config.precision = 'single'
@@ -82,6 +83,7 @@ class NNSubdomainRunnerTest(unittest.TestCase):
     def setUp(self):
         config = LBConfig()
         config.seed = 0
+        config.init_iters = 0
         config.access_pattern = 'AA'
         config.precision = 'single'
         config.block_size = 8
@@ -89,6 +91,8 @@ class NNSubdomainRunnerTest(unittest.TestCase):
         config.lat_nx, config.lat_ny = 40, 80
         config.logger = DummyLogger()
         config.grid = 'D2Q9'
+        config.benchmark_sample_from = 0
+        config.benchmark_minibatch = 1
         config.bulk_boundary_split = False
         config.output = ''
         self.config = config

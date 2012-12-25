@@ -7,9 +7,10 @@ from sailfish.lb_base import LBSim
 
 class TestCase2D(unittest.TestCase):
     lattice_size = 64, 64
-   
+
     def setUp(self):
         config = LBConfig()
+        config.init_iters = 0
         config.seed = 0
         config.precision = 'single'
         config.block_size = 8
@@ -27,6 +28,7 @@ class TestCase3D(unittest.TestCase):
 
     def setUp(self):
         config = LBConfig()
+        config.init_iters = 0
         config.seed = 0
         config.precision = 'single'
         config.block_size = 8
