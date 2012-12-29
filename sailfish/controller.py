@@ -6,6 +6,7 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+import __builtin__
 import cPickle as pickle
 import copy
 import math
@@ -687,12 +688,16 @@ class LBSimulationController(object):
     def run(self, ignore_cmdline=False):
         """Runs a simulation."""
 
-        if ignore_cmdline:
+        # No point in trying to process the command-line if running under
+        # IPython.
+        if ignore_cmdline or hasattr(__builtin__, '__IPYTHON__'):
             args = []
         else:
             args = sys.argv[1:]
 
-        self.config = self._config_parser.parse(args)
+        self.config = self._config_parser.parse(
+            args, internal_defaults={'quiet': True} if hasattr(
+                __builtin__, '__IPYTHON__') else None)
         self._lb_class.modify_config(self.config)
         self.geo = self._lb_geo(self.config)
 

@@ -49,7 +49,7 @@ class LBConfigParser(object):
                     'Unknown option "{0}" specified in update_defaults()'.format(option)
         return self._parser.set_defaults(**defaults)
 
-    def parse(self, args):
+    def parse(self, args, internal_defaults=None):
         config = ConfigParser.ConfigParser()
         config.read(['/etc/sailfishrc', os.path.expanduser('~/.sailfishrc'),
                 '.sailfishrc'])
@@ -62,6 +62,10 @@ class LBConfigParser(object):
             self._parser.set_defaults(**dict(config.items('main')))
         except ConfigParser.NoSectionError:
             pass
+
+        if internal_defaults is not None:
+            self._parser.set_defaults(**internal_defaults)
+
         self._parser.parse_args(args=args, namespace=self.config)
 
         # Additional internal config options, not settable via
