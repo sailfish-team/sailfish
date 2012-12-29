@@ -141,7 +141,7 @@
 			// Diagonal components.
 			%for a in range(0, dim):
 				tmp = ${cex(sym.ex_flux(grid, 'd0', a, a, config), pointers=True)} -
-					  ${cex(sym.S.rho * (grid.v[a] * grid.v[b] + grid.cssq))};
+					  ${cex(sym.S.rho * (grid.v[a]**2 + grid.cssq))};
 				strain += tmp * tmp;
 			%endfor
 
