@@ -118,12 +118,27 @@
 	%endif
 
 	%if subgrid == 'les-smagorinsky':
-		// Compute relaxation time using the standard viscosity-relaxation time relation.
+		// Relaxation time using the standard viscosity-relaxation time relation.
 		float tau0 = 0.5f + 3.0f * visc;
 
+		// Form of the relaxation time correction as in comp-gas/9401004v1.
+		// Note that the Smagorinsky constant in Sailfish (C_s) is defined as:
+		//   C_s^2 = \Delta^2 C
+		// where the quantities on the RHS correspond to those used in the paper.
+
+		// The correction to viscosity due to eddies is:
+		//   eddy_visc = C \Delta^2 |\bar{S}|
+		// with:
+		//   |\bar{S}| = (\sqrt(\nu_0^2 + 18 C \Delta^2 Q^{1/2}) - \nu_0) / (6 C \Delta^2)
+		// where
+		//   Q = T_ab T_ab
+		// and the nonequilibrium stress tensor: T = e_ia e_ib (f_i - f_i^eq)
+
+		// The 2nd order tensor formed from the equilibrium distributions is:
+		//   rho / 3 * \delta_{ab} + rho u_a u_b
+		// and this has to be subtracted from ex_flux (e_ia e_ib f_i).
+
 		// TODO(michalj): Fix this for multifluid models.
-		// Modify the relaxation time proportionally to the modulus of the local strain rate tensor.
-		// The 2nd order tensor formed from the equilibrium distributions is rho / 3 * \delta_{ab} + rho u_a u_b
 		{
 			float tmp, strain;
 
@@ -131,7 +146,7 @@
 
 			// Off-diagonal components, count twice for symmetry reasons.
 			%for a in range(0, dim):
-				%for b in range(a+1, dim):
+				%for b in range(a + 1, dim):
 					 tmp = ${cex(sym.ex_flux(grid, 'd0', a, b, config), pointers=True)} -
 						   ${cex(sym.S.rho * grid.v[a] * grid.v[b])};
 					 strain += 2.0f * tmp * tmp;
@@ -145,9 +160,9 @@
 				strain += tmp * tmp;
 			%endfor
 
-			// Form of the relaxation time correction as in comp-gas/9401004v1.
+			// This is 3.0 * eddy_visc.
 			tau0 += (sqrtf(visc*visc + 18.0f * ${cex(smagorinsky_const**2)} *
-					  sqrtf(strain)) - visc) / 2.0f;
+					 sqrtf(strain)) - visc) / 2.0f;
 		}
 	%endif
 </%def>
