@@ -9,6 +9,7 @@ import sys
 import tempfile
 import mako.exceptions
 from mako.lookup import TemplateLookup
+from mako.template import Template
 
 import sailfish.io
 
@@ -119,6 +120,17 @@ class BlockCodeGenerator(object):
         except:
             print mako.exceptions.text_error_template().render()
             return ''
+
+        for aux in self._sim.aux_code:
+            if aux.count('\n') > 0:
+                code_tmpl = Template(aux)
+            else:
+                code_tmpl = lookup.get_template(aux)
+            try:
+                src += '\n' + code_tmpl.render(**ctx)
+            except:
+                print mako.exceptions.text_error_template().render()
+                return ''
 
         if self.is_double_precision():
             src = _convert_to_double(src)

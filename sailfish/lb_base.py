@@ -20,6 +20,12 @@ class LBSim(object):
 
     kernel_file = "__TEMPLATE_NOT_SET__"
 
+    #: List of additional template files or inline code fragments to include
+    #  in the generated simulation code. The templates here are appended in
+    #  order, after the contents of kernel_file above. List entries are
+    #  considered to be code fragments if they have at least two lines.
+    aux_code = []
+
     #: Set this to a class implementing the SubdomainRunner interface in order
     #  to use subdomain runner other than default.
     subdomain_runner = None
