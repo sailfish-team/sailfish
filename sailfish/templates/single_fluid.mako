@@ -102,7 +102,8 @@ ${kernel_common.body(bgk_args_decl)}
 ${kernel} void SetInitialConditions(
 	${global_ptr} float *dist1_in,
 	${kernel_args_1st_moment('iv')}
-	${global_ptr} float *irho, int *map
+	${global_ptr} ${const_ptr} float *__restrict__ irho,
+	${global_ptr} ${const_ptr} int *__restrict__ map
 	${scratch_space_if_required()})
 {
 	${local_indices()}
@@ -125,8 +126,8 @@ ${kernel} void SetInitialConditions(
 }
 
 ${kernel} void PrepareMacroFields(
-	${global_ptr} int *map,
-	${global_ptr} float *dist1_in,
+	${global_ptr} ${const_ptr} int *__restrict__ map,
+	${global_ptr} ${const_ptr} float *__restrict__ dist1_in,
 	${global_ptr} float *orho,
 	int options
 	${scratch_space_if_required()}
@@ -152,7 +153,7 @@ ${kernel} void PrepareMacroFields(
 }
 
 ${kernel} void CollideAndPropagate(
-	${global_ptr} int *map,
+	${global_ptr} ${const_ptr} int *__restrict__ map,
 	${global_ptr} float *dist_in,
 	${global_ptr} float *dist_out,
 	${global_ptr} float *gg0m0,

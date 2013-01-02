@@ -267,7 +267,7 @@ class CUDABackend(object):
             'shared_var': '__shared__',
             'kernel': '__global__',
             'global_ptr': '',
-            'const_ptr': '',
+            'const_ptr': 'const',
             'device_func': '__device__',
             'const_var': '__constant__',
         }

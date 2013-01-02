@@ -213,7 +213,7 @@ ${device_func} void checkInvalidValues(Dist* d, ${position_decl()}) {
 %>
 
 // Load the distributions from din to dout, for the node with the index 'idx'.
-${device_func} inline void getDistLocal(Dist *dout, ${global_ptr} float *din, int idx)
+${device_func} inline void getDistLocal(Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, int idx)
 {
 	%for i, dname in enumerate(grid.idx_name):
 		dout->${dname} = ${get_dist('din', i, 'idx')};
@@ -222,7 +222,7 @@ ${device_func} inline void getDistLocal(Dist *dout, ${global_ptr} float *din, in
 
 // Performs propagation when reading distributions from global memory.
 // This implements the propagate-on-read scheme.
-${device_func} inline void getUnpropagatedDist(Dist *dout, ${global_ptr} float *din, int idx) {
+${device_func} inline void getUnpropagatedDist(Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, int idx) {
 	%for i, (dname, ei) in enumerate(zip(grid.idx_name, grid.basis)):
 		dout->${dname} = ${get_dist('din', i, 'idx', offset=rel_offset(*(-ei)))};
 	%endfor
@@ -234,13 +234,13 @@ ${device_func} inline void getUnpropagatedDist(Dist *dout, ${global_ptr} float *
 // timestep, the distributions are read from and written to the exact same places
 // in global memory.
 ${device_func} inline void getUnpropagatedDistFromOppositeSlots(
-		Dist *dout, ${global_ptr} float *din, int idx) {
+		Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, int idx) {
 	%for i, (dname, ei) in enumerate(zip(grid.idx_name, grid.basis)):
 		dout->${dname} = ${get_dist('din', grid.idx_opposite[i], 'idx', offset=rel_offset(*(-ei)))};
 	%endfor
 }
 
-${device_func} inline void getDist(Dist *dout, ${global_ptr} float *din, int gi
+${device_func} inline void getDist(Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, int gi
 								   ${iteration_number_if_required()}) {
 	%if access_pattern == 'AB':
 		getDistLocal(dout, din, gi);

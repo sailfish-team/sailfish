@@ -3,7 +3,7 @@
 // More sophisticated finite difference formulas optimized to minimize spurious velocities
 // at the surface of a spherical drop.  Fomulas taken from:
 //   Phys Rev E 77, 046702 (2008)
-${device_func} inline void laplacian_and_grad(${global_ptr} float *field, int fi, int i, float *laplacian, float *grad, int x, int y
+${device_func} inline void laplacian_and_grad(${global_ptr} ${const_ptr} float *__restrict__ field, int fi, int i, float *laplacian, float *grad, int x, int y
 %if dim == 3:
 	, int z
 %endif

@@ -199,7 +199,7 @@ class OpenCLBackend(object):
             'shared_var': '__local',
             'kernel': '__kernel',
             'global_ptr': '__global',
-            'const_ptr': '__constant',
+            'const_ptr': '',
             'device_func': '',
             'const_var': '__constant',
         }

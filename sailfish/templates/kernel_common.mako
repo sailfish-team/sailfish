@@ -6,11 +6,11 @@
 <%page args="bgk_args_decl"/>
 <%namespace file="code_common.mako" import="cex"/>
 
-<%def name="kernel_args_1st_moment(name)">
-	${global_ptr} float *${name}x,
-	${global_ptr} float *${name}y,
+<%def name="kernel_args_1st_moment(name, const=False)">
+	${global_ptr} ${const_ptr if const else ''} float *__restrict__ ${name}x,
+	${global_ptr} ${const_ptr if const else ''} float *__restrict__ ${name}y,
 %if dim == 3:
-	${global_ptr} float *${name}z,
+	${global_ptr} ${const_ptr if const else ''} float *__restrict__ ${name}z,
 %endif
 </%def>
 
@@ -28,7 +28,7 @@
 
 <%def name="scratch_space_if_required()">
 	%if scratch_space:
-		, ${global_ptr} float *node_scratch_space
+		, ${global_ptr} float *__restrict__ node_scratch_space
 	%endif
 </%def>
 
@@ -40,7 +40,7 @@
 
 <%def name="scalar_field_if_required(name, required)">
 	%if required:
-		, ${global_ptr} float *${name}
+		, ${global_ptr} float *__restrict__ ${name}
 	%endif
 </%def>
 

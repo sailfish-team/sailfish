@@ -87,8 +87,8 @@ ${kernel} void SetInitialConditions(
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *dist2_in,
 	${kernel_args_1st_moment('iv')}
-	${global_ptr} float *irho,
-	${global_ptr} float *iphi)
+	${global_ptr} ${const_ptr} float *__restrict__ irho,
+	${global_ptr} ${const_ptr} float *__restrict__ iphi)
 {
 	${local_indices()}
 
@@ -108,9 +108,9 @@ ${kernel} void SetInitialConditions(
 
 %if simtype == 'free-energy':
 ${kernel} void FreeEnergyPrepareMacroFields(
-	${global_ptr} int *map,
-	${global_ptr} float *dist1_in,
-	${global_ptr} float *dist2_in,
+	${global_ptr} ${const_ptr} int *__restrict__ map,
+	${global_ptr} ${const_ptr} float *__restrict__ dist1_in,
+	${global_ptr} ${const_ptr} float *__restrict__ dist2_in,
 	${global_ptr} float *orho,
 	${global_ptr} float *ophi,
 	int options
@@ -204,13 +204,13 @@ ${kernel} void FreeEnergyPrepareMacroFields(
 }
 
 ${kernel} void FreeEnergyCollideAndPropagateFluid(
-	${global_ptr} int *map,
+	${global_ptr} ${const_ptr} int *__restrict__ map,
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *dist1_out,
-	${global_ptr} float *gg0m0,
-	${global_ptr} float *gg1m0,
+	${global_ptr} float *__restrict__ gg0m0,
+	${global_ptr} float *__restrict__ gg1m0,
 	${kernel_args_1st_moment('ov')}
-	${global_ptr} float *gg1laplacian,
+	${global_ptr} float *__restrict__ gg1laplacian,
 	int options
 	${scratch_space_if_required()}
 	${iteration_number_if_required()})
@@ -257,13 +257,13 @@ ${kernel} void FreeEnergyCollideAndPropagateFluid(
 }
 
 ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
-	${global_ptr} int *map,
+	${global_ptr} ${const_ptr} int *__restrict__ map,
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *dist1_out,
-	${global_ptr + ' float *gg0m0,' if phi_needs_rho else ''}
-	${global_ptr} float *gg1m0,
+	${global_ptr + const_ptr + ' float *__restrict__ gg0m0,' if phi_needs_rho else ''}
+	${global_ptr} ${const_ptr} float *__restrict__ gg1m0,
 	${kernel_args_1st_moment('ov')}
-	${global_ptr} float *gg1laplacian,
+	${global_ptr} ${const_ptr} float *__restrict__ gg1laplacian,
 	int options
 	${scratch_space_if_required()}
 	${iteration_number_if_required()})
