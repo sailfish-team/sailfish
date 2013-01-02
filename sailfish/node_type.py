@@ -102,7 +102,7 @@ class NTEquilibriumVelocity(LBNodeType):
 
     def __init__(self, velocity, orientation=None):
         self.params = {'velocity': velocity}
-        self.orientation = None
+        self.orientation = orientation
 
 
 class NTEquilibriumDensity(LBNodeType):
