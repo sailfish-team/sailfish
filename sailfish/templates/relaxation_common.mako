@@ -5,7 +5,7 @@
 <%namespace file="code_common.mako" import="*"/>
 
 ## Defines the actual acceleration vectors.
-<%def name="body_force(grid_idx, vector_decl=True)">
+<%def name="body_force(grid_idx=0, vector_decl=True)">
 	%if forces is not UNDEFINED and (forces.numeric or forces.symbolic):
 		%if sym_force.needs_accel(grid_idx, forces, {}):
 			%if forces.symbolic and time_dependence:
