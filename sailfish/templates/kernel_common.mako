@@ -126,11 +126,13 @@
 </%def>
 
 <%def name="check_invalid_values()">
-	## Grad outflow nodes use invalid values to tag directions lacking distribution
-	## data.
-	if (isWetNode(type) ${'&& !isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
-		checkInvalidValues(&d0, ${position()});
-	}
+	%if gpu_check_invalid_values:
+		## Grad outflow nodes use invalid values to tag directions lacking distribution
+		## data.
+		if (isWetNode(type) ${'&& !isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
+			checkInvalidValues(&d0, ${position()});
+		}
+	%endif
 </%def>
 
 <%def name="save_macro_fields(density=True, velocity=True)">

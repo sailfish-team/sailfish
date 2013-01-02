@@ -92,7 +92,7 @@ ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq) {
 	}
 
 	if (alpha < 1.0f) {
-		%if check_invalid_values:
+		%if gpu_check_invalid_values:
 			printf("Alpha estimated at: %e\n", alpha);
 		%endif
 		die();

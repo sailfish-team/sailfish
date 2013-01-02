@@ -182,7 +182,7 @@ ${device_func} void die(void) {
 }
 
 ${device_func} void checkInvalidValues(Dist* d, ${position_decl()}) {
-	%if check_invalid_values:
+	%if gpu_check_invalid_values:
 		bool valid = true;
 		%for dname in grid.idx_name:
 			if (!isfinite(d->${dname})) {
