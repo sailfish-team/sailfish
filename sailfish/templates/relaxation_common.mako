@@ -185,6 +185,9 @@
 
 	${update_relaxation_time(grid_idx)}
 
+	## TODO: If the regularization is never used with collision operators
+	## other than LBGK, move this directly to BGK relaxate and replace
+	## the normal collision step with: fi = feq + (1 - omega) freg.
 	%if regularized:
 		float flux[${flux_components}];
 		compute_noneq_2nd_moment(d0, rho, v0, flux);
