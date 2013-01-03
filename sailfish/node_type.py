@@ -135,6 +135,34 @@ class NTZouHeDensity(LBNodeType):
         self.orientation = orientation
 
 
+class NTRegularizedVelocity(LBNodeType):
+    """Velocity boundary condition using the regularized LB model and
+    non-equilibrium bounce-back.
+
+    See Phys. Rev. E 77, 056703 (2008) for more info.
+    """
+    needs_orientation = True
+    wet_node = True
+
+    def __init__(self, velocity, orientation=None):
+        self.params = {'velocity': velocity}
+        self.orientation = orientation
+
+
+class NTRegularizedDensity(LBNodeType):
+    """Density boundary condition using the regularized LB model and
+    non-equilibrium bounce-back.
+
+    See Phys. Rev. E 77, 056703 (2008) for more info.
+    """
+    needs_orientation = True
+    wet_node = True
+
+    def __init__(self, density, orientation=None):
+        self.params = {'density': density}
+        self.orientation = orientation
+
+
 class NTGuoDensity(LBNodeType):
     """Guo density."""
 

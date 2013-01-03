@@ -29,6 +29,10 @@ class LBFluidSim(LBSim):
         group.add_argument('--incompressible',
                 action='store_true', default=False,
                 help='use the incompressible model of Luo and He')
+        group.add_argument('--regularized',
+                           action='store_true', default=False,
+                           help='Apply the regularization procedure prior to '
+                           'the collision step.')
         group.add_argument('--model', help='LB collision model to use',
                 type=str, choices=['bgk', 'mrt', 'elbm'],
                 default='bgk')
@@ -51,6 +55,7 @@ class LBFluidSim(LBSim):
         ctx['smagorinsky_const'] = self.config.smagorinsky_const
         ctx['entropy_tolerance'] = 1e-6 if self.config.precision == 'single' else 1e-10
         ctx['alpha_output'] = self.alpha_output
+        ctx['regularized'] = self.config.regularized
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)

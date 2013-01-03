@@ -4,7 +4,7 @@ import math
 import numpy as np
 from sailfish.geo import LBGeometry2D
 from sailfish.subdomain import SubdomainSpec2D, Subdomain2D
-from sailfish.node_type import NTFullBBWall, NTEquilibriumVelocity
+from sailfish.node_type import NTFullBBWall, NTRegularizedVelocity
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
 
@@ -58,7 +58,7 @@ class LDCBlock(Subdomain2D):
 
     def boundary_conditions(self, hx, hy):
         wall_bc = NTFullBBWall
-        velocity_bc = NTEquilibriumVelocity
+        velocity_bc = NTRegularizedVelocity
 
         wall_map = (hx == self.gx-1) | (hx == 0) | (hy == 0)
         self.set_node((hy == self.gy-1) & (hx > 0) & (hx < self.gx-1), velocity_bc((self.max_v, 0.0)))

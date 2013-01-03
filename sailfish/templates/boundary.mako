@@ -179,6 +179,16 @@ ${device_func} inline void compute_2nd_moment(Dist *fi, float *out)
 	%endfor
 }
 
+// Computes the 2nd moment of the non-equilibrium distribution function
+// given the full distribution fuction 'fi'.
+${device_func} inline void compute_noneq_2nd_moment(Dist* fi, const float rho, float *v0, float *out)
+{
+	%for i, (a, b) in enumerate([(x,y) for x in range(0, dim) for y in range(x, dim)]):
+		out[${i}] = ${cex(sym.ex_flux(grid, 'fi', a, b, config), pointers=True)} -
+					${cex(sym.ex_eq_flux(grid, a, b))};
+	%endfor
+}
+
 // Compute the 1st moments of the distributions and divide it by the 0-th moment
 // i.e. compute velocity.
 ${device_func} inline void compute_1st_div_0th(Dist *fi, float *out, float zero)
@@ -194,8 +204,8 @@ ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 	compute_1st_div_0th(fi, v, *rho);
 }
 
-%if nt.NTZouHeVelocity in node_types or nt.NTZouHeDensity in node_types:
-<%def name="noneq_bb(orientation)">
+%if nt.NTZouHeVelocity in node_types or nt.NTZouHeDensity in node_types or nt.NTRegularizedVelocity in node_types:
+<%def name="do_noneq_bb(orientation)">
 	case ${orientation}:
 		<%
 			import copy
@@ -212,6 +222,20 @@ ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 		break;
 </%def>
 
+<%def name="noneq_bb()">
+	// Bounce-back of the non-equilibrium parts.
+	switch (orientation) {
+		%for i in range(1, grid.dim * 2 + 1):
+			${do_noneq_bb(i)}
+		%endfor
+		case ${nt_dir_other}:
+			bounce_back(fi);
+			return;
+	}
+</%def>
+%endif
+
+%if nt.NTZouHeVelocity in node_types or nt.NTZouHeDensity in node_types:
 <%def name="zouhe_fixup(orientation)">
 	case ${orientation}:
 		%for arg, val in sym.zouhe_fixup(grid, orientation):
@@ -222,15 +246,7 @@ ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 
 ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v0)
 {
-	// Bounce-back of the non-equilibrium `parts.
-	switch (orientation) {
-		%for i in range(1, grid.dim * 2 + 1):
-			${noneq_bb(i)}
-		%endfor
-		case ${nt_dir_other}:
-			bounce_back(fi);
-			return;
-	}
+	${noneq_bb()}
 
 	float nvx, nvy;
 	%if dim == 3:
@@ -251,6 +267,7 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v0)
 		nvz = *rho * v0[2] - nvz;
 	%endif
 
+	// Redistribute excess momentum.
 	switch (orientation) {
 		%for i in range(1, grid.dim * 2 + 1):
 			${zouhe_fixup(i)}
@@ -331,7 +348,11 @@ ${device_func} inline void getMacro(
 	%if nt.NTZouHeVelocity in node_types:
 		else if (isNTZouHeVelocity(node_type)) {
 			${_macro_velocity_bc_common()}
-			zouhe_bb(fi, orientation, rho, v0);
+		}
+	%endif
+	%if nt.NTRegularizedVelocity in node_types:
+		else if (isNTRegularizedVelocity(node_type)) {
+			${_macro_velocity_bc_common()}
 		}
 	%endif
 	%if nt.NTZouHeDensity in node_types:
@@ -339,13 +360,19 @@ ${device_func} inline void getMacro(
 			${_macro_density_bc_common()}
 			zouhe_bb(fi, orientation, &par_rho, v0);
 			compute_macro_quant(fi, rho, v0);
-			*rho = par_rho ${' -1.0f' if config.minimize_roundoff else ''};
+			*rho = par_rho ${'-1.0f' if config.minimize_roundoff else ''};
 		}
 	%endif
 	%if nt.NTEquilibriumDensity in node_types:
 		else if (isNTEquilibriumDensity(node_type)) {
 			${_macro_density_bc_common()}
-			*rho = par_rho ${' -1.0f' if config.minimize_roundoff else ''};
+			*rho = par_rho ${'-1.0f' if config.minimize_roundoff else ''};
+		}
+	%endif
+	%if nt.NTRegularizedDensity in node_types:
+		else if (isNTRegularizedDensity(node_type)) {
+			${_macro_density_bc_common()}
+			*rho = par_rho ${'-1.0f' if config.minimize_roundoff else ''};
 		}
 	%endif
 }
@@ -457,8 +484,10 @@ ${device_func} inline void postcollisionBoundaryConditions(
 
 ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
 {
+	if (0) {}
+
 	%if nt.NTFullBBWall in node_types:
-		if (isNTFullBBWall(node_type)) {
+		else if (isNTFullBBWall(node_type)) {
 			bounce_back(fi);
 		}
 	%endif
@@ -466,7 +495,7 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, i
 	%if (nt.NTEquilibriumVelocity in node_types) or (nt.NTEquilibriumDensity in node_types):
 		## Additional variables required for the evaluation of the
 		## equilibrium distribution function.
-		if (is_NTEquilibriumNode(node_type)) {
+		else if (is_NTEquilibriumNode(node_type)) {
 			<% eq = equilibria[0](grid, config) %>
 			%for local_var in eq.local_vars:
 				float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
@@ -477,11 +506,37 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, i
 		}
 	%endif
 
+	%if nt.NTZouHeVelocity in node_types:
+		else if (isNTZouHeVelocity(node_type)) {
+			zouhe_bb(fi, orientation, rho, v0);
+		}
+	%endif
+
+	%if nt.NTRegularizedVelocity in node_types or nt.NTRegularizedDensity in node_types:
+		else if (0 ${'|| isNTRegularizedVelocity(node_type)' if nt.NTRegularizedVelocity in node_types else ''}
+				   ${'|| isNTRegularizedDensity(node_type)' if nt.NTRegularizedDensity in node_types else ''}) {
+			${noneq_bb()}
+			float flux[${flux_components}];
+			compute_noneq_2nd_moment(fi, *rho, v0, flux);
+
+			<%
+				eq = equilibria[0](grid, config)
+				reg_diff = sym.reglb_flux_tensor(grid)
+			%>
+			%for local_var in eq.local_vars:
+				float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
+			%endfor
+			%for feq, idx, reg in zip(eq.expression, grid.idx_name, reg_diff):
+				fi->${idx} = ${cex(feq, pointers=True)} + ${cex(reg, pointers=True)};
+			%endfor
+		}
+	%endif
+
 	%if nt.NTSlip in node_types:
 		%if grid.dim == 3 and grid.Q == 13:
 			__SLIP_BOUNDARY_CONDITION_UNSUPPORTED_IN_D3Q13__
 		%endif
-		if (isNTSlip(node_type)) {
+		else if (isNTSlip(node_type)) {
 			float t;
 			switch (orientation) {
 			%for i in range(1, grid.dim*2+1):

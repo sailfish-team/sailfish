@@ -567,6 +567,13 @@ def ex_flux(grid, distp, comp_a, comp_b, config):
 
     return ret
 
+# rho / 3 * \delta_{ab} + rho u_a u_b
+def ex_eq_flux(grid, comp_a, comp_b):
+    if comp_a != comp_b:
+        return S.rho * grid.v[comp_a] * grid.v[comp_b]
+    else:
+        return S.rho * (grid.v[comp_a]**2 + grid.cssq)
+
 def free_energy_mrt(grid, dest_dist, src_dist):
     src_syms = Matrix([Symbol('%s.%s' % (src_dist, x)) for x in grid.idx_name])
     dst_syms = [Symbol('%s->%s' % (dest_dist, x)) for x in grid.idx_name]
@@ -723,6 +730,21 @@ def get_interblock_dists(grid, direction, opposite=False):
 def relaxation_time(viscosity):
     return (6.0 * viscosity + 1.0) / 2.0
 
+def _pressure_tensor(grid):
+    press = [Symbol('flux[%d]' % i) for i in range(grid.dim * (grid.dim + 1) / 2)]
+    P = sympy.ones(grid.dim)  # P_ab - rho cs^2 \delta_ab
+    k = 0
+    for i in range(grid.dim):
+        for j in range(i, grid.dim):
+            P[i, j] = press[k]
+            P[j, i] = press[k]
+            k += 1
+    return P
+
+# e_ia e_ib - cs^2 \delta_ab
+def _q_tensor(grid, ei):
+    return ei.transpose().multiply(ei) - sympy.eye(grid.dim) * grid.cssq
+
 def grad_approx(grid):
     """Returns expressions for the Grad distributions as defined by Eq. 11 in
     EPL 74 (2), pp. 215-221 (2006).
@@ -730,24 +752,25 @@ def grad_approx(grid):
     :param grid: a grid object
     """
     out = []
-    press = [Symbol('flux[%d]' % i) for i in range(grid.dim * (grid.dim + 1) / 2)]
-    for ei, weight in zip(grid.basis, grid.weights):
-        Ma = sympy.ones(grid.dim)  # P_ab - rho cs^2 \delta_ab
-        k = 0
-        for i in range(grid.dim):
-            for j in range(i, grid.dim):
-                Ma[i, j] = press[k]
-                Ma[j, i] = press[k]
-                k += 1
-        Ma -= sympy.eye(grid.dim) * S.rho * grid.cssq
+    P = _pressure_tensor(grid) - sympy.eye(grid.dim) * S.rho * grid.cssq
 
-        # e_ia e_ib - cs^2 \delta_ab
-        Mb = ei.transpose().multiply(ei) - sympy.eye(grid.dim) * grid.cssq
-        t = Ma.dot(Mb)
-        t *= 1 / (grid.cssq**2 * 2)
+    for ei, weight in zip(grid.basis, grid.weights):
+        Q = _q_tensor(grid, ei)
+        t = P.dot(Q) / (grid.cssq**2 * 2)
         t += S.rho + S.rho * ei.dot(grid.v) / grid.cssq
         t *= weight
         out.append(t)
+    return out
+
+def reglb_flux_tensor(grid):
+    """Returns expressions for the non-equilibrium flux tensor contraction
+    with the Q tensor, used for the regularized LB model.
+    """
+    out = []
+    P = _pressure_tensor(grid)
+    for ei, weight in zip(grid.basis, grid.weights):
+        Q = _q_tensor(grid, ei)
+        out.append(P.dot(Q) * weight / (2 * grid.cssq**2))
     return out
 
 #

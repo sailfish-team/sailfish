@@ -148,7 +148,7 @@
 			%for a in range(0, dim):
 				%for b in range(a + 1, dim):
 					 tmp = ${cex(sym.ex_flux(grid, 'd0', a, b, config), pointers=True)} -
-						   ${cex(sym.S.rho * grid.v[a] * grid.v[b])};
+						   ${cex(sym.ex_eq_flux(grid, a, b))};
 					 strain += 2.0f * tmp * tmp;
 				%endfor
 			%endfor
@@ -156,7 +156,7 @@
 			// Diagonal components.
 			%for a in range(0, dim):
 				tmp = ${cex(sym.ex_flux(grid, 'd0', a, a, config), pointers=True)} -
-					  ${cex(sym.S.rho * (grid.v[a]**2 + grid.cssq))};
+					  ${cex(sym.ex_eq_flux(grid, a, a))};
 				strain += tmp * tmp;
 			%endfor
 
@@ -184,4 +184,14 @@
 	%endfor
 
 	${update_relaxation_time(grid_idx)}
+
+	%if regularized:
+		float flux[${flux_components}];
+		compute_noneq_2nd_moment(d0, rho, v0, flux);
+		<% reg_diff = sym.reglb_flux_tensor(grid) %>
+
+		%for feq, idx, reg in zip(eq.expression, grid.idx_name, reg_diff):
+			d0->${idx} = feq0.${idx} + ${cex(reg, pointers=True)};
+		%endfor
+	%endif
 </%def>

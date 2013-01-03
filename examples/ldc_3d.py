@@ -3,7 +3,7 @@
 import numpy as np
 from sailfish.geo import LBGeometry3D
 from sailfish.subdomain import SubdomainSpec3D, Subdomain3D
-from sailfish.node_type import NTFullBBWall, NTEquilibriumVelocity
+from sailfish.node_type import NTFullBBWall, NTRegularizedVelocity
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
 
@@ -50,7 +50,7 @@ class LDCBlock(Subdomain3D):
 
     def boundary_conditions(self, hx, hy, hz):
         wall_bc = NTFullBBWall
-        velocity_bc = NTEquilibriumVelocity
+        velocity_bc = NTRegularizedVelocity
 
         wall_map = ((hz == 0) | (hx == self.gx - 1) | (hx == 0) | (hy == 0) |
                 (hy == self.gy - 1))
