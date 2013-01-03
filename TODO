@@ -5,18 +5,10 @@ http://code.google.com/p/sailfish-cfd/issues/list?can=2&q=label%3Aenhancement
 
 * TASKS
 
-- Regularized boundary conditions for 2D and 3D.
-
 - Automated LDC regtest.
   Add a new regtest to automatically run the Lid-Driven Cavity example,
   and generate plots comparing the results to data from the literature
   (see also regtest/ldc_golden).
-
-- Implement the single-grid access pattern.
-  Instead of alternating between two distinct grids, the LBM can be
-  implemented so that only a single grid is used (at an increased
-  computational cost of the kernel).  Implement and test this access
-  pattern for all grids.
 
 - Use the Poiseuille geometry to test velocity BCs.
   By transforming the standard force-driven test case into a moving
