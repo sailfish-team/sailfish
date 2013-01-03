@@ -285,6 +285,24 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 	}
 </%def>
 
+<%def name="_macro_velocity_bc_common()">
+	int node_param_idx = decodeNodeParamIdx(ncode);
+	// We're dealing with a boundary node, for which some of the distributions
+	// might be meaningless.  Fill them with the values of the opposite
+	// distributions.
+	${fill_missing_distributions()}
+	*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
+	node_param_get_vector(node_param_idx, v0 ${dynamic_val_args()});
+
+	switch (orientation) {
+		%for i in range(1, grid.dim*2+1):
+			case ${i}:
+				*rho = ${cex(sym.ex_rho(grid, 'fi', incompressible, missing_dir=i), pointers=True)};
+				break;
+		%endfor
+	}
+</%def>
+
 //
 // Get macroscopic density rho and velocity v given a distribution fi, and
 // the node class node_type.
@@ -307,28 +325,12 @@ ${device_func} inline void getMacro(
 	}
 	%if nt.NTEquilibriumVelocity in node_types:
 		else if (isNTEquilibriumVelocity(node_type)) {
-			int node_param_idx = decodeNodeParamIdx(ncode);
-			// We're dealing with a boundary node, for which some of the distributions
-			// might be meaningless.  Fill them with the values of the opposite
-			// distributions.
-			${fill_missing_distributions()}
-			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			node_param_get_vector(node_param_idx, v0 ${dynamic_val_args()});
-
-			switch (orientation) {
-				%for i in range(1, grid.dim*2+1):
-					case ${i}:
-						*rho = ${cex(sym.ex_rho(grid, 'fi', incompressible, missing_dir=i), pointers=True)};
-						break;
-				%endfor
-			}
+			${_macro_velocity_bc_common()}
 		}
 	%endif
 	%if nt.NTZouHeVelocity in node_types:
 		else if (isNTZouHeVelocity(node_type)) {
-			int node_param_idx = decodeNodeParamIdx(ncode);
-			*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
-			node_param_get_vector(node_param_idx, v0 ${dynamic_val_args()});
+			${_macro_velocity_bc_common()}
 			zouhe_bb(fi, orientation, rho, v0);
 		}
 	%endif
