@@ -439,6 +439,34 @@ class Subdomain(object):
         elif node_type.needs_orientation:
             self._needs_orientation = True
 
+    def update_node(self, where, node_type):
+        """Updates a boundary condition at selected node(s).
+
+        Use this method only to update nodes in a _running_ simulation.
+        See set_node for a description of params.
+        """
+        if inspect.isclass(node_type):
+            assert issubclass(node_type, nt.LBNodeType)
+            node_type = node_type()
+        else:
+            assert isinstance(node_type, nt.LBNodeType)
+
+        if not self._type_map_encoded:
+            raise ValueError('Simulation not started. Use set_node instead.')
+
+        key = hash((node_type.id, frozenset(node_type.params.items())))
+        if key not in self._params:
+            raise ValueError('Setting nodes with new parameters is not '
+                             'supported.')
+
+        if node_type.needs_orientation and (not hasattr(node_type, 'orientation')
+                                            or node_type.orientation is None):
+            raise ValueError('Node orientation not specified.')
+
+        self._type_map[where] = self._encoder._subdomain_encode_node(
+            getattr(node_type, 'orientation', 0),
+            node_type.id, key)
+
     def reset(self):
         self.config.logger.debug('Setting subdomain geometry...')
         self._type_map_encoded = False

@@ -216,6 +216,14 @@ class GeoEncoderConst(GeoEncoder):
         else:
             self._bits_scratch = 0
 
+    def _subdomain_encode_node(self, orientation, node_type, param):
+        """Helper method for use from Subdomain only.
+
+        Use after encode() has been called, which initialized
+        self._type_choice_map."""
+        return self._encode_node(orientation, param,
+                                 np.choose(np.int32(node_type),
+                                           self._type_choice_map))
 
     def encode(self, orientation, detect_orientation):
         """
@@ -234,13 +242,13 @@ class GeoEncoderConst(GeoEncoder):
 
         # Remap type IDs.
         max_type_code = max(self._type_id_remap.keys())
-        type_choice_map = np.zeros(max_type_code + 1, dtype=np.uint32)
+        self._type_choice_map = np.zeros(max_type_code + 1, dtype=np.uint32)
         for orig_code, new_code in self._type_id_remap.iteritems():
-            type_choice_map[orig_code] = new_code
+            self._type_choice_map[orig_code] = new_code
 
         self._type_map[:] = self._encode_node(orientation,
                 self._encoded_param_map,
-                np.choose(np.int32(self._type_map), type_choice_map),
+                np.choose(np.int32(self._type_map), self._type_choice_map),
                 self._scratch_map)
         self.config.logger.debug('... type map done.')
 
