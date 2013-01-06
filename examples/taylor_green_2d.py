@@ -6,7 +6,7 @@ This is a well-known decaying vortex flow with an exact closed form solution:
 
     u_x = -u_0 cos(x) sin(y) exp(-2 nu t)
     u_y =  u_0 sin(x) cos(y) exp(-2 nu t)
-    p = rho / 4 (cos(2x) + cos(2y)) * exp(-4 nu t)
+    p = rho / 4 u_0^2 (cos(2x) + cos(2y)) * exp(-4 nu t)
 
 and can be used to test accuracy of LB models e.g. as a function of viscosity
 or maximum velocity in the simulation (Mach number).
@@ -17,7 +17,25 @@ which result from the LB -> physical parameter scaling.
 While running, the simulation prints to stdout:
     iteration, relative velocity error (simulation result / reference solution),
     max velocity in the simulation, max velocity in the reference solution
-"""
+
+To verify that this is a solution of the incompressible Navier-Stokes equations:
+
+    from sympy import *
+    x, y, nu, t, u0, rho, p0 = symbols('x y nu t u0 rho p0 kx ky')
+    u = -u0 * cos(x) * sin(y) * exp(-2 * nu * t)
+    v =  u0 * sin(x) * cos(y) * exp(-2 * nu * t)
+    P = p0 - rho / 4 * u0**2 * (cos(2 * x) + cos(2 * y)) * exp(-4 * nu * t)
+
+    dpdx = simplify((diff(u, x, x) + diff(u, y, y)) * nu -
+                    (diff(u, t) + u * diff(u, x) + v * diff(u, y)))  # dp/dx / rho
+    dpdy = simplify((diff(v, x, x) + diff(v, y, y)) * nu -
+                    (diff(v, t) + u * diff(v, x) + v * diff(v, y)))  # dp/dy / rho
+
+    s.expand_trig(s.diff(P, x) / rho) == dpdx
+    s.expand_trig(s.diff(P, y) / rho) == dpdy
+
+For the LB solution, we take p0 = 1.0 and use the P = rho/c_s^2 equation of
+state to get the form in solution()."""
 
 import math
 import numpy as np
@@ -57,7 +75,7 @@ class TaylorGreenSubdomain(Subdomain2D):
 
         vx = -config.max_v * ky / k * f * np.sin(ky * hy) * np.cos(kx * hx)
         vy =  config.max_v * kx / k * f * np.sin(kx * hx) * np.cos(ky * hy)
-        rho = 1.0 - Ma**2 / (ksq * 2.0) * (
+        rho = 1.0 - Ma**2 / (ksq * 4.0) * (
             ky**2 * np.cos(2 * kx * hx) +
             kx**2 * np.cos(2 * ky * hy)) * f * f
         return rho, vx, vy
@@ -99,12 +117,13 @@ class TaylorGreenSim(LBFluidSim):
         elif self.iteration % self.config.err_every == 0:
             vx = runner._sim.vx.astype(np.float64)
             vy = runner._sim.vy.astype(np.float64)
+            rho = runner._sim.rho.astype(np.float64)
 
             ny, nx = runner._sim.vx.shape
             hy, hx = np.mgrid[0:ny, 0:nx]
 
             Ma = self.config.max_v / math.sqrt(runner._sim.grid.cssq)
-            _, ref_ux, ref_uy = self.reference_solution(hx, hy, nx, ny,
+            ref_rho, ref_ux, ref_uy = self.reference_solution(hx, hy, nx, ny,
                                                         self.iteration, Ma)
             top_v = np.max(np.sqrt(np.square(vx) + np.square(vy)))
             top_ref_v = np.max(np.sqrt(np.square(ref_ux) + np.square(ref_uy)))
@@ -112,7 +131,7 @@ class TaylorGreenSim(LBFluidSim):
             dy = ref_uy - vy
             err = (np.linalg.norm(np.dstack([dx, dy])) /
                    np.linalg.norm(np.dstack([ref_ux, ref_uy])))
-            print self.iteration, err, top_v, top_ref_v
+            print self.iteration, err, top_v, top_ref_v, np.max(rho), np.max(ref_rho)
 
 
 if __name__ == '__main__':
