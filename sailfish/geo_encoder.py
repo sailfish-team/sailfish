@@ -221,7 +221,7 @@ class GeoEncoderConst(GeoEncoder):
 
         Use after encode() has been called, which initialized
         self._type_choice_map."""
-        return self._encode_node(orientation, param,
+        return self._encode_node(np.uint32(orientation), param,
                                  np.choose(np.int32(node_type),
                                            self._type_choice_map))
 
