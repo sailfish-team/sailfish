@@ -393,6 +393,8 @@ class D3Q19(DxQy):
 
 
 def alpha_series():
+    """See PRL 97, 010201 (2006) for form."""
+
     a1 = Symbol('a1')
     a2 = Symbol('a2')
     a3 = Symbol('a3')
@@ -403,7 +405,7 @@ def alpha_series():
             + 16 * a2**2 / a1**2
             - 8 * a3 / a1
             + 80 * a2 * a3 / a1**2
-            - 80 * a2**3 / a1
+            - 80 * a2**3 / a1**3
             - 16 * a4 / a1)
 
     return alpha
