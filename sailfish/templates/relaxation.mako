@@ -104,6 +104,7 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 		}
 	%endif
 
+	// alpha * beta
 	alpha *= 1.0f / (2.0f * tau0 + 1.0f);
 
 	%for idx in grid.idx_name:

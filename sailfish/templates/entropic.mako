@@ -5,6 +5,7 @@
 
 <%namespace file="code_common.mako" import="*"/>
 
+// See PRL 97, 010201 (2006), Eq. 12 for form of coefficients.
 ${device_func} inline void ComputeACoeff(Dist* fi, Dist* fneq, float *a1,
 		float *a2, float *a3, float *a4) {
 	*a1 = 0.0f;
@@ -32,6 +33,10 @@ ${device_func} inline void ComputeACoeff(Dist* fi, Dist* fneq, float *a1,
 	*a4 *= -1.0f / 20.0f;
 }
 
+// Estimates the alpha relaxation parameter using an asymptotic expansion
+// of the entropy equality H(f) = H(f^alpha) in powers of fneq / f, where
+// f^alpha is the entropic mirror state f + alpha * fneq.
+// fneq = feq - fi
 ${device_func} inline float EstimateAlphaSeries(Dist* fi, Dist* fneq) {
 	float a1, a2, a3, a4;
 
@@ -100,17 +105,13 @@ ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq) {
 	return alpha;
 }
 
+// Returns true if the deviation of distribution from the equilibrium is small
+// enough so that the asymptotic alpha expansion can be applied (see EstimateAlphaSeries).
 ${device_func} inline bool SmallEquilibriumDeviation(Dist* fi, Dist* feq) {
-	return false;
-	%if grid is not sym.D3Q15:
-		return false;
-	%else:
-		%for i in range(grid.Q):
-			if (fabsf((feq->${grid.idx_name[i]} - fi->${grid.idx_name[i]}) / fi->${grid.idx_name[i]}) > 0.01f) {
-				return false;
-			}
-		%endfor
-
-		return true;
-	%endif
+	%for i in range(grid.Q):
+		if (fabsf((feq->${grid.idx_name[i]} - fi->${grid.idx_name[i]}) / fi->${grid.idx_name[i]}) > 0.01f) {
+			return false;
+		}
+	%endfor
+	return true;
 }
