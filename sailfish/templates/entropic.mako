@@ -75,9 +75,8 @@ ${device_func} inline float CalculateEntropyIneq(Dist* fi, Dist* fneq, float alp
 	return ent;
 }
 
-${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq) {
+${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq, float alpha) {
 	float ent = CalculateEntropy(fi);
-	float alpha = 2.0f;
 	int i = 0;
 
 	// Newton's method to find alpha.
@@ -92,11 +91,14 @@ ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq) {
 		alpha = alpha - ent_increase / delta_ent_derivative;
 		i++;
 		if (i > 10000) {
+			%if gpu_check_invalid_values:
+				printf("Alpha estimation did not converge after %d iterations. alpha=%e H=%e dH=%e\n", i, alpha, ent, delta_ent_derivative);
+			%endif
 			die();
 		}
 	}
 
-	if (alpha < 1.0f) {
+	if (alpha < 1.0f || !isfinite(alpha)) {
 		%if gpu_check_invalid_values:
 			printf("Alpha estimated at: %e\n", alpha);
 		%endif

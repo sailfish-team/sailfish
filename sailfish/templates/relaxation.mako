@@ -1,5 +1,5 @@
 <%!
-  from sailfish import sym, sym_force
+  from sailfish import sym, sym_force, sym_equilibrium
   import sailfish.node_type as nt
 %>
 
@@ -60,20 +60,16 @@ ${device_func} inline void FE_MRT_relaxate${grid_idx}(${bgk_args_decl(grid_idx)}
 ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 	${dynamic_val_args_decl()}
 %if alpha_output:
-	, int options,
-	${global_ptr} float* alpha_out
+	, ${global_ptr} float* alpha_out
 %endif
 )
 {
-	%for i in range(0, len(grids)):
-		Dist fneq${i};
-	%endfor
-
+	Dist fneq;
 	<%
 		if grid is sym.D3Q15:
-			elbm_eq, elbm_eq_vars = sym.elbm_d3q15_equilibrium(grid)
+			eq = sym_equilibrium.elbm_d3q15_equilibrium(grid)
 		else:
-			elbm_eq, elbm_eq_vars = sym.elbm_equilibrium(grid)
+			eq = sym_equilibrium.elbm_equilibrium(grid)
 	%>
 
 	float v0[${dim}];
@@ -81,34 +77,36 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 	${fluid_velocity(0)};
 
 	## Local variables used by the equilibrium.
-	%for local_var in elbm_eq_vars:
+	%for local_var in eq.local_vars:
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
 	%endfor
 
-	%for i, eq in enumerate(elbm_eq):
-		%for feq, idx in zip(eq, grid.idx_name):
-			fneq${i}.${idx} = ${cex(feq)} - d0->${idx};
-		%endfor
+	%for feq, idx in zip(eq.expression, grid.idx_name):
+		fneq.${idx} = ${cex(feq)} - d0->${idx};
 	%endfor
 
 	float alpha;
-	if (SmallEquilibriumDeviation(d0, &fneq0)) {
-		alpha = EstimateAlphaSeries(d0, &fneq0);
+	if (SmallEquilibriumDeviation(d0, &fneq)) {
+		alpha = EstimateAlphaSeries(d0, &fneq);
 	} else {
-		alpha = EstimateAlphaFromEntropy(d0, &fneq0);
+		%if alpha_output:
+			alpha = EstimateAlphaFromEntropy(d0, &fneq, *alpha_out);
+		%else:
+			alpha = EstimateAlphaFromEntropy(d0, &fneq, 2.0f);
+		%endif
 	}
 
-	%if model == 'elbm' and alpha_output:
-		if (options & OPTION_SAVE_MACRO_FIELDS) {
-			*alpha_out = alpha;
-		}
+	%if alpha_output:
+		// Always save alpha in global memory so that it can be used as a starting
+		// point for the Newton-Rhapson method in the next iteration.
+		*alpha_out = alpha;
 	%endif
 
 	// alpha * beta
 	alpha *= 1.0f / (2.0f * tau0 + 1.0f);
 
 	%for idx in grid.idx_name:
-		d0->${idx} += alpha * fneq0.${idx};
+		d0->${idx} += alpha * fneq.${idx};
 	%endfor
 
 	${fluid_output_velocity(0)}
@@ -186,7 +184,7 @@ ${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
 	%elif model == 'mrt' and simtype == 'free-energy':
 		FE_MRT_relaxate${grid_idx}(${bgk_args(grid_idx)}, &d0, type ${dynamic_val_call_args()});
 	%elif model == 'elbm':
-		ELBM_relaxate(${bgk_args()}, &d0 ${dynamic_val_call_args()} ${cond(alpha_output, ', options, alpha + gi')});
+		ELBM_relaxate(${bgk_args()}, &d0 ${dynamic_val_call_args()} ${cond(alpha_output, ', alpha + gi')});
 	%else:
 		MS_relaxate(&d0, type, v ${dynamic_val_call_args()});
 	%endif

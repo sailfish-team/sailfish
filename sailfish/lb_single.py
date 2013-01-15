@@ -53,7 +53,7 @@ class LBFluidSim(LBSim):
         ctx['simtype'] = 'lbm'
         ctx['subgrid'] = self.config.subgrid
         ctx['smagorinsky_const'] = self.config.smagorinsky_const
-        ctx['entropy_tolerance'] = 1e-6 if self.config.precision == 'single' else 1e-10
+        ctx['entropy_tolerance'] = 1e-5 # 1e-6 if self.config.precision == 'single' else 1e-10
         ctx['alpha_output'] = self.alpha_output
         ctx['regularized'] = self.config.regularized
 
@@ -179,7 +179,8 @@ class LBEntropicFluidSim(LBFluidSim):
 
     @classmethod
     def fields(cls):
-        return [ScalarField('rho'), VectorField('v'), ScalarField('alpha')]
+        return [ScalarField('rho'), VectorField('v'),
+                ScalarField('alpha', init=2.0)]
 
 
 class LBFreeSurface(LBFluidSim):

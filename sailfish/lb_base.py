@@ -105,6 +105,7 @@ class LBSim(object):
         for field in self.fields():
             if type(field) is ScalarField:
                 f = runner.make_scalar_field(name=field.name, async=True)
+                f[:] = field.init
                 self._scalar_fields.append(FieldPair(field, f))
             elif type(field) is VectorField:
                 f = runner.make_vector_field(name=field.name, async=True)
@@ -292,13 +293,15 @@ class LBForcedSim(LBSim):
 
 
 class Field(object):
-    def __init__(self, name, expr=None, need_nn=False):
+    def __init__(self, name, expr=None, need_nn=False, init=0.0):
         """
         :param need_nn: if True, the model needs access to this field
             on the neighboring nodes.
+        :param init: Initial value. Only used for scalar fields.
         """
         self.name = name
         self.expr = expr
+        self.init = init
         self.need_nn = need_nn
 
 class ScalarField(Field):
