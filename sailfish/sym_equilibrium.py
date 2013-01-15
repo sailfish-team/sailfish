@@ -146,6 +146,7 @@ def elbm_equilibrium(grid):
 def elbm_d3q15_equilibrium(grid):
     """
     Form of equilibrium defined in PRL 97, 010201 (2006).
+    See also Chikatamarla, PhD Thesis, Eq. (5.7), (5.8).
     """
     rho = S.rho
 
@@ -163,7 +164,7 @@ def elbm_d3q15_equilibrium(grid):
         Rational(27, 16) * (-vsq**3 + 2 * (vy**2 + vz**2) *
             (vsq * vx**2 + vy**2 * vz**2) +
             20 * vx**2 * vy**2 * vz**2) +
-        81 * vsq**4 / 128 +
+        Rational(81, 128) * vsq**4 +
         Rational(81, 32) * (vx**8 + vy**8 + vz**8
             - 36 * vx**2 * vy**2 * vz**2 * vsq
             - vx**4 * vy**4
