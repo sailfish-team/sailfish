@@ -39,10 +39,8 @@ ${device_func} inline void ComputeACoeff(Dist* fi, Dist* fneq, float *a1,
 // fneq = feq - fi
 ${device_func} inline float EstimateAlphaSeries(Dist* fi, Dist* fneq) {
 	float a1, a2, a3, a4;
-
 	ComputeACoeff(fi, fneq, &a1, &a2, &a3, &a4);
-	float alpha = ${cex(sym.alpha_series())};
-	return alpha;
+	return ${cex(sym.alpha_series())};
 }
 
 // TODO(mjanusz): The entropy calculation should use a sympy expression.
@@ -57,7 +55,7 @@ ${device_func} inline float CalculateEntropy(Dist* fi) {
 	return ent;
 }
 
-// Calculates entropy for the mirror state with a given alpha.
+// Calculates entropy for the mirror state with a given alpha (f^alpha = f + alpha * fneq)
 // Also calculates d \Delta entropy / d alpha and returns it in 'derivative'.
 ${device_func} inline float CalculateEntropyIneq(Dist* fi, Dist* fneq, float alpha, float *derivative) {
 	float ent = 0.0f;
@@ -75,24 +73,58 @@ ${device_func} inline float CalculateEntropyIneq(Dist* fi, Dist* fneq, float alp
 	return ent;
 }
 
+// Returns the maximum value of alpha for which all components of f_alpha are positive.
+${device_func} inline float FindMaxAlpha(Dist* fi, Dist *fneq) {
+	float max_alpha = 1000.0f;
+
+	%for name in grid.idx_name:
+		if (fi->${name} < 0.0f || fneq->${name} < 0.0f) {
+			max_alpha = min(max_alpha, -fi->${name} / fneq->${name});
+		}
+	%endfor
+
+	return max_alpha;
+}
+
 ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq, float alpha) {
 	float ent = CalculateEntropy(fi);
 	int i = 0;
+	float init_alpha = alpha;
+	const float max_alpha = FindMaxAlpha(fi, fneq);
 
 	// Newton's method to find alpha.
 	while (true) {
 		float delta_ent_derivative;
 		float ent_ineq = CalculateEntropyIneq(fi, fneq, alpha, &delta_ent_derivative);
+		if (isnan(ent_ineq) && alpha != 1.1f) {
+			alpha = 1.1f;
+			continue;
+		}
 		float ent_increase = ent_ineq - ent;
-		if (ent_increase < ${cex(entropy_tolerance)}) {
+		if (fabsf(ent_increase) < ${cex(entropy_tolerance)}) {
 			break;
 		}
 		// Newton's method to solve: H(f_i) = H(f + alpha f_neq).
-		alpha = alpha - ent_increase / delta_ent_derivative;
+		float new_alpha = alpha - ent_increase / delta_ent_derivative;
+
+		if (new_alpha > max_alpha) {
+			// Fall back to the middle of the interval in case Newton's
+			// method would result in an invalid alpha.
+			new_alpha = (alpha + max_alpha) / 2.0f;
+		}
+
+		if (fabsf(new_alpha - alpha) < 1e-10f) {
+			break;
+		}
+
+		alpha = new_alpha;
 		i++;
-		if (i > 10000) {
+		if (i > 1000) {
 			%if gpu_check_invalid_values:
-				printf("Alpha estimation did not converge after %d iterations. alpha=%e H=%e dH=%e\n", i, alpha, ent, delta_ent_derivative);
+				${dump_dists('(*fi)', short=True)}
+				${dump_dists('(*fneq)', short=True)}
+				printf("Alpha estimation did not converge after %d iterations. alpha=%e H=%e dH=%e."
+						" init=%e max=%e\n", i, alpha, ent, delta_ent_derivative, init_alpha, max_alpha);
 			%endif
 			die();
 		}
@@ -100,6 +132,8 @@ ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq, float
 
 	if (alpha < 1.0f || !isfinite(alpha)) {
 		%if gpu_check_invalid_values:
+			${dump_dists('(*fi)', short=True)}
+			${dump_dists('(*fneq)', short=True)}
 			printf("Alpha estimated at: %e\n", alpha);
 		%endif
 		die();
@@ -109,11 +143,16 @@ ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq, float
 
 // Returns true if the deviation of distribution from the equilibrium is small
 // enough so that the asymptotic alpha expansion can be applied (see EstimateAlphaSeries).
-${device_func} inline bool SmallEquilibriumDeviation(Dist* fi, Dist* feq) {
-	%for i in range(grid.Q):
-		if (fabsf((feq->${grid.idx_name[i]} - fi->${grid.idx_name[i]}) / fi->${grid.idx_name[i]}) > 0.01f) {
-			return false;
+${device_func} inline float SmallEquilibriumDeviation(Dist* fi, Dist* fneq) {
+	float deviation = 0.0f;
+	float t;
+
+	%for name in grid.idx_name:
+		t = fabsf(fneq->${name} / fi->${name});
+		deviation = max(deviation, t);
+		if (deviation > 0.01f) {
+			return deviation;
 		}
 	%endfor
-	return true;
+	return deviation;
 }

@@ -193,6 +193,9 @@ class LBSim(object):
     def get_pbc_kernels(self, runner):
         return []
 
+    def get_aux_kernels(self, runner):
+        return KernelPair([], [])
+
     def initial_conditions(self, runner):
         pass
 

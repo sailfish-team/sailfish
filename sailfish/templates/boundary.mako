@@ -527,7 +527,7 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, i
 				float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
 			%endfor
 			%for feq, idx, reg in zip(eq.expression, grid.idx_name, reg_diff):
-				fi->${idx} = ${cex(feq, pointers=True)} + ${cex(reg, pointers=True)};
+				fi->${idx} = max(1e-7f, ${cex(feq, pointers=True)} + ${cex(reg, pointers=True)});
 			%endfor
 		}
 	%endif

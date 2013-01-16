@@ -755,6 +755,8 @@ class SubdomainRunner(object):
         self._step_bulk(sync_req)
         self._sim.iteration += 1
         self._send_dists()
+        if sync_req:
+            self._step_aux()
         # Run this at a point after the compute step is fully scheduled for execution
         # on the GPU and where it doesn't unnecessarily delay other operations.
         self.backend.set_iteration(self._sim.iteration)
@@ -846,6 +848,10 @@ class SubdomainRunner(object):
         for kernel, grid in self._collect_kernels[self._sim.iteration & 1]:
             self.backend.run_kernel(kernel, grid, self._data_stream)
         self._profile.record_gpu_end(TimeProfile.COLLECTION, self._data_stream)
+
+    def _step_aux(self):
+        for kernel in self._aux_kernels[(self._sim.iteration - 1) & 1]:
+            self.backend.run_kernel(kernel, self._kernel_grid_full, self._data_stream)
 
     @profile(TimeProfile.SEND_DISTS)
     def _send_dists(self):
@@ -1248,6 +1254,7 @@ class SubdomainRunner(object):
         self._init_interblock_kernels()
         self._prepare_compute_kernels()
         self._pbc_kernels = self._sim.get_pbc_kernels(self)
+        self._aux_kernels = self._sim.get_aux_kernels(self)
 
         self._initial_conditions()
 

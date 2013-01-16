@@ -86,7 +86,10 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 	%endfor
 
 	float alpha;
-	if (SmallEquilibriumDeviation(d0, &fneq)) {
+	const float dev = SmallEquilibriumDeviation(d0, &fneq);
+	if (dev < 1e-6f) {
+		alpha = 2.0f;
+	} else if (dev < 0.01f) {
 		alpha = EstimateAlphaSeries(d0, &fneq);
 	} else {
 		%if alpha_output:
