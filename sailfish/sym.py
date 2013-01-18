@@ -393,7 +393,7 @@ class D3Q19(DxQy):
 
 
 def alpha_series():
-    """See PRL 97, 010201 (2006) for form."""
+    """See Phys Rev Lett 97, 010201 (2006) for the expression."""
 
     a1 = Symbol('a1')
     a2 = Symbol('a2')
