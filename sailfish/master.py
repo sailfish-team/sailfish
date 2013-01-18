@@ -205,7 +205,16 @@ class LBMachineMaster(object):
                 break
 
         if vis_class is None:
-            engine = util.get_visualization_engines()
+            self.config.logger.warning('Requested visualization engine not '
+                                       'available.')
+            try:
+                vis_class = util.get_visualization_engines().next()
+            except StopIteration:
+                self.config.logger.warning(
+                    'No visualization backends available. Falling back to '
+                    'batch mode.')
+                self.config.mode = 'batch'
+                return lambda subdomain: output_cls(self.config, subdomain.id)
 
         # Event to signal that the visualization process should be terminated.
         self._vis_quit_event = Event()
