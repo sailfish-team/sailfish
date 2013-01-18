@@ -110,6 +110,7 @@ and then run::
 To run the Sailfish examples, remember to use the correct Python interpreter (i.e. the one
 installed via MacPorts).  For instance:
 
-  python2.7 ./ldc_2d.py --mode=visualization --visualize=pygame --scr_depth=24
+  python2.7 ./ldc_2d.py --mode=visualization
 
-Note that for the pygame visualization, you may need to specify the --scr_depth option.
+If this fails, try running the simulation without any arguments to see whether the problem
+is with the visualization module or the computational backend.
