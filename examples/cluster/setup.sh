@@ -36,29 +36,29 @@ export CXXFLAGS="${CFLAGS} -Wl,-rpath -Wl,${PREFIX}/lib -I${PREFIX}/include -L${
 #cd ..
 
 # zmq
-wget -c http://download.zeromq.org/zeromq-2.2.0.tar.gz
-tar zxf zeromq-2.2.0.tar.gz
-cd zeromq-2.2.0
+wget -c http://download.zeromq.org/zeromq-3.2.2.tar.gz
+tar zxf zeromq-3.2.2.tar.gz
+cd zeromq-3.2.2
 ./configure --prefix=${PREFIX}
 make
 make install
 cd ..
 
-wget -c http://pypi.python.org/packages/source/p/pyzmq/pyzmq-2.2.0.tar.gz#md5=100b73973d6fb235b8da6adea403566e
-tar zxf pyzmq-2.2.0.tar.gz
-cd pyzmq-2.2.0
+wget -c http://pypi.python.org/packages/source/p/pyzmq/pyzmq-2.2.0.1.tar.gz
+tar zxf pyzmq-2.2.0.1.tar.gz
+cd pyzmq-2.2.0.1
 python setup.py install --prefix=${PREFIX} --zmq=${PREFIX}
 cd ..
 
-wget -c http://pypi.python.org/packages/source/p/pip/pip-1.1.tar.gz#md5=62a9f08dd5dc69d76734568a6c040508
-tar zxf pip-1.1.tar.gz
-cd pip-1.1
+wget -c http://pypi.python.org/packages/source/p/pip/pip-1.2.1.tar.gz
+tar zxf pip-1.2.1.tar.gz
+cd pip-1.2.1
 python setup.py install --prefix=${PREFIX}
 cd ..
 
-wget -c http://pypi.python.org/packages/source/d/distribute/distribute-0.6.27.tar.gz#md5=ecd75ea629fee6d59d26f88c39b2d291
-tar zxf distribute-0.6.27.tar.gz
-cd distribute-0.6.27
+wget -c http://pypi.python.org/packages/source/d/distribute/distribute-0.6.34.tar.gz
+tar zxf distribute-0.6.34.tar.gz
+cd distribute-0.6.34
 python setup.py install --prefix=${PREFIX}
 cd ..
 
