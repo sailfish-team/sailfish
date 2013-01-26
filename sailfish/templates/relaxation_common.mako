@@ -99,7 +99,7 @@
 		## components and grids used. If this assumption is ever changed, the code
 		## below will have to be extended appropriately.
 		%for j in range(0, dim):
-			iv0[${j}] += ${cex(sym_force.fluid_accel(sim, igrid, j, forces, force_couplings))};
+			iv0[${j}] += ${cex(0.5 * sym_force.fluid_accel(sim, igrid, j, forces, force_couplings))};
 		%endfor
 	%endif
 </%def>
