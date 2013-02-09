@@ -1,7 +1,7 @@
-#Numerical solutions of 2-D steady incompressible driven cavity ow at high 
-#Reynolds numbers E. Erturk; T. C. Corke and C. Gokcol with numerical calculation
-#of Navier-Stokes equations;  grid size: 601X601  
-RE:  1000 2500 5000 7500 10 000 12 500 15 000 17 500 20 000 21 000
+# Numerical solutions of 2-D steady incompressible driven cavity flow at high
+# Reynolds numbers E. Erturk; T. C. Corke and C. Gokcol with numerical calculation
+# of Navier-Stokes equations; grid size: 601x601
+# Re = 1000 2500 5000 7500 10000 12500 15000 17500 20000 21000
 1.000 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000
 0.985 -0.0973 -0.1675 -0.2441 -0.2991 -0.3419 -0.3762 -0.4041 -0.4269 -0.4457 -0.4522
 0.970 -0.2173 -0.3725 -0.5019 -0.5550 -0.5712 -0.5694 -0.5593 -0.5460 -0.5321 -0.5266
