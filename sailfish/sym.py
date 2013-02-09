@@ -758,7 +758,7 @@ def grad_approx(grid):
 
     for ei, weight in zip(grid.basis, grid.weights):
         Q = _q_tensor(grid, ei)
-        t = P.dot(Q) / (grid.cssq**2 * 2)
+        t = sum(P.multiply_elementwise(Q)) / (grid.cssq**2 * 2)
         t += S.rho + S.rho * ei.dot(grid.v) / grid.cssq
         t *= weight
         out.append(t)
@@ -772,7 +772,7 @@ def reglb_flux_tensor(grid):
     P = _pressure_tensor(grid)
     for ei, weight in zip(grid.basis, grid.weights):
         Q = _q_tensor(grid, ei)
-        out.append(P.dot(Q) * weight / (2 * grid.cssq**2))
+        out.append(sum(P.multiply_elementwise(Q)) * weight / (2 * grid.cssq**2))
     return out
 
 #
