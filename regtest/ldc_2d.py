@@ -17,8 +17,6 @@ import tempfile
 
 from examples.ldc_2d import LDCBlock, LDCSim
 from sailfish.controller import LBSimulationController
-from sailfish.geo import LBGeometry2D
-from sailfish.subdomain import SubdomainSpec2D
 from sailfish import io
 
 from utils.merge_subdomains import merge_subdomains
