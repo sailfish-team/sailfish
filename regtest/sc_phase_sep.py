@@ -35,11 +35,11 @@ def run_test(name, precision):
     if not os.path.exists(basepath):
         os.makedirs(basepath)
 
-    xvec = np.linspace(3, 5.6, num=POINTS)
+    xvec = np.linspace(3, 5.5, num=POINTS)
     f = open(os.path.join(basepath, '%s.dat' % precision), 'w')
     output = os.path.join(tmpdir, 'phase_sep')
 
-    max_iters = 10000
+    max_iters = 50000
     for g in xvec:
         print ' {0}'.format(g),
         defaults = {
