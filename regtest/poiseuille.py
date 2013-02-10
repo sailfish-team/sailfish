@@ -7,7 +7,7 @@ import tempfile
 import numpy as np
 import matplotlib
 
-matplotlib.use('cairo')
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 from sailfish.controller import LBSimulationController
@@ -69,15 +69,15 @@ def run_test_2d():
         profile_sim = vx[:,nyw]
         profile_th = TestPoiseuille2D.subdomain.velocity_profile(ctrl.config, hy)
 
-        yvec[i] = np.max(profile_sim) / np.max(profile_th) - 1.0
+        yvec[i] = np.nanmax(profile_sim) / np.nanmax(profile_th) - 1.0
 
         plt.gca().yaxis.grid(True)
         plt.gca().xaxis.grid(True)
         plt.gca().xaxis.grid(True, which='minor')
         plt.gca().yaxis.grid(True, which='minor')
-        plt.plot(profile_th[1:-1] - profile_sim[1:-1], 'b.-')
+        plt.plot((profile_th[1:-1] - profile_sim[1:-1]) / np.nanmax(profile_th), 'b.-')
         plt.gca().set_xbound(0, len(profile_sim)-2)
-        plt.title('theoretical - simulation; visc = %f' % visc)
+        plt.title('(theoretical - simulation) / theo; visc = %f' % visc)
         plt.savefig(os.path.join(profile_path, 'profile{0:02d}.png'.format(i)),
                 format='png')
 
