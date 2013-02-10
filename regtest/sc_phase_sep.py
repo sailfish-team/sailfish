@@ -46,6 +46,7 @@ def run_test(name, precision):
                 'quiet': True,
                 'verbose': False,
                 'every': 1000,
+                'seed': 2348,
                 'max_iters': max_iters,
                 'output': output,
                 'G': -g,
