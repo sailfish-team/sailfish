@@ -39,7 +39,7 @@ def run_test(name, precision):
     f = open(os.path.join(basepath, '%s.dat' % precision), 'w')
     output = os.path.join(tmpdir, 'phase_sep')
 
-    max_iters = 1000
+    max_iters = 10000
     for g in xvec:
         print ' {0}'.format(g),
         defaults = {
