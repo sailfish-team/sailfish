@@ -15,10 +15,11 @@ import tempfile
 import matplotlib
 import numpy as np
 
-matplotlib.use('cairo')
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 from examples.sc_phase_separation import SCSim
+from sailfish import io
 from sailfish.geo import LBGeometry2D
 from sailfish.controller import LBSimulationController
 
@@ -38,21 +39,25 @@ def run_test(name, precision):
     f = open(os.path.join(basepath, '%s.dat' % precision), 'w')
     output = os.path.join(tmpdir, 'phase_sep')
 
+    max_iters = 1000
     for g in xvec:
         print ' {0}'.format(g),
         defaults = {
                 'quiet': True,
                 'verbose': False,
                 'every': 1000,
-                'max_iters': 100000,
+                'max_iters': max_iters,
                 'output': output,
-                'G': g,
+                'G': -g,
             }
 
         LBSimulationController(SCSim, LBGeometry2D,
                 default_config=defaults).run(ignore_cmdline=True)
 
-        data = np.load('{0}_blk0_{1}.npz'.format(output, 100000))
+        digits = io.filename_iter_digits(max_iters)
+        fname = io.filename(output, digits, 0, max_iters)
+
+        data = np.load(fname)
         rho = data['rho']
         avg = np.average(rho)
         order = np.sqrt(np.average(np.square(rho - avg))) / avg
