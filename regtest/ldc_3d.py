@@ -29,6 +29,8 @@ class TestLDCSim(LDCSim):
             'lat_nx': 256,
             'lat_ny': 256,
             'lat_nz': 256,
+            'access_pattern': 'AA',
+            'grid': 'D3Q19',
             'output': os.path.join(tmpdir, 'result')})
 
     @classmethod
@@ -44,7 +46,7 @@ class TestLDCSim(LDCSim):
 
 def save_output(basepath, max_iters):
     merged = merge_subdomains(os.path.join(tmpdir, 'result'),
-                    io.filename_iter_digits(max_iters, max_iters, save=False)
+                    io.filename_iter_digits(max_iters), max_iters, save=False)
 
     rho = merged['rho']
     lat_nz, lat_ny, lat_nx = rho.shape
@@ -73,12 +75,12 @@ def run_test(name):
         os.makedirs(basepath)
 
     ctrl = LBSimulationController(TestLDCSim)
-    ctrl.run()
+    ctrl.run(ignore_cmdline=True)
     horiz = np.loadtxt('ldc_golden/re400_horiz', skiprows=1)
     vert = np.loadtxt('ldc_golden/re400_vert', skiprows=1)
 
-    plt.plot(2 * (horiz[:,0] - 0.5), -2 * (horiz[:,1] - 0.5), label='Sheu, Tsai paper')
-    plt.plot(2 * (vert[:,0] - 0.5), -2 * (vert[:,1] - 0.5), label='Sheu, Tsai paper')
+    plt.plot(2 * (horiz[:,0] - 0.5), -2 * (horiz[:,1] - 0.5), '.', label='Sheu, Tsai paper')
+    plt.plot(2 * (vert[:,0] - 0.5), -2 * (vert[:,1] - 0.5), '.', label='Sheu, Tsai paper')
     save_output(basepath, MAX_ITERS)
     plt.legend(loc='lower right')
     plt.gca().yaxis.grid(True)
