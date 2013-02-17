@@ -19,7 +19,7 @@ ${sym.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors, phi=phi
 
 		values = ', '.join(values)
 	%>
-	printf("dists: ${format_str}\n", ${values});
+	printf("${format_str}\n", ${values});
 </%def>
 
 <%def name="cond(cond, text)">

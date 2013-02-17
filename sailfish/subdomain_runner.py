@@ -711,6 +711,8 @@ class SubdomainRunner(object):
                 like=self._subdomain.encoded_map())
 
         if self._subdomain.scratch_space_size > 0:
+            self.config.logger.debug("Using {0} scratch space slots".format(
+                self._subdomain.scratch_space_size))
             self.gpu_scratch_space = self.backend.alloc_buf(
                     size=self._subdomain.scratch_space_size * self.float().nbytes)
         else:
