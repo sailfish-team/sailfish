@@ -16,7 +16,9 @@
 
 %for i, expressions in symbol_idx_map.iteritems():
 	${device_func} inline void time_dep_param_${i}(float *out ${dynamic_val_args_decl()}) {
-		float phys_time = get_time_from_iteration(iteration_number);
+		%if time_dependence:
+			float phys_time = get_time_from_iteration(iteration_number);
+		%endif
 		%for j, expr in enumerate(expressions):
 			out[${j}] = ${cex(expr)};
 		%endfor

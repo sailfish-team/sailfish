@@ -274,7 +274,7 @@ def get_dry_node_type_ids():
 def get_orientation_node_type_ids():
     return [id for id, nt in _NODE_TYPES.iteritems() if nt.needs_orientation]
 
-def multifield(values, where):
+def multifield(values, where=None):
     """Collapses a list of numpy arrays into a structured field that can be
     used for setting boundary condition parameters at multiple nodes at the
     same time.
@@ -304,8 +304,10 @@ def multifield(values, where):
             new_values[i] = np.zeros(shape, dtype=np.float64)
             new_values[i][:] = old  # broadcast to the whole array
 
-    return np.core.records.fromarrays(new_values)[where]
-
+    if where is not None:
+        return np.core.records.fromarrays(new_values)[where]
+    else:
+        return np.core.records.fromarrays(new_values).flatten()
 
 class DynamicValue(object):
     """A node parameter that is evaluated on the device.
