@@ -167,12 +167,14 @@ ${kernel} void CollideAndPropagate(
 	${local_indices_split()}
 	${shared_mem_propagation_vars()}
 	${load_node_type()}
+	${declare_misc_bc_vars()}
 
 	// Cache the distributions in local variables
 	Dist d0;
 	getDist(&d0, dist_in, gi ${iteration_number_arg_if_required()});
 	fixMissingDistributions(&d0, dist_in, ncode, type, orientation, gi,
 							ovx, ovy ${', ovz' if dim == 3 else ''}, gg0m0
+							${misc_bc_args()}
 							${scratch_space_arg_if_required()});
 
 	// Macroscopic quantities for the current cell
@@ -193,6 +195,7 @@ ${kernel} void CollideAndPropagate(
 
 	${relaxate(bgk_args)}
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out
+									${misc_bc_args()}
 									${scratch_space_arg_if_required()});
 	${check_invalid_values()}
 	${save_macro_fields()}

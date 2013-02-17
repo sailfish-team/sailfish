@@ -85,29 +85,9 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 		fneq.${idx} = ${cex(feq)} - d0->${idx};
 	%endfor
 
-	float alpha;
-	const float dev = SmallEquilibriumDeviation(d0, &fneq);
-	if (dev < 1e-6f) {
-		alpha = 2.0f;
-	} else if (dev < 0.01f) {
-		alpha = EstimateAlphaSeries(d0, &fneq);
-	} else {
-		%if alpha_output:
-			alpha = EstimateAlphaFromEntropy(d0, &fneq, *alpha_out);
-		%else:
-			alpha = EstimateAlphaFromEntropy(d0, &fneq, 2.0f);
-		%endif
-	}
-
-	%if alpha_output:
-		// Always save alpha in global memory so that it can be used as a starting
-		// point for the Newton-Rhapson method in the next iteration.
-		*alpha_out = alpha;
-	%endif
-
+	float alpha = EntropicRelaxationParam(d0, &fneq ${cond(alpha_output, ', alpha_out')});
 	// alpha * beta
 	alpha *= 1.0f / (2.0f * tau0 + 1.0f);
-
 	%for idx in grid.idx_name:
 		d0->${idx} += alpha * fneq.${idx};
 	%endfor

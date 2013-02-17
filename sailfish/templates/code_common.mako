@@ -2,8 +2,8 @@
     from sailfish import sym
 %>
 
-<%def name="cex(ex, pointers=False, rho=None, vectors=True, phi=None)">
-${sym.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors, phi=phi)}
+<%def name="cex(ex, pointers=False, rho=None, vectors=True, phi=None, vel=None)">
+${sym.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors, phi=phi, vel=vel)}
 </%def>
 
 <%def name="dump_dists(name, short=False)">
@@ -28,3 +28,8 @@ ${sym.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors, phi=phi
 	%endif
 </%def>
 
+<%def name="eval_dist(ex, dest)">
+	%for val, idx in zip(ex, grid.idx_name):
+		${dest}.${idx} = ${cex(val)}
+	%endfor
+</%def>

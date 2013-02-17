@@ -73,8 +73,8 @@
 ## Computes the fluid velocity for use in the relaxation process.
 ## igrid: grid ID
 ## equilibrium: if True, calculate velocity for the equilibrium distribution
-<%def name="fluid_velocity(igrid=0, equilibrium=False)">
-	%if forces is not UNDEFINED and force_implementation == 'guo':
+<%def name="fluid_velocity(igrid=0, equilibrium=False, ignore_forces=False)">
+	%if forces is not UNDEFINED and force_implementation == 'guo' and not ignore_forces:
 		## The half time-step velocity shift is only used in Guo's method.
 		%for j in range(0, dim):
 			%if igrid in force_for_eq and equilibrium:

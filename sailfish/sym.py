@@ -899,7 +899,7 @@ class KernelCodePrinter(CCodePrinter):
             return super(KernelCodePrinter, self)._print_Function(expr)
 
 def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=True,
-          phi=None):
+          phi=None, vel=None):
     """Convert a SymPy expression into a string containing valid C code.
 
     :param sim: the main simulation class (descendant of :class:`LBMSim`)
@@ -911,6 +911,7 @@ def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=True,
         acceleration) will be replaced by references to C arrays
     :param rho: density symbol (sympy Symbol, string).  If ``None`` the
         standard rho symbol for the grid will be used.
+    :param vel: symbol to use for velocity
     :rtype: string representing the C code
     """
 
@@ -947,6 +948,9 @@ def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=True,
 
     if vectors:
         t = use_vectors(t)
+
+    if vel:
+        t = t.replace('v0', vel)
 
     t = make_float(int2float(t))
     return t

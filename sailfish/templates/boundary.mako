@@ -1,5 +1,5 @@
 <%!
-    from sailfish import sym
+    from sailfish import sym, sym_equilibrium
     import sailfish.node_type as nt
 %>
 
@@ -7,6 +7,22 @@
 <%namespace file="propagation.mako" import="rel_offset,get_odist"/>
 <%namespace file="utils.mako" import="*"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
+
+<%def name="misc_bc_args_decl()">
+	${cond(misc_bc_vars, ', ')} ${', '.join('float* %s' % x for x in misc_bc_vars)}
+</%def>
+
+<%def name="misc_bc_args()">
+	${cond(misc_bc_vars, ', ')} ${', '.join(misc_bc_vars)}
+</%def>
+
+<%def name="declare_misc_bc_vars()">
+	%if nt.NTWallTMS in node_types:
+		// Target macroscopic values for TMS nodes.
+		float tg_rho[1];
+		float tg_v[${dim}];
+	%endif
+</%def>
 
 %if time_dependence:
 	${device_func} inline float get_time_from_iteration(unsigned int iteration) {
@@ -379,12 +395,14 @@ ${device_func} inline void getMacro(
 	%endif
 }
 
-// Uses extrapolation to compute missing distributions for some implementations
+
+// Uses extrapolation/other schemes to compute missing distributions for some implementations
 // of boundary condtitions.
 ${device_func} inline void fixMissingDistributions(
 		Dist *fi, ${global_ptr} float *dist_in, int ncode, int node_type, int orientation, int gi,
 		${kernel_args_1st_moment('iv')}
 		${global_ptr} float *gg0m0
+		${misc_bc_args_decl()}
 		${scratch_space_if_required()}) {
 	## These boundary conditions are non-local and can thus be implemented in
 	## this way only with the AB access pattern. In the AA access pattern,
@@ -446,6 +464,33 @@ ${device_func} inline void fixMissingDistributions(
 				%endfor
 			}
 		%endif
+
+		%if nt.NTWallTMS in node_types:
+			// Replaces the missing distributions using the bounce-back rule.
+			// No density/momentum correction happens here.
+			else if (isNTWallTMS(node_type)) {
+				${fill_missing_distributions()}
+				compute_macro_quant(fi, tg_rho, tg_v);
+
+				<% eq = sym_equilibrium.get_equilibrium(config, equilibria, model, grids, 0) %>
+				%for local_var in eq.local_vars:
+					const float ${cex(local_var.lhs)} =
+						${cex(local_var.rhs, rho='*tg_rho', vel='tg_v')};
+				%endfor
+				// Replace missing distributions with equilibrium ones
+				// calculated for the target macroscopic variables.
+				switch (orientation) {
+					%for i in range(1, grid.dim*2+1):
+						case ${i}: {
+							%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
+								${lvalue.var} = ${cex(eq.expression[lvalue.idx], rho='*tg_rho', vel='tg_v')};
+							%endfor
+							break;
+						}
+					%endfor
+				}
+			}
+		%endif
 	%endif
 }
 
@@ -454,6 +499,7 @@ ${device_func} inline void fixMissingDistributions(
 ${device_func} inline void postcollisionBoundaryConditions(
 		Dist *fi, int ncode, int node_type, int orientation,
 		float *rho, float *v0, int gi, ${global_ptr} float *dist_out
+		${misc_bc_args_decl()}
 		${scratch_space_if_required()})
 {
 	%if nt.NTHalfBBWall in node_types:
@@ -479,6 +525,33 @@ ${device_func} inline void postcollisionBoundaryConditions(
 			float flux[${flux_components}];
 			compute_2nd_moment(fi, flux);
 			storeNodeScratchSpace(scratch_id, node_type, flux, node_scratch_space);
+		}
+	%endif
+
+	%if nt.NTWallTMS in node_types:
+		// Adds the (f^eq{TG} - f^eq{inst}) part of the distribution.
+		if (isNTWallTMS(node_type)) {
+			{
+				<% eq = sym_equilibrium.get_equilibrium(config, equilibria, model, grids, 0) %>
+				%for local_var in eq.local_vars:
+					const float ${cex(local_var.lhs)} =
+						${cex(local_var.rhs, rho='*tg_rho', vel='tg_v', pointers=True)};
+				%endfor
+
+				%for val, idx in zip(eq.expression, grid.idx_name):
+					fi->${idx} += ${cex(val, rho='*tg_rho', vel='tg_v', pointers=True)};
+				%endfor
+			}
+			{
+				<% eq = sym_equilibrium.get_equilibrium(config, equilibria, model, grids, 0) %>
+				%for local_var in eq.local_vars:
+					const float ${cex(local_var.lhs)} = ${cex(local_var.rhs, pointers=True)};
+				%endfor
+
+				%for val, idx in zip(eq.expression, grid.idx_name):
+					fi->${idx} -= ${cex(val, pointers=True)};
+				%endfor
+			}
 		}
 	%endif
 }

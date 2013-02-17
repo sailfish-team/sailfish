@@ -507,6 +507,12 @@ class Subdomain(object):
         if self.dim == 3:
             ctx['z_local_device_to_global_offset'] = self.spec.oz - self.spec.envelope_size
 
+        ctx['misc_bc_vars'] = []
+        for nt_id in self._seen_types:
+            node_type = nt._NODE_TYPES[nt_id]
+            if hasattr(node_type, 'update_context'):
+                node_type.update_context(ctx)
+
     def encoded_map(self):
         if not self._type_map_encoded:
             self._encoder.encode(self._orientation.base, self._needs_orientation)

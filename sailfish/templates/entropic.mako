@@ -156,3 +156,28 @@ ${device_func} inline float SmallEquilibriumDeviation(Dist* fi, Dist* fneq) {
 	%endfor
 	return deviation;
 }
+
+${device_func} inline float EntropicRelaxationParam(Dist* fi, Dist* fneq
+		${cond(alpha_output, ', ' + global_ptr + ' float* alpha_out')}) {
+	const float dev = SmallEquilibriumDeviation(fi, fneq);
+	float alpha;
+	if (dev < 1e-6f) {
+		alpha = 2.0f;
+	} else if (dev < 0.01f) {
+		alpha = EstimateAlphaSeries(fi, fneq);
+	} else {
+		%if alpha_output:
+			alpha = EstimateAlphaFromEntropy(fi, fneq, *alpha_out);
+		%else:
+			alpha = EstimateAlphaFromEntropy(fi, fneq, 2.0f);
+		%endif
+	}
+
+	%if alpha_output:
+		// Always save alpha in global memory so that it can be used as a starting
+		// point for the Newton-Rhapson method in the next iteration.
+		*alpha_out = alpha;
+	%endif
+
+	return alpha;
+}

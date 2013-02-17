@@ -7,7 +7,7 @@ __license__ = 'LGPL3'
 from collections import namedtuple
 import sympy
 from sympy import Rational, Symbol, Eq
-from sailfish.sym import poly_factorize, S
+from sailfish.sym import poly_factorize, S, D3Q15
 
 EqDef = namedtuple('EqDef', 'expression local_vars')
 
@@ -203,3 +203,14 @@ def elbm_d3q15_equilibrium(grid):
         out.append(t)
 
     return EqDef(out, lvars)
+
+def get_equilibrium(config, equilibria, model, grids, grid_idx):
+    if model == 'elbm':
+        grid = grids[grid_idx]
+        if grid is D3Q15:
+            return elbm_d3q15_equilibrium(grid)
+        else:
+            return elbm_equilibrium(grid)
+    else:
+	    return equilibria[grid_idx](grids[grid_idx], config)
+
