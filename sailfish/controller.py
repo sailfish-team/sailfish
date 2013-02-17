@@ -356,7 +356,7 @@ class LBSimulationController(object):
 
         group = self._config_parser.add_group('Checkpointing')
         group.add_argument('--checkpoint_file', type=str, help='Location of '
-                'the checkpoint file.', metavar='PATH')
+                'the checkpoint file.', metavar='PATH', default='')
         group.add_argument('--single_checkpoint', action='store_true',
                 default=False,
                 help='If True, only a single checkpoint file will be '
