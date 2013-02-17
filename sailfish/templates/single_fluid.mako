@@ -160,8 +160,8 @@ ${kernel} void CollideAndPropagate(
 	${kernel_args_1st_moment('ov')}
 	int options
 	${scratch_space_if_required()}
-	${iteration_number_if_required()}
 	${scalar_field_if_required('alpha', alpha_output)}
+	${iteration_number_if_required()}
 	)
 {
 	${local_indices_split()}
