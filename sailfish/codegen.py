@@ -34,6 +34,15 @@ def _remove_math_function_suffix(t):
     t = t.replace('tanhf(', 'tan(')
     return t
 
+def _use_instrinsics(t):
+    t = t.replace('logf(', '__logf(')
+    t = t.replace('expf(', '__expf(')
+    t = t.replace('powf(', '__powf(')
+    t = t.replace('sinf(', '__sinf(')
+    t = t.replace('cosf(', '__cosf(')
+    #t = t.replace('sqrtf(', '__fsqrt_('
+    return t
+
 class BlockCodeGenerator(object):
     """Generates CUDA/OpenCL code for a simulation of a subdomain."""
 
