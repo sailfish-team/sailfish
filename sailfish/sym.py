@@ -392,6 +392,28 @@ class D3Q19(DxQy):
                 cls.mrt_equilibrium.append(mrt_eq[name])
 
 
+class D3Q27(DxQy):
+    dim = 3
+    Q = 27
+
+    basis = map(lambda x: Matrix((x, )),
+                [(0,0,0),
+                 (1,0,0), (-1,0,0), (0,1,0), (0,-1,0), (0,0,1), (0,0,-1),
+                 (1,1,0), (-1,1,0), (1,-1,0), (-1,-1,0),
+                 (0,1,1), (0,-1,1), (0,1,-1), (0,-1,-1),
+                 (1,0,1), (-1,0,1), (1,0,-1), (-1,0,-1),
+                 (1,1,1), (1,1,-1), (1,-1,1), (1,-1,-1),
+                 (-1,1,1), (-1,1,-1), (-1,-1,1), (-1,-1,-1)])
+
+    weights = map(lambda x: Rational(*x),
+                  [(8, 27),
+                   (2, 27), (2, 27), (2, 27), (2, 27), (2, 27), (2, 27),
+                   (1, 54), (1, 54), (1, 54), (1, 54), (1, 54), (1, 54),
+                   (1, 54), (1, 54), (1, 54), (1, 54), (1, 54), (1, 54),
+                   (1, 216), (1, 216), (1, 216), (1, 216),
+                   (1, 216), (1, 216), (1, 216), (1, 216)])
+
+
 def alpha_series():
     """See Phys Rev Lett 97, 010201 (2006) for the expression."""
 
@@ -1202,7 +1224,7 @@ def _prepare_symbols():
     S.gz = SlfSymbol('gz', 'Z node location in the global coordinate system')
     S.time = SlfSymbol('phys_time', 'time in physical units')
 
-KNOWN_GRIDS = (D2Q9, D3Q13, D3Q15, D3Q19)
+KNOWN_GRIDS = (D2Q9, D3Q13, D3Q15, D3Q19, D3Q27)
 
 _prepare_symbols()
 _prepare_grids()
