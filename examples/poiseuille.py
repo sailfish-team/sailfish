@@ -73,13 +73,13 @@ class PoiseuilleSubdomain(Subdomain2D):
     @classmethod
     def velocity_profile(cls, config, hi):
         width = cls.channel_width(config)
-        h = cls.wall_bc.location
+        h = 0.5
 
         return (4.0 * cls.max_v / width**2 * (hi + h) * (width - hi - h))
 
     @classmethod
     def channel_width(cls, config):
-        return cls.width(config) - 1 - 2 * cls.wall_bc.location
+        return cls.width(config) - 1 - 2 * 0.5
 
     @classmethod
     def width(cls, config):

@@ -17,7 +17,6 @@ class LBNodeType(object):
     # Initialized when module is loaded.
     id = None
     wet_node = False
-    location = 0.0
 
     # If True, the node does not participate in the simulation.
     excluded = False
@@ -76,15 +75,22 @@ class _NTUnused(LBNodeType):
 
 
 class NTHalfBBWall(LBNodeType):
-    """Half-way bounce-back (no-slip) node."""
+    """Half-way bounce-back (no-slip) node.
+
+    The effective location of the wall is half a lattice spacing away from
+    the bulk of the fluid.
+    """
     wet_node = True
     standard_macro = True
     needs_orientation = True
 
 
 class NTFullBBWall(LBNodeType):
-    """Full-way bounce-back (no-slip) node."""
-    # XXX: location
+    """Full-way bounce-back (no-slip) node.
+
+    The effective location of the wall if half a lattice spacing between
+    the wall node and the fluid node.
+    """
     standard_macro = True
 
     # Only necessary for wetting conditions in binary fluid models.
