@@ -82,7 +82,7 @@ def shallow_water_equilibrium(grid, config):
 
     return EqDef(out, local_vars=[])
 
-def bgk_equilibrium(grid, config, rho=None, rho0=None):
+def bgk_equilibrium(grid, config, rho=None, rho0=None, order=2):
     """Get expressions for the BGK equilibrium distribution.
 
     :param grid: the grid class to be used
@@ -101,9 +101,14 @@ def bgk_equilibrium(grid, config, rho=None, rho0=None):
             rho0 = rho
 
     for ei, weight in zip(grid.basis, grid.weights):
-        out.append(weight * (rho + rho0 * poly_factorize(
-            3 * ei.dot(grid.v) + Rational(9, 2) * (ei.dot(grid.v))**2 -
-            Rational(3, 2) * grid.v.dot(grid.v))))
+        h = (ei.dot(grid.v) / grid.cssq +
+             ei.dot(grid.v)**2 / grid.cssq**2 / 2 -
+             grid.v.dot(grid.v) / 2 / grid.cssq)
+        if order > 2:
+            h += (ei.dot(grid.v)**3 / grid.cssq**3 / 2 -
+                  ei.dot(grid.v) * grid.v.dot(grid.v) / grid.cssq**2 / 2)
+
+        out.append(weight * (rho + rho0 * poly_factorize(h)))
 
     return EqDef(out, local_vars=[])
 
