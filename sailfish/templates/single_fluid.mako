@@ -195,6 +195,7 @@ ${kernel} void CollideAndPropagate(
 
 	${relaxate(bgk_args)}
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out
+									${iteration_number_arg_if_required()}
 									${misc_bc_args()}
 									${scratch_space_arg_if_required()});
 	${check_invalid_values()}

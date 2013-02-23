@@ -432,8 +432,8 @@ ${device_func} inline void fixMissingDistributions(
 				%for o in range(1, grid.dim*2+1):
 					case ${o}: {
 						<%
-							offset1 = rel_offset(*(-grid.dir_to_vec(o)))
-							offset2 = rel_offset(*(2 * -grid.dir_to_vec(o)))
+							offset1 = get_rel_offset(*(-grid.dir_to_vec(o)))
+							offset2 = get_rel_offset(*(2 * -grid.dir_to_vec(o)))
 						%>
 						%for dist_idx in sym.get_missing_dists(grid, o):
 							fi->${grid.idx_name[dist_idx]} =
@@ -499,6 +499,7 @@ ${device_func} inline void fixMissingDistributions(
 ${device_func} inline void postcollisionBoundaryConditions(
 		Dist *fi, int ncode, int node_type, int orientation,
 		float *rho, float *v0, int gi, ${global_ptr} float *dist_out
+		${iteration_number_if_required()}
 		${misc_bc_args_decl()}
 		${scratch_space_if_required()})
 {
@@ -508,7 +509,16 @@ ${device_func} inline void postcollisionBoundaryConditions(
 			%for i in range(1, grid.dim * 2 + 1):
 				case ${i}: {
 					%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
-						${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
+						%if access_pattern == 'AB':
+							${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
+						%else:
+							if (iteration_number & 1) {
+								${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
+							} else {
+								${get_odist('dist_out', grid.idx_opposite[lvalue.idx],
+											*grid.basis[grid.idx_opposite[lvalue.idx]])} = ${rvalue};  // ${lvalue.var}
+							}
+						%endif
 					%endfor
 					break;
 				}

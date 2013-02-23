@@ -249,7 +249,8 @@ ${kernel} void FreeEnergyCollideAndPropagateFluid(
 
 	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
 	${relaxate(bgk_args_fe, 0)}
-	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist1_out);
+	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist1_out
+									${iteration_number_arg_if_required()});
 	${guo_density_node_index_shift_final()}
 	${check_invalid_values()}
 	${save_macro_fields(velocity=False)}
@@ -287,7 +288,8 @@ ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
 
 	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v);
 	${relaxate(bgk_args_fe, 1)}
-	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v, gi, dist1_out);
+	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v, gi, dist1_out
+									${iteration_number_arg_if_required()});
 	${guo_density_node_index_shift_final()}
 	${check_invalid_values()}
 	${propagate('dist1_out', 'd0')}
