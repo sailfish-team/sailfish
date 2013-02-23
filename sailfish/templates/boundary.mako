@@ -404,11 +404,11 @@ ${device_func} inline void fixMissingDistributions(
 		${global_ptr} float *gg0m0
 		${misc_bc_args_decl()}
 		${scratch_space_if_required()}) {
+	if (0) {}
 	## These boundary conditions are non-local and can thus be implemented in
 	## this way only with the AB access pattern. In the AA access pattern,
 	## their implementation requires a separate kernel call.
 	%if access_pattern == 'AB':
-		if (0) {}
 		%if nt.NTCopy in node_types:
 			else if (isNTCopy(node_type)) {
 				switch (orientation) {
@@ -464,33 +464,33 @@ ${device_func} inline void fixMissingDistributions(
 				%endfor
 			}
 		%endif
+	%endif
 
-		%if nt.NTWallTMS in node_types:
-			// Replaces the missing distributions using the bounce-back rule.
-			// No density/momentum correction happens here.
-			else if (isNTWallTMS(node_type)) {
-				${fill_missing_distributions()}
-				compute_macro_quant(fi, tg_rho, tg_v);
+	%if nt.NTWallTMS in node_types:
+		// Replaces the missing distributions using the bounce-back rule.
+		// No density/momentum correction happens here.
+		else if (isNTWallTMS(node_type)) {
+			${fill_missing_distributions()}
+			compute_macro_quant(fi, tg_rho, tg_v);
 
-				<% eq = sym_equilibrium.get_equilibrium(config, equilibria, model, grids, 0) %>
-				%for local_var in eq.local_vars:
-					const float ${cex(local_var.lhs)} =
-						${cex(local_var.rhs, rho='*tg_rho', vel='tg_v')};
+			<% eq = sym_equilibrium.get_equilibrium(config, equilibria, model, grids, 0) %>
+			%for local_var in eq.local_vars:
+				const float ${cex(local_var.lhs)} =
+					${cex(local_var.rhs, rho='*tg_rho', vel='tg_v')};
+			%endfor
+			// Replace missing distributions with equilibrium ones
+			// calculated for the target macroscopic variables.
+			switch (orientation) {
+				%for i in range(1, grid.dim*2+1):
+					case ${i}: {
+						%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
+							${lvalue.var} = ${cex(eq.expression[lvalue.idx], rho='*tg_rho', vel='tg_v')};
+						%endfor
+						break;
+					}
 				%endfor
-				// Replace missing distributions with equilibrium ones
-				// calculated for the target macroscopic variables.
-				switch (orientation) {
-					%for i in range(1, grid.dim*2+1):
-						case ${i}: {
-							%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
-								${lvalue.var} = ${cex(eq.expression[lvalue.idx], rho='*tg_rho', vel='tg_v')};
-							%endfor
-							break;
-						}
-					%endfor
-				}
 			}
-		%endif
+		}
 	%endif
 }
 
@@ -529,7 +529,7 @@ ${device_func} inline void postcollisionBoundaryConditions(
 	%endif
 
 	%if nt.NTWallTMS in node_types:
-		// Adds the (f^eq{TG} - f^eq{inst}) part of the distribution.
+		// Adds the (f^eq(TG) - f^eq(inst)) part of the distribution.
 		if (isNTWallTMS(node_type)) {
 			{
 				<% eq = sym_equilibrium.get_equilibrium(config, equilibria, model, grids, 0) %>
