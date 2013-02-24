@@ -182,7 +182,7 @@ class NTWallTMS(LBNodeType):
 
     For more info see:
     S.S. Chikatamarla, I.V. Karlin, "Entropic lattice Boltzmann method for
-    turbulent flow simulations: Boundary conditions, Physica A (2013),
+    turbulent flow simulations: Boundary conditions", Physica A (2013),
     doi: 10.1016/j.physa.2012.12.034
     """
     wet_node = True
@@ -204,6 +204,20 @@ class NTGradFreeflow(LBNodeType):
     wet_node = True
     standard_macro = True
     scratch_space = ScratchSize(dim2=3, dim3=6)
+
+
+class NTDoNothing(LBNodeType):
+    """Outflow node without any special processing for undefined distributions.
+
+    The value from the previous time step is retained for all undefined
+    distributions (i.e. pointing into the domain at the boundary).
+
+    Using this boundary condition is only necessary with the AA memory layout.
+    In the AB memory layout, leaving the outflow nodes defined as NTFluid works
+    just fine."""
+    wet_node = True
+    needs_orientation = True
+
 
 class NTCopy(LBNodeType):
     """Copies distributions from another node.

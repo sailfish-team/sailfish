@@ -503,8 +503,10 @@ ${device_func} inline void postcollisionBoundaryConditions(
 		${misc_bc_args_decl()}
 		${scratch_space_if_required()})
 {
+	if (0) {}
+
 	%if nt.NTHalfBBWall in node_types:
-		if (isNTHalfBBWall(node_type)) {
+		else if (isNTHalfBBWall(node_type)) {
 			switch (orientation) {
 			%for i in range(1, grid.dim * 2 + 1):
 				case ${i}: {
@@ -530,7 +532,7 @@ ${device_func} inline void postcollisionBoundaryConditions(
 	%if nt.NTGradFreeflow in node_types:
 		// Store the flux tensor so that it can be used to compute the Grad approximation
 		// in the next iteration.
-		if (isNTGradFreeflow(node_type)) {
+		else if (isNTGradFreeflow(node_type)) {
 			int scratch_id = decodeNodeScratchId(ncode);
 			float flux[${flux_components}];
 			compute_2nd_moment(fi, flux);
@@ -540,7 +542,7 @@ ${device_func} inline void postcollisionBoundaryConditions(
 
 	%if nt.NTWallTMS in node_types:
 		// Adds the (f^eq(TG) - f^eq(inst)) part of the distribution.
-		if (isNTWallTMS(node_type)) {
+		else if (isNTWallTMS(node_type)) {
 			{
 				<% eq = sym_equilibrium.get_equilibrium(config, equilibria, model, grids, 0) %>
 				%for local_var in eq.local_vars:
@@ -560,6 +562,26 @@ ${device_func} inline void postcollisionBoundaryConditions(
 
 				%for val, idx in zip(eq.expression, grid.idx_name):
 					fi->${idx} -= ${cex(val, pointers=True)};
+				%endfor
+			}
+		}
+	%endif
+
+	%if access_pattern == 'AA' and nt.NTDoNothing in node_types:
+		// Only need to do special processing for the propagate in-place step.
+		// For this step, we store the missing distributions in the ghost nodes
+		// adjacent to the do-nothing node in such a way that in the next iteration
+		// they will be retrieved using the standard procedure.
+		else if (isNTDoNothing(node_type) && !(iteration_number & 1)) {
+			switch (orientation) {
+				%for o in range(1, grid.dim*2+1):
+					case ${o}: {
+						%for dist_idx in sym.get_missing_dists(grid, o):
+							${get_odist('dist_out', grid.idx_opposite[dist_idx],
+										*grid.basis[grid.idx_opposite[dist_idx]])} = fi->${grid.idx_name[dist_idx]};
+						%endfor
+						break;
+					}
 				%endfor
 			}
 		}
