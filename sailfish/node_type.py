@@ -122,7 +122,7 @@ class NTWallTMS(LBNodeType):
     """
     wet_node = True
     needs_orientation = True
-    location = 0.5
+    location = -0.5
 
     # This will cause the standard procedure to compute the instantaneous u and
     # rho as defined in the paper.
