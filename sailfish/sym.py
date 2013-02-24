@@ -8,6 +8,7 @@ __license__ = 'LGPL3'
 
 import copy
 from collections import namedtuple
+import operator
 from operator import itemgetter
 import math
 import re
@@ -817,6 +818,35 @@ SHAN_CHEN_POTENTIALS = {
 #
 # Sympy stuff.
 #
+
+def truncate_velocity(poly, order=2):
+    """Truncates a polynomial to terms of desired order in velocity.
+
+    :param poly: Poly object to truncate
+    :param order: desired order
+    """
+    degs = []
+    for x in poly.gens:
+        if x in (S.g0m1x, S.g0m1y, S.g0m1z):
+            degs.append(1)
+        elif str(x) == 'vsq':
+            degs.append(2)
+        else:
+            degs.append(0)
+
+    truncated = 0
+    for powers, coeff in poly.terms():
+        o = 0
+        for power, deg in zip(powers, degs):
+            o += deg * power
+
+        if o > order:
+            continue
+        truncated += coeff * reduce(operator.mul, (
+            x**p for p, x in zip(powers, poly.gens)))
+
+    return truncated
+
 
 def poly_factorize(poly):
     """Factorize multivariate polynomials into a sum of products of monomials.
