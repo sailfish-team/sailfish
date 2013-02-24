@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding=utf-u
 """
 Velocity-driven flow through a duct of rectangular cross-section.
 

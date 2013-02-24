@@ -36,6 +36,12 @@ class LBNodeType(object):
     # ScratchSize.
     scratch_space = 0
 
+    # What is the effective location of the boundary condition along the
+    # direction of the normal vector. Positive values indicate offset towards
+    # the fluid domain, negative values insidate offset away from the fluid
+    # domain.
+    location = 0.0
+
     def __init__(self, **params):
         if 'orientation' in params:
             self.orientation = params['orientation']
@@ -56,6 +62,9 @@ class LBNodeType(object):
             else:
                 return cls.scratch_space.dim3
 
+############################################################################
+# Special node types, do not use directly.
+############################################################################
 
 class _NTFluid(LBNodeType):
     """Fluid node."""
@@ -73,6 +82,9 @@ class _NTUnused(LBNodeType):
     """Unused node."""
     excluded = True
 
+############################################################################
+# Wall (no-slip) nodes.
+############################################################################
 
 class NTHalfBBWall(LBNodeType):
     """Half-way bounce-back (no-slip) node.
@@ -83,6 +95,7 @@ class NTHalfBBWall(LBNodeType):
     wet_node = True
     standard_macro = True
     needs_orientation = True
+    location = -0.5
 
 
 class NTFullBBWall(LBNodeType):
@@ -92,24 +105,36 @@ class NTFullBBWall(LBNodeType):
     the wall node and the fluid node.
     """
     standard_macro = True
+    location = 0.5
 
     # Only necessary for wetting conditions in binary fluid models.
     needs_orientation = True
 
-class NTSlip(LBNodeType):
-    """Full-slip node."""
+
+class NTWallTMS(LBNodeType):
+    """Wall boundary condition for turbulent flows, based on the Tamm-Mott-Smith
+    approximation.
+
+    For more info see:
+    S.S. Chikatamarla, I.V. Karlin, "Entropic lattice Boltzmann method for
+    turbulent flow simulations: Boundary conditions", Physica A (2013),
+    doi: 10.1016/j.physa.2012.12.034
+    """
+    wet_node = True
+    needs_orientation = True
+    location = 0.5
+
+    # This will cause the standard procedure to compute the instantaneous u and
+    # rho as defined in the paper.
     standard_macro = True
 
+    @classmethod
+    def update_context(cls, ctx):
+        ctx['misc_bc_vars'].extend(('tg_rho', 'tg_v'))
 
-class NTEquilibriumVelocity(LBNodeType):
-    """Velocity boundary condition using the equilibrium distribution."""
-    needs_orientation = True
-    wet_node = True
-
-    def __init__(self, velocity, orientation=None):
-        self.params = {'velocity': velocity}
-        self.orientation = orientation
-
+############################################################################
+# Density (pressure) nodes.
+############################################################################
 
 class NTEquilibriumDensity(LBNodeType):
     """Density boundary condition using the equilibrium distribution."""
@@ -118,40 +143,6 @@ class NTEquilibriumDensity(LBNodeType):
 
     def __init__(self, density, orientation=None):
         self.params = {'density': density}
-        self.orientation = orientation
-
-
-class NTZouHeVelocity(LBNodeType):
-    """Zou-he velocity."""
-    needs_orientation = True
-    wet_node = True
-
-    def __init__(self, velocity, orientation=None):
-        self.params = {'velocity': velocity}
-        self.orientation = orientation
-
-
-class NTZouHeDensity(LBNodeType):
-    """Zou-He density."""
-    needs_orientation = True
-    wet_node = True
-
-    def __init__(self, density, orientation=None):
-        self.params = {'density': density}
-        self.orientation = orientation
-
-
-class NTRegularizedVelocity(LBNodeType):
-    """Velocity boundary condition using the regularized LB model and
-    non-equilibrium bounce-back.
-
-    See Phys. Rev. E 77, 056703 (2008) for more info.
-    """
-    needs_orientation = True
-    wet_node = True
-
-    def __init__(self, velocity, orientation=None):
-        self.params = {'velocity': velocity}
         self.orientation = orientation
 
 
@@ -176,25 +167,56 @@ class NTGuoDensity(LBNodeType):
         self.params = {'density': density}
 
 
-class NTWallTMS(LBNodeType):
-    """Wall boundary condition for turbulent flows, based on the Tamm-Mott-Smith
-    approximation.
-
-    For more info see:
-    S.S. Chikatamarla, I.V. Karlin, "Entropic lattice Boltzmann method for
-    turbulent flow simulations: Boundary conditions", Physica A (2013),
-    doi: 10.1016/j.physa.2012.12.034
-    """
-    wet_node = True
+class NTZouHeDensity(LBNodeType):
+    """Zou-He density."""
     needs_orientation = True
+    wet_node = True
 
-    # This will cause the standard procedure to compute the instantaneous u and
-    # rho as defined in the paper.
-    standard_macro = True
+    def __init__(self, density, orientation=None):
+        self.params = {'density': density}
+        self.orientation = orientation
 
-    @classmethod
-    def update_context(cls, ctx):
-        ctx['misc_bc_vars'].extend(('tg_rho', 'tg_v'))
+
+############################################################################
+# Velocity nodes.
+############################################################################
+
+class NTEquilibriumVelocity(LBNodeType):
+    """Velocity boundary condition using the equilibrium distribution."""
+    needs_orientation = True
+    wet_node = True
+
+    def __init__(self, velocity, orientation=None):
+        self.params = {'velocity': velocity}
+        self.orientation = orientation
+
+
+class NTZouHeVelocity(LBNodeType):
+    """Zou-he velocity."""
+    needs_orientation = True
+    wet_node = True
+
+    def __init__(self, velocity, orientation=None):
+        self.params = {'velocity': velocity}
+        self.orientation = orientation
+
+
+class NTRegularizedVelocity(LBNodeType):
+    """Velocity boundary condition using the regularized LB model and
+    non-equilibrium bounce-back.
+
+    See Phys. Rev. E 77, 056703 (2008) for more info.
+    """
+    needs_orientation = True
+    wet_node = True
+
+    def __init__(self, velocity, orientation=None):
+        self.params = {'velocity': velocity}
+        self.orientation = orientation
+
+############################################################################
+# Outflow (zero-gradient) nodes.
+############################################################################
 
 class NTGradFreeflow(LBNodeType):
     """Outflow node using Grad's approximation.
@@ -235,6 +257,7 @@ class NTCopy(LBNodeType):
         """
         self.params = {'normal': normal}
 
+
 class NTYuOutflow(LBNodeType):
     """Implements the open boundary condition described in:
 
@@ -257,6 +280,7 @@ class NTYuOutflow(LBNodeType):
             can be generated using grid.vec_to_dir.
         """
         self.params = {'normal': normal}
+
 
 class NTNeumann(LBNodeType):
     """Implements a Neumann boundary condition.
@@ -291,6 +315,14 @@ class NTNeumann(LBNodeType):
             can be generated using grid.vec_to_dir.
         """
         self.params = {'normal': normal}
+
+############################################################################
+# Other nodes.
+############################################################################
+
+class NTSlip(LBNodeType):
+    """Full-slip node."""
+    standard_macro = True
 
 def __init_node_type_list():
     """Assigns IDs to classes descendant from LBNodeType."""
