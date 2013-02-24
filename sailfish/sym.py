@@ -649,8 +649,8 @@ def get_missing_dists(grid, orientation):
     :param grid: grid object
     :param orientation: orientation code
     """
-    # Normal vector points outside of the simulation domain.
-    normal = -grid.dir_to_vec(orientation)
+    # Normal vector points inside the simulation domain.
+    normal = grid.dir_to_vec(orientation)
     _, unknown = _get_known_dists(grid, normal)
     return unknown
 

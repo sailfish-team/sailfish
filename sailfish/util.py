@@ -59,6 +59,48 @@ def get_visualization_engines():
         except ImportError:
             pass
 
+
+def _cluster_from_nodes_dict(nodes, iface):
+    port = random.randint(8000, 16000)
+    if not iface:
+        iface = None
+
+    cluster = []
+    for node, gpus in sorted(nodes.iteritems()):
+        try:
+            ipaddr = socket.gethostbyname(node)
+        except socket.error:
+            ipaddr = node
+        cluster.append(config.MachineSpec('socket=%s:%s' % (ipaddr, port),
+            node, gpus=list(gpus), iface=iface))
+
+    class Cluster(object):
+        def __init__(self, nodes):
+            self.nodes = nodes
+
+    return Cluster(cluster)
+
+
+def lsf_vars_to_clusterspec(vars, iface=''):
+    """Builds a Saiflish cluster definition based on LSF environment variables."""
+
+    gpus_per_core = float(vars['FDUST_GPU_PER_CORE'])
+
+    def host_cpu(x):
+        while x:
+            host = x.pop()
+            cpus = int(x.pop())
+            yield host, cpus
+
+    hosts = list(reversed(vars['LSB_MCPU_HOSTS'].split()))
+    nodes = defaultdict(set)
+    for host, cpus in host_cpu(hosts):
+        for gpu in range(int(cpus * gpus_per_core)):
+            nodes[host].add(gpu)
+
+    return _cluster_from_nodes_dict(nodes, iface)
+
+
 def gpufile_to_clusterspec(gpufile, iface=''):
     """Builds a Sailfish cluster definition based on a PBS GPUFILE."""
 
@@ -74,24 +116,8 @@ def gpufile_to_clusterspec(gpufile, iface=''):
         nodes[host].add(gpu)
     f.close()
 
-    port = random.randint(8000, 16000)
-    if not iface:
-        iface = None
+    return _cluster_from_nodes_dict(nodes, iface)
 
-    cluster = []
-    for node, gpus in nodes.iteritems():
-        try:
-            ipaddr = socket.gethostbyname(node)
-        except socket.error:
-            ipaddr = node
-        cluster.append(config.MachineSpec('socket=%s:%s' % (ipaddr, port),
-            node, gpus=list(gpus), iface=iface))
-
-    class Cluster(object):
-        def __init__(self, nodes):
-            self.nodes = nodes
-
-    return Cluster(cluster)
 
 def reverse_pairs(iterable, subitems=1):
     it = iter(iterable)

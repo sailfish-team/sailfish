@@ -36,6 +36,15 @@ def _start_subdomain_runner(subdomain, config, sim, num_subdomains,
     # caching..
     if num_subdomains > 1:
         tempfile.tempdir = tempfile.mkdtemp()
+
+    # If using libfairydust, the parent process (machine master) is called
+    # 'res' and we have to rename ourselves to something else so that the
+    # GPU resources will be allocated to the master, not the runners.
+    if 'FDUST_GPU_CNT_TOTAL' in os.environ:
+        os.environ['SPT_NOENV'] = '1'
+        import setproctitle
+        setproctitle.setproctitle('sim')
+
     # We instantiate the backend class here (instead of in the machine
     # master), so that the backend object is created within the
     # context of the new process.
@@ -277,6 +286,8 @@ class LBMachineMaster(object):
             # simulation and no port information should be necessary.
             assert not ports
 
+        self.config.logger.debug('Port map is: {0}'.format(ports))
+
         for socket in sockets:
             socket.send_pyobj(ports)
 
@@ -285,7 +296,6 @@ class LBMachineMaster(object):
                 ti, min_ti, max_ti = socket.recv_pyobj()
                 self._channel.send((tuple(ti), tuple(min_ti), tuple(max_ti)))
                 socket.send('ack')
-
 
         # Wait for all subdomain runners to finish.
         done_runners = set()

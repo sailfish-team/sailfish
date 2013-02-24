@@ -113,4 +113,4 @@ if __name__ == '__main__':
         id = 'sailfish'
     serversock = bind_and_listen(hostport)
     startserver(serversock, loop=False, id=id)
-
+    print_("socketserver exiting.")

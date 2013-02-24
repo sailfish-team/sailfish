@@ -61,6 +61,14 @@ def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
         import multiprocessing as mp
         pname = 'Master/{0}'.format(platform.node())
         mp.current_process().name = pname
+
+        # libfairydust will not detect the correct variables unless we pretend
+        # to be the 'res' process.
+        if 'FDUST_GPU_CNT_TOTAL' in os.environ:
+            os.environ['SPT_NOENV'] = '1'
+            import setproctitle
+            setproctitle.setproctitle('res')
+
         master = LBMachineMaster(*pickle.loads(args), lb_class=lb_class,
                 subdomain_addr_map=subdomain_addr_map, channel=channel,
                 iface=iface)
@@ -333,9 +341,18 @@ class LBSimulationController(object):
                 default='sailfish-init.sh', help='Script to execute on remote '
                 'nodes in order to set the environment prior to starting '
                 'a machine master.')
-        group.add_argument('--cluster_pbs_interface', type=str,
-                default='', help='Network interface to use on PBS nodes for '
-                'internode communication.')
+        group.add_argument('--cluster_interface', type=str,
+                           dest='cluster_interface',
+                           default='',
+                           help='Network interface to use on PBS/LSF nodes for '
+                           'internode communication.')
+        group.add_argument('--nocluster_lsf', action='store_false',
+                           default=True, dest='cluster_lsf', help='If True, '
+                           'standard LSF variables will be used to run the job '
+                           'in a cluster.')
+        group.add_argument('--nofdust', action='store_false',
+                           default=True, dest='fdust', help='If True, will use '
+                           'logical GPUs 0..n via libfairydust (if present).')
         group.add_argument('--nocheck_invalid_results_host', action='store_false',
                 dest='check_invalid_results_host',
                 default=True, help='If True, will terminate the simulation if '
@@ -513,29 +530,16 @@ class LBSimulationController(object):
                     args=(self.config, subdomains, self._lb_class))
         self._simulation_process.start()
 
-    def _start_pbs_handlers(self):
-        cluster = util.gpufile_to_clusterspec(os.environ['PBS_GPUFILE'],
-                self.config.cluster_pbs_interface)
-        self._pbs_handlers = []
-        id_string = 'sailfish-%s' % os.getpid()
-
-        def _start_socketserver(addr, port):
-            return subprocess.Popen(['pbsdsh', '-h',
-                addr, 'sh', '-c',
-                ". %s ; python %s/socketserver.py :%s %s" %
-                (self.config.cluster_pbs_initscript,
-                    os.path.realpath(os.path.dirname(util.__file__)),
-                    port, id_string)])
-
+    def _start_handlers(self, start_socketserver, cluster, id_string):
         for node in cluster.nodes:
             port = node.get_port()
-            self._pbs_handlers.append(_start_socketserver(node.addr, port))
+            self._node_handlers.append(start_socketserver(node.addr, port))
 
         def _try_next_port(i, node, still_starting):
             port = node.get_port() + 1
             node.set_port(port)
             print 'retrying node %s:%s...' % (node.host, node.addr)
-            self._pbs_handlers[i] = _start_socketserver(node.addr, port)
+            self._node_handlers[i] = _start_socketserver(node.addr, port)
             still_starting.append((i, node))
 
         starting_nodes = list(enumerate(cluster.nodes))
@@ -543,7 +547,7 @@ class LBSimulationController(object):
             still_starting = []
 
             for i, node in starting_nodes:
-                if self._pbs_handlers[i].returncode is not None:
+                if self._node_handlers[i].returncode is not None:
                     # Remote process terminated -- try to start again with a
                     # different port.
                     _try_next_port(i, node, still_starting)
@@ -561,10 +565,38 @@ class LBSimulationController(object):
             sys.stdout.flush()
             time.sleep(0.5)
 
-        return cluster
+    def _prepare_lsf_handlers(self, id_string):
+        cluster = util.lsf_vars_to_clusterspec(os.environ,
+                                               self.config.cluster_interface)
+        def _start_socketserver(addr, port):
+            return subprocess.Popen(['blaunch',
+                addr, 'sh', '-c', "python %s/socketserver.py :%s %s" % (
+                    os.path.realpath(os.path.dirname(util.__file__)),
+                    port, id_string)])
+
+        return cluster, _start_socketserver
+
+    def _prepare_pbs_handlers(self, id_string):
+        cluster = util.gpufile_to_clusterspec(os.environ['PBS_GPUFILE'],
+                                              self.config.cluster_interface)
+        def _start_socketserver(addr, port):
+            return subprocess.Popen(['pbsdsh', '-h',
+                addr, 'sh', '-c',
+                ". %s ; python %s/socketserver.py :%s %s" %
+                (self.config.cluster_pbs_initscript,
+                    os.path.realpath(os.path.dirname(util.__file__)),
+                    port, id_string)])
+
+        return cluster, _start_socketserver
 
     def _is_pbs_cluster(self):
         return self.config.cluster_pbs and 'PBS_GPUFILE' in os.environ
+
+    def _is_lsf_cluster(self):
+        # This assumes the LSF cluster is using libfairydust for GPU allocation.
+        # See https://github.com/adrian-bl/libfairydust for more info.
+        return (self.config.cluster_lsf and 'LSFUSER' in os.environ and
+                'FDUST_GPU_CNT_TOTAL' in os.environ)
 
     def _start_simulation(self, subdomains):
         """Starts a simulation.
@@ -573,11 +605,25 @@ class LBSimulationController(object):
         """
 
         # A PBS implementation with GPU-aware scheduling is required.
-        if self._is_pbs_cluster():
+        if self._is_pbs_cluster() or self._is_lsf_cluster():
             assert self.config.cluster_spec == '', ('Cluster specifications '
                     'are not supported when running under PBS.')
 
-            cluster = self._start_pbs_handlers()
+            id_string = 'sailfish-%s' % os.getpid()
+            if self._is_pbs_cluster():
+                cluster, start_socketserver = self._prepare_pbs_handlers(id_string)
+            else:
+                cluster, start_socketserver = self._prepare_lsf_handlers(id_string)
+
+            self._node_handlers = []
+            self._start_handlers(start_socketserver, cluster, id_string)
+            self._start_cluster_simulation(subdomains, cluster)
+        elif self._is_lsf_cluster():
+            assert self.config.cluster_spec == '', (
+                'Cluster specifications are not supported when running under '
+                'LSF.')
+
+            cluster = self._start_lsf_handlers()
             self._start_cluster_simulation(subdomains, cluster)
         elif self.config.cluster_spec:
             self._start_cluster_simulation(subdomains)
@@ -620,7 +666,7 @@ class LBSimulationController(object):
         min_timings = []
         max_timings = []
 
-        if self.config.cluster_spec or self._is_pbs_cluster():
+        if self.config.cluster_spec or self._is_pbs_cluster() or self._is_lsf_cluster():
             if self.config.mode == 'benchmark':
                 for ch, node_subdomains in zip(self._cluster_channels, self._node_subdomains):
                     for sub in node_subdomains:
@@ -634,8 +680,8 @@ class LBSimulationController(object):
             for gw in self._cluster_gateways:
                 gw.exit()
 
-            if self._is_pbs_cluster():
-                for handler in self._pbs_handlers:
+            if self._is_pbs_cluster() or self._is_lsf_cluster():
+                for handler in self._node_handlers:
                     handler.terminate()
         else:
             if self.config.mode == 'benchmark':

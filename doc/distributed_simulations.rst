@@ -112,6 +112,13 @@ by running::
     cd $HOME/mysailfish
     qsub ../sailfish-test.pbs
 
+Using a LSF cluster
+^^^^^^^^^^^^^^^^^^^
+Sailfish can run distributed simulations on LSF clusters with ``libfairydust`` for GPU allocation.
+No special configuration is required and the job can be submittied via ``bsub`` directly.
+Please refer to your cluster documentation for information about how to specify GPU
+requirements.
+
 Using InfiniBand
 ^^^^^^^^^^^^^^^^
 Sailfish currently does not support InfiniBand (IB) explicitly.  It is however possible
@@ -120,8 +127,12 @@ replace TCP connections with SDP ones.  To do so, you need to:
 
   * make sure the ``ib_sdp`` kernel module is loaded on the computational nodes,
   * add ``export LD_PRELOAD=libsdp.so`` to your ``sailfish-init.sh`` script,
-  * run your simulation with the ``--cluster_pbs_interface=ib0`` parameter (this assumes
+  * run your simulation with the ``--cluster_interface=ib0`` parameter (this assumes
     the IB interface on the computational nodes is ``ib0``).
+
+If your system is configured to allow it, it may be possible to run the simulation
+using TCP over the InfiniBand interface without ``libsdp``. In this case, specifying
+the ``--cluster_interface`` option should be enough.
 
 How it works behind the scenes
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

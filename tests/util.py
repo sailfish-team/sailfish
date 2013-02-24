@@ -23,6 +23,18 @@ class TestPbsUtils(unittest.TestCase):
                      'node2.domain', [0], None)],
                 cluster.nodes)
 
+class TestLsfUtils(unittest.TestCase):
+    def test_lsf_config_processing(self):
+        vars = {
+            'LSB_MCPU_HOSTS': 'hostA 2 hostB 1',
+            'FDUST_GPU_PER_CORE': 1
+        }
+        random.seed(1234)
+        cluster = util.lsf_vars_to_clusterspec(vars)
+        self.assertEqual(
+            [config.MachineSpec('socket=hostA:15732', 'hostA', [0, 1], None),
+             config.MachineSpec('socket=hostB:15732', 'hostB', [0], None)],
+            cluster.nodes)
 
 class TestMiscUtils(unittest.TestCase):
     def test_reverse_pairs(self):
