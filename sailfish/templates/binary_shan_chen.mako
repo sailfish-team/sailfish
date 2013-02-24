@@ -113,7 +113,8 @@ ${kernel} void ShanChenCollideAndPropagate${grid_idx}(
 
 	// FIXME: In order for the half-way bounce back boundary condition to work, a layer of unused
 	// nodes currently has to be placed behind the wall layer.
-	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g${grid_idx}m0, v, gi, dist1_out);
+	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g${grid_idx}m0, v, gi, dist1_out
+									${iteration_number_arg_if_required()});
 	${guo_density_node_index_shift_final()}
 	${check_invalid_values()}
 	${propagate('dist1_out', 'd0')}
