@@ -74,7 +74,7 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 
 	float v0[${dim}];
 	${body_force(grid_idx=0)}
-	${fluid_velocity(0)};
+	${fluid_velocity(0, equilibrium=True)};
 
 	## Local variables used by the equilibrium.
 	%for local_var in eq.local_vars:
@@ -91,6 +91,12 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 	%for idx in grid.idx_name:
 		d0->${idx} += alpha * fneq.${idx};
 	%endfor
+
+	## Is there a force acting on the current grid?
+	%if sym_force.needs_accel(0, forces, force_couplings):
+		${fluid_velocity(0)};
+		${apply_body_force(0, no_feq=True)};
+	%endif
 
 	${fluid_output_velocity(0)}
 }

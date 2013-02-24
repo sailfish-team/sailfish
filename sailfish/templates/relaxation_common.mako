@@ -1,5 +1,6 @@
 <%!
   from sailfish import sym, sym_force
+  import sympy
 %>
 
 <%namespace file="code_common.mako" import="*"/>
@@ -51,10 +52,19 @@
 }
 </%def>
 
+<%def name="edm_force_no_feq(i)">
+{
+	// Exact difference method.
+	%for feq_shifted, feq, idx in zip(sym_force.edm_shift_velocity(equilibria[i](grids[i], config).expression), equilibria[i](grids[i], config).expression, grid.idx_name):
+		d0->${idx} += ${cex(sym.poly_factorize(sympy.simplify(feq_shifted - feq)))};
+	%endfor
+}
+</%def>
+
 ## Applies a body force in the relaxation step. This functioan effectively
 ## modifies the collision operator (BGK, ELBM, etc). At the time this function
 ## is called d${i} is already a post-relaxation distribution.
-<%def name="apply_body_force(i)">
+<%def name="apply_body_force(i, no_feq=False)">
 	%if simtype == 'free-energy':
 		%for val, idx in zip(sym_force.free_energy_external_force(sim, grid_num=i), grid.idx_name):
 			d0->${idx} += ${cex(val)};
@@ -63,7 +73,11 @@
 		%if force_implementation == 'guo':
 			${guo_force(i)}
 		%elif force_implementation == 'edm':
-			${edm_force(i)}
+			%if no_feq:
+				${edm_force_no_feq(i)}
+			%else:
+				${edm_force(i)}
+			%endif
 		%else:
 			__NOT_IMPLEMENTED_${force_implementation}
 		%endif
