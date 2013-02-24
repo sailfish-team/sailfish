@@ -95,7 +95,7 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 	## Is there a force acting on the current grid?
 	%if sym_force.needs_accel(0, forces, force_couplings):
 		${fluid_velocity(0)};
-		${apply_body_force(0, no_feq=True)};
+		${apply_body_force(0, no_feq=True, subs=dict(tau0='1.0/alpha'))};
 	%endif
 
 	${fluid_output_velocity(0)}
