@@ -382,7 +382,7 @@ class LBSimulationController(object):
                 '--check_invalid_results_gpu')
         group.add_argument('--restore_from', type=str, metavar='PATH',
                 help='Location of a checkpoint file from which to start the '
-                'simulation.')
+                'simulation.', default='')
         group.add_argument('--final_checkpoint', action='store_true',
                 default=False, help='Generates a checkpoint after the simulation '
                 'is completed.')
