@@ -1267,7 +1267,8 @@ class SubdomainRunner(object):
             self.config.logger.warning("Running infinite simulation.")
 
         if self.config.restore_from:
-            self.restore_checkpoint(self.config.restore_from)
+            self.restore_checkpoint(io.subdomain_checkpoint(
+                self.config.restore_from, self._spec.id))
 
         if self._initialization:
             self.initialize()

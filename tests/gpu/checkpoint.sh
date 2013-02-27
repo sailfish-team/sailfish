@@ -1,12 +1,12 @@
 #!/bin/bash
 
 sim=$1
-tmpdir=$(mktemp -d)
+tmpdir=$(mktemp -d checkpoint.XXXXXX)
 
 echo -n "$sim .."
 
 ${sim} --max_iters=103 --final_checkpoint --checkpoint_file=${tmpdir}/tmp --quiet
-${sim} --max_iters=200 --restore_from=${tmpdir}/tmp.103.cpoint.npz --output=${tmpdir}/result_2step --every=100 --quiet
+${sim} --max_iters=200 --restore_from=${tmpdir}/tmp.103 --output=${tmpdir}/result_2step --every=100 --quiet
 ${sim} --max_iters=200 --output=${tmpdir}/result_1step --every=200 --quiet
 
 if utils/compare_results.py ${tmpdir}/result_1step.0.200.npz ${tmpdir}/result_2step.0.200.npz; then
