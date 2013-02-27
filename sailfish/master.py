@@ -37,14 +37,6 @@ def _start_subdomain_runner(subdomain, config, sim, num_subdomains,
     if num_subdomains > 1:
         tempfile.tempdir = tempfile.mkdtemp()
 
-    # If using libfairydust, the parent process (machine master) is called
-    # 'res' and we have to rename ourselves to something else so that the
-    # GPU resources will be allocated to the master, not the runners.
-    if 'FDUST_GPU_CNT_TOTAL' in os.environ:
-        os.environ['SPT_NOENV'] = '1'
-        import setproctitle
-        setproctitle.setproctitle('sim')
-
     # We instantiate the backend class here (instead of in the machine
     # master), so that the backend object is created within the
     # context of the new process.

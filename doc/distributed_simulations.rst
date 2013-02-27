@@ -114,10 +114,9 @@ by running::
 
 Using a LSF cluster
 ^^^^^^^^^^^^^^^^^^^
-Sailfish can run distributed simulations on LSF clusters with ``libfairydust`` for GPU allocation.
+Sailfish can run distributed simulations on LSF clusters supporting MPI and ``libfairydust`` for GPU allocation
 No special configuration is required and the job can be submittied via ``bsub`` directly.
-The ``setproctitle`` module is necessary for ``libfairydust`` compatibility. The module can be
-installed e.g. using ``pip``. Please refer to your cluster documentation for information about how to specify GPU
+Please refer to your cluster documentation for information about how to specify GPU
 requirements.
 
 Using InfiniBand

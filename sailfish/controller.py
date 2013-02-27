@@ -62,13 +62,6 @@ def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
         pname = 'Master/{0}'.format(platform.node())
         mp.current_process().name = pname
 
-        # libfairydust will not detect the correct variables unless we pretend
-        # to be the 'res' process.
-        if 'FDUST_GPU_CNT_TOTAL' in os.environ:
-            os.environ['SPT_NOENV'] = '1'
-            import setproctitle
-            setproctitle.setproctitle('res')
-
         master = LBMachineMaster(*pickle.loads(args), lb_class=lb_class,
                 subdomain_addr_map=subdomain_addr_map, channel=channel,
                 iface=iface)
@@ -569,7 +562,7 @@ class LBSimulationController(object):
         cluster = util.lsf_vars_to_clusterspec(os.environ,
                                                self.config.cluster_interface)
         def _start_socketserver(addr, port):
-            return subprocess.Popen(['blaunch',
+            return subprocess.Popen(['mpirun', '-H',
                 addr, 'sh', '-c', "python %s/socketserver.py :%s %s" % (
                     os.path.realpath(os.path.dirname(util.__file__)),
                     port, id_string)])
