@@ -348,15 +348,6 @@ ${device_func} inline void getMacro(
 {
 	if (NTUsesStandardMacro(node_type) || orientation == ${nt_dir_other}) {
 		compute_macro_quant(fi, rho, v0);
-		%if nt.NTHalfBBWall in node_types:
-			if (isNTHalfBBWall(node_type)) {
-				v0[0] = 0.0f;
-				v0[1] = 0.0f;
-				%if dim == 3:
-					v0[2] = 0.0f;
-				%endif
-			}
-		%endif
 	}
 	%if nt.NTEquilibriumVelocity in node_types:
 		else if (isNTEquilibriumVelocity(node_type)) {
