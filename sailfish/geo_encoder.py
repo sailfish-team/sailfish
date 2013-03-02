@@ -149,6 +149,8 @@ class GeoEncoderConst(GeoEncoder):
                     nodes_idx = np.argwhere(param_map == node_key)
 
                     uniques = np.unique(param)
+                    uniques.flags.writeable = False
+
                     for value in uniques:
                         if value in seen_params:
                             idx = param_to_idx[value]

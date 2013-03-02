@@ -19,7 +19,7 @@ class TestOrientationDetection2D(TestCase2D):
         spec.runner._init_shape()
         sub = TestSubdomain2D(list(reversed(self.lattice_size)), spec, D2Q9)
         sub.reset()
-        sub._encoder.detect_orientation(sub._orientation.base)
+        sub._encoder.detect_orientation(sub._orientation_base)
 
         nx, ny = self.lattice_size
         hx, hy = sub._get_mgrid()
@@ -57,7 +57,7 @@ class TestOrientationDetection3D(TestCase3D):
         spec.runner._init_shape()
         sub = TestSubdomain3D(list(reversed(self.lattice_size)), spec, D3Q19)
         sub.reset()
-        sub._encoder.detect_orientation(sub._orientation.base)
+        sub._encoder.detect_orientation(sub._orientation_base)
 
         nx, ny, nz = self.lattice_size
         hx, hy, hz = sub._get_mgrid()

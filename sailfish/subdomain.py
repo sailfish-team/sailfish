@@ -358,17 +358,21 @@ class Subdomain(object):
         # for copying to the compute device. The entries in this array are
         # node type IDs.
         self._type_map = spec.runner.make_scalar_field(np.uint32, register=False)
+        self._type_map_base = spec.runner.field_base(self._type_map)
         self._type_vis_map = np.zeros(list(reversed(spec.size)),
                 dtype=np.uint8)
         self._type_map_encoded = False
         self._param_map = spec.runner.make_scalar_field(dtype=np.int_,
                 register=False)
+        self._param_map_base = spec.runner.field_base(self._param_map)
         self._params = {}
         self._encoder = None
         self._seen_types = set([0])
+        self._type_map_base = spec.runner.field_base(self._type_map)
         self._needs_orientation = False
         self._orientation = spec.runner.make_scalar_field(np.uint32,
                 register=False)
+        self._orientation_base = spec.runner.field_base(self._orientation)
 
     @property
     def config(self):
@@ -485,7 +489,7 @@ class Subdomain(object):
         # TODO: At this point, we should decide which GeoEncoder class to use.
         from sailfish import geo_encoder
         self._encoder = geo_encoder.GeoEncoderConst(self)
-        self._encoder.prepare_encode(self._type_map.base, self._param_map.base,
+        self._encoder.prepare_encode(self._type_map_base, self._param_map_base,
                                      self._params)
 
         self.config.logger.debug('... encoder done.')
@@ -515,10 +519,10 @@ class Subdomain(object):
 
     def encoded_map(self):
         if not self._type_map_encoded:
-            self._encoder.encode(self._orientation.base, self._needs_orientation)
+            self._encoder.encode(self._orientation_base, self._needs_orientation)
             self._type_map_encoded = True
 
-        return self._type_map.base
+        return self._type_map_base
 
     def visualization_map(self):
         """Returns an unencoded type map for visualization/
@@ -548,26 +552,26 @@ class Subdomain2D(Subdomain):
         es = self.spec.envelope_size
         if not es:
             return
-        self._type_map.base[0:es, :] = nt._NTGhost.id
-        self._type_map.base[:, 0:es] = nt._NTGhost.id
-        self._type_map.base[es + self.spec.ny:, :] = nt._NTGhost.id
-        self._type_map.base[:, es + self.spec.nx:] = nt._NTGhost.id
+        self._type_map_base[0:es, :] = nt._NTGhost.id
+        self._type_map_base[:, 0:es] = nt._NTGhost.id
+        self._type_map_base[es + self.spec.ny:, :] = nt._NTGhost.id
+        self._type_map_base[:, es + self.spec.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
-        uniq_types = set(np.unique(self._type_map.base))
+        uniq_types = set(np.unique(self._type_map_base))
         dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
         dry_types = self._type_map.dtype.type(dry_types)
 
         # Find nodes which are walls themselves and are completely surrounded by
         # walls.  These nodes are marked as unused, as they do not contribute to
         # the dynamics of the fluid in any way.
-        cnt = np.zeros_like(self._type_map.base).astype(np.uint32)
+        cnt = np.zeros_like(self._type_map_base).astype(np.uint32)
         for i, vec in enumerate(self.grid.basis):
-            a = np.roll(self._type_map.base, int(-vec[0]), axis=1)
+            a = np.roll(self._type_map_base, int(-vec[0]), axis=1)
             a = np.roll(a, int(-vec[1]), axis=0)
             cnt[util.in_anyd_fast(a, dry_types)] += 1
 
-        self._type_map.base[(cnt == self.grid.Q)] = nt._NTUnused.id
+        self._type_map_base[(cnt == self.grid.Q)] = nt._NTUnused.id
 
 class Subdomain3D(Subdomain):
     dim = 3
@@ -586,22 +590,22 @@ class Subdomain3D(Subdomain):
         es = self.spec.envelope_size
         if not es:
             return
-        self._type_map.base[0:es, :, :] = nt._NTGhost.id
-        self._type_map.base[:, 0:es, :] = nt._NTGhost.id
-        self._type_map.base[:, :, 0:es] = nt._NTGhost.id
-        self._type_map.base[es + self.spec.nz:, :, :] = nt._NTGhost.id
-        self._type_map.base[:, es + self.spec.ny:, :] = nt._NTGhost.id
-        self._type_map.base[:, :, es + self.spec.nx:] = nt._NTGhost.id
+        self._type_map_base[0:es, :, :] = nt._NTGhost.id
+        self._type_map_base[:, 0:es, :] = nt._NTGhost.id
+        self._type_map_base[:, :, 0:es] = nt._NTGhost.id
+        self._type_map_base[es + self.spec.nz:, :, :] = nt._NTGhost.id
+        self._type_map_base[:, es + self.spec.ny:, :] = nt._NTGhost.id
+        self._type_map_base[:, :, es + self.spec.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
-        uniq_types = set(np.unique(self._type_map.base))
+        uniq_types = set(np.unique(self._type_map_base))
         dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
         dry_types = self._type_map.dtype.type(dry_types)
 
         # Find nodes which are walls themselves and are completely surrounded by
         # walls. These nodes are marked as unused, as they do not contribute to
         # the dynamics of the fluid in any way.
-        dry_map = util.in_anyd_fast(self._type_map.base,
+        dry_map = util.in_anyd_fast(self._type_map_base,
                                     dry_types).astype(np.uint8)
         neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
         neighbors[1,1,1] = 1
@@ -609,4 +613,4 @@ class Subdomain3D(Subdomain):
             neighbors[1 + ei[2], 1 + ei[1], 1 + ei[0]] = 1
 
         where = (filters.convolve(dry_map, neighbors, mode='wrap') == self.grid.Q)
-        self._type_map.base[where] = nt._NTUnused.id
+        self._type_map_base[where] = nt._NTUnused.id

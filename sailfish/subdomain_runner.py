@@ -82,6 +82,8 @@ class SubdomainRunner(object):
         else:
             self.float = np.float32
 
+        # Maps ID of field base buffer to the strided view.
+        self._field_base = {}
         self._scalar_fields = []
         self._vector_fields = []
         self._gpu_field_map = {}
@@ -240,7 +242,10 @@ class SubdomainRunner(object):
 
         assert field.base is buf
         fview = field[self._spec._nonghost_slice]
-        assert fview.base is field
+        self._field_base[id(fview.base)] = field
+
+        # Prior to numpy 1.7.0, the base was field (first element up the chain).
+        assert fview.base is buf or fview.base is field
 
         # Zero the non-ghost part of the field.
         fview[:] = 0
@@ -251,6 +256,9 @@ class SubdomainRunner(object):
         if register:
             self._scalar_fields.append(fview)
         return fview
+
+    def field_base(self, field):
+        return self._field_base[id(field.base)]
 
     def make_vector_field(self, name=None, output=False, async=False):
         """Allocates several scalar arrays representing a vector field."""
@@ -692,12 +700,12 @@ class SubdomainRunner(object):
         self.config.logger.debug("Initializing compute unit data.")
 
         for field in self._scalar_fields:
-            self._gpu_field_map[id(field)] = self.backend.alloc_buf(like=field.base)
+            self._gpu_field_map[id(field)] = self.backend.alloc_buf(like=self._field_base[id(field.base)])
 
         for field in self._vector_fields:
             gpu_vector = []
             for component in field:
-                gpu_vector.append(self.backend.alloc_buf(like=component.base))
+                gpu_vector.append(self.backend.alloc_buf(like=self._field_base[id(component.base)]))
             self._gpu_field_map[id(field)] = gpu_vector
 
         for grid in self._sim.grids:
