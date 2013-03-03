@@ -15,7 +15,8 @@ class Fluid2DVis(vis.FluidVis):
     name = 'matplotlib'
     dims = [2]
 
-    def __init__(self, config, subdomains, quit_event, sim_quit_event, vis_config):
+    def __init__(self, config, subdomains, quit_event, sim_quit_event,
+                 vis_config, geo_queues):
         super(Fluid2DVis, self).__init__()
         self.config = config
         self.config.logger.info("Initializating matplotlib 2D vis. engine.")

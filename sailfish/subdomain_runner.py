@@ -14,6 +14,7 @@ import zmq
 from sailfish import codegen, io
 from sailfish.profile import profile, TimeProfile
 from sailfish.subdomain_connection import ConnectionBuffer, MacroConnectionBuffer
+import sailfish.node_type as nt
 
 # Used to hold a reference to a CUDA kernel and a grid on which it is
 # to be executed.
@@ -89,7 +90,6 @@ class SubdomainRunner(object):
         self._gpu_field_map = {}
         self._gpu_grids_primary = []
         self._gpu_grids_secondary = []  # only used for the AB access pattern
-        self._vis_map_cache = None
         self._quit_event = quit_event
 
         self._profile = TimeProfile(self)
@@ -275,9 +275,8 @@ class SubdomainRunner(object):
         return components
 
     def visualization_map(self):
-        if self._vis_map_cache is None:
-            self._vis_map_cache = self._subdomain.visualization_map()
-        return self._vis_map_cache
+        """Returns an unencoded geometry map used for visualization."""
+        return self._subdomain.visualization_map()
 
     def _init_geometry(self):
         self.config.logger.debug("Initializing geometry.")
@@ -1325,6 +1324,18 @@ class SubdomainRunner(object):
         self._prepare_compute_kernels()
         self._init_compute()
 
+    def _handle_geo_updates(self):
+        q = self._spec.geo_queue
+        if q.empty():
+            return
+        hx, hy = self._subdomain._get_mgrid()
+        while not q.empty():
+            (x, y), node_type = q.get_nowait()
+            self._subdomain.update_node((hy == y) & (hx == x),
+                                        nt.NTFullBBWall(orientation=np.int32(0))
+                                        if node_type else nt._NTFluid)
+        self.backend.to_buf(self._gpu_geo_map)
+
     def main(self):
         is_quit = False
 
@@ -1348,6 +1359,9 @@ class SubdomainRunner(object):
                 if (self.config.max_iters > 0 and self._sim.iteration >=
                         self.config.max_iters) or self.need_quit():
                     break
+
+                if self._spec.geo_queue is not None:
+                    self._handle_geo_updates()
 
                 self._data_stream.synchronize()
                 self._calc_stream.synchronize()

@@ -13,7 +13,8 @@ class Fluid3DVisCutplane(vis_2d.Fluid2DVis):
     name = '3dcutplane'
     dims = [3]
 
-    def __init__(self, config, subdomains, quit_event, sim_quit_event, vis_config):
+    def __init__(self, config, subdomains, quit_event, sim_quit_event,
+                 vis_config, geo_queues):
         self._slice_position = [0, 0, 0]
         self._slice_axis = 0
         super(Fluid3DVisCutplane, self).__init__(config, subdomains,

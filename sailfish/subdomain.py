@@ -60,6 +60,7 @@ class SubdomainSpec(object):
         self._clear_connections()
         self._clear_connectors()
 
+        self.geo_queue = None
         self.vis_buffer = None
         self.vis_geo_buffer = None
         self._periodicity = [False] * self.dim
@@ -169,11 +170,13 @@ class SubdomainSpec(object):
         self.actual_size = [x + 2 * envelope_size for x in self.size]
         self.envelope_size = envelope_size
 
-    def init_visualization_buffers(self):
+    def init_visualization(self):
         size = reduce(operator.mul, self.size)
         vis_lock = mp.Lock()
         self.vis_buffer = mp.Array(ctypes.c_float, size, lock=vis_lock)
         self.vis_geo_buffer = mp.Array(ctypes.c_uint8, size, lock=vis_lock)
+        self.geo_queue = mp.Queue(4096)
+        return self.geo_queue
 
     @classmethod
     def face_to_dir(cls, face):
@@ -464,13 +467,17 @@ class Subdomain(object):
 
         key = hash((node_type.id, frozenset(node_type.params.items())))
         if key not in self._params:
-            raise ValueError('Setting nodes with new parameters is not '
-                             'supported.')
+            if node_type.id == 0:
+                key = 0
+            else:
+                raise ValueError('Setting nodes with new parameters is not '
+                                 'supported.')
 
         if node_type.needs_orientation and (not hasattr(node_type, 'orientation')
                                             or node_type.orientation is None):
             raise ValueError('Node orientation not specified.')
 
+        self._type_vis_map[where] = node_type.id
         self._type_map[where] = self._encoder._subdomain_encode_node(
             getattr(node_type, 'orientation', 0),
             node_type.id, key)

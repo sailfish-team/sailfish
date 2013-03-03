@@ -147,7 +147,8 @@ class Fluid2DVis(vis.FluidVis):
         group.add_argument('--scr_depth', help='screen color depth', type=int,
                            default=24)
 
-    def __init__(self, config, subdomains, quit_event, sim_quit_event, vis_config):
+    def __init__(self, config, subdomains, quit_event, sim_quit_event,
+                 vis_config, geo_queues=None):
         pygame.init()
         pygame.surfarray.use_arraytype('numpy')
 
@@ -157,6 +158,7 @@ class Fluid2DVis(vis.FluidVis):
         self._quit_event = quit_event
         self._sim_quit_event = sim_quit_event
         self._vis_config = vis_config
+        self._geo_queues = geo_queues
         self._subdomains = subdomains
 
         # This will default the visualization to the first component of the
@@ -174,9 +176,7 @@ class Fluid2DVis(vis.FluidVis):
         self._vistype = self.VIS_LINEAR
         self._cmap = [None, 'std', 'rb']
         self._font = pygame.font.SysFont(_font_name(), 14)
-        self._impart_velocity = False
-        self._mouse_pos = 0,0
-        self._mouse_vel = 0,0
+        self._drawing = False
 
         self.resize()
 
@@ -215,8 +215,10 @@ class Fluid2DVis(vis.FluidVis):
         ret = ['subdomain {0}'.format(subdomain.id),
                self._vis_config.field_name]
 
-        srf2 = self._draw_field(srf, width, height, subdomain)
+        srf2, f_min, f_max = self._draw_field(srf, width, height, subdomain)
         pygame.transform.scale(srf2, self._screen.get_size(), self._screen)
+
+        ret.append('[%.2f:%.2f]' % (f_min, f_max))
 
         # TODO(michalj): Add support for vector fields.
         # TODO(michalj): Add support for tracer particles.
@@ -264,16 +266,21 @@ class Fluid2DVis(vis.FluidVis):
 
         # Unlock the surface and put the picture on screen.
         del a
-        return srf
+        return srf, v_min, v_max
 
-    def _get_loc(self, event):
-        x = event.pos[0] * self.lat_nx / self._screen.get_width()
-        y = self.lat_ny-1 - (event.pos[1] * self.lat_ny / self._screen.get_height())
-        return min(max(x, 0), self.lat_nx-1), min(max(y, 0), self.lat_ny-1)
+    def _get_loc(self, event, subdomain):
+        x = event.pos[0] * subdomain.nx / self._screen.get_width()
+        y = subdomain.ny - 1 - (event.pos[1] * subdomain.ny / self._screen.get_height())
+        return min(max(x, 0), subdomain.nx-1), min(max(y, 0), subdomain.ny-1)
 
     def _process_misc_event(self, event):
         """A function to make it possible to process additional events in subclasses."""
         pass
+
+    def _draw_wall(self, event):
+        subdomain = self._subdomains[self._vis_config.subdomain]
+        x, y = self._get_loc(event, subdomain)
+        self._geo_queues[self._vis_config.subdomain].put(((x, y), self._draw_type == 1))
 
     def _process_events(self):
         for event in pygame.event.get():
@@ -281,6 +288,17 @@ class Fluid2DVis(vis.FluidVis):
                 self._sim_quit_event.set()
             elif event.type == pygame.VIDEORESIZE:
                 self.set_mode(*event.size)
+            elif event.type == pygame.MOUSEBUTTONUP:
+                self._draw_type = event.button
+                self._draw_wall(event)
+                self._drawing = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                self._draw_type = event.button
+                self._drawing = True
+                self._draw_wall(event)
+            elif event.type == pygame.MOUSEMOTION:
+                if self._drawing:
+                    self._draw_wall(event)
             elif event.type == pygame.KEYDOWN:
                 # Previous field.
                 if event.key == pygame.K_MINUS:
@@ -336,11 +354,6 @@ class Fluid2DVis(vis.FluidVis):
                     print 'Saved %s.' % fname
                 elif event.key == pygame.K_i:
                     self._show_info = not self._show_info
-#                elif event.key == pygame.K_LCTRL:
-#                    self._impart_velocity = True
-#            elif event.type == pygame.KEYUP:
-#                if event.key == pygame.K_LCTRL:
-#                    self._impart_velocity = False
 
             self._process_misc_event(event)
 
@@ -375,7 +388,7 @@ class Fluid2DVis(vis.FluidVis):
         while True:
             self._process_events()
             self._update_display()
-            pygame.time.wait(50)
+#            pygame.time.wait(50)
 
             if self._quit_event.is_set():
                 break

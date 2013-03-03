@@ -183,9 +183,9 @@ class LBMachineMaster(object):
             return lambda subdomain: output_cls(self.config, subdomain.id)
 
         # XXX compute total storage requirements
-
+        self._vis_geo_queues = []
         for subdomain in self.subdomains:
-            subdomain.init_visualization_buffers()
+            self._vis_geo_queues.append(subdomain.init_visualization())
 
         vis_lock = mp.Lock()
         vis_config = Value(io.VisConfig, lock=vis_lock)
@@ -217,7 +217,7 @@ class LBMachineMaster(object):
         self._vis_process = Process(
                 target=lambda: vis_class(
                     self.config, self.subdomains, self._vis_quit_event,
-                    self._quit_event, vis_config).run(),
+                    self._quit_event, vis_config, self._vis_geo_queues).run(),
                 name='VisEngine')
         self._vis_process.start()
 
