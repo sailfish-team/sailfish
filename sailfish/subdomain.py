@@ -5,8 +5,10 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 from collections import defaultdict, namedtuple
+import ctypes
 import inspect
 import operator
+import multiprocessing as mp
 import numpy as np
 from scipy.ndimage import filters
 
@@ -167,9 +169,11 @@ class SubdomainSpec(object):
         self.actual_size = [x + 2 * envelope_size for x in self.size]
         self.envelope_size = envelope_size
 
-    def set_vis_buffers(self, vis_buffer, vis_geo_buffer):
-        self.vis_buffer = vis_buffer
-        self.vis_geo_buffer = vis_geo_buffer
+    def init_visualization_buffers(self):
+        size = reduce(operator.mul, self.size)
+        vis_lock = mp.Lock()
+        self.vis_buffer = mp.Array(ctypes.c_float, size, lock=vis_lock)
+        self.vis_geo_buffer = mp.Array(ctypes.c_uint8, size, lock=vis_lock)
 
     @classmethod
     def face_to_dir(cls, face):

@@ -147,7 +147,7 @@ class Fluid2DVis(vis.FluidVis):
         group.add_argument('--scr_depth', help='screen color depth', type=int,
                            default=24)
 
-    def __init__(self, config, blocks, quit_event, sim_quit_event, vis_config):
+    def __init__(self, config, subdomains, quit_event, sim_quit_event, vis_config):
         pygame.init()
         pygame.surfarray.use_arraytype('numpy')
 
@@ -157,13 +157,14 @@ class Fluid2DVis(vis.FluidVis):
         self._quit_event = quit_event
         self._sim_quit_event = sim_quit_event
         self._vis_config = vis_config
-        self._blocks = blocks
+        self._subdomains = subdomains
 
-        # this will default visualization to the fist component of velocity field
+        # This will default the visualization to the first component of the
+        # velocity field.
         self._vis_config.field = 1
 
-        # Whether a single block is visualized.
-        self._single_block = True
+        # Whether a single subdomain is visualized.
+        self._single_subdomain = True
 
         self._font_color = (0, 255, 0)
         self._show_info = True
@@ -199,7 +200,7 @@ class Fluid2DVis(vis.FluidVis):
 
     @property
     def size(self):
-        return self._blocks[self._vis_config.block].size
+        return self._subdomains[self._vis_config.subdomain].size
 
     def get_field_vals(self, field):
         v = []
@@ -210,37 +211,37 @@ class Fluid2DVis(vis.FluidVis):
     def _visualize(self):
         width, height = self.size
         srf = pygame.Surface((width, height))
-        block = self._blocks[self._vis_config.block]
-        ret = ['block {0}'.format(block.id),
+        subdomain = self._subdomains[self._vis_config.subdomain]
+        ret = ['subdomain {0}'.format(subdomain.id),
                self._vis_config.field_name]
 
-        srf2 = self._draw_field(srf, width, height, block)
+        srf2 = self._draw_field(srf, width, height, subdomain)
         pygame.transform.scale(srf2, self._screen.get_size(), self._screen)
 
         # TODO(michalj): Add support for vector fields.
         # TODO(michalj): Add support for tracer particles.
         return ret
 
-    def _get_geo_map(self, width, height, block):
+    def _get_geo_map(self, width, height, subdomain):
         geo_map = np.zeros((height, width), dtype=np.uint8)
-        geo_map.reshape(width * height)[:] = block.vis_geo_buffer[:]
+        geo_map.reshape(width * height)[:] = subdomain.vis_geo_buffer[:]
         return geo_map
 
-    def _draw_geometry(self, tg_buffer, width, height, block):
-        geo_map = np.rot90(self._get_geo_map(width, height, block), 3)
+    def _draw_geometry(self, tg_buffer, width, height, subdomain):
+        geo_map = np.rot90(self._get_geo_map(width, height, subdomain), 3)
         dry_types = geo_map.dtype.type(node_type.get_dry_node_type_ids())
         tg_buffer[util.in_anyd_fast(geo_map, dry_types)] = self._color_wall
 
-    def _get_field(self, width, height, block):
+    def _get_field(self, width, height, subdomain):
         # FIXME(michalj): This is horribly inefficient.  We should only recreate
         # the array if the data has been updated.
         tmp = np.zeros((height, width), dtype=np.float32)
-        tmp.reshape(width * height)[:] = block.vis_buffer[:]
+        tmp.reshape(width * height)[:] = subdomain.vis_buffer[:]
         return tmp
 
-    def _draw_field(self, srf, width, height, block):
+    def _draw_field(self, srf, width, height, subdomain):
         a = pygame.surfarray.pixels3d(srf)
-        tmp = self._get_field(width, height, block)
+        tmp = self._get_field(width, height, subdomain)
         v_max = np.nanmax(tmp)
         v_min = np.nanmin(tmp)
 
@@ -259,7 +260,7 @@ class Fluid2DVis(vis.FluidVis):
         vis_field = cmaps[1][self._cmap[1]](tmp)
         a[:] = vis_field[:]
 
-        self._draw_geometry(a, width, height, block)
+        self._draw_geometry(a, width, height, subdomain)
 
         # Unlock the surface and put the picture on screen.
         del a
@@ -293,15 +294,15 @@ class Fluid2DVis(vis.FluidVis):
                     self._vis_config.field = new_field
                 # Previous subdomain.
                 elif event.key == pygame.K_j:
-                    new_block = self._vis_config.block - 1
-                    new_block %= len(self._blocks)
-                    self._vis_config.block = new_block
+                    new_subdomain = self._vis_config.subdomain - 1
+                    new_subdomain %= len(self._subdomains)
+                    self._vis_config.subdomain = new_subdomain
                     self.resize()
                 # Next subdomain.
                 elif event.key == pygame.K_k:
-                    new_block = self._vis_config.block + 1
-                    new_block %= len(self._blocks)
-                    self._vis_config.block = new_block
+                    new_subdomain = self._vis_config.subdomain + 1
+                    new_subdomain %= len(self._subdomains)
+                    self._vis_config.subdomain = new_subdomain
                     self.resize()
                 elif event.key == pygame.K_LEFTBRACKET:
                     #n = len(self.field.vals)

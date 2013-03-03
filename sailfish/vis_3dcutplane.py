@@ -13,10 +13,10 @@ class Fluid3DVisCutplane(vis_2d.Fluid2DVis):
     name = '3dcutplane'
     dims = [3]
 
-    def __init__(self, config, blocks, quit_event, sim_quit_event, vis_config):
+    def __init__(self, config, subdomains, quit_event, sim_quit_event, vis_config):
         self._slice_position = [0, 0, 0]
         self._slice_axis = 0
-        super(Fluid3DVisCutplane, self).__init__(config, blocks,
+        super(Fluid3DVisCutplane, self).__init__(config, subdomains,
                                                  quit_event, sim_quit_event,
                                                  vis_config)
 
@@ -28,7 +28,7 @@ class Fluid3DVisCutplane(vis_2d.Fluid2DVis):
 
     @property
     def size(self):
-        size = list(self._blocks[self._vis_config.block].size)
+        size = list(self._subdomains[self._vis_config.subdomain].size)
         del size[self._slice_axis]
         return size
 
@@ -39,22 +39,22 @@ class Fluid3DVisCutplane(vis_2d.Fluid2DVis):
         return sel
 
     def size3d(self):
-        return list(reversed(self._blocks[self._vis_config.block].size))
+        return list(reversed(self._subdomains[self._vis_config.subdomain].size))
 
-    def _get_geo_map(self, width, height, block):
+    def _get_geo_map(self, width, height, subdomain):
         size = self.size3d()
         t = np.zeros(size, dtype=np.uint8)
-        t.ravel()[:] = block.vis_geo_buffer[:]
+        t.ravel()[:] = subdomain.vis_geo_buffer[:]
         geo_map = np.zeros((height, width), dtype=np.uint8)
         geo_map[:] = t[self.selector]
         return geo_map
 
-    def _get_field(self, width, height, block):
+    def _get_field(self, width, height, subdomain):
         # FIXME(michalj): This is horribly inefficient.  We should only recreate
         # the array if the data has been updated.
         size = self.size3d()
         t = np.zeros(size, dtype=np.float32)
-        t.ravel()[:] = block.vis_buffer[:]
+        t.ravel()[:] = subdomain.vis_buffer[:]
 
         tmp = np.zeros((height, width), dtype=np.float32)
         tmp[:] = t[self.selector]

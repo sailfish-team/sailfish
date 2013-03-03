@@ -182,21 +182,16 @@ class LBMachineMaster(object):
         if self.config.mode != 'visualization':
             return lambda subdomain: output_cls(self.config, subdomain.id)
 
-        # basic_fields = sim.fields()
         # XXX compute total storage requirements
 
         for subdomain in self.subdomains:
-            size = reduce(operator.mul, subdomain.size)
-            vis_lock = mp.Lock()
-            vis_buffer = Array(ctypes.c_float, size, lock=vis_lock)
-            vis_geo_buffer = Array(ctypes.c_uint8, size, lock=vis_lock)
-            subdomain.set_vis_buffers(vis_buffer, vis_geo_buffer)
+            subdomain.init_visualization_buffers()
 
         vis_lock = mp.Lock()
         vis_config = Value(io.VisConfig, lock=vis_lock)
         vis_config.iteration = -1
         vis_config.field_name = ''
-        vis_config.all_blocks = False
+        vis_config.all_subdomains = False
 
         # Start the visualizatione engine.
         vis_class = None

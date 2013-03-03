@@ -13,8 +13,8 @@ from ctypes import Structure, c_uint16, c_int32, c_uint8, c_bool
 
 class VisConfig(Structure):
     MAX_NAME_SIZE = 64
-    _fields_ = [('iteration', c_int32), ('block', c_uint16), ('field', c_uint8),
-                ('all_blocks', c_bool), ('fields', c_uint8),
+    _fields_ = [('iteration', c_int32), ('subdomain', c_uint16), ('field', c_uint8),
+                ('all_subdomains', c_bool), ('fields', c_uint8),
                 ('field_name',
                  type(ctypes.create_string_buffer(MAX_NAME_SIZE)))]
 
@@ -77,15 +77,15 @@ class VisualizationWrapper(LBOutput):
 
     # TODO(michalj): Add support for visualization fields different from these
     # used for the output file.
-    def __init__(self, config, block, vis_config, output_cls):
-        self._output = output_cls(config, block.id)
-        self._vis_buffer = block.vis_buffer
+    def __init__(self, config, subdomain, vis_config, output_cls):
+        self._output = output_cls(config, subdomain.id)
+        self._vis_buffer = subdomain.vis_buffer
         self._vis_config = vis_config
-        self._geo_buffer = block.vis_geo_buffer
+        self._geo_buffer = subdomain.vis_geo_buffer
         self._first_save = True
-        self.block = block
-        self.nodes = reduce(operator.mul, block.size)
-        self._dim = len(self.block.size)
+        self.subdomain = subdomain
+        self.nodes = reduce(operator.mul, subdomain.size)
+        self._dim = len(self.subdomain.size)
 
     def register_field(self, field, name, visualization=False):
         self._output.register_field(field, name, visualization)
@@ -116,9 +116,10 @@ class VisualizationWrapper(LBOutput):
             self._vis_config.fields = self._scalar_len + self._vis_len + self._vector_len
             self._first_save = False
 
-        # Only update the buffer if the block to which we belong is
+        # Only update the buffer if the subdomain to which we belong is
         # currently being visualized.
-        if self._vis_config.all_blocks or self.block.id == self._vis_config.block:
+        if (self._vis_config.all_subdomains or
+            self.subdomain.id == self._vis_config.subdomain):
             self._vis_config.iteration = i
             requested_field = self._vis_config.field
             self._vis_config.field_name = self._field_names[requested_field]
@@ -138,7 +139,7 @@ class VisualizationWrapper(LBOutput):
                 field = self._output._vector_fields[name][component]
 
             self._vis_buffer[0:self.nodes] = np.ravel(field)
-            self._geo_buffer[0:self.nodes] = np.ravel(self.block.runner.visualization_map())
+            self._geo_buffer[0:self.nodes] = np.ravel(self.subdomain.runner.visualization_map())
 
 
 def filename_iter_digits(max_iters=0):

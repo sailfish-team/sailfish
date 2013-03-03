@@ -15,20 +15,20 @@ class Fluid2DVis(vis.FluidVis):
     name = 'matplotlib'
     dims = [2]
 
-    def __init__(self, config, blocks, quit_event, sim_quit_event, vis_config):
+    def __init__(self, config, subdomains, quit_event, sim_quit_event, vis_config):
         super(Fluid2DVis, self).__init__()
         self.config = config
         self.config.logger.info("Initializating matplotlib 2D vis. engine.")
         self._quit_event = quit_event
         self._sim_quit_event = sim_quit_event
         self._vis_config = vis_config
-        self._blocks = blocks
+        self._subdomains = subdomains
 
         self.background = None
 
     @property
     def size(self):
-        return self._blocks[self._vis_config.block].size
+        return self._subdomains[self._vis_config.subdomain].size
 
     def update(self, event):
         if self._quit_event.is_set():
@@ -41,9 +41,9 @@ class Fluid2DVis(vis.FluidVis):
         # XXX
         self._vis_config.field = 1
         width, height = self.size
-        block = self._blocks[self._vis_config.block]
+        subdomain = self._subdomains[self._vis_config.subdomain]
         buffer = np.zeros((height, width))
-        buffer.ravel()[:] = block.vis_buffer[:]
+        buffer.ravel()[:] = subdomain.vis_buffer[:]
 
         self.ax.set_title('Iteration: {0}'.format(curr_iter))
         self.plot.set_data(buffer)
