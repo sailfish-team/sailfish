@@ -12,34 +12,37 @@ from sympy.core import expr
 ScratchSize = namedtuple('ScratchSize', ('dim2', 'dim3'))
 
 
-# Node type classes.  Use this to define boundary conditions.
 class LBNodeType(object):
+    """Base class for node types."""
+
     # Initialized when module is loaded.
     id = None
+
+    #: If True, the node undergoes normal relaxation process.
     wet_node = False
 
-    # If True, the node does not participate in the simulation.
+    #: If True, the node does not participate in the simulation.
     excluded = False
 
-    # If True, the node does not require any special processing to calculate
-    # macroscopic fluid quantities.  Typical examples of nodes requiring
-    # special treatment are edge and corner nodes where not all mass fractions
-    # are known.
+    #: If True, the node does not require any special processing to calculate
+    #: macroscopic fluid quantities.  Typical examples of nodes requiring
+    #: special treatment are edge and corner nodes where not all mass fractions
+    #: are known.
     standard_macro = False
 
-    # If True, the node needs a basic orientation vector (only primary
-    # directions are currently supported).
+    #: If True, the node needs a basic orientation vector (only primary
+    #: directions are currently supported).
     needs_orientation = False
 
-    # Number of floating point values that the node needs to keep as additional
-    # information in global memory. This can be an int or an instance of
-    # ScratchSize.
+    #: Number of floating point values that the node needs to keep as additional
+    #: information in global memory. This can be an int or an instance of
+    #: ScratchSize.
     scratch_space = 0
 
-    # What is the effective location of the boundary condition along the
-    # direction of the normal vector. Positive values indicate offset towards
-    # the fluid domain, negative values insidate offset away from the fluid
-    # domain.
+    #: Indicates the effective location of the boundary condition along the
+    #: direction of the normal vector. Positive values indicate offset towards
+    #: the fluid domain, negative values insidate offset away from the fluid
+    #: domain.
     location = 0.0
 
     def __init__(self, **params):
@@ -268,7 +271,7 @@ class NTYuOutflow(LBNodeType):
     This is an extrapolation based method, using data from next-nearest
     neighbors:
 
-    f_i(x_j) = 2 f_i(x_j - n) - f_i(x_j - 2n)
+    .. math:: f_i(x_j) = 2 f_i(x_j - n) - f_i(x_j - 2n)
     """
     wet_node = True
     standard_macro = True
@@ -295,18 +298,19 @@ class NTNeumann(LBNodeType):
     Vol. 8, Nos. 1–4, 2008
 
     Implements:
-      \partial u / \partial n (t, x_j) = \phi(t, x_j)
+        .. math:: \\frac{\partial u}{\partial n (t, x_j)} = \phi(t, x_j)
     via:
-      f_i(t+1, j_0) = f_iopp^c(t, j_o + c_i) +
-                      6 feq_i (u(t, x_j1) + 2\phi(t, x_j)) \cdot c_i
+        .. math:: f_i(t+1, j_0) = f_{\mathrm{iopp}}^c(t, j_o + c_i) +
+                      6 f^{\mathrm{eq}}_i (u(t, x_{j1}) + 2\phi(t, x_j)) \cdot c_i
     with:
-      j_0: ghost node
-      x_j: actual boundary node
-      x_j1: fluid node at x_j - normal
-      c_i: incoming distributions
-      iopp: direction opposite to i
-      feq_i: f_eq(1, 0)
-      f_i^c: distribution after collision (prior to streaming)
+
+     * :math:`j_0`: ghost node
+     * :math:`x_j`: actual boundary node
+     * :math:`x_{j1}`: fluid node at :math:`x_j` - normal
+     * :math:`c_i`: incoming distributions
+     * :math:`iopp`: direction opposite to i
+     * :math:`f^{\mathrm{eq}}_i`: :math:`f^{\mathrm{eq}}_i(1, 0)`
+     * :math:`f_i^c`: distribution after collision (prior to streaming)
     """
     def __init__(self, normal):
         """
