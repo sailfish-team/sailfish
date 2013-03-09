@@ -15,8 +15,8 @@ Sailfish Reference Manual
 Sailfish is a free computational fluid dynamics solver based on the Lattice Boltzmann
 method and optimized for modern multi-core systems, especially GPUs (Graphics Processing Units).
 
-To illustrate how easy it is to create simulations using the Sailfish package,
-here is a simple example code to simulate fluid flow in a lid-driven cavity::
+To see how easy it is to run simulations using the Sailfish package, take a look at this
+sample code for the lid-driven cavity test case::
 
     import numpy as np
     from sailfish.subdomain import Subdomain2D

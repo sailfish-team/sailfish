@@ -69,7 +69,7 @@ on your system and use ``i686`` instead of ``x86_64`` if you are on a 32-bit mac
 Ubuntu installation instructions
 --------------------------------
 
-These instructions assume that you want to use the CUDA backend.  Before installing following them,
+These instructions assume that you want to use the CUDA backend.  Before following them,
 please make sure the NVIDIA CUDA Toolkit is installed in ``/usr/local/cuda`` (default location) and
 that ``nvcc`` is in your ``$PATH``.  You can get the necessary files at http://nvidia.com/cuda.
 
@@ -108,7 +108,7 @@ and then run::
   port install py-sympy py-pyopencl py-game py-mako py-scipy py-zmq
 
 To run the Sailfish examples, remember to use the correct Python interpreter (i.e. the one
-installed via MacPorts).  For instance:
+installed via MacPorts).  For instance::
 
   python2.7 ./ldc_2d.py --mode=visualization
 
