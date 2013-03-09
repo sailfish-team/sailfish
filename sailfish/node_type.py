@@ -101,7 +101,7 @@ class NTHalfBBWall(LBNodeType):
 class NTFullBBWall(LBNodeType):
     """Full-way bounce-back (no-slip) node.
 
-    The effective location of the wall if half a lattice spacing between
+    The effective location of the wall is half a lattice spacing between
     the wall node and the fluid node.
     """
     standard_macro = True

@@ -8,7 +8,7 @@ installed on the host system.  These are as follows (minimal required versions a
 General requirements:
 
 * numpy-1.6.0
-* sympy-0.7.0
+* sympy-0.7.1
 * mako-0.2.5
 * execnet-1.0.9
 * Python zeromq-2.1.10

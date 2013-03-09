@@ -30,6 +30,11 @@ Geometry
 .. automodule:: subdomain
    :members:
 
+``node_type``
+^^^^^^^^^^^^^
+.. automodule:: node_type
+   :members:
+
 Symbolic computation
 --------------------
 ``sym``
