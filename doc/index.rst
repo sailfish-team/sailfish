@@ -66,6 +66,7 @@ Contents
    api
    about
    release
+   media
 
 Indices and tables
 ==================
