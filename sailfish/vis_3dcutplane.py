@@ -19,7 +19,7 @@ class Fluid3DVisCutplane(vis_2d.Fluid2DVis):
         self._slice_axis = 0
         super(Fluid3DVisCutplane, self).__init__(config, subdomains,
                                                  quit_event, sim_quit_event,
-                                                 vis_config)
+                                                 vis_config, geo_queues)
 
     # Since we inherit from Fluid2DVis, we need to make sure arguments are not
     # registered twice.
