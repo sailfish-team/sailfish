@@ -28,17 +28,10 @@ here is a simple example code to simulate fluid flow in a lid-driven cavity::
         max_v = 0.1
 
         def boundary_conditions(self, hx, hy):
-            wall_bc = NTFullBBWall
-            velocity_bc = NTEquilibriumVelocity
-
-            lor = np.logical_or
-            land = np.logical_and
-            lnot = np.logical_not
-
-            wall_map = land(lor(lor(hx == self.gx-1, hx == 0), hy == 0),
-                            lnot(hy == self.gy-1))
-            self.set_node(hy == self.gy-1, velocity_bc((self.max_v, 0.0)))
-            self.set_node(wall_map, wall_bc)
+            wall_map = (((hx == self.gx-1) | (hx == 0) | (hy == 0)) &
+                        np.logical_not(hy == self.gy-1))
+            self.set_node(hy == self.gy-1, NTEquilibriumVelocity((self.max_v, 0.0)))
+            self.set_node(wall_map, NTFullBBWall)
 
         def initial_conditions(self, sim, hx, hy):
             sim.rho[:] = 1.0
@@ -47,12 +40,6 @@ here is a simple example code to simulate fluid flow in a lid-driven cavity::
 
     class LDCSim(LBFluidSim):
         subdomain = LDCBlock
-
-        @classmethod
-        def update_defaults(cls, defaults):
-            defaults.update({
-                'lat_nx': 256,
-                'lat_ny': 256})
 
     if __name__ == '__main__':
         ctrl = LBSimulationController(LDCSim).run()
