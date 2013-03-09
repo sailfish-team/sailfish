@@ -112,8 +112,20 @@ by running::
     cd $HOME/mysailfish
     qsub ../sailfish-test.pbs
 
+How it works behind the scenes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If the ``--cluster_pbs`` option is set to true (default) and the ``$PBS_GPUFILE``
+environment variable is set, Sailfish will assume it is running on a PBS cluster.
+A cluster specification will be dynamically built using the contents of
+``$PBS_GPUFILE``.  For each machine listed in this file, ``pbsdsh`` will be used
+to execute ``--cluster_pbs_initscript`` (``sailfish-init.sh`` in the previous
+section), followed by ``python sailfish/socketserver.py`` (with a random port).
+The socket server will then be used to establish an execnet channel to the
+node and to start a local machine master.
+
 Using a LSF cluster
-^^^^^^^^^^^^^^^^^^^
+-------------------
 Sailfish can run distributed simulations on LSF clusters supporting MPI and ``libfairydust`` for GPU allocation
 No special configuration is required and the job can be submittied via ``bsub`` directly.
 Please refer to your cluster documentation for information about how to specify GPU
@@ -133,16 +145,3 @@ replace TCP connections with SDP ones.  To do so, you need to:
 If your system is configured to allow it, it may be possible to run the simulation
 using TCP over the InfiniBand interface without ``libsdp``. In this case, specifying
 the ``--cluster_interface`` option should be enough.
-
-How it works behind the scenes
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If the ``--cluster_pbs`` option is set to true (default) and the ``$PBS_GPUFILE``
-environment variable is set, Sailfish will assume it is running on a PBS cluster.
-A cluster specification will be dynamically built using the contents of
-``$PBS_GPUFILE``.  For each machine listed in this file, ``pbsdsh`` will be used
-to execute ``--cluster_pbs_initscript`` (``sailfish-init.sh`` in the previous
-section), followed by ``python sailfish/socketserver.py`` (with a random port).
-The socket server will then be used to establish an execnet channel to the
-node and to start a local machine master.
-
