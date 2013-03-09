@@ -132,7 +132,7 @@ Please refer to your cluster documentation for information about how to specify 
 requirements.
 
 Using InfiniBand
-^^^^^^^^^^^^^^^^
+----------------
 Sailfish currently does not support InfiniBand (IB) explicitly.  It is however possible
 to utilize IB interconnects by using the ``libsdp`` library which makes it possible to automatically
 replace TCP connections with SDP ones.  To do so, you need to:
