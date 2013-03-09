@@ -93,7 +93,22 @@ class NTHalfBBWall(LBNodeType):
     """Half-way bounce-back (no-slip) node.
 
     The effective location of the wall is half a lattice spacing away from
-    the bulk of the fluid.
+    the bulk of the fluid. With such a location of the wall,
+    this node type provides 2nd order spatial accuracy.
+
+    The idea of a half-way bounce-back node is similar to the full-way
+    bounce-back, but the reflection takes only one time step
+    :math:`f_{i}^{pre}(x, t+1) = f_{opp(i)}^{post}(x, t)`.
+
+    For non-stationary flows the half-way bounce-back rule is more accurate
+    than the full-way bounce-back. For stationary flows there is no difference
+    between them as the one step time lag in the full-way bounce-back rule
+    does not impact the amount of momentum and mass transferred between
+    the fluid and the boundary.
+
+    The wall normal vector is necessary for the half-way bounce-back rule to
+    work as only the unknown distributions (those for which there is no data
+    streaming from other nodes) at the boundary nodes are replaced.
     """
     wet_node = True
     standard_macro = True
@@ -104,8 +119,22 @@ class NTHalfBBWall(LBNodeType):
 class NTFullBBWall(LBNodeType):
     """Full-way bounce-back (no-slip) node.
 
+    Use this node type if you need walls whose normal vector is unknown
+    or is not aligned with the Cartesian axes.
+
     The effective location of the wall is half a lattice spacing between
-    the wall node and the fluid node.
+    the wall node and the fluid node. With such a location of the wall,
+    this node type provides 2nd order spatial accuracy.
+
+    Full-way bounce-back works as follows:
+
+    * at time :math:`t` distributions are propagated from the fluid to the
+      bounce-back node
+    * at time :math:`t+1` the distributions at the bounce-back node are
+      reflected across the node center, and then streamed in the standard way
+
+    This can be summarized as :math:`f_{i}^{pre}(x, t+2) = f_{opp(i)}^{post}(x, t)` since it
+    takes two time steps for the reflected distributions to reach back the fluid nodes.
     """
     standard_macro = True
     location = 0.5
@@ -171,7 +200,10 @@ class NTGuoDensity(LBNodeType):
 
 
 class NTZouHeDensity(LBNodeType):
-    """Zou-He density."""
+    """Zou-He density.
+
+    Uses bounce-back of the off-equilibrium distributions.
+    """
     needs_orientation = True
     wet_node = True
 
@@ -195,7 +227,10 @@ class NTEquilibriumVelocity(LBNodeType):
 
 
 class NTZouHeVelocity(LBNodeType):
-    """Zou-he velocity."""
+    """Zou-He velocity.
+
+    Uses bounce-back of the off-equilibrium distributions.
+    """
     needs_orientation = True
     wet_node = True
 
