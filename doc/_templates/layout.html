@@ -1,11 +1,38 @@
 {% extends "!layout.html" %}
 {% set customsidebar = 'sidebarcontent.html' %}
 
+{% block extrahead %}
+{{ super() }}
+<style>
+.alt {
+	background-color: #eee;
+}
+thead tr {
+	background-color: #bbb;
+}
+</style>
+{% endblock %}
+
 {% block rootrellink %}
 	<li><a href="{{ pathto('index') }}">home</a>|&nbsp;</li>
 	<li><a href="https://github.com/sailfish-team/sailfish">download</a>|&nbsp;</li>
 	<li><a href="{{ pathto('search') }}">search</a>|&nbsp;</li>
 	<li><a href="{{ pathto('contents') }}">docs</a> &raquo;</li>
+{% endblock %}
+
+{% block document %}
+
+{{ super() }}
+
+<script type="text/javascript">
+$("table.docutils:not(.citation) tbody tr").filter(function() {
+  return $(this).children().length == 2;
+}).filter(':odd').addClass('alt');
+
+$("tr.alt td[rowspan]").each(function() {
+  $(this).parent().nextAll().slice(0, this.rowSpan - 1).addClass('alt');
+});
+</script>
 {% endblock %}
 
 {% block relbar1 %}
