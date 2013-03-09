@@ -405,15 +405,13 @@ ${device_func} inline void fixMissingDistributions(
 				switch (orientation) {
 				%for o in range(1, grid.dim*2+1):
 					case ${o}: {
-						<%
-							offset = rel_offset(*(-grid.dir_to_vec(o)))
-						%>
 						%for dist_idx in sym.get_missing_dists(grid, o):
-							fi->${grid.idx_name[dist_idx]} = ${get_dist('dist_in', dist_idx, 'gi', offset)};
+							fi->${grid.idx_name[dist_idx]} = ${get_odist('dist_in', dist_idx, *grid.dir_to_vec(o))};
 						%endfor
 						break;
 					}
 				%endfor
+				}
 			}
 		%endif
 

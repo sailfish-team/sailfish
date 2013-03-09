@@ -286,15 +286,7 @@ class NTCopy(LBNodeType):
     boundary condition."""
     wet_node = True
     standard_macro = True
-
-    def __init__(self, normal):
-        """
-        :param normal: direction number corresponding to the normal vector
-            pointing outward (i.e. outside of the domain); direction numbers
-            can be generated using grid.vec_to_dir.
-        """
-        self.params = {'normal': normal}
-
+    needs_orientation = True
 
 class NTYuOutflow(LBNodeType):
     """Implements the open boundary condition described in:
