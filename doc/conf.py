@@ -46,14 +46,14 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Sailfish'
-copyright = u'2009-2012, Michał Januszewski'
+copyright = u'2009-2013, Michał Januszewski'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = '2012.2'
+version = '2013.1'
 # The full version, including alpha/beta/rc tags.
 release = version
 
@@ -99,7 +99,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  Major themes that come with
 # Sphinx are currently 'default' and 'sphinxdoc'.
-html_theme = 'default'
+html_theme = 'sphinxdoc'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -202,4 +202,4 @@ latex_documents = [
 #latex_use_modindex = True
 
 autoclass_content = 'both'
-autodoc_member_order = 'groupwise'
+autodoc_member_order = 'bysource'
