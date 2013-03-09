@@ -1,8 +1,8 @@
 Release notes
 =============
 
-2013.1
-""""""
+2013.1 (in progress)
+""""""""""""""""""""
  * 4 new outflow boundary conditions: Grad's approximation (NTGradFreeflow), Yu's method (NTYuOutflow), node copying method (NTCopy), Neumann's BC (NTNeumann).
  * New boundary conditions based on the regularized LB dynamics (NTRegularizedDensity, NTRegularizedVelocity).
  * New no-slip boundary condition based on the Tamm-Mott-Smith approximation (NTWallTMS).
