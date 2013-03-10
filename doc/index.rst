@@ -57,9 +57,9 @@ Contents
    :maxdepth: 3
 
    intro
+   models
    installation
    tutorial
-   models
    performance
    internals
    testcases

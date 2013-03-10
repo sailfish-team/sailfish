@@ -25,7 +25,7 @@ thead tr {
 {{ super() }}
 
 <script type="text/javascript">
-$("table.docutils:not(.citation) tbody tr").filter(function() {
+$("table.docutils:not(.citation):not(.field-list) tbody tr").filter(function() {
   return $(this).children().length == 2;
 }).filter(':odd').addClass('alt');
 
