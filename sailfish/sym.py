@@ -954,6 +954,10 @@ class KernelCodePrinter(CCodePrinter):
         else:
             return super(KernelCodePrinter, self)._print_Function(expr)
 
+    def _print_Rational(self, expr):
+        p, q = int(expr.p), int(expr.q)
+        return '%d.0/%d.0' % (p, q)
+
 def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=True,
           phi=None, vel=None):
     """Convert a SymPy expression into a string containing valid C code.
