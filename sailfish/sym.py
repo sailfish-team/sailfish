@@ -483,15 +483,29 @@ def slip_bb_swap_pairs(grid, normal_dir):
                     break
     return ret
 
+def get_missing_dists(grid, orientation):
+    """Returns an iterable of missing distribution indices.
+
+    :param grid: grid object
+    :param orientation: orientation code
+    """
+    # Normal vector points inside the simulation domain.
+    normal = grid.dir_to_vec(orientation)
+    _, unknown = _get_known_dists(grid, normal)
+    return unknown
+
+
 def fill_missing_dists(grid, distp, missing_dir):
+    """
+    :param grid: grid object
+    :param distp: name of the pointer to the Dist structure
+    :param missing_dir: orientation code
+    """
     syms = [Symbol('%s->%s' % (distp, x)) for x in grid.idx_name]
     ret = []
 
-    for i, sym in enumerate(syms):
-        sp = grid.basis[i].dot(grid.dir_to_vec(missing_dir))
-
-        if sp < 0:
-            ret.append((TargetDist(syms[grid.idx_opposite[i]], grid.idx_opposite[i]), sym))
+    for idx in get_missing_dists(grid, missing_dir):
+        ret.append((TargetDist(syms[idx], idx), syms[grid.idx_opposite[idx]]))
 
     return ret
 
@@ -644,16 +658,6 @@ def _get_known_dists(grid, normal):
 
     return known, unknown
 
-def get_missing_dists(grid, orientation):
-    """Returns an iterable of missing distribution indices.
-
-    :param grid: grid object
-    :param orientation: orientation code
-    """
-    # Normal vector points inside the simulation domain.
-    normal = grid.dir_to_vec(orientation)
-    _, unknown = _get_known_dists(grid, normal)
-    return unknown
 
 def noneq_bb(grid, orientation, eq):
     normal = grid.dir_to_vec(orientation)
