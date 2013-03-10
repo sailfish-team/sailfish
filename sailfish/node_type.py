@@ -319,27 +319,21 @@ class NTNeumann(LBNodeType):
     Vol. 8, Nos. 1–4, 2008
 
     Implements:
-        .. math:: \\frac{\partial u}{\partial n (t, x_j)} = \phi(t, x_j)
+        .. math:: \\frac{\partial u}{\partial n (t, x_j)} = \\varphi(t, x_j)
     via:
-        .. math:: f_i(t+1, j_0) = f_{\mathrm{iopp}}^c(t, j_o + c_i) +
-                      6 f^{\mathrm{eq}}_i (u(t, x_{j1}) + 2\phi(t, x_j)) \cdot c_i
+        .. math:: \phi(t, x_{j0}) = u(t, x_{j1}) + 2 \\varphi (t, x_j)
+        .. math:: f_i(t+1, x_{j0}) = f_{\mathrm{\\bar{i}}}^c(t, x_{j0} + c_i) +
+                      6 f^{\mathrm{eq}}_i (u(t, x_{j1}) + 2\phi(t, x_{j0})) \cdot c_i
     with:
 
-     * :math:`j_0`: ghost node
-     * :math:`x_j`: actual boundary node
-     * :math:`x_{j1}`: fluid node at :math:`x_j` - normal
+     * :math:`x_j`: boundary node
+     * :math:`x_{j0}`: ghost node
+     * :math:`x_{j1}`: fluid node at :math:`x_{j0}` - 2 * normal
      * :math:`c_i`: incoming distributions
-     * :math:`iopp`: direction opposite to i
+     * :math:`\\bar{i}`: direction opposite to i
      * :math:`f^{\mathrm{eq}}_i`: :math:`f^{\mathrm{eq}}_i(1, 0)`
      * :math:`f_i^c`: distribution after collision (prior to streaming)
     """
-    def __init__(self, normal):
-        """
-        :param normal: direction number corresponding to the normal vector
-            pointing outward (i.e. outside of the domain); direction numbers
-            can be generated using grid.vec_to_dir.
-        """
-        self.params = {'normal': normal}
 
 ############################################################################
 # Other nodes.
