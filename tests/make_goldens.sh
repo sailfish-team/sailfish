@@ -4,7 +4,7 @@
 # it against a set of goldens.
 #
 # Usage:
-#  make_goldens.sh <output_dir> <golden_dir>
+#  make_goldens.sh <golden_dir>
 
 output_dir=$1
 
@@ -12,3 +12,4 @@ output_dir=$1
 
 source tests/goldens.sh
 collect_data ${output_dir}
+git rev-parse HEAD > ${output_dir}/VERSION
