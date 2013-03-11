@@ -10,5 +10,5 @@ output_dir=$1
 
 [[ -z ${output_dir} ]] && exit 1
 
-source goldens.sh
+source tests/goldens.sh
 collect_data ${output_dir}

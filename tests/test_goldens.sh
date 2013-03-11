@@ -11,7 +11,7 @@ golden_dir=$2
 
 [[ -z ${output_dir} || -z ${golden_dir} ]] && exit 1
 
-source goldens.sh
+source tests/goldens.sh
 collect_data ${output_dir}
 
 echo "Comparing $output_dir with goldens in $golden_dir"

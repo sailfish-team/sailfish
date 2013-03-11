@@ -1,5 +1,5 @@
 
-.PHONY: clean regtest regtest_small_block presubmit test_examples test_gpu
+.PHONY: clean regtest regtest_small_block presubmit test_examples test_gpu goldens test_goldens
 
 regtest_ldc:
 	python -u regtest/ldc_3d.py
@@ -63,6 +63,14 @@ regtest_small_block:
 	python regtest/subdomains/3d_ldc.py --block_size=16
 	python regtest/subdomains/binary_pbc.py --block_size=16
 	python regtest/subdomains/2d_binary.py --block_size=16
+
+goldens:
+	@mkdir -p goldens
+	@bash tests/make_goldens.sh goldens
+
+test_goldens:
+	@mkdir -p tmp
+	@bash tests/test_goldens.sh tmp goldens
 
 presubmit: test test_gpu test_examples regtest regtest_small_block regtest_aa
 
