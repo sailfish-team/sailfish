@@ -1,5 +1,5 @@
 <%!
-  from sailfish import sym, sym_force, sym_equilibrium
+  from sailfish import sym, sym_force, sym_equilibrium, sym_codegen
   import sailfish.node_type as nt
 %>
 
@@ -36,7 +36,7 @@ ${device_func} inline void FE_MRT_relaxate${grid_idx}(${bgk_args_decl(grid_idx)}
 
 	%if grid_idx == 0:
 		%for dst, src in sym.free_energy_mrt(sim.grid, 'd0', 'feq0'):
-			${dst} -= ${sym.make_float(src)};
+			${dst} -= ${sym_codegen.make_float(src)};
 		%endfor
 	%endif
 

@@ -7,7 +7,8 @@ __license__ = 'LGPL3'
 from collections import namedtuple
 import sympy
 from sympy import Rational, Symbol, Eq
-from sailfish.sym import poly_factorize, S, D3Q15
+from sailfish.sym import S, D3Q15
+from sailfish.sym_codegen import poly_factorize
 
 EqDef = namedtuple('EqDef', 'expression local_vars')
 

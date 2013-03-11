@@ -1,9 +1,9 @@
 <%!
-    from sailfish import sym
+    from sailfish import sym_codegen
 %>
 
 <%def name="cex(ex, pointers=False, rho=None, vectors=True, phi=None, vel=None)">
-${sym.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors, phi=phi, vel=vel)}
+${sym_codegen.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors, phi=phi, vel=vel)}
 </%def>
 
 <%def name="dump_dists(name, short=False)">

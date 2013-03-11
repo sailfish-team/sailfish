@@ -1,5 +1,5 @@
 <%
-  from sailfish import sym, sym_force
+  from sailfish import sym, sym_force, sym_codegen
   import sailfish.node_type as nt
 %>
 
@@ -74,7 +74,7 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0 ${dynamic_va
 
 	%for i, name in enumerate(grid.mrt_names):
 		%if grid.mrt_collision[i] != 0:
-			fm.${name} -= ${sym.make_float(grid.mrt_collision[i])} * (fm.${name} - feq.${name});
+			fm.${name} -= ${sym_codegen.make_float(grid.mrt_collision[i])} * (fm.${name} - feq.${name});
 		%endif
 	%endfor
 

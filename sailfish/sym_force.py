@@ -10,7 +10,8 @@ from mako.runtime import Undefined
 import sympy
 from sympy import Matrix, Symbol
 
-from sailfish.sym import poly_factorize, S
+from sailfish.sym import S
+from sailfish.sym_codegen import poly_factorize
 
 def needs_coupling_accel(i, force_couplings):
     """Returns True is a grid is coupled to any other grid.
