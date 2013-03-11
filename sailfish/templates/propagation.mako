@@ -233,7 +233,11 @@
 
 <%def name="propagate(dist_out, dist_in='fi')">
 	%if access_pattern == 'AB':
-		${propagate_shared(dist_out, dist_in)}
+		%if propagate_on_read:
+			${propagate_inplace(dist_out, dist_in)}
+		%else:
+			${propagate_shared(dist_out, dist_in)}
+		%endif
 	%elif access_pattern == 'AA':
 		if (iteration_number & 1) {
 			${propagate_shared(dist_out, dist_in)}

@@ -105,13 +105,15 @@
 </%def>
 
 <%def name="shared_mem_propagation_vars()">
-	// Shared variables for in-block propagation
-	%for i in sym.get_prop_dists(grid, 1):
-		${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
-	%endfor
-	%for i in sym.get_prop_dists(grid, 1):
-		#define prop_${grid.idx_name[grid.idx_opposite[i]]} prop_${grid.idx_name[i]}
-	%endfor
+	%if not propagate_on_read:
+		// Shared variables for in-block propagation
+		%for i in sym.get_prop_dists(grid, 1):
+			${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
+		%endfor
+		%for i in sym.get_prop_dists(grid, 1):
+			#define prop_${grid.idx_name[grid.idx_opposite[i]]} prop_${grid.idx_name[i]}
+		%endfor
+	%endif
 </%def>
 
 <%def name="load_node_type()">

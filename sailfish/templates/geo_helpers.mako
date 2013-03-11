@@ -243,7 +243,11 @@ ${device_func} inline void getUnpropagatedDistFromOppositeSlots(
 ${device_func} inline void getDist(Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, int gi
 								   ${iteration_number_if_required()}) {
 	%if access_pattern == 'AB':
-		getDistLocal(dout, din, gi);
+		%if propagate_on_read:
+			getUnpropagatedDist(dout, din, gi);
+		%else:
+			getDistLocal(dout, din, gi);
+		%endif
 	%else:
 		if ((iteration_number & 1) == 0) {
 			getDistLocal(dout, din, gi);

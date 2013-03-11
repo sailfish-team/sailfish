@@ -55,6 +55,11 @@ class LBSim(object):
                            'errors by using a model that avoids adding O(1) '
                            'and O(Ma) quantities. This currently only works '
                            'for BGK-like models.')
+        group.add_argument('--propagate_on_read', action='store_true',
+                           default=False, help='Uses the propagate-on-read '
+                           'scheme in which distributions are saved to the '
+                           'local node only, and streaming happens implicitly '
+                           'by reading data from neighboring nodes.')
 
     @classmethod
     def modify_config(cls, config):
@@ -93,6 +98,7 @@ class LBSim(object):
         ctx['relaxation_enabled'] = self.config.relaxation_enabled
         ctx['dt_per_lattice_time_unit'] = self.config.dt_per_lattice_time_unit
         ctx['access_pattern'] = self.config.access_pattern
+        ctx['propagate_on_read'] = self.config.propagate_on_read
         ctx['needs_iteration_num'] = self.config.needs_iteration_num
         ctx['equilibria'] = self.equilibria
         ctx['config'] = self.config
