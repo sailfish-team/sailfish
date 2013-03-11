@@ -118,12 +118,14 @@
 	%endif
 </%def>
 
+## Note: update BGK_relaxate* if a new condition is added below for which
+## a modified relaxation time is used.
 <%def name="update_relaxation_time(grid_idx)">
 	## In models where the relaxation time is constant everywhere, tau0 is a global
 	## constant and does not need to be declared here.
 	%if simtype == 'free-energy' and grid_idx == 0:
 		// Linear interpolation of relaxation time.
-		float tau0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) / 2.0f;
+		float tau0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) * 0.5f;
 		if (phi < -1.0f) {
 			tau0 = tau_b;
 		} else if (phi > 1.0f) {

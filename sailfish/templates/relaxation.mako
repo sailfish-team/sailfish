@@ -114,8 +114,16 @@ ${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
 	${body_force(grid_idx)}
 	${bgk_relaxation_preamble(grid_idx)}
 
+	%if grid_idx == 1:
+		float omega = ${cex(1.0 / tau_phi)};
+	%elif subgrid == 'les-smagorinsky' or (simtype == 'free-energy' and grid_idx == 0):
+		float omega = 1.0 / tau0;
+	%else:
+		float omega = ${cex(1.0 / tau)};
+	%endif
+
 	%for idx in grid.idx_name:
-		d0->${idx} += (feq0.${idx} - d0->${idx}) / tau${grid_idx};
+		d0->${idx} += omega * (feq0.${idx} - d0->${idx});
 	%endfor
 
 	%if nt.NTGuoDensity in node_types:
