@@ -150,6 +150,10 @@ class KernelCodePrinter(CCodePrinter):
         p, q = int(expr.p), int(expr.q)
         return '%d.0/%d.0' % (p, q)
 
+    # Replaces expressions: x / F, with x * (1.0 / F), where F is a floating
+    # point or integer number. This allows the CUDA compiler to replace the
+    # division operation by a multiplication when the code runs in double
+    # precision.
     def _print_Mul(self, expr):
         s = super(KernelCodePrinter, self)._print_Mul(expr)
         return re.sub(r'/ ?([0-9\.]+)', r'* (1.0 / \1)', s)
