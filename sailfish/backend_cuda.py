@@ -64,8 +64,11 @@ class CUDABackend(object):
                 help='keep intermediate CUDA files', action='store_true',
                 default=False)
         group.add_argument('--cuda-fermi-highprec', dest='cuda_fermi_highprec',
-                help='use high precision division on Compute Capability 2.0+ '
+                help='use high precision division and sqrt on Compute Capability 2.0+ '
                      ' devices', action='store_true', default=False)
+        group.add_argument('--cuda-disable-l1', dest='cuda_disable_l1',
+                           help='disable L1 cache for global memory '
+                           'reads/stores', action='store_true', default=False)
         group.add_argument('--nocuda_cache', dest='cuda_cache',
                            action='store_false', default=True,
                            help='Disable the use of the pycuda compiler cache.')
@@ -180,6 +183,12 @@ class CUDABackend(object):
             options.append('--prec-div=false')
             options.append('--prec-sqrt=false')
 
+        if self.options.cuda_disable_l1:
+            options.extend(['-Xptxas', '-dlcm=cg'])
+
+        # Generate annotated PTX code.
+        options.append('-src-in-ptx')
+
         if self.options.cuda_cache:
             cache = None
         else:
@@ -196,6 +205,9 @@ class CUDABackend(object):
             number, which will be provided to it as the last argument
         """
         kern = prog.get_function(name)
+
+        # Use a larger L1 cache by default.
+        kern.set_cache_config(cuda.func_cache.PREFER_L1)
 
         if needs_iteration:
             args_format += 'i'
