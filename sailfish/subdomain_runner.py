@@ -1350,6 +1350,7 @@ class SubdomainRunner(object):
                 if sync_req and self.config.debug_dump_dists:
                     dbuf = self._debug_get_dist(self)
                     self._output.dump_dists(dbuf, self._sim.iteration)
+                    del dbuf
 
                 self.step(sync_req)
 
