@@ -186,8 +186,9 @@ class CUDABackend(object):
         if self.options.cuda_disable_l1:
             options.extend(['-Xptxas', '-dlcm=cg'])
 
-        # Generate annotated PTX code.
-        options.append('-src-in-ptx')
+        if cuda.get_driver_version() >= 5000:
+            # Generate annotated PTX code.
+            options.append('-src-in-ptx')
 
         if self.options.cuda_cache:
             cache = None
