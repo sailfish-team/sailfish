@@ -5,7 +5,34 @@ In this section, we show how to create a simple lattice Boltzmann simulation
 using Sailfish.
 To keep things simple, we stick to two dimensions and use the lid-driven cavity
 example, which is one of the standard test cases in computational fluid
-dynamics.
+dynamics. Here is the complete example which we are going to analyze step by step::
+
+    import numpy as np
+    from sailfish.subdomain import Subdomain2D
+    from sailfish.node_type import NTFullBBWall, NTEquilibriumVelocity
+    from sailfish.controller import LBSimulationController
+    from sailfish.lb_single import LBFluidSim
+
+    class LDCBlock(Subdomain2D):
+        max_v = 0.1
+
+        def boundary_conditions(self, hx, hy):
+            wall_map = (((hx == self.gx-1) | (hx == 0) | (hy == 0)) &
+                        np.logical_not(hy == self.gy-1))
+            self.set_node(hy == self.gy-1, NTEquilibriumVelocity((self.max_v, 0.0)))
+            self.set_node(wall_map, NTFullBBWall)
+
+        def initial_conditions(self, sim, hx, hy):
+            sim.rho[:] = 1.0
+            sim.vx[hy == self.gy-1] = self.max_v
+
+
+    class LDCSim(LBFluidSim):
+        subdomain = LDCBlock
+
+    if __name__ == '__main__':
+        LBSimulationController(LDCSim).run()
+
 
 The program outline
 -------------------
@@ -64,7 +91,7 @@ methods in superclasses. After that we can add our options::
 
 :class:`LDCBlock` describes the simulation geometry and inherits from
 :class:`Subdomain2D`. The derived geometry class needs to define at least the
-following two methods: ``bondary_conditions`` and ``initial_conditions``.
+following two methods: ``boundary_conditions`` and ``initial_conditions``.
 
 ``boundary_conditions`` is used to set the type of each node in the simulation
 domain. The function takes two arguments: ``hx`` and ``hy``, which are NumPy
@@ -94,12 +121,8 @@ therefore write our function as follows::
         max_v = 0.1
 
         def boundary_conditions(self, hx, hy):
-            lor = np.logical_or
-            land = np.logical_and
-            lnot = np.logical_not
-
-            wall_map = land(lor(lor(hx == self.gx - 1, hx == 0), hy == 0),
-                            lnot(hy == self.gy - 1))
+            wall_map = (((hx == self.gx-1) | (hx == 0) | (hy == 0)) &
+                        np.logical_not(hy == self.gy-1))
             self.set_node(hy == self.gy - 1, NTEquilibriumVelocity((self.max_v, 0.0)))
             self.set_node(wall_map, NTFullBBWall)
 
