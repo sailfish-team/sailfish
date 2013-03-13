@@ -17,6 +17,7 @@ Release notes
  * Compatiblity fixed for sympy-0.7.2 and numpy-1.7.0.
  * Added support for distributed simulations on LSF clusters.
  * Added the D3Q27 lattice.
+ * Added support for drawing walls in the pygame visualization interface.
 
 2012.2
 """"""
