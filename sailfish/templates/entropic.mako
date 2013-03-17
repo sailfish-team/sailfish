@@ -27,10 +27,10 @@ ${device_func} inline void ComputeACoeff(Dist* fi, Dist* fneq, float *a1,
 		*a4 += p;
 	%endfor
 
-	*a1 *= 1.0f / 2.0f;
-	*a2 *= -1.0f / 6.0f;
-	*a3 *= 1.0f / 12.0f;
-	*a4 *= -1.0f / 20.0f;
+	*a1 *= ${cex(1.0 / 2.0)};
+	*a2 *= ${cex(-1.0 / 6.0)};
+	*a3 *= ${cex(1.0 / 12.0)};
+	*a4 *= ${cex(-1.0 / 20.0)};
 }
 
 // Estimates the alpha relaxation parameter using an asymptotic expansion
@@ -110,7 +110,7 @@ ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq, float
 		if (new_alpha > max_alpha) {
 			// Fall back to the middle of the interval in case Newton's
 			// method would result in an invalid alpha.
-			new_alpha = (alpha + max_alpha) / 2.0f;
+			new_alpha = 0.5f * (alpha + max_alpha);
 		}
 
 		if (fabsf(new_alpha - alpha) < 1e-10f) {
