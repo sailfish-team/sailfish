@@ -46,8 +46,8 @@
 <%def name="edm_force(i)">
 {
 	// Exact difference method.
-	%for feq_shifted, idx in zip(sym_force.edm_shift_velocity(equilibria[i](grids[i], config).expression), grid.idx_name):
-		d0->${idx} += ${cex(feq_shifted)} - feq${i}.${idx};
+	%for feq_shifted, idx in zip(sym_force.edm_shift_velocity(equilibria[i](grids[i], config).expression, grid, i), grid.idx_name):
+		d0->${idx} += ${cex(feq_shifted)} - feq0.${idx};
 	%endfor
 }
 </%def>

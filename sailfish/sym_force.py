@@ -180,12 +180,13 @@ def free_energy_external_force(sim, grid_num=0):
     ret = [sympy.simplify(-sum_)] + ret
     return ret
 
-def edm_shift_velocity(expressions):
+def edm_shift_velocity(expressions, grid, grid_num):
     ret = []
+    ea = accel_vector(grid, grid_num)
     for feq in expressions:
         ret.append(sympy.simplify(feq.subs({
-            S.vx: S.vx + S.eax,
-            S.vy: S.vy + S.eay,
-            S.vz: S.vz + S.eaz
+            S.vx: S.vx + ea[0],
+            S.vy: S.vy + ea[1],
+            S.vz: S.vz + ea[2] if grid.dim == 3 else 0
         })))
     return ret
