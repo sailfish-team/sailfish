@@ -45,13 +45,14 @@ class TimeProfile(object):
         self._max_timings = [0.0] * (self.STEP_SQ + 1)
         self._samples = 0
         self._sample_sum = 0.0
+        self._is_benchmark = runner.config.mode == 'benchmark'
 
     def record_start(self):
         self.t_start = time.time()
 
     def record_end(self):
         self.t_end = time.time()
-        if self._runner.config.mode != 'benchmark':
+        if not self._is_benchmark:
             return
         mi = self._runner.config.max_iters - self._runner.config.benchmark_sample_from
 
@@ -103,7 +104,7 @@ class TimeProfile(object):
         self.record_cpu_start(self.STEP)
 
     def end_step(self):
-        if (self._runner._sim.iteration <
+        if (not self._is_benchmark or self._runner._sim.iteration <
             self._runner.config.benchmark_sample_from):
             return
 
@@ -117,12 +118,14 @@ class TimeProfile(object):
             self._max_timings[i] = max(self._max_timings[i], duration)
 
     def record_gpu_start(self, event, stream):
-        ev = self._make_event(stream, timing=True)
+        ev = self._make_event(stream, timing=self._is_benchmark)
         self._events_start[event] = ev
         return ev
 
-    def record_gpu_end(self, event, stream):
-        ev = self._make_event(stream, timing=True)
+    def record_gpu_end(self, event, stream, need_event=False):
+        if not self._is_benchmark and not need_event:
+            return
+        ev = self._make_event(stream, timing=self._is_benchmark)
         self._events_end[event] = ev
         return ev
 

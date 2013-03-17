@@ -77,6 +77,7 @@ class CUDABackend(object):
     def __init__(self, options, gpu_id):
         """Initializes the CUDA backend.
 
+        :param options: LBConfig object
         :param gpu_id: number of the GPU to use
         """
         cuda.init()

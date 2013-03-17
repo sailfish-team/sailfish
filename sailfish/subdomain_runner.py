@@ -846,7 +846,8 @@ class SubdomainRunner(object):
 
         self._profile.record_gpu_start(TimeProfile.BOUNDARY, blk_str)
         self.backend.run_kernel(kernel, grid, blk_str)
-        ev = self._profile.record_gpu_end(TimeProfile.BOUNDARY, blk_str)
+        ev = self._profile.record_gpu_end(TimeProfile.BOUNDARY, blk_str,
+                                          need_event=True)
 
         # Enqueue a wait so that the data collection will not start until the
         # kernel handling boundary calculations is completed (that kernel runs
@@ -1677,7 +1678,8 @@ class NNSubdomainRunner(SubdomainRunner):
             run(bnd_kernel_macro, grid_bnd, str_calc)
         else:
             run(bulk_kernel_macro, grid_bulk, str_calc)
-        ev = record_gpu_end(TimeProfile.MACRO_BOUNDARY, str_calc)
+        ev = record_gpu_end(TimeProfile.MACRO_BOUNDARY, str_calc,
+                            need_event=True)
         str_data.wait_for_event(ev)
 
         record_gpu_start(TimeProfile.MACRO_COLLECTION, str_data)
@@ -1701,7 +1703,7 @@ class NNSubdomainRunner(SubdomainRunner):
         for kernel, grid in self._macro_distrib_kernels:
             run(kernel, grid, str_data)
 
-        ev = record_gpu_end(TimeProfile.MACRO_DISTRIB, str_data)
+        ev = record_gpu_end(TimeProfile.MACRO_DISTRIB, str_data, need_event=True)
         str_calc.wait_for_event(ev)
 
         # Actual simulation step.
@@ -1712,7 +1714,7 @@ class NNSubdomainRunner(SubdomainRunner):
         else:
             for k in bulk_kernel_sim:
                 run(k, grid_bulk, str_calc)
-        ev = record_gpu_end(TimeProfile.BOUNDARY, str_calc)
+        ev = record_gpu_end(TimeProfile.BOUNDARY, str_calc, need_event=True)
         str_data.wait_for_event(ev)
 
         record_gpu_start(TimeProfile.COLLECTION, str_data)

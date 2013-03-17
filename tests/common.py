@@ -18,6 +18,7 @@ class TestCase2D(unittest.TestCase):
         config.lat_nx, config.lat_ny = self.lattice_size
         config.logger = DummyLogger()
         config.grid = 'D2Q9'
+        config.mode = 'batch'
         self.sim = LBSim(config)
         self.config = config
         self.backend = DummyBackend()
@@ -36,5 +37,6 @@ class TestCase3D(unittest.TestCase):
         config.lat_nx, config.lat_ny, config.lat_nz = self.lattice_size
         config.logger = DummyLogger()
         config.grid = 'D3Q19'
+        config.mode = 'batch'
         self.sim = LBSim(config)
         self.backend = DummyBackend()
