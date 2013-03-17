@@ -7,7 +7,7 @@ __license__ = 'LGPL3'
 from collections import namedtuple
 import sympy
 from sympy import Rational, Symbol, Eq
-from sailfish.sym import S, D3Q15
+from sailfish.sym import S, D3Q15, D3Q19
 from sailfish.sym_codegen import poly_factorize
 
 EqDef = namedtuple('EqDef', 'expression local_vars')
@@ -149,55 +149,132 @@ def elbm_equilibrium(grid):
 
     return EqDef(out, lvars)
 
-def elbm_d3q15_equilibrium(grid):
-    """
-    Form of equilibrium defined in PRL 97, 010201 (2006).
-    See also Chikatamarla, PhD Thesis, Eq. (5.7), (5.8).
-    """
+def elbm_d3q19_equilibrium(grid, order=8):
     rho = S.rho
 
-    prefactor = Symbol('prefactor')
-    coeff1 = Symbol('coeff1')
-    coeff2 = Symbol('coeff2')
-    coeff3 = Symbol('coeff3')
+    prefactor = Symbol('chi')
+    coeff1 = Symbol('zeta_x')
+    coeff2 = Symbol('zeta_y')
+    coeff3 = Symbol('zeta_z')
     vsq = Symbol('vsq')
     vx, vy, vz = grid.v
+
+    o = [(1 if i <= order else 0) for i in range(0, 8)]
 
     lvars = []
     lvars.append(Eq(vsq, grid.v.dot(grid.v)))
     lvars.append(Eq(prefactor, poly_factorize(
-        rho * (1 - 3 * vsq / 2 + 9 * vsq**2 / 8 +
-        Rational(27, 16) * (-vsq**3 + 2 * (vy**2 + vz**2) *
-            (vsq * vx**2 + vy**2 * vz**2) +
-            20 * vx**2 * vy**2 * vz**2) +
-        Rational(81, 128) * vsq**4 +
-        Rational(81, 32) * (vx**8 + vy**8 + vz**8
-            - 36 * vx**2 * vy**2 * vz**2 * vsq
-            - vx**4 * vy**4
-            - vy**4 * vz**4
-            - vx**4 * vz**4)))))
+        rho * (1 -
+               o[2] * Rational(3, 2) * vsq +
+               o[4] * Rational(9, 8) * vsq**2 -
+               o[6] * Rational(27, 16) * (vx**6 + vx**4 * (vy**2 + vz**2) +
+                                          (vy**2 + vz**2) * (vy**4 + vz**4) +
+                                          vx**2 * (vy**4 + 12 * vy**2 * vz**2 +
+                                                   vz**4)) +
+               o[8] * Rational(81, 128) * (5 * vx**8 + 5 * vy**8 + 4 * vy**6 *
+                                           vz**2 + 2 * vy**4 * vz**4 +
+                                           4 * vy**2 * vz**6 +
+                                           5 * vz**8 + 4 * vx**6 * (vy**2 + vz**2) +
+                                           4 * vx**2 * (vy**2 + vz**2) * (
+                                               vy**4 + 17 * vy**2 * vz**2 + vz**4) +
+                                           2 * vx**4 * (vy**4 + 36 * vy**2 *
+                                                        vz**2 + vz**4))))))
 
     cfs = [coeff1, coeff2, coeff3]
 
     for i, coeff in enumerate(cfs):
-        tmp = (1 + 3 * grid.v[i] + 9 * grid.v[i]**2 / 2 +
-            9 * grid.v[i]**3 / 2 + 27 * grid.v[i]**4 / 8)
+        tmp = (1 +
+               o[1] * 3 * grid.v[i] +
+               o[2] * Rational(9, 2) * grid.v[i]**2 +
+               o[3] * Rational(9, 2) * grid.v[i]**3 +
+               o[4] * Rational(27, 8) * grid.v[i]**4)
 
         # Cyclic permutation.
         x = i
         y = (i + 1) % 3
         z = (i + 2) % 3
 
-        tmp += Rational(27, 8) * (grid.v[x]**5
-                - 4 * grid.v[x] * grid.v[y]**2 * grid.v[z]**2)
-        tmp += Rational(81, 16) * (grid.v[x]**6
-                - 8 * grid.v[x]**2 * grid.v[y]**2 * grid.v[z]**2)
-        tmp += Rational(81, 16) * (grid.v[x]**7
-                - 10 * grid.v[x]**3 * grid.v[y]**2 * grid.v[z]**2
-                + 2 * grid.v[x] * grid.v[y]**2 * grid.v[z]**2 * vsq)
-        tmp += Rational(243, 128) * (grid.v[x]**8
-                + 16 * grid.v[x]**2 * grid.v[y]**2 * grid.v[z]**2
-                * (grid.v[y]**2 + grid.v[z]**2))
+        tmp += o[5] * Rational(27, 8) * (
+            grid.v[x]**5 + 2 * grid.v[x] * grid.v[y]**2 * grid.v[z]**2)
+        tmp += o[6] * Rational(81, 16) * (
+            grid.v[x]**6 + 4 * grid.v[x]**2 * grid.v[y]**2 * grid.v[z]**2)
+        tmp += o[7] * Rational(81, 16) * (
+            grid.v[x] * (grid.v[x]**6 + 4 * grid.v[x]**2 * grid.v[y]**2 * grid.v[z]**2 -
+                         grid.v[y]**2 * grid.v[z]**2 * (grid.v[y]**2 +
+                                                        grid.v[z]**2)))
+        tmp += o[8] * Rational(243, 128) * (
+            grid.v[x]**2 * (grid.v[x]**6 - 8 * grid.v[y]**2 * grid.v[z]**2 * (
+                grid.v[y]**2 + grid.v[z]**2)))
+
+        lvars.append(Eq(coeff, poly_factorize(tmp)))
+
+    out = []
+    for ei, weight in zip(grid.basis, grid.entropic_weights):
+        t = prefactor * weight
+        for j, comp in enumerate(ei):
+            t *= cfs[j]**comp
+        out.append(t)
+
+    return EqDef(out, lvars)
+
+
+def elbm_d3q15_equilibrium(grid, order=8):
+    """
+    Form of equilibrium defined in PRL 97, 010201 (2006).
+    See also Chikatamarla, PhD Thesis, Eq. (5.7), (5.8).
+    """
+    rho = S.rho
+
+    prefactor = Symbol('chi')
+    coeff1 = Symbol('zeta_x')
+    coeff2 = Symbol('zeta_y')
+    coeff3 = Symbol('zeta_z')
+    vsq = Symbol('vsq')
+    vx, vy, vz = grid.v
+
+    o = [(1 if i <= order else 0) for i in range(0, 8)]
+
+    lvars = []
+    lvars.append(Eq(vsq, grid.v.dot(grid.v)))
+    lvars.append(Eq(prefactor, poly_factorize(
+        rho * (1 -
+               o[2] * Rational(3, 2) * vsq +
+               o[4] * Rational(9, 8) * vsq**2 +
+               o[6] * Rational(27, 16) * (-vsq**3 + 2 * (vy**2 + vz**2) *
+                                   (vsq * vx**2 + vy**2 * vz**2) +
+                                   20 * vx**2 * vy**2 * vz**2) +
+               o[8] * (Rational(81, 128) * vsq**4 +
+                       Rational(81, 32) * (
+                           vx**8 + vy**8 + vz**8
+                           - 36 * vx**2 * vy**2 * vz**2 * vsq
+                           - vx**4 * vy**4
+                           - vy**4 * vz**4
+                           - vx**4 * vz**4))))))
+
+    cfs = [coeff1, coeff2, coeff3]
+
+    for i, coeff in enumerate(cfs):
+        tmp = (1 +
+               o[1] * 3 * grid.v[i] +
+               o[2] * Rational(9, 2) * grid.v[i]**2 +
+               o[3] * Rational(9, 2) * grid.v[i]**3 +
+               o[4] * Rational(27, 8) * grid.v[i]**4)
+
+        # Cyclic permutation.
+        x = i
+        y = (i + 1) % 3
+        z = (i + 2) % 3
+
+        tmp += o[5] * Rational(27, 8) * (
+            grid.v[x]**5 - 4 * grid.v[x] * grid.v[y]**2 * grid.v[z]**2)
+        tmp += o[6] * Rational(81, 16) * (
+            grid.v[x]**6 - 8 * grid.v[x]**2 * grid.v[y]**2 * grid.v[z]**2)
+        tmp += o[7] * Rational(81, 16) * (
+            grid.v[x]**7 - 10 * grid.v[x]**3 * grid.v[y]**2 * grid.v[z]**2 +
+            2 * grid.v[x] * grid.v[y]**2 * grid.v[z]**2 * vsq)
+        tmp += o[8] * Rational(243, 128) * (
+            grid.v[x]**8 + 16 * grid.v[x]**2 * grid.v[y]**2 * grid.v[z]**2
+            * (grid.v[y]**2 + grid.v[z]**2))
 
         lvars.append(Eq(coeff, poly_factorize(tmp)))
 
@@ -215,6 +292,8 @@ def get_equilibrium(config, equilibria, model, grids, grid_idx):
         grid = grids[grid_idx]
         if grid is D3Q15:
             return elbm_d3q15_equilibrium(grid)
+        elif grid is D3Q19:
+            return elbm_d3q19_equilibrium(grid)
         else:
             return elbm_equilibrium(grid)
     else:
