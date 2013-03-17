@@ -159,7 +159,7 @@ def elbm_d3q19_equilibrium(grid, order=8):
     vsq = Symbol('vsq')
     vx, vy, vz = grid.v
 
-    o = [(1 if i <= order else 0) for i in range(0, 8)]
+    o = [(1 if i <= order else 0) for i in range(0, 9)]
 
     lvars = []
     lvars.append(Eq(vsq, grid.v.dot(grid.v)))
@@ -232,7 +232,7 @@ def elbm_d3q15_equilibrium(grid, order=8):
     vsq = Symbol('vsq')
     vx, vy, vz = grid.v
 
-    o = [(1 if i <= order else 0) for i in range(0, 8)]
+    o = [(1 if i <= order else 0) for i in range(0, 9)]
 
     lvars = []
     lvars.append(Eq(vsq, grid.v.dot(grid.v)))

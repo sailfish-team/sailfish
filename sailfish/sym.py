@@ -316,6 +316,8 @@ class D3Q19(DxQy):
                 (1,36), (1,36), (1,36), (1,36), (1,36), (1,36),
                 (1,36), (1,36), (1,36), (1,36), (1,36), (1,36)])
 
+    entropic_weights = weights
+
     mrt_names = ['rho', 'en', 'eps', 'mx', 'ex', 'my', 'ey', 'mz', 'ez',
                  'pxx3', 'pixx3', 'pww', 'piww', 'pxy', 'pyz', 'pzx', 'm3x', 'm3y', 'm3z']
 

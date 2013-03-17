@@ -1,3 +1,4 @@
+import operator
 import re
 try:
     from sympy.core import singleton
@@ -15,6 +16,26 @@ import numpy as np
 # Sympy stuff.
 #
 
+def _truncate_add(add, order=2):
+    ret = 0
+    from sailfish.sym import S
+    for mul in add.args:
+        o = 0
+        for a in mul.args:
+            if a in (S.g0m1x, S.g0m1y, S.g0m1z):
+                o += 1
+            elif str(a) == 'vsq':
+                o += 2
+            elif type(a) is sympy.Pow:
+                if a.base in (S.g0m1x, S.g0m1y, S.g0m1z):
+                    o += a.exp
+                elif str(a.base) == 'vsq':
+                    o += a.exp * 2
+
+        if o <= order:
+            ret += mul
+    return ret
+
 def truncate_velocity(poly, order=2):
     """Truncates a polynomial to terms of desired order in velocity.
 
@@ -22,6 +43,7 @@ def truncate_velocity(poly, order=2):
     :param order: desired order
     """
     degs = []
+    from sailfish.sym import S
     for x in poly.gens:
         if x in (S.g0m1x, S.g0m1y, S.g0m1z):
             degs.append(1)
@@ -29,6 +51,17 @@ def truncate_velocity(poly, order=2):
             degs.append(2)
         else:
             degs.append(0)
+
+    gens = []
+
+    for g in poly.gens:
+        if type(g) is sympy.Pow and g.exp == -1:
+            g = g.series(S.g0m1x, n=order+1).removeO()
+            g = g.series(S.g0m1y, n=order+1).removeO()
+            g = g.series(S.g0m1z, n=order+1).removeO()
+            gens.append(g)
+        else:
+            gens.append(g)
 
     truncated = 0
     for powers, coeff in poly.terms():
@@ -39,9 +72,16 @@ def truncate_velocity(poly, order=2):
         if o > order:
             continue
         truncated += coeff * reduce(operator.mul, (
-            x**p for p, x in zip(powers, poly.gens)))
+            x**p for p, x in zip(powers, gens)))
 
-    return truncated
+    truncated = truncated.series(S.g0m1x, n=order+1).removeO()
+    truncated = truncated.series(S.g0m1y, n=order+1).removeO()
+    truncated = truncated.series(S.g0m1z, n=order+1).removeO()
+
+    if type(truncated) is sympy.Add:
+        return _truncate_add(truncated.expand(), order)
+    else:
+        return truncated
 
 
 def poly_factorize(poly):
