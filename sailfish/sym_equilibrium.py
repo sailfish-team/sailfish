@@ -289,8 +289,8 @@ def elbm_d3q15_equilibrium(grid, order=8):
 
     return EqDef(out, lvars)
 
-def get_equilibrium(config, equilibria, model, grids, grid_idx):
-    if model == 'elbm':
+def get_equilibrium(config, equilibria, grids, grid_idx):
+    if config.entropic_equilibrium:
         grid = grids[grid_idx]
         if grid is D3Q15:
             return elbm_d3q15_equilibrium(grid)

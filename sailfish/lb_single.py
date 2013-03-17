@@ -33,6 +33,10 @@ class LBFluidSim(LBSim):
                            action='store_true', default=False,
                            help='Apply the regularization procedure prior to '
                            'the collision step.')
+        group.add_argument('--entropic_equilibrium',
+                           action='store_true', default=False,
+                           help='Use the equilibrium in product form instead '
+                           'of the standard LBGK equilibrium.')
         group.add_argument('--model', help='LB collision model to use',
                 type=str, choices=['bgk', 'mrt', 'elbm'],
                 default='bgk')

@@ -459,7 +459,7 @@ ${device_func} inline void fixMissingDistributions(
 			${fill_missing_distributions()}
 			compute_macro_quant(fi, tg_rho, tg_v);
 
-			<% eq = sym_equilibrium.get_equilibrium(config, equilibria, model, grids, 0) %>
+			<% eq = sym_equilibrium.get_equilibrium(config, equilibria, grids, 0) %>
 			%for local_var in eq.local_vars:
 				const float ${cex(local_var.lhs)} =
 					${cex(local_var.rhs, rho='*tg_rho', vel='tg_v')};
@@ -530,7 +530,7 @@ ${device_func} inline void postcollisionBoundaryConditions(
 		// Adds the (f^eq(TG) - f^eq(inst)) part of the distribution.
 		else if (isNTWallTMS(node_type)) {
 			{
-				<% eq = sym_equilibrium.get_equilibrium(config, equilibria, model, grids, 0) %>
+				<% eq = sym_equilibrium.get_equilibrium(config, equilibria, grids, 0) %>
 				%for local_var in eq.local_vars:
 					const float ${cex(local_var.lhs)} =
 						${cex(local_var.rhs, rho='*tg_rho', vel='tg_v', pointers=True)};
@@ -541,7 +541,7 @@ ${device_func} inline void postcollisionBoundaryConditions(
 				%endfor
 			}
 			{
-				<% eq = sym_equilibrium.get_equilibrium(config, equilibria, model, grids, 0) %>
+				<% eq = sym_equilibrium.get_equilibrium(config, equilibria, grids, 0) %>
 				%for local_var in eq.local_vars:
 					const float ${cex(local_var.lhs)} = ${cex(local_var.rhs, pointers=True)};
 				%endfor

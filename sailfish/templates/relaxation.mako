@@ -65,14 +65,7 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 )
 {
 	Dist fneq;
-	<%
-		if grid is sym.D3Q15:
-			eq = sym_equilibrium.elbm_d3q15_equilibrium(grid)
-		elif grid is sym.D3Q19:
-			eq = sym_equilibrium.elbm_d3q19_equilibrium(grid)
-		else:
-			eq = sym_equilibrium.elbm_equilibrium(grid)
-	%>
+	<% eq = sym_equilibrium.get_equilibrium(config, equilibria, grids, 0) %>
 
 	float v0[${dim}];
 	${body_force(grid_idx=0)}
