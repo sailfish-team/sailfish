@@ -105,9 +105,11 @@ def bgk_equilibrium(grid, config, rho=None, rho0=None, order=2):
         h = (ei.dot(grid.v) / grid.cssq +
              ei.dot(grid.v)**2 / grid.cssq**2 / 2 -
              grid.v.dot(grid.v) / 2 / grid.cssq)
-        if order > 2:
-            h += (ei.dot(grid.v)**3 / grid.cssq**3 / 2 -
-                  ei.dot(grid.v) * grid.v.dot(grid.v) / grid.cssq**2 / 2)
+        # Aidun, Clausen; Latice-Boltzmann Method for Complex Flows
+        # Note: this does not seem to recover the 1st moment in the unit test!
+#        if order > 2:
+#            h += (ei.dot(grid.v)**3 / grid.cssq**3 / 2 -
+#                  ei.dot(grid.v) * grid.v.dot(grid.v) / grid.cssq**2 / 2)
 
         out.append(weight * (rho + rho0 * poly_factorize(h)))
 

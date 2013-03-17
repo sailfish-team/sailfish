@@ -3,17 +3,18 @@ from sailfish import config, sym, sym_codegen, sym_equilibrium
 import sympy
 from sympy import Poly
 
+cfg = config.LBConfig()
+cfg.minimize_roundoff = False
+cfg.incompressible = False
+
 class TestEntropicEquilibria(unittest.TestCase):
 
     def test_d3q15_2nd_order_bgk(self):
         """Verifies that the entropic equilibrium for D3Q15 is the same
         as the LBGK equilibrium up to 2nd order in velocity."""
         grid = sym.D3Q15
-        c = config.LBConfig()
-        c.minimize_roundoff = False
-        c.incompressible = False
 
-        bgk = sym_equilibrium.bgk_equilibrium(grid, c)
+        bgk = sym_equilibrium.bgk_equilibrium(grid, cfg)
         elbm = sym_equilibrium.elbm_d3q15_equilibrium(grid, order=2)
 
         for i, (elbm_ex, bgk_ex) in enumerate(zip(elbm.expression, bgk.expression)):
@@ -30,11 +31,8 @@ class TestEntropicEquilibria(unittest.TestCase):
         """Verifies that the entropic equilibrium for D3Q19 is the same
         as the LBGK equilibrium up to 2nd order in velocity."""
         grid = sym.D3Q19
-        c = config.LBConfig()
-        c.minimize_roundoff = False
-        c.incompressible = False
 
-        bgk = sym_equilibrium.bgk_equilibrium(grid, c)
+        bgk = sym_equilibrium.bgk_equilibrium(grid, cfg)
         elbm = sym_equilibrium.elbm_d3q19_equilibrium(grid, order=2)
 
         for i, (elbm_ex, bgk_ex) in enumerate(zip(elbm.expression, bgk.expression)):
@@ -49,12 +47,6 @@ class TestEntropicEquilibria(unittest.TestCase):
 
 
     def _verify_moments(self, grid, elbm):
-        c = config.LBConfig()
-        c.minimize_roundoff = False
-        c.incompressible = False
-
-        bgk = sym_equilibrium.bgk_equilibrium(grid, c)
-
         rho_ex = 0
         momentum = [0, 0, 0]
 
@@ -97,6 +89,36 @@ class TestEntropicEquilibria(unittest.TestCase):
         grid = sym.D3Q19
         elbm = sym_equilibrium.elbm_d3q19_equilibrium(grid, order=8)
         self._verify_moments(grid, elbm)
+
+class TestLBGKEquilibrium(unittest.TestCase):
+
+    def _verify_moments(self, grid, order):
+        bgk = sym_equilibrium.bgk_equilibrium(grid, cfg, order=order)
+        rho_ex = 0
+        momentum = [0, 0, 0]
+
+        for ex, ei in zip(bgk.expression, grid.basis):
+            rho_ex += ex
+            for i, ei_c in enumerate(ei):
+                momentum[i] += ei_c * ex
+
+        self.assertEqual(sympy.simplify(rho_ex), sym.S.rho)
+        self.assertEqual(sympy.simplify(momentum[0]), sym.S.rho * sym.S.vx)
+        self.assertEqual(sympy.simplify(momentum[1]), sym.S.rho * sym.S.vy)
+        if grid.dim == 3:
+            self.assertEqual(sympy.simplify(momentum[2]), sym.S.rho * sym.S.vz)
+
+    def test_d3q15(self):
+        self._verify_moments(sym.D3Q15, 2)
+
+    def test_d3q19(self):
+        self._verify_moments(sym.D3Q19, 2)
+
+    def test_d3q27(self):
+        self._verify_moments(sym.D3Q27, 2)
+
+    def test_d2q9(self):
+        self._verify_moments(sym.D2Q9, 2)
 
 if __name__ == '__main__':
     unittest.main()
