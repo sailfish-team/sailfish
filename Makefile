@@ -13,13 +13,15 @@ perf_block_plots:
 	python perftest/make_block_plots.py perftest perftest/results/single/GeForce_GTX_285/blocksize
 
 test:
+	python tests/controller.py
+	python tests/encoder.py
+	python tests/sim.py
+	python tests/subdomain.py
 	python tests/subdomain_connection.py
 	python tests/subdomain_runner.py
-	python tests/subdomain.py
-	python tests/sim.py
 	python tests/sym.py
+	python tests/sym_equilibrium.py
 	python tests/util.py
-	python tests/encoder.py
 
 test_examples:
 	@bash tests/run_examples.sh
