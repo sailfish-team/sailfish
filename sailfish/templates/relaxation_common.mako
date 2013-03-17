@@ -1,5 +1,5 @@
 <%!
-  from sailfish import sym, sym_force
+  from sailfish import sym, sym_codegen, sym_force
   import sympy
 %>
 
@@ -56,7 +56,7 @@
 {
 	// Exact difference method.
 	%for feq_shifted, feq, idx in zip(sym_force.edm_shift_velocity(equilibria[i](grids[i], config).expression), equilibria[i](grids[i], config).expression, grid.idx_name):
-		d0->${idx} += ${cex(sym.poly_factorize(sympy.simplify(feq_shifted - feq)))};
+		d0->${idx} += ${cex(sym_codegen.poly_factorize(sympy.simplify(feq_shifted - feq)))};
 	%endfor
 }
 </%def>
