@@ -55,7 +55,7 @@
 <%def name="edm_force_no_feq(i)">
 {
 	// Exact difference method.
-	%for feq_shifted, feq, idx in zip(sym_force.edm_shift_velocity(equilibria[i](grids[i], config).expression), equilibria[i](grids[i], config).expression, grid.idx_name):
+	%for feq_shifted, feq, idx in zip(sym_force.edm_shift_velocity(equilibria[i](grids[i], config).expression, grid, i), equilibria[i](grids[i], config).expression, grid.idx_name):
 		d0->${idx} += ${cex(sym_codegen.poly_factorize(sympy.simplify(feq_shifted - feq)))};
 	%endfor
 }
