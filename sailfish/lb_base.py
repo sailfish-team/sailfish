@@ -96,6 +96,7 @@ class LBSim(object):
         ctx['loc_names'] = ['gx', 'gy', 'gz']
         ctx['constants'] = self.constants()
         ctx['relaxation_enabled'] = self.config.relaxation_enabled
+        ctx['propagation_enabled'] = self.config.propagation_enabled
         ctx['dt_per_lattice_time_unit'] = self.config.dt_per_lattice_time_unit
         ctx['access_pattern'] = self.config.access_pattern
         ctx['propagate_on_read'] = self.config.propagate_on_read

@@ -57,7 +57,7 @@ def _start_subdomain_runner(subdomain, config, sim, num_subdomains,
     runner = runner_cls(sim, subdomain, output, backend, quit_event, summary_addr,
             master_addr)
     runner.run()
-
+    return runner
 
 class LBMachineMaster(object):
     """Controls execution of a LB simulation on a single physical machine
@@ -328,7 +328,7 @@ class LBMachineMaster(object):
 
             subdomain = self.subdomains[0]
             output = output_initializer(subdomain)
-            _start_subdomain_runner(subdomain, self.config, self.sim,
+            self.runner = _start_subdomain_runner(subdomain, self.config, self.sim,
                     len(self.subdomains), backend_cls,
                     subdomain2gpu[subdomain.id], output, self._quit_event,
                     None, self._channel is not None)

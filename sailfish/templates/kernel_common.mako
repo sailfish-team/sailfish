@@ -105,7 +105,7 @@
 </%def>
 
 <%def name="shared_mem_propagation_vars()">
-	%if not propagate_on_read:
+	%if not propagate_on_read and propagation_enabled:
 		// Shared variables for in-block propagation
 		%for i in sym.get_prop_dists(grid, 1):
 			${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];

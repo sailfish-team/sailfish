@@ -232,7 +232,9 @@
 </%def>
 
 <%def name="propagate(dist_out, dist_in='fi')">
-	%if access_pattern == 'AB':
+	%if not propagation_enabled:
+		${propagate_inplace(dist_out, dist_in)}
+	%elif access_pattern == 'AB':
 		%if propagate_on_read:
 			${propagate_inplace(dist_out, dist_in)}
 		%else:
