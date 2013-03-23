@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Verifies the node scratch space functionality."""
+"""Verifies the "do nothing" node type."""
 
 import unittest
 import numpy as np
