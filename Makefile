@@ -74,7 +74,7 @@ test_goldens:
 	@mkdir -p tmp
 	@bash tests/test_goldens.sh tmp goldens
 
-presubmit: test test_gpu test_examples regtest regtest_small_block regtest_aa
+presubmit: test test_gpu test_examples regtest regtest_small_block regtest_aa test_access_pattern
 
 clean:
 	rm -f sailfish/*.pyc
