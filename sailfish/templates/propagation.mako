@@ -74,7 +74,7 @@
 	%if grid.dim == 2:
 		${x + y * arr_nx}
 	%else:
-		${x + arr_nx * (y + arr_ny*z)}
+		${x + arr_nx * (y + arr_ny * z)}
 	%endif
 </%def>
 

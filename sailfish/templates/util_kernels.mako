@@ -339,17 +339,17 @@ ${kernel} void ApplyPeriodicBoundaryConditionsWithSwap(
 	%else:
 		int idx2 = get_global_id(1);
 		if (axis == 0) {
-			if (idx1 >= ${lat_ny} || idx2 >= ${lat_nz}) { return; }
+			if (idx1 >= ${lat_ny-1} || idx2 >= ${lat_nz-1} || idx1 < 1 || idx2 < 1) { return; }
 			gi_low = getGlobalIdx(1, idx1, idx2);				// real node
 			gi_high = getGlobalIdx(${lat_nx-1}, idx1, idx2);	// ghost node
 			${pbc_helper(0, lat_ny-2, lat_nz-2, opposite=True)}
 		} else if (axis == 1) {
-			if (idx1 >= ${lat_nx} || idx2 >= ${lat_nz}) { return; }
+			if (idx1 >= ${lat_nx-1} || idx2 >= ${lat_nz-1} || idx1 < 1 || idx2 < 1) { return; }
 			gi_low = getGlobalIdx(idx1, 1, idx2);				// real node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-1}, idx2);	// ghost node
 			${pbc_helper(1, lat_nx-2, lat_nz-2, opposite=True)}
 		} else {
-			if (idx1 >= ${lat_nx} || idx2 >= ${lat_ny}) { return; }
+			if (idx1 >= ${lat_nx-1} || idx2 >= ${lat_ny-1} || idx1 < 1 || idx2 < 1) { return; }
 			gi_low = getGlobalIdx(idx1, idx2, 1);				// real node
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-1});	// ghost node
 			${pbc_helper(2, lat_nx-2, lat_ny-2, opposite=True)}
@@ -412,7 +412,7 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 			${_copy_field_if_finite('gi_low', 'gi_high')}
 		} else {
 			if (idx1 >= ${lat_nx} || idx2 >= ${lat_ny}) { return; }
-			gi_low = getGlobalIdx(idx1, idx2, 0);				// ghsot node
+			gi_low = getGlobalIdx(idx1, idx2, 0);				// ghost node
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});	// real node
 			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(idx1, idx2, 1);				// real node
