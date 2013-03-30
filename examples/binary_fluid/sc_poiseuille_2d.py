@@ -43,7 +43,7 @@ class PoiseuilleSim(LBBinaryFluidShanChen):
             'visc': visc1,
             'tau_phi': relaxation_time(visc2),
             'force_implementation': 'edm',
-            'G': 1.0,
+            'G': 1.2,
             'periodic_y': True,
         })
 
