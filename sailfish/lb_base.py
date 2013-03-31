@@ -231,7 +231,7 @@ class LBForcedSim(LBSim):
     @classmethod
     def add_options(cls, group, dim):
         group.add_argument('--force_implementation',
-                           type=str, choices=['guo', 'edm'], default='guo',
+                           type=str, choices=['guo', 'edm', 'velocity_shift'], default='guo',
                            help='Selects how body forces are introduced into '
                            'the simulation. Available choices are: guo and '
                            'EDM (Exact Difference Method')

@@ -61,7 +61,7 @@
 }
 </%def>
 
-## Applies a body force in the relaxation step. This functioan effectively
+## Applies a body force in the relaxation step. This function effectively
 ## modifies the collision operator (BGK, ELBM, etc). At the time this function
 ## is called d${i} is already a post-relaxation distribution.
 <%def name="apply_body_force(i, no_feq=False, subs={})">
@@ -78,7 +78,7 @@
 			%else:
 				${edm_force(i)}
 			%endif
-		%else:
+		%elif force_implementation != 'velocity_shift':
 			__NOT_IMPLEMENTED_${force_implementation}
 		%endif
 	%endif
@@ -88,15 +88,21 @@
 ## igrid: grid ID
 ## equilibrium: if True, calculate velocity for the equilibrium distribution
 <%def name="fluid_velocity(igrid=0, equilibrium=False, ignore_forces=False)">
-	%if forces is not UNDEFINED and force_implementation == 'guo' and not ignore_forces:
-		## The half time-step velocity shift is only used in Guo's method.
-		%for j in range(0, dim):
-			%if igrid in force_for_eq and equilibrium:
-				v0[${j}] = iv0[${j}] + ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], j, forces, force_couplings))};
-			%else:
-				v0[${j}] = iv0[${j}] + ${cex(0.5 * sym_force.fluid_accel(sim, igrid, j, forces, force_couplings))};
-			%endif
-		%endfor
+	%if forces is not UNDEFINED and not ignore_forces:
+		%if force_implementation == 'guo':
+			## The half time-step velocity shift is only used in Guo's method.
+			%for j in range(0, dim):
+				%if igrid in force_for_eq and equilibrium:
+					v0[${j}] = iv0[${j}] + ${cex(0.5 * sym_force.fluid_accel(sim, force_for_eq[igrid], j, forces, force_couplings))};
+				%else:
+					v0[${j}] = iv0[${j}] + ${cex(0.5 * sym_force.fluid_accel(sim, igrid, j, forces, force_couplings))};
+				%endif
+			%endfor
+		%elif force_implementation == 'velocity_shift':
+			%for j in range(0, dim):
+				v0[${j}] = iv0[${j}] + tau${igrid} * ${cex(sym_force.fluid_accel(sim, igrid, j, forces, force_couplings))};
+			%endfor
+		%endif
 	%else:
 		%for j in range(0, dim):
 			v0[${j}] = iv0[${j}];
