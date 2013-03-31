@@ -1349,9 +1349,11 @@ class SubdomainRunner(object):
                 sync_req = self._sim.need_sync()
 
                 if sync_req and self.config.debug_dump_dists:
-                    dbuf = self._debug_get_dist(self)
-                    self._output.dump_dists(dbuf, self._sim.iteration)
-                    del dbuf
+                    bufs = []
+                    for i in range(len(self._sim.grids)):
+                        bufs.append(self._debug_get_dist(self, grid_num=i))
+                    self._output.dump_dists(bufs, self._sim.iteration)
+                    del bufs
 
                 self.step(sync_req)
 

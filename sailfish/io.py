@@ -156,7 +156,7 @@ def filename(base, digits, subdomain_id, it, suffix='.npz'):
 def merged_filename(base, digits, it, suffix='.npz'):
     return ('{0}.{1:0' + str(digits) + 'd}{2}').format(base, it, suffix)
 
-def dists_filename(base, digits, subdomain_id, it, suffix='.npy'):
+def dists_filename(base, digits, subdomain_id, it, suffix='.npz'):
     return filename(base + '_dists', digits, subdomain_id, it, suffix=suffix)
 
 def node_type_filename(base, subdomain_id, suffix='.npy'):
@@ -245,7 +245,7 @@ class NPYOutput(LBOutput):
 
     def dump_dists(self, dists, i):
         fname = dists_filename(self.basename, self.digits, self.subdomain_id, i)
-        np.save(fname, dists)
+        np.savez(fname, *dists)
 
     def dump_node_type(self, node_type_map):
         fname = node_type_filename(self.basename, self.subdomain_id)
@@ -271,7 +271,8 @@ class MatlabOutput(LBOutput):
     def dump_dists(self, dists, i):
         import scipy.io
         fname = dists_filename(self.basename, self.digits, self.subdomain_id, i)
-        scipy.io.savemat(fname, dists)
+        # FIXME: add support for saving more than one distribution set.
+        scipy.io.savemat(fname, dists[0])
 
 
 _OUTPUTS = [NPYOutput, VTKOutput, MatlabOutput]
