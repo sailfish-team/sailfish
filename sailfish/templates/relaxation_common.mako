@@ -102,6 +102,10 @@
 			%for j in range(0, dim):
 				v0[${j}] = iv0[${j}] + tau${igrid} * ${cex(sym_force.fluid_accel(sim, igrid, j, forces, force_couplings))};
 			%endfor
+		%else:
+			%for j in range(0, dim):
+				v0[${j}] = iv0[${j}];
+			%endfor
 		%endif
 	%else:
 		%for j in range(0, dim):
