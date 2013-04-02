@@ -456,7 +456,6 @@ ${device_func} inline void fixMissingDistributions(
 		// Replaces the missing distributions using the bounce-back rule.
 		// No density/momentum correction happens here.
 		else if (isNTWallTMS(node_type)) {
-			${fill_missing_distributions()}
 			compute_macro_quant(fi, tg_rho, tg_v);
 
 			<% eq = sym_equilibrium.get_equilibrium(config, equilibria, grids, 0) %>
@@ -549,6 +548,27 @@ ${device_func} inline void postcollisionBoundaryConditions(
 				%for val, idx in zip(eq.expression, grid.idx_name):
 					fi->${idx} -= ${cex(val, pointers=True)};
 				%endfor
+			}
+
+			// Write new values back to memory like for the half-way bounce-back.
+			switch (orientation) {
+			%for i in range(1, grid.dim * 2 + 1):
+				case ${i}: {
+					%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
+						%if access_pattern == 'AB':
+							${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
+						%else:
+							if (iteration_number & 1) {
+								${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
+							} else {
+								${get_odist('dist_out', grid.idx_opposite[lvalue.idx],
+											*grid.basis[grid.idx_opposite[lvalue.idx]])} = ${rvalue};  // ${lvalue.var}
+							}
+						%endif
+					%endfor
+					break;
+				}
+			%endfor
 			}
 		}
 	%endif
