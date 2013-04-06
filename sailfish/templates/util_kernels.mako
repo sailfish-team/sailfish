@@ -134,7 +134,7 @@
 				if dim == 2:
 					return 'idx1 >= 1 && idx1 <= {0}'.format(max_dim)
 				else:
-					return 'idx1 >= 1 && idx2 >= 1 && idx1 <= {0} && idx2 <= {0}'.format(
+					return 'idx1 >= 1 && idx2 >= 1 && idx1 <= {0} && idx2 <= {1}'.format(
 						max_dim, max_dim2)
 			# If the distributions are already propagated, then certain locations
 			# could not have been propagated to. For instance, fNW for a node at
