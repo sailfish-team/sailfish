@@ -57,8 +57,8 @@ In order to select the nodes you want to modify, you need to formulate an expres
 using these arrays.  For instance, if you want nodes where the X coordinate is
 lower than 5, you would use `hx < 5`. You can combine multiple conditions with
 numpy logical functions (`np.logical_and`, `np.logical_or`, etc), for instance
-`np.logical_and(hx < 5, hy == 8)` or using binary operators (take care to put
-expressions in parentheses), e.g. `(hx < 5) & (hy == 8)`.
+`np.logical_and(hx < 5, hy == 8)` or using the binary operators `&` (and) and `|` (or). Take care to put
+expressions in parentheses, e.g. `(hx < 5) & (hy == 8)`.
 
 Boundary conditions
 -------------------

@@ -95,7 +95,7 @@ following two methods: ``boundary_conditions`` and ``initial_conditions``.
 
 ``boundary_conditions`` is used to set the type of each node in the simulation
 domain. The function takes two arguments: ``hx`` and ``hy``, which are NumPy
-arrays constructed using the mgrid mechanism. We normally won’t be accessing these
+arrays constructed using the mgrid mechanism (see :ref:`Node addressing <understanding_node_addressing>`). We normally won’t be accessing these
 parameters directly anyway, so the exact details of how the distributions are
 stored are irrelevant at this point. The size of the simulation domain is already
 known when the geometry class is instantiated and can be accessed via its
