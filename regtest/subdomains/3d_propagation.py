@@ -8,7 +8,7 @@ import unittest
 import numpy as np
 
 from sailfish import io
-from sailfish.geo import LBGeometry3D
+from sailfish.geo import LBGeometry3D, EqualSubdomainsGeometry3D
 from sailfish.subdomain import SubdomainSpec3D, Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
@@ -175,8 +175,8 @@ class TwoBlockPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
         self._verify(b0, b1, HorizTest)
 
     def test_vert_spread(self):
@@ -186,8 +186,8 @@ class TwoBlockPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
         self._verify(b0, b1, VertTest)
 
     def test_depth_spread(self):
@@ -197,8 +197,8 @@ class TwoBlockPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
         self._verify(b0, b1, DepthTest)
 
 
@@ -285,8 +285,8 @@ class TwoBlockMisalignedPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
 
         ae = np.testing.assert_equal
         ae(b1[vi(0, 1, 0),  5, 1, 20], np.float32(0.11))
@@ -307,8 +307,8 @@ class TwoBlockMisalignedPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
 
         ae = np.testing.assert_equal
         ae(b1[vi(1, 0, 0),  8, 5, 1], np.float32(0.11))
@@ -385,8 +385,8 @@ class PeriodicPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'per_horiz_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
 
         ae = np.testing.assert_equal
 
@@ -438,8 +438,8 @@ class PartialPeriodicPropagationTest(unittest.TestCase):
                 TwoBlocksXConnGeoTest).run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'per_horiz_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
 
         ae = np.testing.assert_equal
         ae(b1[vi(1, 1, 0), 32, 1, 1], np.float32(0.11))
@@ -529,7 +529,7 @@ class SingleBlockPeriodicTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'per_single_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
         ae = np.testing.assert_equal
 
         ae(b0[vi(-1, 0, 0), 32, 32, 64], np.float32(0.11))
@@ -608,7 +608,7 @@ class SingleBlockPeriodicQ15Test(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'per_single_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
         ae = np.testing.assert_equal
 
         ae(b0[vi2(-1, 0, 0), 32, 32, 64], np.float32(0.11))
@@ -660,7 +660,6 @@ class AASimulationTest(SimulationTest):
             'lat_nx': 32,
             'lat_ny': 64,
             'lat_nz': 64,
-            'save_src': '/tmp/test.cu',
             })
 
     def initial_conditions(self, runner):
@@ -672,22 +671,65 @@ class AASimulationTest(SimulationTest):
 
         runner._debug_set_dist(dbuf)
 
+class AASimulationTest2(SimulationTest):
+    subdomain = BlockTest
+
+    @classmethod
+    def update_defaults(cls, defaults):
+        SimulationTest.update_defaults(defaults)
+        defaults.update({
+            'access_pattern': 'AA',
+            'lat_nx': 60,
+            'lat_ny': 40,
+            'lat_nz': 40,
+            'grid': 'D3Q19',
+            'periodic_x': True,
+            'periodic_z': True,
+            'max_iters': 5,
+            'every': 1,
+            'check_invalid_results_gpu': False,
+            'subdomains': 2,
+            'conn_axis': 'x',
+            'block_size': 64,
+            })
+
+    def initial_conditions(self, runner):
+        dbuf = runner._debug_get_dist()
+        dbuf[:] = 0.0
+
+        if runner._spec.id == 0:
+            dbuf[vi(0, 1, -1), 2, 37, 10] = 0.11
+
+        runner._debug_set_dist(dbuf)
+
+
 class AAPropagationTest(unittest.TestCase):
     def test_4subdomains(self):
         ctrl = LBSimulationController(AASimulationTest, FourSubdomainsTest)
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
-        b2 = np.load(io.dists_filename(output, 1, 2, 1))
-        b3 = np.load(io.dists_filename(output, 1, 3, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
+        b2 = np.load(io.dists_filename(output, 1, 2, 1))['arr_0']
+        b3 = np.load(io.dists_filename(output, 1, 3, 1))['arr_0']
         ae = np.testing.assert_equal
 
         # No propagation in the first step, but the distributions are stored
         # in opposite slots.
         ae(b3[vi(0, -1, -1), 0, 0, 10], np.float32(0.11))
 
+    def test_2subdomains(self):
+        ctrl = LBSimulationController(AASimulationTest2,
+                                      EqualSubdomainsGeometry3D)
+        ctrl.run(ignore_cmdline=True)
+
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 2))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 2))['arr_0']
+        ae = np.testing.assert_equal
+
+        ae(b0[vi(0, 1, -1), 40, 39, 10], np.float32(0.11))
 
 def setUpModule():
     global tmpdir

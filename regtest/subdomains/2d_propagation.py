@@ -153,8 +153,8 @@ class MixedPeriodicPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
         ae = np.testing.assert_equal
 
         ae(b0[vi(-1, 0), 256, 128], np.float32(0.31))
@@ -194,8 +194,8 @@ class AAPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
         ae = np.testing.assert_equal
 
         # No propagation in the first step, but the distributions are stored
@@ -222,8 +222,8 @@ class AAPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
         ae = np.testing.assert_equal
 
         # No propagation in the first step, but the distributions are stored
@@ -259,9 +259,9 @@ class AAPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
-        b2 = np.load(io.dists_filename(output, 1, 2, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
+        b2 = np.load(io.dists_filename(output, 1, 2, 1))['arr_0']
         ae = np.testing.assert_equal
 
         # No propagation in the first step, but the distributions are stored
@@ -322,8 +322,8 @@ class PeriodicCornerPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
         ae = np.testing.assert_equal
 
         ae(b0[vi(1, 0), 1, 1], np.float32(0.11))
@@ -386,8 +386,8 @@ class PeriodicPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
 
         ae = np.testing.assert_equal
 
@@ -446,7 +446,7 @@ class PeriodicPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
         ae = np.testing.assert_equal
 
         ae(b0[vi(1, 0), 128, 1], np.float32(0.11))
@@ -485,7 +485,7 @@ class PeriodicPropagationTest(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
         ae = np.testing.assert_equal
 
         ae(b0[vi(1, 1), 1, 1], np.float32(0.11))
@@ -506,10 +506,10 @@ class TestCornerPropagation(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
-        b2 = np.load(io.dists_filename(output, 1, 2, 1))
-        b3 = np.load(io.dists_filename(output, 1, 3, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
+        b2 = np.load(io.dists_filename(output, 1, 2, 1))['arr_0']
+        b3 = np.load(io.dists_filename(output, 1, 3, 1))['arr_0']
 
         np.testing.assert_equal(b0[vi(-1, -1), 128, 128], np.float32(0.44))
         np.testing.assert_equal(b1[vi(-1, 1), 1, 128], np.float32(0.33))
@@ -551,10 +551,10 @@ class TestCornerPropagation(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
-        b2 = np.load(io.dists_filename(output, 1, 2, 1))
-        b3 = np.load(io.dists_filename(output, 1, 3, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
+        b2 = np.load(io.dists_filename(output, 1, 2, 1))['arr_0']
+        b3 = np.load(io.dists_filename(output, 1, 3, 1))['arr_0']
         ae = np.testing.assert_equal
 
         ae(b3[vi(1, 1), 1, 1], np.float32(0.11))
@@ -626,9 +626,9 @@ class TestThreeBlockPropagation(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         output = os.path.join(tmpdir, 'test_out')
-        b0 = np.load(io.dists_filename(output, 1, 0, 1))
-        b1 = np.load(io.dists_filename(output, 1, 1, 1))
-        b2 = np.load(io.dists_filename(output, 1, 2, 1))
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        b1 = np.load(io.dists_filename(output, 1, 1, 1))['arr_0']
+        b2 = np.load(io.dists_filename(output, 1, 2, 1))['arr_0']
 
         ae = np.testing.assert_equal
 
