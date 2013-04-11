@@ -204,6 +204,10 @@ class OpenCLBackend(object):
             'const_var': '__constant',
         }
 
+    def sync_stream(self, *streams):
+        for s in streams:
+            s.synchronize()
+
 
 class EventWrapper(object):
     def __init__(self, event):

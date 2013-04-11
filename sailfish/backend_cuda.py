@@ -5,6 +5,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 import operator
+import time
 
 import pycuda.compiler
 import pycuda.tools
@@ -67,16 +68,20 @@ class CUDABackend(object):
                 help='use high precision division and sqrt on Compute Capability 2.0+ '
                      ' devices', action='store_true', default=False)
         group.add_argument('--cuda-disable-l1', dest='cuda_disable_l1',
-                           help='disable L1 cache for global memory '
+                           help='Disable L1 cache for global memory '
                            'reads/stores', action='store_true', default=False)
         group.add_argument('--nocuda_cache', dest='cuda_cache',
                            action='store_false', default=True,
                            help='Disable the use of the pycuda compiler cache.')
         group.add_argument('--cuda-sched-yield', dest='cuda_sched_yield',
                            action='store_true', default=False,
-                           help='yield to other threads when waiting for CUDA '
+                           help='Yield to other threads when waiting for CUDA '
                            + 'calls to complete; improves performance of other '
                            + 'CPU threads under high load.')
+        group.add_argument('--cuda-minimize-cpu-usage', dest='minimize_cpu',
+                           action='store_true', default=False,
+                           help='Minimize CPU usage when waiting for results ' +
+                           'from the GPU. Might slightly degrade performance.')
         return 1
 
     def __init__(self, options, gpu_id):
@@ -293,5 +298,19 @@ class CUDABackend(object):
             'const_var': '__constant__',
         }
 
+    def sync_stream(self, *streams):
+        if self.options.minimize_cpu:
+            l = len(streams)
+            while True:
+                i = 0
+                for s in streams:
+                    if s.is_done():
+                        i += 1
+                if i == l:
+                    return
+                time.sleep(1e-4)
+        else:
+            for s in streams:
+                s.synchronize()
 
 backend=CUDABackend

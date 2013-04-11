@@ -9,6 +9,7 @@ import cPickle as pickle
 import math
 import operator
 import os
+import time
 import numpy as np
 import zmq
 from sailfish import codegen, io
@@ -840,6 +841,7 @@ class SubdomainRunner(object):
                 kernel = self._kernels_bnd_none[self._sim.iteration & 1][0]
             grid = self._boundary_blocks
         else:
+            # Run bulk kernel is there is no bulk/boundary split.
             kernel, grid = self._get_bulk_kernel(sync_req)
 
         blk_str = self._calc_stream
@@ -865,6 +867,9 @@ class SubdomainRunner(object):
 
     @profile(TimeProfile.SEND_DISTS)
     def _send_dists(self):
+        if not self._spec._connectors:
+            return
+
         if self.config.access_pattern == 'AA' and self._sim.iteration & 1:
             buf = 'local_coll_buf'
         else:
@@ -875,7 +880,8 @@ class SubdomainRunner(object):
             for x in conn_bufs:
                 self.backend.from_buf_async(getattr(x, buf).gpu, self._data_stream)
 
-        self._data_stream.synchronize()
+        self.backend.sync_stream(self._data_stream)
+
         for b_id, connector in self._spec._connectors.iteritems():
             conn_bufs = self._block_to_connbuf[b_id]
 
@@ -1367,8 +1373,8 @@ class SubdomainRunner(object):
                 if self._spec.geo_queue is not None:
                     self._handle_geo_updates()
 
-                self._data_stream.synchronize()
-                self._calc_stream.synchronize()
+                self.backend.sync_stream(self._data_stream, self._calc_stream)
+
                 if output_req:
                     if self.config.check_invalid_results_host:
                         if not self._output.verify():
@@ -1473,7 +1479,8 @@ class NNSubdomainRunner(SubdomainRunner):
             for x in conn_bufs:
                 self.backend.from_buf_async(x.coll_buf.gpu, self._data_stream)
 
-        self._data_stream.synchronize()
+        self.backend.sync_stream(self._data_stream)
+
         for b_id, connector in self._spec._connectors.iteritems():
             conn_bufs = self._block_to_macrobuf[b_id]
             if len(conn_bufs) > 1:
