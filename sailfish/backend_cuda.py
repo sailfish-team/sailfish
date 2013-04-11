@@ -72,6 +72,11 @@ class CUDABackend(object):
         group.add_argument('--nocuda_cache', dest='cuda_cache',
                            action='store_false', default=True,
                            help='Disable the use of the pycuda compiler cache.')
+        group.add_argument('--cuda-sched-yield', dest='cuda_sched_yield',
+                           action='store_true', default=False,
+                           help='yield to other threads when waiting for CUDA '
+                           + 'calls to complete; improves performance of other '
+                           + 'CPU threads under high load.')
         return 1
 
     def __init__(self, options, gpu_id):
@@ -87,7 +92,9 @@ class CUDABackend(object):
         self._tex_to_memcpy = {}
         self.options = options
         self._device = cuda.Device(gpu_id)
-        self._ctx = self._device.make_context()
+        self._ctx = self._device.make_context(
+            flags=cuda.ctx_flags.SCHED_AUTO if not options.cuda_sched_yield else
+            cuda.ctx_flags.SCHED_YIELD)
 
         # To keep track of allocated memory.
         self._total_memory_bytes = 0
