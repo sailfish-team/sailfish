@@ -62,6 +62,17 @@ increase the speed of some of the more complex LB models.  If you decide to appl
 optimization, watch out for degraded precision (always run regression tests of our simulation)
 and increased register usage.
 
+Minimizing CPU usage
+^^^^^^^^^^^^^^^^^^^^
+If you care about the CPU time used for running Sailfish simulations, use ``--cuda-sched-yield``
+and ``--cuda-minimize-cpu-usage`` to improve the default settings at a slight performance cost.
+The first option makes the CUDA threads yield to other ones when waiting for GPU, which can
+improve performance of CPU code in high load situations. The second option instructs CUDA to
+use blocking synchronization. This will decrease performance of the GPU simulation by increasing
+latency of host synchronization operations. The CPU usage decrease will be larger for bigger
+simulation domains and more complex models -- the longer a step of the simulation takes, the
+lower the CPU usage.
+
 NVIDIA Fermi cards
 ------------------
 Fermi devices are based on a new GPU architecture and can benefit from additional optimizations.
@@ -81,71 +92,14 @@ To fully take advantage of the available computational power, a larger block siz
 be necessary (typically twice as large as for devices of the previous generation, but make sure
 to check occupancy and register usage as well).
 
-Performance comparison for different devices
---------------------------------------------
+L1 cache
+^^^^^^^^
+The usage of L1 cache is often detrimental to performance of the simulation, especially in double
+precision. Use ``--cuda-disable-l1`` to disable the usage of L1 for caching global memory accesses.
 
-Single precision
-^^^^^^^^^^^^^^^^
-.. plot::
-
-    from pyplots import make_comparison
-    make_comparison.comparison_plot('../perftest/results/single')
-
-Double precision
-^^^^^^^^^^^^^^^^
-.. plot::
-
-    from pyplots import make_comparison
-    make_comparison.comparison_plot('../perftest/results/double')
-
-
-Performance impact of the block size (single precision)
--------------------------------------------------------
-
-GeForce GTX 285
-^^^^^^^^^^^^^^^
-.. plot::
-
-    from pyplots import make_block_plots
-    make_block_plots.make_summary('../perftest/results/single/GeForce_GTX_285/blocksize')
-
-Tesla C1060
-^^^^^^^^^^^
-.. plot::
-
-    from pyplots import make_block_plots
-    make_block_plots.make_summary('../perftest/results/single/Tesla_C1060/blocksize')
-
-
-Tesla C2050
-^^^^^^^^^^^
-.. plot::
-
-    from pyplots import make_block_plots
-    make_block_plots.make_summary('../perftest/results/single/Tesla_C2050/blocksize')
-
-Performance impact of the block size (double precision)
--------------------------------------------------------
-
-GeForce GTX 285
-^^^^^^^^^^^^^^^
-.. plot::
-
-    from pyplots import make_block_plots
-    make_block_plots.make_summary('../perftest/results/double/GeForce_GTX_285/blocksize')
-
-Tesla C1060
-^^^^^^^^^^^
-.. plot::
-
-    from pyplots import make_block_plots
-    make_block_plots.make_summary('../perftest/results/double/Tesla_C1060/blocksize')
-
-
-Tesla C2050
-^^^^^^^^^^^
-.. plot::
-
-    from pyplots import make_block_plots
-    make_block_plots.make_summary('../perftest/results/double/Tesla_C2050/blocksize')
-
+Hardware error correction (ECC)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The ECC functionality available in Tesla-class cards can decrease performance by 10-30% compared
+to memory without error correction. If you don't need the functionality and are sure that your
+hardware is stable, you can disable ECC using the ``nvidia-smi`` tool. Note that this requires
+root access and a machine reboot, and as such might not be possible in a shared computing environment.
