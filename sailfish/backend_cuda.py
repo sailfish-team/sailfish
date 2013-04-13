@@ -281,6 +281,8 @@ class CUDABackend(object):
 
     def make_event(self, stream, timing=False):
         flags = 0
+        if self.options.minimize_cpu:
+            flags |= cuda.event_flags.BLOCKING_SYNC
         if not timing:
             flags |= cuda.event_flags.DISABLE_TIMING
         event = cuda.Event(flags)
@@ -300,15 +302,8 @@ class CUDABackend(object):
 
     def sync_stream(self, *streams):
         if self.options.minimize_cpu:
-            l = len(streams)
-            while True:
-                i = 0
-                for s in streams:
-                    if s.is_done():
-                        i += 1
-                if i == l:
-                    return
-                time.sleep(1e-4)
+            for s in streams:
+                self.make_event(s).synchronize()
         else:
             for s in streams:
                 s.synchronize()
