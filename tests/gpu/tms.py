@@ -94,7 +94,6 @@ class Test2DTMS(unittest.TestCase):
             'check_invalid_results_host': False,
             'lat_nx': self.nx,
             'lat_ny': self.ny,
-            'save_src': '/tmp/test.cu',
             'max_iters': 1,
             'visc': 1.0/12.0,
         }

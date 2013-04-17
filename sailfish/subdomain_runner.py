@@ -746,14 +746,14 @@ class SubdomainRunner(object):
         return self._gpu_geo_map
 
     def get_kernel(self, name, args, args_format, block_size=None,
-            needs_iteration=False):
+            needs_iteration=False, shared=0):
         if block_size is None:
             block = self._kernel_block_size
         else:
             block = block_size
         return self.backend.get_kernel(self.module, name, args=args,
                 args_format=args_format, block=block,
-                needs_iteration=needs_iteration)
+                needs_iteration=needs_iteration, shared=shared)
 
     def exec_kernel(self, name, args, args_format, needs_iteration=False):
         kernel = self.get_kernel(name, args, args_format,

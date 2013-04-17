@@ -15,7 +15,7 @@ import pycuda.reduction as reduction
 
 
 def _expand_block(block):
-    if block is int:
+    if type(block) is int:
         return (block, 1, 1)
     elif len(block) == 1:
         return (block[0], 1, 1)
@@ -215,6 +215,13 @@ class CUDABackend(object):
     def get_kernel(self, prog, name, block, args, args_format, shared=0,
             needs_iteration=False):
         """
+        :param name: kernel name
+        :param block: CUDA block size
+        :param args: iterable of arguments to pass to the kernel
+        :param args_format: string indicating the type of kernel arguments; see
+            pycuda documentation for more info
+        :param shared: number of bytes of shared memory to allocate for the
+            kernel
         :param needs_iteration: if True, the kernel needs access to the current iteration
             number, which will be provided to it as the last argument
         """
