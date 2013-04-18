@@ -572,30 +572,13 @@ ${device_func} inline void postcollisionBoundaryConditions(
 			}
 		}
 	%endif
-
-	%if access_pattern == 'AA' and nt.NTDoNothing in node_types:
-		// Only need to do special processing for the propagate in-place step.
-		// For this step, we store the missing distributions in the ghost nodes
-		// adjacent to the do-nothing node in such a way that in the next iteration
-		// they will be retrieved using the standard procedure.
-		else if (isNTDoNothing(node_type) && !(iteration_number & 1)) {
-			switch (orientation) {
-				%for o in range(1, grid.dim*2+1):
-					case ${o}: {
-						%for dist_idx in sym.get_missing_dists(grid, o):
-							${get_odist('dist_out', grid.idx_opposite[dist_idx],
-										*grid.basis[grid.idx_opposite[dist_idx]])} = fi->${grid.idx_name[dist_idx]};
-						%endfor
-						break;
-					}
-				%endfor
-			}
-		}
-	%endif
 }
 
 
-${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, int node_type, int orientation, float *rho, float *v0)
+${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode,
+		int node_type, int orientation, float *rho, float *v0
+		${', ' + global_ptr + 'float *dist_out, int gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+		${iteration_number_if_required()})
 {
 	if (0) {}
 
@@ -662,6 +645,30 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode, i
 					break;
 				}
 			%endfor
+			}
+		}
+	%endif
+
+	%if access_pattern == 'AA' and nt.NTDoNothing in node_types:
+		// Only need to do special processing for the propagate in-place step.
+		// For this step, we store the missing distributions in the ghost nodes
+		// adjacent to the do-nothing node in such a way that in the next iteration
+		// they will be retrieved using the standard procedure.
+		else if (isNTDoNothing(node_type)) {
+			switch (orientation) {
+				%for o in range(1, grid.dim*2+1):
+					case ${o}: {
+						%for dist_idx in sym.get_missing_dists(grid, o):
+							if (iteration_number & 1) {
+								${get_odist('dist_out', dist_idx)} = fi->${grid.idx_name[dist_idx]};
+							} else {
+								${get_odist('dist_out', grid.idx_opposite[dist_idx],
+											*grid.basis[grid.idx_opposite[dist_idx]])} = fi->${grid.idx_name[dist_idx]};
+							}
+						%endfor
+						break;
+					}
+				%endfor
 			}
 		}
 	%endif

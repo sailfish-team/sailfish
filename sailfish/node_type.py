@@ -277,6 +277,7 @@ class NTDoNothing(LBNodeType):
     just fine."""
     wet_node = True
     needs_orientation = True
+    standard_macro = True
 
 
 class NTCopy(LBNodeType):

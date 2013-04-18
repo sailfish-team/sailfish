@@ -185,7 +185,9 @@ ${kernel} void CollideAndPropagate(
 		${sc_calculate_force()}
 	%endif
 
-	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
+	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v
+								   ${', dist_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+								   ${iteration_number_arg_if_required()});
 
 	%if initialization:
 		v[0] = ovx[gi];
