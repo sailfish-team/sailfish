@@ -108,7 +108,9 @@ ${kernel} void ShanChenCollideAndPropagate${grid_idx}(
 
 	${guo_density_restore_index()}
 
-	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g${grid_idx}m0, v);
+	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g${grid_idx}m0, v
+								   ${', dist1_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+								   ${iteration_number_arg_if_required()});
 	${relaxate(bgk_args_sc, grid_idx)}
 
 	// FIXME: In order for the half-way bounce back boundary condition to work, a layer of unused

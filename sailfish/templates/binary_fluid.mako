@@ -247,7 +247,10 @@ ${kernel} void FreeEnergyCollideAndPropagateFluid(
 		gg0m0[gi] = g0m0;
 	%endif
 
-	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v);
+	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v
+								   ${', dist_out1, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+								   ${iteration_number_arg_if_required()});
+
 	${relaxate(bgk_args_fe, 0)}
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist1_out
 									${iteration_number_arg_if_required()});
@@ -286,7 +289,9 @@ ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
 	${'v[2] = ovz[gi]' if dim == 3 else ''};
 	g1m0 = gg1m0[gi];
 
-	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v);
+	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v
+								   ${', dist1_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+								   ${iteration_number_arg_if_required()});
 	${relaxate(bgk_args_fe, 1)}
 	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v, gi, dist1_out
 									${iteration_number_arg_if_required()});
