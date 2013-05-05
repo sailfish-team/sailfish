@@ -149,7 +149,7 @@ class SubdomainRunner(object):
         self._subdomain.update_context(ctx)
         ctx.update(self.backend.get_defines())
 
-        # Size of the lattice.
+        # Size of the lattice (without padding).
         ctx['lat_ny'] = self._lat_size[-2]
         ctx['lat_nx'] = self._lat_size[-1]
 
