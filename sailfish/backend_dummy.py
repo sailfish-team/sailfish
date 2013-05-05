@@ -65,6 +65,9 @@ class DummyBackend(object):
     def make_event(self, stream, timing=False):
         return DummyEvent()
 
+    def sync_stream(self, *streams):
+        pass
+
 class DummyStream(object):
     def synchronize(self):
         pass
