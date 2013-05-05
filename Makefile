@@ -29,6 +29,7 @@ test_examples:
 test_gpu:
 	python tests/gpu/scratch_space.py
 	python tests/gpu/do_nothing_node.py
+	python tests/gpu/reduction.py
 
 test_checkpoint:
 	@bash tests/gpu/checkpoint.sh examples/ldc_2d.py
