@@ -14,32 +14,38 @@
 
 <%def name="reduction_x(name, axis, out_type='float', block_size=1024)">
 	int gx = get_local_id(0);	// ID inside the current block
-	if (gx > ${lat_nx - 1}) {
-		return;
-	}
-
 	int g_scan = get_global_id(1);
 
-	extern __shared__ ${out_type} sdata[];
+	__shared__ ${out_type} sdata[${block_size}];
+	sdata[gx] = 0.0f;
+
+	// Skip ghost nodes.
+	if (gx >= ${lat_nx - 1}) {
+		return;
+	}
 
 	// Read data from global memory into sdata.
 	${out_type} acc = 0.0f;
 
-	%if dim == 2:
-		int gi = getGlobalIdx(gx, g_scan);
-		acc = acc + f[gi];
-	%else:
-		<% other_nx = lat_ny if axis == 2 else lat_nz %>
-		for (int g_other = 0; g_other <= ${other_nx}; g_other++) {
-			%if axis == 1:
-				int gi = getGlobalIdx(gx, g_scan, g_other);
-			%else:
-				int gi = getGlobalIdx(gx, g_other, g_scan);
-			%endif
+	// Only load global memory data for real nodes.
+	if (gx > 0) {
+		%if dim == 2:
+			// +1 shift due to ghost nodes.
+			int gi = getGlobalIdx(gx, g_scan + 1);
 			acc = acc + f[gi];
-		}
-	%endif
-	sdata[gx] = acc;
+		%else:
+			<% other_nx = lat_ny if axis == 2 else lat_nz %>
+			for (int g_other = 0; g_other <= ${other_nx}; g_other++) {
+				%if axis == 1:
+					int gi = getGlobalIdx(gx, g_scan, g_other);
+				%else:
+					int gi = getGlobalIdx(gx, g_other, g_scan);
+				%endif
+				acc = acc + f[gi];
+			}
+		%endif
+		sdata[gx] = acc;
+	}
 	__syncthreads();
 
 	// Cross-warp aggregation.
@@ -76,11 +82,14 @@
 <%def name="reduction_nox(name, out_type='float')">
 	${out_type} acc = 0.0f;
 	int gx = get_global_id(0);
-	if (gx > ${lat_nx - 1}) {
+
+	// Skip ghost nodes.
+	if (gx >= ${lat_nx - 1} || gx == 0) {
 		return;
 	}
 
-	for (int gy = 0; gy < ${lat_ny}; gy++) {
+	// TODO(michalj): Modify the 1 below for variable ghost node layer.
+	for (int gy = 1; gy < ${lat_ny-1}; gy++) {
 		%if dim == 3:
 			for (int gz = 0; gz < ${lat_nz}; gz++) {
 				int gi = getGlobalIdx(gx, gy, gz);
@@ -92,7 +101,8 @@
 		%endif
 	}
 
-	out[gx] = acc;
+	// Skip ghost nodes.
+	out[gx - 1] = acc;
 </%def>
 
 <%def name="reduction(name, axis, out_type='float', block_size=1024)">

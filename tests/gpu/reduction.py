@@ -18,7 +18,7 @@ class TestSubdomain2D(Subdomain2D):
         pass
 
     def initial_conditions(self, sim, hx, hy):
-        sim.data[:] = np.random.random(sim.data.shape)
+        sim.data[:] = hx * 3 + hy * 7
 
 class TestSubdomainRunner(SubdomainRunner):
     def step(self, output_req):
@@ -35,12 +35,13 @@ class TestSubdomainRunner(SubdomainRunner):
         self.backend.run_kernel(k, [1, 1])
         # Reduce over X.
         k = self.get_kernel('Reducetesty2d', [gpu_data, gpu_ret_y],
-                            'PP', shared=NX * 4, block_size=1024)
+                            'PP', block_size=1024)
         self.backend.run_kernel(k, [1, NY])
 
         self.backend.from_buf(gpu_ret_x)
         self.backend.from_buf(gpu_ret_y)
         self.backend.sync()
+        self._sim.iteration += 1
 
 class TestSim2D(LBSim):
     subdomain = TestSubdomain2D
@@ -72,9 +73,10 @@ class TestXReduction(unittest.TestCase):
         ctrl.run(ignore_cmdline=True)
 
         sim = ctrl.master.sim
-        exp = np.sum(sim.rho, axis=1)
-
-        print sim._runner
+        np.testing.assert_array_almost_equal(ctrl.master.runner.ret_x,
+                                             np.sum(sim.data, axis=0))
+        np.testing.assert_array_almost_equal(ctrl.master.runner.ret_y,
+                                             np.sum(sim.data, axis=1))
 
     def test_3d(self):
         pass
