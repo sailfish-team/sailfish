@@ -10,3 +10,5 @@ ${reduction('TestY', 1, block_size=1024)}
 %if dim == 3:
 	${reduction('TestZ', 2, block_size=1024)}
 %endif
+
+${reduction('TestY2', 1, block_size=32)}

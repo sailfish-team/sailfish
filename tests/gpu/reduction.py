@@ -2,7 +2,7 @@
 
 import unittest
 import numpy as np
-
+import math
 
 from sailfish.lb_base import LBSim, ScalarField
 from sailfish.subdomain import Subdomain2D, Subdomain3D
@@ -45,10 +45,31 @@ class TestSubdomainRunner2D(SubdomainRunner):
                             'PP', block_size=1024)
         self.backend.run_kernel(k, [1, NY])
 
+        h = (NX + 2 + 31) / 32
+        self.ret_y2 = np.zeros(NY, dtype=np.float32)
+        gpu_ret_y2 = self.backend.alloc_buf(like=self.ret_y2)
+        temp_y2 = np.zeros((NY, h), dtype=np.float32)
+        gpu_temp_y2 = self.backend.alloc_buf(like=temp_y2)
+
+        # Reduce over X.
+        k = self.get_kernel('ReduceTestY2', [gpu_data, gpu_temp_y2],
+                            'PP', block_size=32)
+        self.backend.run_kernel(k, [h, NY])
+        k = self.get_kernel('FinalizeReduceTestY2', [gpu_temp_y2, gpu_ret_y2],
+                            'PP', block_size=int(pow(2, math.ceil(math.log(h, 2)))))
+        self.backend.run_kernel(k, [1, NY])
+
         self.backend.from_buf(gpu_ret_x)
         self.backend.from_buf(gpu_ret_y)
+        self.backend.from_buf(gpu_ret_y2)
+        self.backend.from_buf(gpu_temp_y2)
+
         self.backend.sync()
         self._sim.iteration += 1
+
+class TestSubdomainRunner2DLong(SubdomainRunner):
+    def step(self, output_req):
+        gpu_data = self.gpu_field(self._sim.data)
 
 class TestSubdomainRunner3D(SubdomainRunner):
     def step(self, output_req):
@@ -94,6 +115,7 @@ class TestSim(LBSim):
 settings = {
     'debug_single_process': True,
     'quiet': True,
+    'save_src': '/tmp/foo.cu',
     'check_invalid_results_gpu': False,
     'check_invalid_results_host': False,
     'max_iters': 1}
@@ -118,7 +140,9 @@ class TestReduction(unittest.TestCase):
         # reduction over X
         np.testing.assert_array_almost_equal(ctrl.master.runner.ret_y,
                                              np.sum(sim.data, axis=1))
-
+        # reduction over X with a finalization step
+        np.testing.assert_array_almost_equal(ctrl.master.runner.ret_y2,
+                                             np.sum(sim.data, axis=1))
     def test_3d(self):
         s = settings
         s.update({
