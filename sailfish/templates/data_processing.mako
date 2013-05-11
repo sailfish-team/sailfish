@@ -21,7 +21,7 @@
 ##  grid.y: spans the axis not being reduced over
 ##  block.x: spans as much of the X axis as possible
 ##
-<%def name="reduction_x(axis, num_inputs, stats, out_type='float', block_size=1024)">
+<%def name="reduction_x(axis, num_inputs, stats, out_type='float', block_size=1024, want_offset=False)">
 	int lx = get_local_id(0);	// ID inside the current block
 	int gx = get_global_id(0);	// global X coordinate within the subdomain
 	int bx = get_group_id(0);	// block index
@@ -79,19 +79,21 @@
 		%for i in range(len(stats)):
 			// 'volatile' required according to Fermi compatibility guide 1.2.2
 			volatile ${out_type} *smem${i} = sdata${i};
-			%for stride in (32, 16, 8, 4, 2, 1):
-				%if block_size >= stride * 2:
-					if (lx < ${stride}) {
+		%endfor
+		%for stride in (32, 16, 8, 4, 2, 1):
+			%if block_size >= stride * 2:
+				if (lx < ${stride}) {
+					%for i in range(len(stats)):
 						smem${i}[lx] = smem${i}[lx] + smem${i}[lx + ${stride}];
-					}
-				%endif
-			%endfor
+					%endfor
+				}
+			%endif
 		%endfor
 	}
 
 	if (lx == 0) {
 		%for i in range(len(stats)):
-			out${i}[g_scan * gridDim.x + bx] = sdata${i}[0];
+			out${i}[g_scan * gridDim.x + bx ${'+ offset' if want_offset else ''}] = sdata${i}[0];
 		%endfor
 	}
 </%def>
@@ -101,7 +103,7 @@
 ## Reduction where the 'x' axis is not being reduced over.
 ## This kernel is meant to be launched using:
 ##  x: spans the X not reduced over (via grid)
-<%def name="reduction_nox(num_inputs, stats, out_type='float')">
+<%def name="reduction_nox(num_inputs, stats, out_type='float', want_offset=False)">
 	%for i in range(len(stats)):
 		${out_type} acc${i} = 0.0f;
 	%endfor
@@ -128,7 +130,7 @@
 
 	// Skip ghost nodes.
 	%for i in range(len(stats)):
-		out${i}[gx - 1] = acc${i};
+		out${i}[gx - 1 ${'+ offset' if want_offset else ''}] = acc${i};
 	%endfor
 </%def>
 
@@ -149,22 +151,30 @@
 ##            operation and the final value
 ##  block_size: CUDA block size for the reduction kernel
 <%def name="reduction(name, axis, num_inputs=1, stats=[[(0,1)]], out_type='float', block_size=1024, want_offset=False)">
+<%
+	need_finalize = axis != 0 and lat_nx >= block_size
+	need_offset = want_offset and not need_finalize
+%>
+
 ${kernel} void Reduce${name}(
 	%for i in range(num_inputs):
 		${global_ptr} float *f${i},
 	%endfor
 	%for i in range(len(stats)):
-		${global_ptr} ${out_type} *out${i}
+		${global_ptr} ${out_type} *out${i} ${',' if i < len(stats) - 1 else ''}
 	%endfor
+	%if need_offset:
+		, int offset
+	%endif
 ) {
 	%if axis == 0:
-		${reduction_nox(num_inputs, stats, out_type)}
+		${reduction_nox(num_inputs, stats, out_type, need_offset)}
 	%else:
-		${reduction_x(axis, num_inputs, stats, out_type, block_size)}
+		${reduction_x(axis, num_inputs, stats, out_type, block_size, need_offset)}
 	%endif
 }
 
-%if axis != 0 and lat_nx >= block_size:
+%if need_finalize:
 // Reduction is 2-step -- Reduce${name} is applied first, and FinalizeReduce${name}
 // has to be called to compute the final value.
 <%
@@ -177,7 +187,7 @@ ${kernel} void FinalizeReduce${name}(
 		${global_ptr} ${out_type} *in,
 		${global_ptr} ${out_type} *out
 %if want_offset:
-		int offset
+		, int offset
 %endif
 ) {
 	int gx = get_local_id(0);	// ID inside the current block
