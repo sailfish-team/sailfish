@@ -1287,6 +1287,7 @@ class SubdomainRunner(object):
         if self._initialization:
             self.initialize()
 
+        self._sim.before_main_loop()
         self.config.logger.info("Starting simulation.")
         self.main()
 

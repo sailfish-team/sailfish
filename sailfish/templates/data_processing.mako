@@ -148,7 +148,7 @@
 ##  out_type: 'float' or 'double', identifies the precision of the reduction
 ##            operation and the final value
 ##  block_size: CUDA block size for the reduction kernel
-<%def name="reduction(name, axis, num_inputs=1, stats=[[(0,1)]], out_type='float', block_size=1024)">
+<%def name="reduction(name, axis, num_inputs=1, stats=[[(0,1)]], out_type='float', block_size=1024, want_offset=False)">
 ${kernel} void Reduce${name}(
 	%for i in range(num_inputs):
 		${global_ptr} float *f${i},
@@ -175,7 +175,11 @@ ${kernel} void Reduce${name}(
 %>
 ${kernel} void FinalizeReduce${name}(
 		${global_ptr} ${out_type} *in,
-		${global_ptr} ${out_type} *out) {
+		${global_ptr} ${out_type} *out
+%if want_offset:
+		int offset
+%endif
+) {
 	int gx = get_local_id(0);	// ID inside the current block
 	int g_scan = get_global_id(1);
 
@@ -214,7 +218,7 @@ ${kernel} void FinalizeReduce${name}(
 	}
 
 	if (gx == 0) {
-		out[g_scan] = sdata[0];
+		out[g_scan ${'+ offset' if want_offset else ''}] = sdata[0];
 	}
 }
 %endif

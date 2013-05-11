@@ -183,6 +183,14 @@ class LBSim(object):
         return ((self.iteration % self.config.checkpoint_every) == 0 and
             self.iteration >= self.config.checkpoint_from)
 
+    def before_main_loop(self, runner):
+        """Called from the subdomain runner before entering the main loop
+        of the simulation.
+
+        This function can be used to initialize additional buffers and kernels
+        that are then going to be used in :func:`after_step`."""
+        pass
+
     def after_step(self, runner):
         """Called from the main loop after the completion of every step."""
         pass
