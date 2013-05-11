@@ -78,7 +78,7 @@ class CUDABackend(object):
                            help='Yield to other threads when waiting for CUDA '
                            + 'calls to complete; improves performance of other '
                            + 'CPU threads under high load.')
-        group.add_argument('--cuda-minimize-cpu-usage', dest='minimize_cpu',
+        group.add_argument('--cuda-minimize-cpu-usage', dest='cuda_minimize_cpu',
                            action='store_true', default=False,
                            help='Minimize CPU usage when waiting for results ' +
                            'from the GPU. Might slightly degrade performance.')
@@ -288,7 +288,7 @@ class CUDABackend(object):
 
     def make_event(self, stream, timing=False):
         flags = 0
-        if self.options.minimize_cpu:
+        if self.options.cuda_minimize_cpu:
             flags |= cuda.event_flags.BLOCKING_SYNC
         if not timing:
             flags |= cuda.event_flags.DISABLE_TIMING
@@ -308,7 +308,7 @@ class CUDABackend(object):
         }
 
     def sync_stream(self, *streams):
-        if self.options.minimize_cpu:
+        if self.options.cuda_minimize_cpu:
             for s in streams:
                 self.make_event(s).synchronize()
         else:
