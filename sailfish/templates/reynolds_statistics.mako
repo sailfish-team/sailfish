@@ -27,6 +27,8 @@
 // Computes <f>, <f^2>, <f^3>, <f^4>
 ${reduction('ComputeMoments', 1, num_inputs=1, stats=[[(0, 1)], [(0, 2)], [(0, 3)], [(0, 4)]], block_size=512, out_type='float', want_offset=True)}
 
+${reduction('ComputeMoments64', 1, num_inputs=1, stats=[[(0, 1)], [(0, 2)], [(0, 3)], [(0, 4)]], block_size=512, out_type='double', want_offset=True)}
+
 // Inputs:
 //  u_x, u_y, u_z, rho
 //
@@ -37,3 +39,8 @@ ${reduction('ComputeCorrelations', 1, num_inputs=4, stats=[
 	[(0, 1), (1, 1)], [(0, 1), (2, 1)], [(1, 1), (2, 1)],
     [(0, 1), (3, 1)], [(1, 1), (3, 1)], [(2, 1), (3, 1)]
 ], block_size=512, out_type='float', want_offset=True)}
+
+${reduction('ComputeCorrelations64', 1, num_inputs=4, stats=[
+	[(0, 1), (1, 1)], [(0, 1), (2, 1)], [(1, 1), (2, 1)],
+    [(0, 1), (3, 1)], [(1, 1), (3, 1)], [(2, 1), (3, 1)]
+], block_size=512, out_type='double', want_offset=True)}
