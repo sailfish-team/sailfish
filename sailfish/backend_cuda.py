@@ -156,6 +156,7 @@ class CUDABackend(object):
         return cuda.pagelocked_zeros(shape, dtype=dtype)
 
     def to_buf(self, cl_buf, source=None):
+        """Copies data from the host to a device buffer."""
         if source is None:
             if cl_buf in self.buffers:
                 cuda.memcpy_htod(cl_buf, self.buffers[cl_buf])
@@ -168,6 +169,7 @@ class CUDABackend(object):
                 cuda.memcpy_htod(cl_buf, source)
 
     def from_buf(self, cl_buf, target=None):
+        """Copies data from a device buffer to the host."""
         if target is None:
             if cl_buf in self.buffers:
                 cuda.memcpy_dtoh(self.buffers[cl_buf], cl_buf)
@@ -213,7 +215,7 @@ class CUDABackend(object):
                 cache_dir=cache) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
 
     def get_kernel(self, prog, name, block, args, args_format, shared=0,
-            needs_iteration=False):
+            needs_iteration=False, more_shared=False):
         """
         :param name: kernel name
         :param block: CUDA block size
@@ -227,8 +229,11 @@ class CUDABackend(object):
         """
         kern = prog.get_function(name)
 
-        # Use a larger L1 cache by default.
-        kern.set_cache_config(cuda.func_cache.PREFER_L1)
+        if more_shared:
+            kern.set_cache_config(cuda.func_cache.PREFER_SHARED)
+        else:
+            # Use a larger L1 cache by default.
+            kern.set_cache_config(cuda.func_cache.PREFER_L1)
 
         if needs_iteration:
             args_format += 'i'

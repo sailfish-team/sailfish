@@ -36,4 +36,4 @@ ${reduction('ComputeMoments', 1, num_inputs=1, stats=[[(0, 1)], [(0, 2)], [(0, 3
 ${reduction('ComputeCorrelations', 1, num_inputs=4, stats=[
 	[(0, 1), (1, 1)], [(0, 1), (2, 1)], [(1, 1), (2, 1)],
     [(0, 1), (3, 1)], [(1, 1), (3, 1)], [(2, 1), (3, 1)]
-], block_size=256, out_type='float', want_offset=True)}
+], block_size=512, out_type='float', want_offset=True)}
