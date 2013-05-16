@@ -11,6 +11,7 @@ import ctypes
 import logging
 import operator
 import os
+import subprocess
 import tempfile
 import time
 
@@ -305,12 +306,23 @@ class LBMachineMaster(object):
 
     def run(self):
         self.config.logger.info('Machine master starting with PID {0}'.format(os.getpid()))
+
+        # Log Sailfish version if running from a git repository.
+        sailfish_root_dir = os.path.join(os.path.realpath(
+            os.path.dirname(__file__)), '..')
+        try:
+            git_hash = subprocess.check_output('cd %s ; git rev-parse HEAD' %
+                                               sailfish_root_dir,
+                                               shell=True).rstrip()
+            self.config.logger.info('Sailfish version: {0}'.format(git_hash))
+        except subprocess.CalledProcessError:
+            pass
+
         self.config.logger.info('Handling subdomains: {0}'.format([b.id for b in
             self.subdomains]))
 
         self.sim = self.lb_class(self.config)
         subdomain2gpu = self._assign_subdomains_to_gpus()
-
         self.config.logger.info('Subdomain -> GPU map: {0}'.format(subdomain2gpu))
 
         ipc_files = self._init_connectors()
