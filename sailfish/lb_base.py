@@ -134,6 +134,7 @@ class LBSim(object):
         self.S = sym.S
         self.iteration = 0
         self.need_sync_flag = False
+        self.need_fields_flag = False
 
         # For use in unit tests only.
         if config is not None:
@@ -159,22 +160,26 @@ class LBSim(object):
         else:
             return False
 
-    def need_sync(self):
-        """Returns True when data for macroscopic fields is necessary
-        for the current iteration, and is used when data will be copied from device.
-        It will take place in two cases:
+    def need_sync_fields(self):
+        """Indicates whether computation/transfer of macroscopic fields is requested.
 
-        1) data output
-        2) need_sync_flag, which will synchronize one time macroscopic
-           fields, it can be used e.g. in after_step
+        This is true if either data is to be output after the current step, or
+        data was requested e.g. by after_step(). To get fields on the host in
+        after_step(), set need_sync_flag to True. To get fields on the GPU only,
+        set need_fields_flags to True.
 
         Called from SubdomainRunner.main().
+
+        Returns:
+          tuple of two boolean values; the first is True if synchronization of
+          fields to the host is requested; the second is True if computation of
+          macroscopic fields is requested.
         """
-        if self.need_sync_flag:
-            self.need_sync_flag = False
-            return True
-        else:
-            return self.need_output()
+        need_sync = self.need_sync_flag or self.need_output()
+        need_fields = self.need_fields_flag or need_sync
+        self.need_fields_flag = False
+        self.need_sync_flag = False
+        return need_sync, need_fields
 
     def need_checkpoint(self):
         """Returns True when a checkpoint is requested after the current

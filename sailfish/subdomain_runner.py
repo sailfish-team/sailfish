@@ -1354,7 +1354,7 @@ class SubdomainRunner(object):
                 self._profile.start_step()
 
                 output_req = self._sim.need_output()
-                sync_req = self._sim.need_sync()
+                sync_req, fields_req = self._sim.need_sync_fields()
 
                 if sync_req and self.config.debug_dump_dists:
                     bufs = []
@@ -1363,7 +1363,7 @@ class SubdomainRunner(object):
                     self._output.dump_dists(bufs, self._sim.iteration)
                     del bufs
 
-                self.step(sync_req)
+                self.step(fields_req)
 
                 if sync_req:
                     self._fields_to_host()
