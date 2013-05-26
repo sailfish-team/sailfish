@@ -29,7 +29,7 @@
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
 #include <type_traits>
 #else
-#include <tr1/type_traits>
+#include <type_traits>
 #endif
 
 /*
@@ -164,7 +164,7 @@ struct roughly_equal_to : public std::binary_function<T, T, bool>
 #ifdef __GXX_EXPERIMENTAL_CXX0X__
 	{ return detail::RoughlyEqualTo<T, std::is_arithmetic<T>::value>::roughly_equal_to(lhs, rhs); }
 #else
-	{ return detail::RoughlyEqualTo<T, std::tr1::is_arithmetic<T>::value>::roughly_equal_to(lhs, rhs); }
+	{ return detail::RoughlyEqualTo<T, std::is_arithmetic<T>::value>::roughly_equal_to(lhs, rhs); }
 #endif
 };
 
@@ -486,8 +486,8 @@ class Derivative
 
 		value_type operator()(const value_type &x) const
 		{
-			return detail::Derivative_<  std::tr1::is_arithmetic< value_type>::value,
-				std::tr1::is_arithmetic<result_type>::value >::derivative(f_, x);
+			return detail::Derivative_<  std::is_arithmetic< value_type>::value,
+				std::is_arithmetic<result_type>::value >::derivative(f_, x);
 		}
 
 	private:

@@ -30,11 +30,11 @@ namespace cvmlcpp
 
 // With normal vector included
 template <typename I, typename T>
-class Facet : public std::tr1::array<I, 3>
+class Facet : public std::array<I, 3>
 {
 	public:
 		typedef T		value_type;
-		typedef std::tr1::array<I, 3>	triange_type;
+		typedef std::array<I, 3>	triange_type;
 		typedef Point3D<T>	normal_type;
 
 		typedef typename triange_type::iterator iterator;

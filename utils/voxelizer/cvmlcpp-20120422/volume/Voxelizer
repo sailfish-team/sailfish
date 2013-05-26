@@ -124,7 +124,7 @@ void _zBuffersToData(Matrix<unsigned char, 3u> &count,
 				for (std::size_t z = begin; z < end; ++z) // ... mark all cells
 				{
 					// Rename coordinates
-					std::size_t pi [] = {x, y, z};
+					std::size_t pi [] = {(std::size_t)x, (std::size_t)y, (std::size_t)z};
 
 					const std::size_t xx = pi[_dm[axis][X]];
 					const std::size_t yy = pi[_dm[axis][Y]];
@@ -380,7 +380,7 @@ template <typename Tg, typename vector_type>
 bool prepareZBuffers_(const Geometry<Tg>  &geometry,
 		     Matrix<std::vector<double>, 2u> zBuffers[3],
 		     const double voxelSize, const vector_type &subVoxOffset,
-		     const std::tr1::array<std::size_t, 3> &dimensions,
+		     const std::array<std::size_t, 3> &dimensions,
 		     const std::size_t pad = 0)
 {
 	if (!(voxelSize > 0.0f))
@@ -447,7 +447,7 @@ for (int axis = 0; axis < 3; ++axis)
 }
 
 template<typename T, class vector_type>
-std::tr1::array<std::size_t, 3>
+std::array<std::size_t, 3>
 calculateDims(const Geometry<T> &geometry, const double voxelSize,
 		const std::size_t pad, const vector_type &subVoxOffset)
 {
@@ -477,7 +477,7 @@ calculateDims(const Geometry<T> &geometry, const double voxelSize,
 			sizes[Y] - floorDims[Y],
 			sizes[Z] - floorDims[Z] };
 
-	std::tr1::array<std::size_t, 3> dimensions;
+	std::array<std::size_t, 3> dimensions;
 	dimensions[X] = 2u*pad + floorDims[X] + (remainders[X] > subVoxOffset[X]);
 	dimensions[Y] = 2u*pad + floorDims[Y] + (remainders[Y] > subVoxOffset[Y]);
 	dimensions[Z] = 2u*pad + floorDims[Z] + (remainders[Z] > subVoxOffset[Z]);
@@ -502,7 +502,7 @@ bool voxelizePositiveGeometry_(const Geometry<Tg> &geometry,
 	 * Take snapshots from 3 perspectives.
 	 */
 	// Dimensions of the Voxel Matrix
-	const std::tr1::array<std::size_t, 3> dimensions =
+	const std::array<std::size_t, 3> dimensions =
 		calculateDims(geometry, voxelSize, pad, subVoxOffset);
 
 	Matrix<std::vector<double>, 2u> zBuffers[3];
@@ -891,13 +891,13 @@ bool voxelize(const Geometry<Tg>  &geometry,
 	// Determine dimensions as powers of 2
 	const typename Geometry<Tg>::vector_type subVoxOffset = 0.5;
 
-	const std::tr1::array<std::size_t, 3> dims =
+	const std::array<std::size_t, 3> dims =
 		detail::calculateDims(g, voxelSize, 0, subVoxOffset);
 	const std::size_t maxDim = std::max(dims[X], std::max(dims[Y],dims[Z]));
 	const std::size_t dimension = isPower2(maxDim) ? maxDim : (2u << log2(maxDim));
 	assert(dimension >= maxDim);
 
-	std::tr1::array<std::size_t, 3> dimensions;
+	std::array<std::size_t, 3> dimensions;
 	dimensions[X] = dimension;
 	dimensions[Y] = dimension;
 	dimensions[Z] = dimension;
@@ -1060,7 +1060,7 @@ bool distances(const Geometry<Tg> &geometry,
 
 	const detail::FacetHash<Tg> facet_hash( (g), voxelSize );
 	
-	const std::tr1::array<std::size_t, 3> dims =
+	const std::array<std::size_t, 3> dims =
 		detail::calculateDims(g, voxelSize, 0, Point3D<Td>(0.5));
 	const std::size_t max_dim = std::max(dims[X],std::max(dims[Y],dims[Z]));
 	const std::size_t max_depth = ((1ul<<log2(max_dim)) == max_dim) ?

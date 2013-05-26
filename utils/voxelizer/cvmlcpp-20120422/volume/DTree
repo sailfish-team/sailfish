@@ -27,8 +27,8 @@
 #include <istream>
 #include <vector>
 
-#include <tr1/array>
-#include <tr1/memory>
+#include <array>
+#include <memory>
 #include <cvmlcpp/base/stl_cstdint.h>
 
 #include <boost/integer_traits.hpp>
@@ -80,9 +80,9 @@ template <typename T, std::size_t D>
 class DTreeNode;
 
 template <typename T, std::size_t D>
-std::tr1::shared_ptr<DTreeNode<T, D> >
+std::shared_ptr<DTreeNode<T, D> >
 readDTreeBranchNode(std::istream& i_stream,
-		std::tr1::shared_ptr<DTreeNode<T, D> >& parent,
+		std::shared_ptr<DTreeNode<T, D> >& parent,
 		const bool isRoot = false) throw(InvalidDTreeXML);
 
 template <std::size_t bytes> struct SizeType
@@ -128,8 +128,8 @@ class DTreeNode
 		static const std::size_t N = 1u<<D;
 
 		typedef DTreeNode<T, D> Node;
-		typedef std::tr1::shared_ptr<Node> NodePtr;
-		typedef std::tr1::weak_ptr<Node> ParentPtr;
+		typedef std::shared_ptr<Node> NodePtr;
+		typedef std::weak_ptr<Node> ParentPtr;
 
 		typedef DTreeBranchNode<T, D> Branch;
 		typedef Branch* BranchPtr;
@@ -196,7 +196,7 @@ class DTreeNode
 			throw(InvalidDTreeXML);
 
 	private:
-		std::tr1::weak_ptr<Node> parent_;
+		std::weak_ptr<Node> parent_;
 		const index_small_t index_;
 
 		void addID(std::size_t &id__) const
@@ -239,7 +239,7 @@ class DTreeBranchNode : public DTreeNode<T, D>
 		virtual bool isLeaf() const { return false; }
 
 	private:
-		typedef std::tr1::array<NodePtr, N> Children;
+		typedef std::array<NodePtr, N> Children;
 		Children children_;
 };
 
@@ -607,7 +607,7 @@ DNode retrieve(std::size_t id__) throw (LeafNodeException)
 		const T& getValue(const P ...p) const
 		{
 			BOOST_STATIC_ASSERT(sizeof...(p) == D);
-			std::tr1::array<std::size_t, D> coords;
+			std::array<std::size_t, D> coords;
 			make_coords(coords, p...);
 			return this->getValueAtCoords(coords);
 		}
@@ -618,19 +618,19 @@ DNode retrieve(std::size_t id__) throw (LeafNodeException)
 
 #ifdef  __GXX_EXPERIMENTAL_CXX0X__
 		template <typename U, typename ...P>
-		static void make_coords(std::tr1::array<std::size_t, D> &coords, const U u, const P ...p)
+		static void make_coords(std::array<std::size_t, D> &coords, const U u, const P ...p)
 		{
 			coords[D-sizeof...(p)-1] = u;
 			if (sizeof...(p))
 				make_coords(coords, p...);
 		}
 		template <typename U>
-		static void make_coords(std::tr1::array<std::size_t, D> &coords, const U u)
+		static void make_coords(std::array<std::size_t, D> &coords, const U u)
 		{
 			coords[D-1] = u;
 		}
 
-		const T& getValueAtCoords(const std::tr1::array<std::size_t, D> &coords) const
+		const T& getValueAtCoords(const std::array<std::size_t, D> &coords) const
 		{
 			const std::size_t maxLevel = this->max_depth();
 			DTree<T, D>::DNode node = this->root();
@@ -712,9 +712,9 @@ namespace cvmlcpp
 {
 
 template <typename T, std::size_t D>
-std::tr1::shared_ptr<DTreeNode<T, D> >
+std::shared_ptr<DTreeNode<T, D> >
 readDTreeLeafNode(std::istream& i_stream,
-		std::tr1::shared_ptr<DTreeNode<T, D> >& parent,
+		std::shared_ptr<DTreeNode<T, D> >& parent,
 		const bool isRoot = false) throw(InvalidDTreeXML)
 {
 	bool foundIndex = false;
@@ -779,15 +779,15 @@ readDTreeLeafNode(std::istream& i_stream,
 }
 
 template <typename T, std::size_t D>
-std::tr1::shared_ptr<DTreeNode<T, D> >
+std::shared_ptr<DTreeNode<T, D> >
 readDTreeNode(std::istream& i_stream,
-		std::tr1::shared_ptr<DTreeNode<T, D> >& parent)
+		std::shared_ptr<DTreeNode<T, D> >& parent)
 	throw(InvalidDTreeXML);
 
 template <typename T, std::size_t D>
-std::tr1::shared_ptr<DTreeNode<T, D> >
+std::shared_ptr<DTreeNode<T, D> >
 readDTreeBranchNode(std::istream& i_stream,
-		std::tr1::shared_ptr<DTreeNode<T, D> >& parent,
+		std::shared_ptr<DTreeNode<T, D> >& parent,
 		const bool isRoot) throw(InvalidDTreeXML)
 {
 	assert(isRoot || !parent->isLeaf());
@@ -797,7 +797,7 @@ readDTreeBranchNode(std::istream& i_stream,
 	typedef typename DTreeHelper<D>::index_small_t index_small_t;
 
 	const std::size_t N = 1<<D;
-	std::tr1::array<bool, N> foundChildren;
+	std::array<bool, N> foundChildren;
 	std::fill(foundChildren.begin(), foundChildren.end(), false);
 
 	bool foundIndex = false;
@@ -866,9 +866,9 @@ readDTreeBranchNode(std::istream& i_stream,
 }
 
 template <class is, typename T, std::size_t D>
-std::tr1::shared_ptr<cvmlcpp::DTreeNode<T, D> >
+std::shared_ptr<cvmlcpp::DTreeNode<T, D> >
 readDTreeNode(is& i_stream,
-		std::tr1::shared_ptr<cvmlcpp::DTreeNode<T, D> >& parent)
+		std::shared_ptr<cvmlcpp::DTreeNode<T, D> >& parent)
 	throw(cvmlcpp::InvalidDTreeXML)
 {
 	// Read open tag

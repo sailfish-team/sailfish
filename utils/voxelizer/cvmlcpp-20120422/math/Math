@@ -26,7 +26,7 @@
 #include <cmath>
 #include <vector>
 
-#include <tr1/type_traits>
+#include <type_traits>
 
 namespace cvmlcpp
 {
@@ -49,7 +49,7 @@ T log2(const T n);
 template <typename T>
 bool isPower2(const T x)
 {
-	assert(std::tr1::is_integral<T>::value);
+	assert(std::is_integral<T>::value);
 	return !(x & (x - 1)) && x;
 }
 

@@ -26,7 +26,7 @@
 #include <cmath>
 
 #ifdef _HAVE_TR1_CMATH
-    #include <tr1/cmath>
+    #include <cmath>
 #endif
 
 #endif

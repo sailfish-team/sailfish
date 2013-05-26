@@ -24,7 +24,7 @@
 #include <map>
 #include <vector>
 #include <iostream>
-#include <tr1/array>
+#include <array>
 
 namespace cvmlcpp
 {
@@ -102,7 +102,7 @@ class KDMap
 		}
 
 	private:
-		std::tr1::array<std::map<T, std::vector<std::size_t> >, D> kdmap_;
+		std::array<std::map<T, std::vector<std::size_t> >, D> kdmap_;
 		std::vector<DATA> data_;
 };
 

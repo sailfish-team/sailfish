@@ -24,7 +24,7 @@
 #include <cvmlcpp/base/stl_compat.h>
 
 #ifdef _HAVE_TR1_CSTDINT
-    #include <tr1/cstdint>
+    #include <cstdint>
 #else
     #include <boost/cstdint.hpp>
 

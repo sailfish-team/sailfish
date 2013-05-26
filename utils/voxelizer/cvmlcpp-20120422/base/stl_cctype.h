@@ -24,7 +24,7 @@
 #include <cvmlcpp/base/stl_compat.h>
 
 #ifdef _HAVE_TR1_CCTYPE
-    #include <tr1/cctype>
+    #include <cctype>
 #else
     #include <ctype.h>
 #endif

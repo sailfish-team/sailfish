@@ -28,8 +28,8 @@
 #include <functional>
 #include <cassert>
 
-#include <tr1/memory>
-#include <tr1/array>
+#include <memory>
+#include <array>
 
 #include <cvmlcpp/base/Allocators>
 
@@ -521,8 +521,8 @@ class _RefMatrix
 			_extents(m.extents()), _data(m._data), _offset(0) { }
 
 		_RefMatrix(const typename
-			std::tr1::array<std::size_t, D>::const_iterator &extents,
-			const typename std::tr1::array<std::size_t, D>::const_iterator &dimsMult,
+			std::array<std::size_t, D>::const_iterator &extents,
+			const typename std::array<std::size_t, D>::const_iterator &dimsMult,
 			  /*const*/ DataHolder &data, const std::size_t offset) :
 				_extents(extents), _dimsMult(dimsMult),
 				_data(data), _offset(offset)
@@ -548,7 +548,7 @@ class _RefMatrix
 					  _offset + index * *_dimsMult);
 		}
 
-		typename std::tr1::array<std::size_t, D>::const_iterator
+		typename std::array<std::size_t, D>::const_iterator
 		extents() const { return _extents; }
 
 		iterator begin() const { return _data.begin() + _offset; }
@@ -559,9 +559,9 @@ class _RefMatrix
 
 	private:
 		const typename
-		std::tr1::array<std::size_t, D>::const_iterator _extents;
+		std::array<std::size_t, D>::const_iterator _extents;
 		const typename
-		std::tr1::array<std::size_t, D>::const_iterator _dimsMult;
+		std::array<std::size_t, D>::const_iterator _dimsMult;
 		DataHolder &_data;
 		const std::size_t _offset;
 };
@@ -581,8 +581,8 @@ class _RefMatrix<T, 1u, DataHolder>
 			_extents(m.extents()), _data(m._data), _offset(0) { }
 
 		_RefMatrix(
-		const std::tr1::array<std::size_t, 1u>::const_iterator &extents,
-		const std::tr1::array<std::size_t, 1u>::const_iterator &dimsMult,
+		const std::array<std::size_t, 1u>::const_iterator &extents,
+		const std::array<std::size_t, 1u>::const_iterator &dimsMult,
 			DataHolder &data, const std::size_t offset) :
 			_extents(extents), _data(data), _offset(offset)
 		{
@@ -612,7 +612,7 @@ class _RefMatrix<T, 1u, DataHolder>
 			return _data[_offset + index];
 		}
 
-		typename std::tr1::array<std::size_t, 1u>::const_iterator
+		typename std::array<std::size_t, 1u>::const_iterator
 		extents() const { return _extents; }
 
 		iterator begin() const { return _data.begin() + _offset; }
@@ -622,7 +622,7 @@ class _RefMatrix<T, 1u, DataHolder>
 
 	private:
 		const typename
-		std::tr1::array<std::size_t, 1u>::const_iterator _extents;
+		std::array<std::size_t, 1u>::const_iterator _extents;
 		DataHolder &_data;
 		const std::size_t _offset;
 };
@@ -719,7 +719,7 @@ class MatrixImpl
 			return _data.size();
 		}
 
-		typename std::tr1::array<std::size_t, D>::const_iterator
+		typename std::array<std::size_t, D>::const_iterator
 		extents() const { return _extents.begin(); }
 
 		std::size_t extent(const std::size_t dimension) const
@@ -801,8 +801,8 @@ class MatrixImpl
 
 	private:
 		bool colMajor_;
-		std::tr1::array<std::size_t, D> _extents;
-		std::tr1::array<std::size_t, D> _dimsMult;
+		std::array<std::size_t, D> _extents;
+		std::array<std::size_t, D> _dimsMult;
 		mutable DataHolder _data;
 
 		void computeDimsMult()
@@ -850,7 +850,7 @@ class MatrixImpl<T, 1u, DataHolder>
 		std::size_t size() const
 		{ return _extents[0]; }
 
-		std::tr1::array<std::size_t, 1u>::const_iterator extents() const
+		std::array<std::size_t, 1u>::const_iterator extents() const
 		{ return _extents.begin(); }
 
 		std::size_t extent(const std::size_t dimension) const
@@ -911,7 +911,7 @@ class MatrixImpl<T, 1u, DataHolder>
 		}
 
 	private:
-		std::tr1::array<std::size_t, 1u> _extents;
+		std::array<std::size_t, 1u> _extents;
 		DataHolder _data;
 };
 
@@ -1004,7 +1004,7 @@ class Matrix
 		{
 			Matrix newMatrix;
 			newMatrix.matrix_ =
-			std::tr1::shared_ptr<MatrixImpl<T,D,DataHolder> >
+			std::shared_ptr<MatrixImpl<T,D,DataHolder> >
 				(new MatrixImpl<T,D,DataHolder>(*matrix_));
 			return newMatrix;
 		}
@@ -1013,7 +1013,7 @@ class Matrix
 
 		std::size_t size() const { return matrix_->size(); }
 
-		typename std::tr1::array<std::size_t, D>::const_iterator
+		typename std::array<std::size_t, D>::const_iterator
 		extents() const { return matrix_->extents(); }
 
 		std::size_t extent(const std::size_t dimension) const
@@ -1061,7 +1061,7 @@ class Matrix
 		bool colMajor() const { return matrix_->colMajor(); }
 
 	private:
-		mutable std::tr1::shared_ptr<MatrixImpl<T,D,DataHolder> > matrix_;
+		mutable std::shared_ptr<MatrixImpl<T,D,DataHolder> > matrix_;
 };
 
 
@@ -1149,7 +1149,7 @@ class Matrix<T, 1u, DataHolder>
 		{
 			Matrix newMatrix;
 			newMatrix.matrix_ =
-			std::tr1::shared_ptr<MatrixImpl<T, 1u, DataHolder> >
+			std::shared_ptr<MatrixImpl<T, 1u, DataHolder> >
 				(new MatrixImpl<T, 1u, DataHolder>(*matrix_));
 			return newMatrix;
 		}
@@ -1158,7 +1158,7 @@ class Matrix<T, 1u, DataHolder>
 
 		std::size_t size() const { return matrix_->size(); }
 
-		typename std::tr1::array<std::size_t, 1u>::const_iterator
+		typename std::array<std::size_t, 1u>::const_iterator
 		extents() const { return matrix_->extents(); }
 
 		std::size_t extent(const std::size_t dimension) const
@@ -1203,7 +1203,7 @@ class Matrix<T, 1u, DataHolder>
 		{ return !(lhs == rhs); }
 
 	private:
-		std::tr1::shared_ptr<MatrixImpl<T, 1, DataHolder> > matrix_;
+		std::shared_ptr<MatrixImpl<T, 1, DataHolder> > matrix_;
 };
 
 template <typename T, std::size_t D>
@@ -1470,7 +1470,7 @@ class DynamicMatrix
 		void clear() { matrix_->clear(); }
 
 	private:
-		std::tr1::shared_ptr<DynamicMatrixImpl<T> > matrix_;
+		std::shared_ptr<DynamicMatrixImpl<T> > matrix_;
 };
 
 } //  end namespace cvmlcpp
@@ -1773,7 +1773,7 @@ class SymmetricMatrix
 		void swap(SymmetricMatrix &that) { std::swap(this->p, that.p); }
 
 	private:
-		std::tr1::shared_ptr<detail::SymmetricMatrixImpl<T> > p;
+		std::shared_ptr<detail::SymmetricMatrixImpl<T> > p;
 };
 
 

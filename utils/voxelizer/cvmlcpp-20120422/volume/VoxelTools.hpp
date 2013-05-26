@@ -123,7 +123,7 @@ struct Expander<1>
 template <template <typename Tm, std::size_t Dm, typename Aux> class Matrix_t,
 	  typename T, std::size_t D, typename A>
 void expandRecursive(const typename DTree<T, D>::DNode & node, Matrix_t<T, D, A> &matrix,
-		const std::tr1::array<std::size_t, D> offsets,
+		const std::array<std::size_t, D> offsets,
 		const std::size_t length, const std::size_t depth_increase)
 {
 /*
@@ -141,7 +141,7 @@ std::cout << "["<<node.depth()<<"] (" << offsets[X] << " " << offsets[Y] << ") "
 	assert(sub_length > 0);
 	for (std::size_t index = 0; index < 1u << D; ++index)
 	{
-		std::tr1::array<std::size_t, D> sub_offsets = offsets;
+		std::array<std::size_t, D> sub_offsets = offsets;
 		for (std::size_t d = 0; d < D; ++d)
 		{
 			assert( ((index & (1u<<d)) >> d) == 0 ||
@@ -292,7 +292,7 @@ void cover(Matrix_t<Ti, 3u, A> & matrix,
 template <template <typename Tm, std::size_t Dm, typename Aux> class Matrix_t,
 	  typename T, std::size_t D, typename A>
 bool expand(const typename DTree<T, D>::DNode & node, Matrix_t<T, D, A> &matrix,
-		const std::size_t depth = 0)
+		const std::size_t depth)
 {
 	const  std::size_t max_depth = node.max_depth();
 	if (depth > 0 && depth < max_depth)
@@ -300,11 +300,11 @@ bool expand(const typename DTree<T, D>::DNode & node, Matrix_t<T, D, A> &matrix,
 	assert(depth == 0 || depth >= max_depth);
 	const std::size_t depth_increase = (depth > max_depth) ? depth - max_depth : 0;
 
-	std::tr1::array<std::size_t, D> offsets;
+	std::array<std::size_t, D> offsets;
 	std::fill(offsets.begin(), offsets.end(), 0);
 	const std::size_t length = 1ul << node.max_depth();
 
-	std::tr1::array<std::size_t, D> dimensions;
+	std::array<std::size_t, D> dimensions;
 	std::fill(dimensions.begin(), dimensions.end(), length << depth_increase);
 	typedef array_traits<Matrix_t, T, D, A>  Traits;
 	Traits::resize(matrix, dimensions.begin());
@@ -317,7 +317,7 @@ bool expand(const typename DTree<T, D>::DNode & node, Matrix_t<T, D, A> &matrix,
 
 template <template <typename Tm, std::size_t Dm, typename Aux> class Matrix_t,
 	  typename T, std::size_t D, typename A>
-bool expand(const DTree<T, D> & tree, Matrix_t<T, D, A> &matrix, const std::size_t depth = 0)
+bool expand(const DTree<T, D> & tree, Matrix_t<T, D, A> &matrix, const std::size_t depth)
 {
 	return expand(tree.root(), matrix, depth);
 }

@@ -23,7 +23,7 @@
 
 #include <cmath>
 
-#include <tr1/type_traits>
+#include <type_traits>
 
 #include <cvmlcpp/base/Enums>
 #include <cvmlcpp/base/Meta>
@@ -74,7 +74,7 @@ struct doOpIs
 	static const Container &execute(Container &lhs, const RHS &rhs)
 	{
 		return _doOpIs<Container, Op,
-				std::tr1::is_arithmetic<RHS>::value>::
+				std::is_arithmetic<RHS>::value>::
 					execute(lhs, rhs);
 	}
 };
@@ -149,7 +149,7 @@ struct doOp
 	static const Container execute(const Container &lhs, const RHS &rhs)
 	{
 		return _doOp<Container, Op,
-				std::tr1::is_arithmetic<RHS>::value>::
+				std::is_arithmetic<RHS>::value>::
 					execute(lhs, rhs);
 	}
 
@@ -157,7 +157,7 @@ struct doOp
 	static const Container execute(const LHS &lhs, const Container &rhs)
 	{
 		return _doOp<Container, Op,
-				std::tr1::is_arithmetic<LHS>::value>::
+				std::is_arithmetic<LHS>::value>::
 					execute(lhs, rhs);
 	}
 

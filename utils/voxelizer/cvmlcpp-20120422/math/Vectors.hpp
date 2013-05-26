@@ -25,8 +25,8 @@
 #include <vector>
 #include <iterator>
 
-#include <tr1/array>
-#include <tr1/type_traits>
+#include <array>
+#include <type_traits>
 
 #include <cvmlcpp/base/stl_cstdint.h>
 
@@ -44,13 +44,13 @@ namespace cvmlcpp
  * A vector of arbitrary but fixed length.
  */
 template <typename T, std::size_t DIMS>
-class StaticVector : public std::tr1::array<T, DIMS>
+class StaticVector : public std::array<T, DIMS>
 {
 	public:
-		typedef typename std::tr1::array<T, DIMS>::value_type
+		typedef typename std::array<T, DIMS>::value_type
 								value_type;
-		typedef typename std::tr1::array<T, DIMS>::iterator   iterator;
-		typedef typename std::tr1::array<T, DIMS>::const_iterator
+		typedef typename std::array<T, DIMS>::iterator   iterator;
+		typedef typename std::array<T, DIMS>::const_iterator
 								const_iterator;
 
 		StaticVector() { }
@@ -65,7 +65,7 @@ class StaticVector : public std::tr1::array<T, DIMS>
 		template <typename U>
 		StaticVector(const U &data)
 		{
-			this->init(data, std::tr1::is_arithmetic<U>());
+			this->init(data, std::is_arithmetic<U>());
 		}
 
 		template <typename It>
@@ -91,7 +91,7 @@ class StaticVector : public std::tr1::array<T, DIMS>
 		template <typename U>
 		const StaticVector &operator=(const U &data)
 		{
-			this->init(data, std::tr1::is_arithmetic<U>());
+			this->init(data, std::is_arithmetic<U>());
 			return *this;
 		}
 
@@ -134,7 +134,7 @@ class StaticVector : public std::tr1::array<T, DIMS>
 		template <typename U>
 		bool operator==(const U &that) const
 		{
-			return this->equals(that, std::tr1::is_arithmetic<U>());
+			return this->equals(that, std::is_arithmetic<U>());
 		}
 
 		template <typename U>
@@ -151,27 +151,27 @@ class StaticVector : public std::tr1::array<T, DIMS>
 	protected:
 		// Fill with 'value'
 		template <typename U>
-		void init(const U value, std::tr1::true_type)
+		void init(const U value, std::true_type)
 		{
 			std::fill(this->begin(),this->end(), value_type(value));
 		}
 
 		template <typename Container>
-		void init(const Container &data, std::tr1::false_type)
+		void init(const Container &data, std::false_type)
 		{
 			assert(data.size() == this->size());
 			std::copy(data.begin(), data.end(), this->begin());
 		}
 
 		template <typename U>
-		bool equals(const U value, std::tr1::true_type) const
+		bool equals(const U value, std::true_type) const
 		{
 			return (std::find_if(this->begin(), this->end(),
 		std::bind2nd(std::not_equal_to<T>(), value)) == this->end());
 		}
 
 		template <typename Container>
-		bool equals(const Container &data, std::tr1::false_type) const
+		bool equals(const Container &data, std::false_type) const
 		{
 			assert(data.size() == this->size());
 			return std::equal(this->begin(), this->end(),
@@ -473,7 +473,7 @@ class DynamicVector : public std::vector<T>
 		template <typename U>
 		const DynamicVector &operator=(const U &data)
 		{
-			this->init(data, std::tr1::is_arithmetic<U>());
+			this->init(data, std::is_arithmetic<U>());
 			return *this;
 		}
 
@@ -515,13 +515,13 @@ class DynamicVector : public std::vector<T>
 
 		bool operator==(const DynamicVector &that) const
 		{
-			return this->equals(that, std::tr1::false_type());
+			return this->equals(that, std::false_type());
 		}
 
 		template <typename U>
 		bool operator==(const U &that) const
 		{
-			return this->equals(that, std::tr1::is_arithmetic<U>());
+			return this->equals(that, std::is_arithmetic<U>());
 		}
 
 		bool operator!=(const DynamicVector &that) const
@@ -537,27 +537,27 @@ class DynamicVector : public std::vector<T>
 	private:
 		// Fill with 'value'
 		template <typename U>
-		void init(const U value, std::tr1::true_type)
+		void init(const U value, std::true_type)
 		{
 			std::fill(this->begin(),this->end(), value_type(value));
 		}
 
 		template <typename Container>
-		void init(const Container &data, std::tr1::false_type)
+		void init(const Container &data, std::false_type)
 		{
 			this->resize(data.size());
 			std::copy(data.begin(), data.end(), this->begin());
 		}
 
 		template <typename U>
-		bool equals(const U value, std::tr1::true_type) const
+		bool equals(const U value, std::true_type) const
 		{
 			return (std::find_if(this->begin(), this->end(),
 		std::bind2nd(std::not_equal_to<T>(), value)) == this->end());
 		}
 
 		template <typename Container>
-		bool equals(const Container &data, std::tr1::false_type) const
+		bool equals(const Container &data, std::false_type) const
 		{
 			assert(data.size() == this->size());
 			return std::equal(this->begin(), this->end(),
@@ -851,7 +851,7 @@ const bool operator!=(const U &lhs, const StaticVector<T, DIMS> &rhs)
 
 template <typename T, std::size_t DIMS, typename U, typename Op>
 const bool strictComp(const StaticVector<T, DIMS> &lhs, const U &rhs,
-		Op op, std::tr1::false_type)
+		Op op, std::false_type)
 {
 	assert(lhs.size() == rhs.size());
 	for (std::size_t i = 0u; i < DIMS; ++i)
@@ -867,7 +867,7 @@ const bool strictComp(const StaticVector<T, DIMS> &lhs, const U &rhs,
 
 template <typename T, std::size_t DIMS, typename U, typename Op>
 const bool strictComp(const StaticVector<T, DIMS> &lhs, const U &rhs,
-		Op op, std::tr1::true_type)
+		Op op, std::true_type)
 {
 	for (std::size_t i = 0u; i < DIMS; ++i)
 	{
@@ -886,7 +886,7 @@ const bool operator<(const StaticVector<T, DIMS> &lhs,
 			const StaticVector<T, DIMS> &rhs)
 {
 	return strictComp(lhs, rhs, std::less<T>(),
-			  std::tr1::false_type());
+			  std::false_type());
 }
 
 template <typename T, std::size_t DIMS>
@@ -894,21 +894,21 @@ const bool operator<(const StaticVector<T, DIMS> &lhs,
 			const DynamicVector<T> &rhs)
 {
 	return strictComp(lhs, rhs, std::less<T>(),
-			  std::tr1::false_type());
+			  std::false_type());
 }
 
 template <typename T, std::size_t DIMS>
 const bool operator<(const StaticVector<T, DIMS> &lhs, const T &rhs)
 {
 	return strictComp(lhs, rhs, std::less<T>(),
-			  std::tr1::true_type());
+			  std::true_type());
 }
 
 template <typename T, std::size_t DIMS, typename U>
 const bool operator<(const StaticVector<T, DIMS> &lhs, const U &rhs)
 {
 	return strictComp(lhs, rhs, std::less<T>(),
-			  std::tr1::is_arithmetic<U>());
+			  std::is_arithmetic<U>());
 }
 
 // Greater
@@ -917,7 +917,7 @@ const bool operator>(const StaticVector<T, DIMS> &lhs,
 			const StaticVector<U, DIMS> &rhs)
 {
 	return strictComp(lhs, rhs, std::greater<T>(),
-			  std::tr1::false_type());
+			  std::false_type());
 }
 
 template <typename T, typename U, std::size_t DIMS>
@@ -925,26 +925,26 @@ const bool operator>(const StaticVector<T, DIMS> &lhs,
 			const DynamicVector<U> &rhs)
 {
 	return strictComp(lhs, rhs, std::greater<T>(),
-			  std::tr1::false_type());
+			  std::false_type());
 }
 
 template <typename T, std::size_t DIMS>
 const bool operator>(const StaticVector<T, DIMS> &lhs, const T &rhs)
 {
 	return strictComp(lhs, rhs, std::greater<T>(),
-			  std::tr1::true_type());
+			  std::true_type());
 }
 
 template <typename T, std::size_t DIMS, typename U>
 const bool operator>(const StaticVector<T, DIMS> &lhs, const U &rhs)
 {
 	return strictComp(lhs, rhs, std::greater<T>(),
-			  std::tr1::is_arithmetic<U>());
+			  std::is_arithmetic<U>());
 }
 
 template <typename T, std::size_t DIMS, typename U, typename Op>
 const bool comp(const StaticVector<T, DIMS> &lhs, const U &rhs,
-		Op op, std::tr1::false_type)
+		Op op, std::false_type)
 {
 	assert(lhs.size() == rhs.size());
 	for (std::size_t i = 0u; i < DIMS; ++i)
@@ -956,7 +956,7 @@ const bool comp(const StaticVector<T, DIMS> &lhs, const U &rhs,
 
 template <typename T, std::size_t DIMS, typename U, typename Op>
 const bool comp(const StaticVector<T, DIMS> &lhs, const U &rhs,
-		Op op, std::tr1::true_type)
+		Op op, std::true_type)
 {
 	for (std::size_t i = 0u; i < DIMS; ++i)
 		if (!op(lhs[i], rhs))
@@ -970,27 +970,27 @@ template <typename T, typename U, std::size_t DIMS>
 const bool operator<=(const StaticVector<T, DIMS> &lhs,
 			const StaticVector<U, DIMS> &rhs)
 {
-	return comp(lhs, rhs, std::less_equal<T>(), std::tr1::false_type());
+	return comp(lhs, rhs, std::less_equal<T>(), std::false_type());
 }
 
 template <typename T, typename U, std::size_t DIMS>
 const bool operator<=(const StaticVector<T, DIMS> &lhs,
 			const DynamicVector<U> &rhs)
 {
-	return comp(lhs, rhs, std::less_equal<T>(), std::tr1::false_type());
+	return comp(lhs, rhs, std::less_equal<T>(), std::false_type());
 }
 
 template <typename T, std::size_t DIMS>
 const bool operator<=(const StaticVector<T, DIMS> &lhs, const T &rhs)
 {
-	return comp(lhs, rhs, std::less_equal<T>(), std::tr1::true_type());
+	return comp(lhs, rhs, std::less_equal<T>(), std::true_type());
 }
 
 template <typename T, std::size_t DIMS, typename U>
 const bool operator<=(const StaticVector<T, DIMS> &lhs, const U &rhs)
 {
 	return comp(lhs, rhs, std::less_equal<T>(),
-		    std::tr1::is_arithmetic<U>());
+		    std::is_arithmetic<U>());
 }
 
 // Greater-equal
@@ -998,27 +998,27 @@ template <typename T, std::size_t DIMS>
 const bool operator>=(const StaticVector<T, DIMS> &lhs,
 			const StaticVector<T, DIMS> &rhs)
 {
-	return comp(lhs, rhs, std::greater_equal<T>(), std::tr1::false_type());
+	return comp(lhs, rhs, std::greater_equal<T>(), std::false_type());
 }
 
 template <typename T, std::size_t DIMS>
 const bool operator>=(const StaticVector<T, DIMS> &lhs,
 			const DynamicVector<T> &rhs)
 {
-	return comp(lhs, rhs, std::greater_equal<T>(), std::tr1::false_type());
+	return comp(lhs, rhs, std::greater_equal<T>(), std::false_type());
 }
 
 template <typename T, std::size_t DIMS>
 const bool operator>=(const StaticVector<T, DIMS> &lhs, const T &rhs)
 {
-	return comp(lhs, rhs, std::greater_equal<T>(), std::tr1::true_type());
+	return comp(lhs, rhs, std::greater_equal<T>(), std::true_type());
 }
 
 template <typename T, std::size_t DIMS, typename U>
 const bool operator>=(const StaticVector<T, DIMS> &lhs, const U &rhs)
 {
 	return comp(lhs, rhs, std::greater_equal<T>(),
-			std::tr1::is_arithmetic<U>());
+			std::is_arithmetic<U>());
 }
 
 

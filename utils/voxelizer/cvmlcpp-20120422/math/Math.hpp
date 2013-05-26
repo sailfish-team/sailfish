@@ -46,13 +46,13 @@ namespace detail
 {
 
 template <typename T, typename U>
-T round_cast_(const U &u, std::tr1::true_type)
+T round_cast_(const U &u, std::true_type)
 {
 	return static_cast<T>(u);
 }
 
 template <typename T, typename U>
-T round_cast_(const U &u, std::tr1::false_type)
+T round_cast_(const U &u, std::false_type)
 {
 	return static_cast<T>(u + ((u>=0)?U(0.5):U(-0.5)) );
 }
@@ -62,14 +62,14 @@ T round_cast_(const U &u, std::tr1::false_type)
 template <typename T, typename U>
 T round_cast(const U &u)
 {
-	return detail::round_cast_<T, U>(u, std::tr1::is_floating_point<T>());
+	return detail::round_cast_<T, U>(u, std::is_floating_point<T>());
 }
 
 namespace detail
 {
 
 template <typename T>
-T log2_(T n, std::tr1::false_type)
+T log2_(T n, std::false_type)
 {
 	assert(n > 0);
 	const std::size_t N = CHAR_BIT*sizeof(T);
@@ -89,10 +89,10 @@ T log2_(T n, std::tr1::false_type)
 }
 
 template <typename T>
-T log2_(const T &n, std::tr1::true_type)
+T log2_(const T &n, std::true_type)
 {
 #ifdef _HAVE_TR1_CMATH
-	using std::tr1::log2;
+	using std::log2;
 	return log2(n);
 #else
 	using std::log;
@@ -106,7 +106,7 @@ template <typename T>
 T log2(const T n)
 {
 	assert(n > T(0)); // Bogus user input ?
-	return detail::log2_(n, std::tr1::is_floating_point<T>());
+	return detail::log2_(n, std::is_floating_point<T>());
 }
 
 template <typename T>
@@ -122,13 +122,13 @@ T factorial(const T &x)
 	40320, 362880, 3628800, 39916800, 479001600};
 
 #ifdef _HAVE_TR1_CMATH
-	assert(x == std::tr1::round(x));
+	assert(x == std::round(x));
 #endif
 
 	if (x >= T(cache_size))
 	{
 		#ifdef _HAVE_TR1_CMATH
- 		return std::tr1::round(std::tr1::tgamma(x+1.0));
+ 		return std::round(std::tgamma(x+1.0));
 		#else
 		assert(ntop > 0);
 		T v = cache[ntop-1];
@@ -156,7 +156,7 @@ T factorial(const T &x)
 	assert(ntop >= x);
 
 #ifdef _HAVE_TR1_CMATH
-	return cache[std::tr1::lround(x)];
+	return cache[std::lround(x)];
 #else
 	return cache[round_cast<std::size_t>(x)];
 #endif
@@ -205,7 +205,7 @@ struct GCD<true>
 	static const T gcd(T u, T v)
 	{
 		// Use this function only for integers
-		assert(std::tr1::is_integral<T>::value);
+		assert(std::is_integral<T>::value);
 
 		/* GCD(0,x) := x */
 		if (u == 0 || v == 0)
@@ -251,7 +251,7 @@ struct GCD<true>
 template <typename T>
 T gcd(const T u, const T v)
 {
-	return detail::GCD<std::tr1::is_integral<T>::value>::gcd(u, v);
+	return detail::GCD<std::is_integral<T>::value>::gcd(u, v);
 }
 
 namespace detail
@@ -311,7 +311,7 @@ struct Binomial<true>
 	{
 		enum {N, K, RESULT};
 		const T CACHE_SIZE = 29;
-		static std::vector<std::vector<std::tr1::array<T, 3> > > cache;
+		static std::vector<std::vector<std::array<T, 3> > > cache;
 
 		// Init cache if needed
 		if (cache.empty())
@@ -399,7 +399,7 @@ T binomial(const T n, const T k)
 {
 	// verify user input
 	assert(n >= k);
-	return detail::Binomial<std::tr1::is_integral<T>::value>::binomial(n, k);
+	return detail::Binomial<std::is_integral<T>::value>::binomial(n, k);
 }
 
 template <typename T>
@@ -485,7 +485,7 @@ namespace detail
 {
 
 template <typename T>
-typename T::value_type modulus_(const T &x, std::tr1::false_type)
+typename T::value_type modulus_(const T &x, std::false_type)
 {
 	typedef typename T::value_type VT;
 	const VT rv = omptl::transform_accumulate(x.begin(), x.end(), VT(0),
@@ -494,22 +494,22 @@ typename T::value_type modulus_(const T &x, std::tr1::false_type)
 }
 
 template <typename T>
-T modulus_arithmic_(const T &x, std::tr1::true_type)
+T modulus_arithmic_(const T &x, std::true_type)
 {
 	return x;
 }
 
 template <typename T>
-T modulus_arithmic_(const T &x, std::tr1::false_type)
+T modulus_arithmic_(const T &x, std::false_type)
 {
 	using std::abs;
 	return abs(x);
 }
 
 template <typename T>
-T modulus_(const T &x, std::tr1::true_type)
+T modulus_(const T &x, std::true_type)
 {
-	return modulus_arithmic_(x, std::tr1::is_unsigned<T>());
+	return modulus_arithmic_(x, std::is_unsigned<T>());
 }
 
 } // end namespace detail
@@ -518,7 +518,7 @@ template <typename T>
 typename ValueType<T>::value_type modulus(const T &x)
 {
 	return round_cast<typename ValueType<T>::value_type>
-		(detail::modulus_(x, std::tr1::is_arithmetic<T>()));
+		(detail::modulus_(x, std::is_arithmetic<T>()));
 }
 
 template <typename Iterator, typename T>
@@ -842,8 +842,8 @@ struct OptimizationUpdater
 			   value_type &high, value_type &dHigh, result_type &fHigh,// value_type &bHigh,
 			   const value_type &x, const value_type &dx, const result_type &fx)
 	{
-		return OptimizationUpdater_<	std::tr1::is_arithmetic< value_type>::value,
-						std::tr1::is_arithmetic<result_type>::value >::
+		return OptimizationUpdater_<	std::is_arithmetic< value_type>::value,
+						std::is_arithmetic<result_type>::value >::
 			    update(low, dLow, fLow,/* bLow,*/ high, dHigh, fHigh,/* bHigh,*/ x, dx, fx);
 	}
 };
@@ -1156,7 +1156,7 @@ void doRungeKutta(const Function &f,
 	assert(tN > t0); // Bogus user input ?
 
 	typedef typename Function::value_type T;
-	assert(std::tr1::is_floating_point<T>::value); // Float types only.
+	assert(std::is_floating_point<T>::value); // Float types only.
 
 	y.clear();
 	y.reserve(N+1u); // Ensure 1 memory alloc only
