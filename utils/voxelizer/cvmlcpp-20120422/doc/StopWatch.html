@@ -1,0 +1,54 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::StopWatch</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>StopWatch</h1>
+
+A <b>StopWatch</b> counts how many clockticks of CPU time have been used by
+your program. These can be converted to seconds by dividing by the standard macro
+<i>CLOCKS_PER_SEC</i>.
+
+<h2>Interface</h2>
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>StopWatch()</pre></td>
+	<td>Constructor; starts the stopwatch.</td>
+</tr>
+
+<tr>
+	<td><pre>std::clock_t read()</pre></td>
+	<td>Returns the number of clock ticks since the stopwatch started.</td>
+</tr>
+
+<tr>
+	<td><pre>void reset()</pre></td>
+	<td>Set the number of clockticks back to zero and start the stopwatch agan.</td>
+</tr>
+
+<tr>
+	<td><pre>std::clock_t restart()</pre></td>
+	<td>Read and reset the stopwatch.</td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

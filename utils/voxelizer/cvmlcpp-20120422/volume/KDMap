@@ -1,0 +1,111 @@
+/***************************************************************************
+ *   Copyright (C) 2010 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_KDMAP
+#define CVMLCPP_KDMAP 1
+
+#include <map>
+#include <vector>
+#include <iostream>
+#include <tr1/array>
+
+namespace cvmlcpp
+{
+
+template<typename T, class DATA, std::size_t D>
+class KDMap
+{
+	public:
+		KDMap() { }
+		
+		/*
+		 * Vectors just need to have an operator[]
+		 */
+		template<typename vector_iterator, typename data_iterator>
+		KDMap(vector_iterator vbegin, const vector_iterator vend,
+			data_iterator dbegin)
+		{
+			do
+			{
+				for (std::size_t d = 0; d < D; ++d)
+					kdmap_[d][ *(vbegin)[d] ].push_back(data_.size());
+				data_.push_back(*dbegin);
+				++vbegin;
+				++dbegin;
+			} while  (vbegin != vend); 
+		}
+		
+		template <typename vector_type>
+		void insert(const vector_type &vector, const DATA &data)
+		{
+			for (std::size_t d = 0; d < D; ++d)
+				kdmap_[d][ vector[d] ].push_back(data_.size());
+			data_.push_back(data);
+		}
+		
+		template <typename vector_type>
+		void search_near(const vector_type &here, const T radius, std::set<DATA> &result) const
+		{
+			std::cout << "search_near(): enter" << std::endl;
+			result.clear();
+			typedef typename std::map<T, std::vector<std::size_t> >::const_iterator map_const_iterator;
+			
+			map_const_iterator begin = kdmap_[0].lower_bound(here[0]-radius);
+			map_const_iterator end   = kdmap_[0].upper_bound(here[0]+radius);
+			std::set<std::size_t> intersection;
+			for ( /* nop */; begin != end; ++begin)
+				intersection.insert(begin->second.begin(), begin->second.end());
+			
+			for (std::size_t d = 1; d < D; ++d)
+			{
+				begin = kdmap_[d].lower_bound(here[0]-radius);
+				end   = kdmap_[d].upper_bound(here[0]+radius);
+
+				std::set<std::size_t> curr;
+				for ( /* nop */; begin != end; ++begin)
+					curr.insert(begin->second.begin(), begin->second.end());
+
+				std::set<std::size_t> prev;
+				intersection.swap(prev);
+				std::set_intersection(	curr.begin(), curr.end(),
+							prev.begin(), prev.end(),
+					std::inserter(intersection, intersection.begin()) );
+			}
+			for (std::set<std::size_t>::const_iterator 
+			     it = intersection.begin(); it != intersection.end(); ++it)
+				result.insert(data_[*it]);
+			std::cout << "search_near(): exit " << result.size() << std::endl;
+		}
+		
+		void clear()
+		{ 
+			for (std::size_t d = 0; d < D; ++d)
+				kdmap_[d].clear(); 
+			data_.clear(); 
+		}
+
+	private:
+		std::tr1::array<std::map<T, std::vector<std::size_t> >, D> kdmap_;
+		std::vector<DATA> data_;
+};
+
+} // end namespace
+
+#endif

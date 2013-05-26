@@ -1,0 +1,196 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::IDGenerators</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>IDGenerators</h1>
+
+<b>IDGenerators</b> provides several classes that generate unique identifyers
+which are designed to fullfill specific requirements. The classes may also be
+used as a Functor, but be aware that parallelism is generally not supported.
+
+<h2>GUIDGenerator</h2>
+
+<p>
+The <b>GUIDGenerator</b> class generates
+<a href="http://en.wikipedia.org/wiki/GUID">Globally Unique IDentifyers</a>,
+it is <i>not</i> thread-safe.
+</p>
+
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>The type of the generated GUIDs.</td>
+</tr>
+
+<tr>
+	<td><pre>GUIDGenerator()</pre></td>
+	<td>Constructor.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type generate()</pre></td>
+	<td>Generates one GUID.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type operator()()</pre></td>
+	<td>Generates one GUID.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t count() const</pre></td>
+	<td>Returns the number of generated values.</td>
+</tr>
+
+</table>
+
+<h2>KeyGenerator</h2>
+
+<p>
+The class <b>template &lt;typename T = std::size_t&gt; KeyGenerator</b> generates
+keys for binary-tree-based structures such as STL's
+<a href="http://www.sgi.com/tech/stl/Map.html">map</a>. It is <i>not</i>
+thread-safe.
+</p>
+
+<p>
+Generally, binary trees have logarithmic time for certain operations, based on
+the assumption that the tree is balanced. Inserting items in sorted order in a
+tree results in a maximally un-balanced tree, i.e. a structure resembling a
+linked list rather than a tree. As a result, operations that usually run in
+logarithmic time require linear time. The KeyGenerator is designed to generate
+values that should result in a balanced tree when inserted sequentially.
+</p>
+
+<p>
+Note that a KeyGenerator will typically always produce the same sequence, a
+reset() function allows a reset to the initial state.
+</p>
+
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>value_type</td>
+	<td>The generated key-types, alias for template parameter "T".</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T = std::size_t&gt;
+KeyGenerator()</pre></td>
+	<td>Constructor.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type generate()</pre></td>
+	<td>Generates one key.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type operator()()</pre></td>
+	<td>Generates one key.</td>
+</tr>
+
+<tr>
+	<td><pre>void reset()</pre></td>
+	<td>Reset to initial state.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t count() const</pre></td>
+	<td>Returns the number of generated values.</td>
+</tr>
+
+</table>
+
+<h2>IncGenerator</h2>
+
+<p>
+The class <b>template &lt;typename T = std::size_t&gt; IncGenerator</b> generates
+incremental values: 0, 1, 2, .... It is <i>not</i> thread-safe.
+</p>
+
+<p>
+Note that an IncGenerator will typically always produce the same sequence, a
+reset() function allows a reset to the initial state.
+</p>
+
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>The generated index-types, alias for template parameter "T".</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T = std::size_t&gt;
+IncGenerator()</pre></td>
+	<td>Constructor.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type generate()</pre></td>
+	<td>Generates one index.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type operator()()</pre></td>
+	<td>Generates one index.</td>
+</tr>
+
+<tr>
+	<td><pre>void reset()</pre></td>
+	<td>Reset to initial state.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t count() const</pre></td>
+	<td>Returns the number of generated values.</td>
+</tr>
+
+</table>
+
+<h2>Example</h2>
+
+To explain the purpose of the <b>KeyGenerator</b> consider the following piece
+of code:
+<pre>
+#include &lt;map&gt;
+#include &lt;cvmlcpp/math/Euclid&gt;
+#include &lt;cvmlcpp/base/IDGenerators&gt;
+
+std::map&lt;std::size_t, dPoint3D&gt; doubleMap;
+
+KeyGenerator&lt;std::size_t&gt; kGen;
+
+for (std::size_t i = 0; i &lt; N; ++i)
+{
+	dPoint3D d;
+
+	// Option A
+	doubleMap.insert(std::pair&lt;std::size_t, double&gt;(i, d));
+
+	// Option B
+	doubleMap.insert(std::pair&lt;std::size_t, double&gt;(kGen(), d));
+}
+
+</pre>
+In this code, using <i>kGen()</i> requires a bit more processing, but will
+result in a better balanced tree.
+
+<!-- End Page -->
+
+</div>
+</body>
+
+</html>

@@ -1,0 +1,337 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Geometry</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Geometry</h1>
+
+<p>
+A <b>Geometry</b> is a <a href='Facet.html'>Facet</a>-based representation of a
+3D volume. The implementation assumes that a facet-mesh is constructed from a
+set of points, and a set of facets, where each point and each facet are
+uniquely identified by a key. Each facet contains the keys to three different
+points, and a normal. The <b>Geometry</b> additionally contains normals for
+each point.
+</p>
+
+<p>
+The <b>Geometry</b> class offers member functions for manipulations such as
+rotations, translations and scaling. More advanced tools can be found in the
+<a href='GeometryTools.html'>GeometryTools</a> package, I/O is in the
+<a href='GeometryIO.html'>GeometryIO</a> package. Conversions to
+<a href='http://en.wikipedia.org/wiki/Voxel'>voxel</a>-representation are
+handled by the <a href=Voxelizer.html'>Voxelizer</a>. Creating a <b>Geometry</b>
+out of voxel-data is handled by the
+<a href='SurfaceExtractor.html'>SurfaceExtractor</a>.
+</p>
+
+<pre>
+template &lt;typename T&gt;
+class Geometry;
+</pre>
+
+<p>
+Note: <i>Template parameter T is assumed to be a floating-point type.</i>
+</p>
+<p>
+<b>Note:</b> <a href='http://meshlab.sourceforge.net/'>MeshLab</a> can be used
+to correct facet representations or to convert other datatypes to STL. 
+</p>
+
+<h2>Interface</h2>
+
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Alias for template parameter <i>T</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>point_type</pre></td>
+	<td>The type of the points.</td>
+</tr>
+
+<tr>
+	<td><pre>facet_type</pre></td>
+	<td>The type of the facets, which is based on indices rather than
+	full points a descibed in the <a href='Facet.html'>Facet</a>
+	documentation.</td>
+</tr>
+
+<tr>
+	<td><pre>vector_type</pre></td>
+	<td>Type of Vectors, such as the normal of the facets.</td>
+</tr>
+
+<tr>
+	<td><pre>const_facet_iterator</pre></td>
+	<td>A read-only iterator for the set of facets.</td>
+</tr>
+
+<tr>
+	<td><pre>const_point_iterator</pre></td>
+	<td>A read-only iterator for the set of points.</td>
+</tr>
+
+<tr>
+	<td><pre>Geometry()</pre></td>
+	<td>Constructs empty Geometry.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename PointsIterator,
+	typename NormalsIterator&gt; Geometry()</pre></td>
+	<td>Constructs a Geometry by calling <i>loadGeometry()</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename PointsIterator,
+	typename NormalsIterator&gt;
+void loadGeometry(const PointsIterator points_begin,
+		const PointsIterator points_end,
+		const NormalsIterator normals_begin)</pre></td>
+	<td>Clear the geometry, and reload it from the given data. The
+	range <i>points_begin</i> to <i>points_end</i> should contain
+	objects of <i>point_type</i> in a multiple of three. Each three
+	consequetive points describe a facet.<br />
+	The corresponding normals should be in a range starting from
+	<i>normals_begin</i>, containing objects of <i>vector_type</i> for each facet.</td>
+</tr>
+
+<tr>
+	<td><pre>void clear()</pre></td>
+	<td>Clear to empty geometry.</td>
+</tr>
+
+<tr>
+	<td><pre>void swap(Geometry&lt;T&gt; &amp;that)</pre></td>
+	<td>Swap <i>this</i> and <i>that</i> Geometry.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t nrFacets() const</pre></td>
+	<td>Get total number of facets.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t nrPoints() const</pre></td>
+	<td>Get total number of points.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type min(const std::size_t dim) const</pre></td>
+	<td>Get minimum coordinates of all points in dimension "dim".
+	Return value is undefined if the geometry doesn't contain any points.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type max(const std::size_t dim) const</pre></td>
+	<td>Get maximum coordinates of all points in dimension "dim".
+	Return value is undefined if the geometry doesn't contain any points.</td>
+</tr>
+
+<tr>
+	<td><pre>const_point_iterator pointsBegin() const</pre></td>
+	<td>A read-only iterator to the beginning of a range of all points.</td>
+</tr>
+
+<tr>
+	<td><pre>const_point_iterator pointsEnd() const</pre></td>
+	<td>A read-only iterator to the end of a range of all points.</td>
+</tr>
+
+<tr>
+	<td><pre>const_facet_iterator facetsBegin() const</pre></td>
+	<td>A read-only iterator to the beginning of a range of all facets.</td>
+</tr>
+
+<tr>
+	<td><pre>const_facet_iterator facetsEnd() const</pre></td>
+	<td>A read-only iterator to the end of a range of all facets.</td>
+</tr>
+
+<tr>
+	<td>
+	<pre>const facet_type &amp;facet(const std::size_t key) const</pre></td>
+	<td>Returns the facet with the given key.</td>
+</tr>
+
+<tr>
+	<td>
+	<pre>const vector_type &amp;facetNormal(const std::size_t key) const</pre>
+	</td>
+	<td>Returns the normal of the facet with the given key.</td>
+</tr>
+
+<tr>
+	<td>
+	<pre>const vector_type &amp;pointNormal(const std::size_t key) const</pre>
+	</td>
+	<td>Returns the normal of the point with the given key.</td>
+</tr>
+
+<tr>
+	<td>
+	<pre>const point_type &amp;point(const std::size_t key) const</pre>
+	</td>
+	<td>Returns a read-only reference to the point with the given key.</td>
+</tr>
+
+<tr>
+	<td><pre>const std::set&lt;std::size_t&gt;
+&amp;facetsHavingPoint(const std::size_t key) const</pre></td>
+	<td>Returns a set of keys of facets that contain the point with the
+	given key.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t addPoint(const value_type &amp;x,
+		const value_type &amp;y,
+		const value_type &amp;z)</pre></td>
+	<td>Add a point <i>(x, y, z)</i>, returns a key for the new point.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t addPoint(const point_type &amp;p)</pre></td>
+	<td>Add point <i>p</i>, returns a key.</td>
+</tr>
+
+<tr>
+	<td>
+	<pre>bool updatePoint(const std::size_t key, const point_type &amp;p)
+	</pre>
+	</td>
+	<td>Alter the point with the given key to equal <i>p</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>bool updatePoint(const std::size_t key, const value_type &amp;x,
+		 const value_type &amp;y, const value_type &amp;z)</pre></td>
+	<td>Alter the point with the given key to equal <i>(x, y, z)</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>bool erasePoint(const std::size_t key)</pre></td>
+	<td>Remove the point with the given key. Fails if the point is part of a
+	facet.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t addFacet(const std::size_t a,
+		const std::size_t b,
+		const std::size_t c)</pre></td>
+	<td>Add a facet with points with keys "a", "b" and "c", returns a key
+	for the new facet.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t addFacet(const facet_type &amp;facet)</pre></td>
+	<td>Add a facet, returns a key for the new facet.</td>
+</tr>
+
+<tr>
+	<td><pre>bool updateFacet(const std::size_t key, const std::size_t a,
+		 const std::size_t b, const std::size_t c)</pre></td>
+	<td>Update the facet with the given key to contain points with keys
+	"a", "b" and "c".</td>
+</tr>
+
+<tr>
+	<td>
+	<pre>bool updateFacet(const std::size_t key, const facet_type &amp;f)
+	</pre></td>
+	<td>Update the facet with the given key to "f".</td>
+</tr>
+
+<tr>
+	<td><pre>bool eraseFacet(const std::size_t key)</pre></td>
+	<td>Erase the facet with the given key.</td>
+</tr>
+
+<tr>
+	<td><pre>void center()</pre></td>
+	<td>Centers the geometry, making sure it is evenly spaced around the
+	Origin, i.e. min(X) = -max(X) etc.</td>
+</tr>
+
+<tr>
+	<td><pre>void centerMass()</pre></td>
+	<td>Centers the geometry such that it's center-of-mass coincides with
+	the Origin.</td>
+</tr>
+
+<tr>
+	<td><pre>void scale(const value_type factor)</pre></td>
+	<td>Scale geometry by multiplying all components of all points by the
+	given factor.</td>
+</tr>
+
+<tr>
+	<td><pre>void scaleTo(const value_type size = 1000.0)</pre></td>
+	<td>Scales such that the geometry will just fit in a
+	"size"-by-"size"-by-"size" box.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;class Vector&gt;
+void translate(const Vector &amp;v)</pre></td>
+	<td>Move the geometry along <code>v</code>.</td>
+</tr>
+
+<tr>
+	<td><pre>void translate( const value_type deltaX,
+		const value_type deltaY,
+		const value_type deltaZ)</pre></td>
+	<td>Translate over Vector <i>(deltaX, deltaY, deltaZ)</i>.</td>
+</tr>
+
+<tr>
+	<td>
+	<pre>void rotate(const std::size_t axis, const value_type angle)</pre></td>
+	<td>Rotate "angle" radials along "axis".</td>
+</tr>
+
+<!-- Template
+<tr>
+	<td><pre></pre></td>
+	<td>.</td>
+</tr>
+-->
+</table>
+
+<h2>Example</h2>
+
+<pre>
+#include &lt;cvmlcpp/volume/Geometry&gt;
+#include &lt;cvmlcpp/volume/GeometryIO&gt;
+#include &lt;cvmlcpp/volume/GeometryTools&gt;
+
+using namespace cvmlcpp;
+
+Geometry&lt;float&gt; g1;
+
+readSTL(g1, "tube.stl");
+fixGeometry(g1);
+
+g1.scaleTo();
+g1.center();
+g1.rotate(X, 3.0);
+
+</pre>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

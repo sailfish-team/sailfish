@@ -1,0 +1,201 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Processing</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Processing</h1>
+
+The <b>Processing</b> module provides useful standard signal processing
+operations such as convolution and correlation.
+
+<p>
+<b>Processing</b> can be used with either <a href='Matrix.html'>Matrix</a>, boost's
+<a href='http://www.boost.org/libs/multi_array/doc/index.html'>multi_array</a>,
+or with <a href='http://www.oonumerics.org/blitz'>Blitz++</a>'s
+Array through <a href='BlitzArray.html'>BlitzArray</a>.
+</p>
+
+<h2>Interface</h2>
+
+<p>
+Convolution and correlation are implemented in the frequency-domain, using
+Fourier-transforms. Therefor <a href='Fourier.html'>Fourier</a>.
+</p>
+
+<p>
+In order to enable parallel processing, use either
+<a href='http://www.openmp.org/'>OpenMP</a> or define <i>USE_THREADS</i>, but,
+following the
+<a href='http://www.fftw.org/fftw3_doc/Installation-and-Supported-Hardware_002fSoftware.html'>
+relevant section</a> of the FFTW manual, preferably not both. If neither are 
+defined, the parameter <i>threads</i> will be ignored. The <i>threads</i>
+parameter refers to the number of threads used by the system threads library, 
+which requires linking extra libraries as explained in the documentation of
+<a href='Fourier.html'>Fourier</a>.
+</p>
+
+<p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td>
+<pre>
+bool convolute( const Array_t&lt;Tlhs, N&gt; &amp;lhs,
+		const Array_t&lt;Trhs, N&gt; &amp;rhs,
+		Array_t&lt;Tresult, N&gt; &amp;result,
+		std::size_t threads = 0u)
+</pre>
+	</td>
+	<td>Convolution of two <i>N</i>-dimensional arrays <i>lhs</i> and
+	<i>rhs</i> using <i>threads</i> threads. On exit, <i>result</i> will
+	have been resized to the desired dimensions.
+	</td>
+</tr>
+
+<tr>
+	<td>
+<pre>
+bool convolute( const Array_t&lt;Tlhs, N&gt; &amp;lhs,
+		const std::vector&lt;Array_t&lt;Trhs, N&gt; &gt; &amp;rhs,
+		std::vector&lt;Array_t&lt;Tresult, N&gt; &gt; &amp;result,
+		std::size_t threads = 0u)
+</pre>
+	</td>
+	<td>Convolution of <i>N</i>-dimensional arrays <i>lhs</i> and
+	all arrays in the vector in <i>rhs</i> using <i>threads</i> threads. 
+	On exit, <i>result</i> will contain as many arrays as <i>rhs</i>, 
+	each will have been resized to the desired dimensions. Each array in
+	<i>result</i> will be a convolution of the array in <i>rhs</i> with 
+	the same index, and <i>lhs</i>.
+	</td>
+</tr>
+
+
+<tr>
+	<td>
+<pre>
+bool correlate( const Array_t&lt;Tlhs, N&gt; &amp;lhs,
+		const Array_t&lt;Trhs, N&gt; &amp;rhs,
+		Array_t&lt;Tresult, N&gt; &amp;result,
+		std::size_t threads = 0u)
+</pre>
+	</td>
+	<td>Correlation of two <i>N</i>-dimensional arrays <i>lhs</i> and
+	<i>rhs</i> using <i>threads</i> threads. On exit, <i>result</i> will
+	have been resized to the desired dimensions.
+	</td>
+</tr>
+
+<tr>
+	<td>
+<pre>
+bool correlate( const Array_t&lt;Tlhs, N&gt; &amp;lhs,
+		const std::vector&lt;Array_t&lt;Trhs, N&gt; &gt; &amp;rhs,
+		std::vector&lt;Array_t&lt;Tresult, N&gt; &gt; &amp;result,
+		std::size_t threads = 0u)
+</pre>
+	</td>
+	<td>Correlation of <i>N</i>-dimensional arrays <i>lhs</i> and
+	all arrays in the vector in <i>rhs</i> using <i>threads</i> threads. 
+	On exit, <i>result</i> will contain as many arrays as <i>rhs</i>, 
+	each will have been resized to the desired dimensions. Each array in
+	<i>result</i> will be a correlation between the array in <i>rhs</i> with 
+	the same index, and <i>lhs</i>.
+	</td>
+</tr>
+<tr>
+	<td>
+<pre>
+bool autocorrelate(const Array_t&lt;Tlhs, N&gt; &amp;lhs,
+		   Array_t&lt;Tresult, N&gt; &amp;result,
+		   std::size_t threads = 0u)
+</pre>
+	</td>
+	<td>Auto-correlation of two <i>N</i>-dimensional array <i>lhs</i>,
+	calculated using <i>threads</i> threads. On exit, <i>result</i> will
+	have been resized to the desired dimensions.
+	</td>
+</tr>
+
+<tr>
+	<td>
+<pre>
+bool autocorrelate(const std::vector&lt;Array_t&lt;Trhs, N&gt; &gt; &amp;lhs,
+		   std::vector&lt;Array_t&lt;Tresult, N&gt; &gt; &amp;result,
+		   std::size_t threads = 0u)
+</pre>
+	</td>
+	<td>Auto-correlation of all <i>N</i>-dimensional arrays in <i>lhs</i>, 
+	calculated using <i>threads</i> threads. 
+	On exit, <i>result</i> will contain as many arrays as <i>lhs</i>, 
+	each will have been resized to the desired dimensions.
+	</td>
+</tr>
+
+<tr>
+	<td>
+<pre>bool localAvg( Array_t&lt;Tlhs, N&gt; &amp;lhs, const int radius,
+		Array_t&lt;Tresult, N&gt; &amp;result,
+		std::size_t threads = 0u)
+</pre>
+	</td>
+	<td>Computes the local average for all elements in <i>lhs</i> using
+	<i>threads</i> threads. On exit, <i>result</i> will
+	have been resized to the dimensions of <i>lhs</i>.
+	</td>
+</tr>
+
+<tr>
+	<td>
+<pre>bool localAvg( std::vector&lt;Array_t&lt;Tlhs, N&gt; &gt; &amp;lhs, const int radius,
+		std::vector&lt;Array_t&lt;Tresult, N&gt; &gt; &amp;result,
+		std::size_t threads = 0u)
+</pre>
+	</td>
+	<td>Computes the local average for all elements in all <i>N</i>-dimensional 
+	arrays in <i>lhs</i> using <i>threads</i> threads. On exit,
+	<i>result</i> will contain <i>N</i>-dimensional arrays representing the
+	local averages, each one will be resized to the dimensions of the items in <i>lhs</i>.
+	</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h2>Examples</h2>
+
+<h3>Convolution</h3>
+
+<pre>
+const std::size_t dims [] = {256u, 256u};
+Matrix&lt;int, 2u&gt; image(dims);
+
+// Read image
+...
+
+const std::size_t maskDims [] = {5, 5};
+Matrix&lt;float, 2u&gt; mask(maskDims, 1.0/25.0);
+
+Matrix&lt;float, 2u&gt; result(dims);
+
+// Convolute
+const bool ok = convolute(image, mask, result);
+</pre>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

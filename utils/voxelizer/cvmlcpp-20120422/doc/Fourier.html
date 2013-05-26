@@ -1,0 +1,415 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Fourier</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Fourier</h1>
+
+<p>
+<b>Fourier</b> offers an consistent interface for Fourrier Transform 
+libraries on 1, 2 and 3-dimensional Matrices. Its behaviour is consistent 
+of that of the famous <a href='http://www.fftw.org/'>FFTW</a> library for 
+Fast Fourier Transforms, even when other libraries are used.
+</p>
+
+<p>
+Currently, <b>Fourrier</b> supports two libraries: MIT's FFTW and NVidia's 
+GPU-accelerated <a href="http://developer.download.nvidia.com/compute/cuda/3_1/toolkit/docs/CUFFT_Library_3.1.pdf">CUFFT</a>.
+Regardless of what library is used, the output is guaranteed to be compatible
+with FFTW's 
+<a href="http://fftw.org/fftw3_doc/Multi_002dDimensional-DFTs-of-Real-Data.html">specifications</a>.
+</p>
+
+<p>
+<b>Fourier</b> can be used with either <a href='Matrix.html'>Matrix</a>, boost's
+<a href='http://www.boost.org/libs/multi_array/doc/index.html'>multi_array</a>,
+or with <a href='http://www.oonumerics.org/blitz'>Blitz++</a>'s
+Array through <a href='BlitzArray.html'>BlitzArray</a>.
+</p>
+
+<p>
+There are two possible styles of using the frontend; through a function which
+executes a single transform, or through the creation of a so-called <i>plan</i>
+in FFTW-style that can be executed multiple times. The latter allows greater
+control over the computation.
+</p>
+
+<p>
+<b>Note:</b> When using <i>real-to-complex</i> transforms, the last dimension of the
+data must be even!
+</p>
+
+<h2>Compatibility with FFTW and CUFFT</h2>
+
+<p>
+The frontend in <b>Fourier</b> makes use of templates, but neither the FFTW library nor CUFFT
+do. The FFTW, by default, assumes the use of <i>doubles</i>. By
+linking the correct libraries, also <i>floats</i> and <i>long doubles</i> are
+supported. The CUFFT requires linking with its libraries, which supports both 
+<i>floats</i> and <i>doubles</i>, provided that your hardware supports this.
+</p>
+
+
+<h3>Parallelism in Detail - FFTW only</h3>
+
+<p>
+This section applies uniquely to the FTTW, as CUFFT is inherently parallelized.
+</p>
+
+<p>
+Multi-threaded execution within the FFTW can be enabled by
+defining <i>USE_THREADS</i>. By default FFTW uses the systems' thread
+libraries, for example <i>pthreads</i>. Alternatively, the FFTW supports OpenMP
+natively, provided that the libraries are to be compiled with support for it.
+</p>
+
+<p>
+Multi-threading using 
+<a href='http://www.openmp.org/'>OpenMP</a> in the <b>Fourier</b> frontend can
+be enabled by appropriate compiler switches, that also enable the use of the
+<a href='http://sip.unige.ch/omptl/'>OMPTL</a> in the code. The FFTW is in
+itself not thread-safe, but <b>Fourier</b> handles the appropriate protection
+of critical sections when the program is parallelized using OpenMP.
+</p>
+
+<p>
+It is recommended to use OpenMP and make sure the FFTW is compiled with support
+for OpenMP, see the
+<a href='http://www.fftw.org/fftw3_doc/Installation-and-Supported-Hardware_002fSoftware.html'>
+relevant documentation</a>.
+</p>
+
+<p>
+For parallelism, i.e. if you have defined <i>USE_THREADS</i>, you
+need to additionally link in the appropriate versions of the thread libraries of
+FFTW. If FFTW was compiled without OpenMP, i.e. configured
+without <i>--with-openmp</i>, you need to additionally link to the thread
+library of your system, for example
+<a href='http://en.wikipedia.org/wiki/POSIX_Threads'>Pthread</a>.
+</p>
+
+<h3>Linking</h3>
+
+<h4>Linking with the FFTW</h4>
+
+<p>
+By default, linking with the fftw is required:
+<pre>
+-lfftw3
+</pre>
+</p>
+
+<p>
+If, FFT's on <i>floats</i> are used, the <i>float</i> version of
+the FFTW is required:
+<pre>
+-lfftw3f
+</pre>
+Similar for <i>long double</i>:
+<pre>
+-lfftw3l
+</pre>
+
+</p>
+
+<h4>Linking with multi-threaded FFTW compiled <i>without</i> OpenMP support</h4>
+
+<p>
+The following compiler-flags for gcc would be required for a program 
+using both <i>floats</i> and <i>long doubles</i> and multi-threading using
+native threads:
+<pre>
+-DUSE_THREADS
+</pre>
+The corresponding linker-flags are:
+<pre>
+-lfftw3 -lfftw3f -lfftw3l -lfftw3f_threads -lfftw3_threads -lfftw3l_threads
+-lpthread
+</pre>
+Note that you may still compile your own program with OpenMP.
+</p>
+
+<h4>Linking with multi-threaded FFTW compiled <i>with</i> OpenMP support</h4>
+
+The following compiler-flags for gcc would be required for a program 
+using both <i>floats</i> and <i>long doubles</i> and multi-threading using only
+OpenMP:
+<pre>
+-DUSE_THREADS
+</pre>
+The corresponding linker-flags are:
+<pre>
+-lfftw3f -lfftw3 -lfftw3l -lfftw3f_threads -lfftw3_threads -lfftw3l_threads
+</pre>
+
+<h4>Linking with CUFFT</h4>
+
+<p>
+When USE_CUFFT is defined during compilation, linking with the cufft and cuda 
+runtime libraries is required:
+<pre>
+-lcufft -lcudart
+</pre>
+Also do not forget to inform your compiler of the link paths to these libraries if needed. 
+</p>
+
+
+<h2>Interface</h2>
+
+<p>
+<b>Note:</b> the typename <i>matrix_type</i> is used to denote either one of
+the accepted matrix types.
+</p>
+
+<h3>Convenient Interface</h3>
+
+<p>
+The convenient interface offers a single funtion that can handle transforms of
+arrays of upto three dimensions.<br />
+<i>Note that the inverse transform is normalized!</i>
+</p>
+
+<p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td>
+<pre>bool doDFT(const ArrayIn&lt;Tin, N&gt; &amp;in,&nbsp;&nbsp;&nbsp;&nbsp;
+	     ArrayOut&lt;Tout, N&gt; &amp;out,
+	     bool forward = true,
+	     std::size_t threads = 1u)</pre></td>
+	<td>Computes the Discrete Fourier Transform of the data in <i>in</i>,
+	and stores the result in <i>out</i>. If <i>forward</i> is <b>true</b>,
+	the forward transform is computed, otherwise the inverse transform. The
+	inverse transform is normalized. The number of threads is only relevant
+	if <i>USE_THREADS</i> is defined, otherwise it is ignored.
+	</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h3>Detailed Interface</h3>
+
+It is possible to have more control over the processing by using the parts of
+the interface that mimic the FFTW in greater detail. This is particularly
+interesting if you need to compute many transforms of the same type, i.e.
+the same dimensionality, size, et cetera.
+<!--
+<p>
+The following functions control the use of
+<a href=''>wisdom</a>. These are templates as the versions for <i>floats</i>,
+<i>doubles</i> and <i>long doubles</i> are kept seperately.
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td>
+<pre>template &lt;typename T&gt;
+bool loadWisdom(std::string wisdom)</pre></td>
+	<td>
+	Load wisdom from a file named <i>wisdom</i>.
+	</td>
+</tr>
+<tr>
+	<td>
+<pre>template &lt;typename T&gt;
+bool saveWisdom(std::string wisdom)</pre></td>
+	<td>
+	Save wisdom to a file named <i>wisdom</i>.
+	</td>
+</tr>
+
+<tr>
+	<td>
+<pre>template &lt;typename T&gt;
+bool forgetWisdom()</pre></td>
+	<td>
+	Forget all accumulated wisdom.
+	</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+-->
+<p>
+The primary interface to emulate the concept of creating plans and executing
+them is through a template class <i>DFT</i>:
+<pre>
+template &lt;typename float_type, std::size_t N&gt;
+class DFT;
+</pre>
+Any instanciated class <i>DFT&lt;float_type, N&gt;</i> offers the following
+interface:
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td>
+<pre>
+  DFT(ArrayIn&lt;std::complex&lt;float_type&gt;, N, Aux&gt; &amp;in, 
+      ArrayOut&lt;std::complex&lt;float_type&gt;, N, Aux&gt; &amp;out,
+      bool forward = true, std::size_t flags = FFTW_ESTIMATE,
+      std::size_t threads = 0u)</pre></td>
+	<td>Constructor. Takes as input a matrix <i>in</i>, as output a
+	matrix <i>out</i>. By default, when <i>forward</i> is true, a forward
+	transform is planned, otherwise an inverse transform is planned.
+	Flags can be passed to the FFTW by the parameter <i>flags</i>. The
+	planning will be done for with the specified number of <i>threads</i>.
+	If <i>threads</i> is zero (the default), a default number of threads
+	will be used.
+	 </td>
+</tr>
+
+<tr>
+	<td>
+<pre>
+  DFT(ArrayIn&lt;float_type, N, Aux&gt; &amp;in, 
+      ArrayOut&lt;std::complex&lt;T&gt;, N, Aux&gt; &amp;out,
+      std::size_t flags = FFTW_ESTIMATE, std::size_t threads = 0u)</pre></td>
+	<td>Constructor. Takes as input a matrix <i>in</i>, as output a
+	matrix <i>out</i>. By default, when <i>forward</i> is true, a forward
+	transform is planned, otherwise an inverse transform is planned.
+	Flags can be passed to the FFTW by the parameter <i>flags</i>. The
+	planning will be done for with the specified number of <i>threads</i>.
+	If <i>threads</i> is zero (the default), a default number of threads
+	will be used.
+	 </td>
+</tr>
+
+<tr>
+	<td>
+<pre>
+  DFT(ArrayIn&lt;std::complex&lt;float_type&gt;, N, Aux&gt; &amp;in,
+      ArrayOut&lt;float_type, N, Aux&gt; &amp;out,
+      bool forward = true, std::size_t flags = FFTW_ESTIMATE,
+      std::size_t threads = 0u)</pre></td>
+	<td>Constructor. Takes as input a matrix <i>in</i>, as output a
+	matrix <i>out</i>. By default, when <i>forward</i> is true, a forward
+	transform is planned, otherwise an inverse transform is planned.
+	Flags can be passed to the FFTW by the parameter <i>flags</i>. The
+	planning will be done for with the specified number of <i>threads</i>.
+	If <i>threads</i> is zero (the default), a default number of threads
+	will be used.
+	 </td>
+</tr>
+
+<tr>
+	<td>
+	<pre>void execute()</pre></td>
+	<td>
+	Execute the planned transform.
+	</td>
+</tr>
+
+<tr>
+	<td>
+	<pre>void execute(std::string wisdom)</pre></td>
+	<td>
+	Execute the planned transform using wisdom from the file <i>wisdom</i>.
+	</td>
+</tr>
+
+<tr>
+	<td>
+	<pre>static std::size_t optimalSize(const std::size_t ext)</pre></td>
+	<td>
+	Given a size of a dimension of a matrix, returns a suggestion
+	for a size, possibly larger, that might give better performance.
+	</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h2>Example</h2>
+
+<p>
+The data-layout of real-to-complex transforms and vice versa is akin to that of 
+the FFTW, as explained in the
+<a href='http://www.fftw.org/fftw3_doc/Multi_002dDimensional-DFTs-of-Real-Data.html'>
+manual</a>. The following example shows how to print data as it would appear
+when using Matlab's <i>fft2</i> command.
+</p>
+
+A real-to-complex transform:
+<pre>
+#include &lt;iostream&gt;
+
+#include &lt;cvmlcpp/base/Enums&gt;
+#include &lt;cvmlcpp/base/Matrix&gt;
+#include &lt;cvmlcpp/signal/Fourier&gt;
+
+double data [] = {
+-0.144892,  -0.0888301,  0.00954482, 0,  0,
+0.00130495,  -0.125482,  -0.0517049, 0,  0,
+-0.0155715,  0.209789,  0.297849, 0,  0,
+0,  0,  0,  0,  0};
+
+const std::size_t size = 20;
+
+using namespace cvmlcpp;
+
+int main()
+{
+	// Create a Matrix with data
+	std::size_t dims [] = {5, 4}; // last dimension must be even
+	Matrix&lt;double, 2&gt; in(dims, data, data+size);
+
+	// Print the data Matrix
+	for (std::size_t x = 0; x &lt; in.extent(X); ++x)
+	{
+		for (std::size_t y = 0; y &lt; in.extent(Y); ++y)
+			std::cout &lt;&lt; in[x][y] &lt;&lt; "   ";
+		std::cout &lt;&lt; std::endl;
+	}
+	std::cout &lt;&lt; std::endl;
+
+	// Create an empty array. It will automatically be resized.
+	Matrix&lt;std::complex&lt;double&gt;, 2&gt; out;
+
+	// The Fourier Transform
+	doDFT(in, out);
+
+	// Print the Complex Matrix
+	for (std::size_t x = 0; x &lt; out.extent(X); ++x)
+	{
+		/*
+		 * The Complex Matrix contains almost half of the elements
+		 * of the original array. The Nth-1 dimension has shrunk from
+		 * 'k' to 'k/2+1'. The "missing" elements are simply the
+		 * complex conjugated of the given elements.
+		 */
+		for (std::size_t y = 0; y &lt; out.extent(Y); ++y)
+			std::cout &lt;&lt; out[x][y] &lt;&lt; "   ";
+
+		// Print the "missing" elements.
+		for (std::size_t y = 1; y &lt; out.extent(Y); ++y)
+			std::cout &lt;&lt; std::conj(out[x][out.extent(Y)-y]) &lt;&lt; " ";
+		std::cout &lt;&lt; std::endl;
+	}
+	std::cout &lt;&lt; std::endl;
+
+	return 0;
+}
+</pre>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

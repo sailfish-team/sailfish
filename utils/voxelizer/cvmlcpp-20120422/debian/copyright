@@ -1,0 +1,25 @@
+This work was packaged for Debian by:
+
+    F.P.Beekhof <fpbeekhof@gmail.com> on Fri, 19 Nov 2010 10:04:55 +0100
+
+It was downloaded from http://tech.unige.ch/cvmlcpp
+
+Upstream Author(s):
+
+    F.P.Beekhof <fpbeekhof@gmail.com>
+
+Copyright:
+
+    <Copyright (C) 2007-now F.P.Beekhof>
+
+License:
+
+    The OMPTL is LGPL. The rest of CVMLCPP is mostly GPL, version 2 or later, 
+    at your option. Please consult files for exceptions.
+
+The Debian packaging is:
+
+    Copyright (C) 2010 F.P.Beekhof <fpbeekhof@gmail.com>
+
+and is licensed under the GPL version 3, 
+see `/usr/share/common-licenses/GPL-3'.

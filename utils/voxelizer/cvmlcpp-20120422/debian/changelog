@@ -1,0 +1,50 @@
+cvmlcpp (20120422-4) unstable; urgency=low
+
+  * New upstream version
+  * Added "-std=c++0x" compiler flags to debian/rules
+
+ -- F.P.Beekhof <fpbeekhof@gmail.com>  Sun, 22 Apr 2012 16:20:11 +0200
+
+cvmlcpp (20111202-3) unstable; urgency=low
+
+  * New upstream version
+  * Added "-fopenmp -NDEBUG" compiler flags to debian/rules
+
+ -- F.P.Beekhof <fpbeekhof@gmail.com>  Fri, 02 Dec 2011 10:20:57 +0100
+
+cvmlcpp (20111110-2) unstable; urgency=low
+
+  * New upstream version
+
+ -- F.P.Beekhof <fpbeekhof@gmail.com>  Thu, 10 Nov 2011 11:21:24 +0100
+
+cvmlcpp (20110923-2) unstable; urgency=low
+
+  * New upstream version
+
+ -- F.P.Beekhof <fpbeekhof@gmail.com>  Fri, 23 Sep 2011 16:43:36 +0200
+
+cvmlcpp (20110803-2) unstable; urgency=low
+
+  * New upstream version
+
+ -- F.P.Beekhof <fpbeekhof@gmail.com>  Wed, 03 Aug 2011 10:56:17 +0200
+
+cvmlcpp (20110728-2) unstable; urgency=low
+
+  * New upstream version
+  * Versioned shared libs in deb packages
+
+ -- F.P.Beekhof <fpbeekhof@gmail.com>  Thu, 28 Jul 2011 16:12:25 +0200
+
+cvmlcpp (20110311-1) unstable; urgency=low
+
+  * New upstream version
+
+ -- F.P.Beekhof <fpbeekhof@gmail.com>  Fri, 11 Mar 2011 15:04:27 +0100
+
+cvmlcpp (20101115-1) unstable; urgency=low
+
+  * Initial release
+
+ -- F.P.Beekhof <fpbeekhof@gmail.com>  Fri, 19 Nov 2010 10:04:55 +0100

@@ -1,0 +1,30 @@
+Source: cvmlcpp
+Priority: extra
+Maintainer: Fokko Beekhof <fpbeekhof@gmail.com>
+Build-Depends: debhelper (>= 7), libboost-dev
+Standards-Version: 3.8.3
+Section: libs
+Homepage: http://tech.unige.ch/cvmlcpp
+
+Package: cvmlcpp-dev
+Section: libdevel
+Architecture: all
+Depends: cvmlcpp (= ${binary:Version}), libboost-dev, libfftw3-dev
+Description: C++ library with various useful components - headers
+ Too many people program the same basic things over and over again, 
+ and re-create the same bugs over and over again. The goal of the 
+ CVMLCPP project is to eliminate this redundancy by offering 
+ high-quality implementations of commonly needed functionality.
+ These are the header files required for development. In the rare
+ case that you use a component that requires linking to CVMLCPP
+ libs, install the cvmlcpp package.
+
+Package: cvmlcpp
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libfftw3-3
+Description: C++ library with various useful components
+ You usually do not need this package. It contains the
+ library files for the few components of the CVMLCPP that
+ require linking.
+

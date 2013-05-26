@@ -1,0 +1,112 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Facet</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Facet</h1>
+
+A <b>Facet</b> facet is essentially any triangle with a normal, as defined in
+<a href='Euclid.html'>Euclid</a>. The triangle may be made up of points,or it
+can be an IndexTriangle. In that case, it does not contain the points itself,
+but numbers that are assumed to identify points in an external data structure.
+
+<pre>
+template &lt;class Triangle, typename T&gt;
+class Facet : public Triangle;
+</pre>
+
+<p>
+Note: <i>As Facet inherits from Triangle, accessing the points of the Facet is
+the same as accessing points of the Triangle.</i>
+</p>
+
+<h2>Interface</h2>
+
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>The type used for the normals, i.e. template parameter "T".</td>
+</tr>
+
+<tr>
+	<td><pre>triange_type</pre></td>
+	<td>The triangle type, i.e. template parameter "Triangle".</td>
+</tr>
+
+<tr>
+	<td><pre>normal_type</pre></td>
+	<td>The type of the normal, which is a kind of
+		<a href='Vector.html'>Vector<a/>.</td>
+</tr>
+
+<tr>
+	<td><pre>const_triangle_iterator</pre></td>
+	<td>Read-only iterator of the triangle_type.</td>
+</tr>
+
+<tr>
+	<td><pre>normal_iterator</pre></td>
+	<td>Iterator of the normal_type.</td>
+</tr>
+
+<tr>
+	<td><pre>const_normal_iterator</pre></td>
+	<td>Read-only Iterator of the const_normal_type.</td>
+</tr>
+
+<tr>
+	<td><pre>Facet()</pre></td>
+	<td>Default Constructor.</td>
+</tr>
+
+<tr>
+	<td><pre>Facet(const const_triangle_iterator first,
+	const const_triangle_iterator last)</pre></td>
+	<td>A Constructor that enters values into the Triangle.</td>
+</tr>
+
+<tr>
+	<td><pre>Facet(const const_triangle_iterator first,
+	const const_triangle_iterator last,
+	const_normal_iterator normalFirst,
+	const_normal_iterator normalLast)</pre></td>
+	<td>A Constructor that enters values into the Triangle and the
+	Normal.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename It&gt;
+void set(It first, It last, const normal_type &amp;normal)</pre>
+	</td>
+	<td>Copy points from range <i>first ... last</i>, copy normal.</td>
+</tr>
+
+<tr>
+	<td><pre>const normal_type &amp;normal() const</pre></td>
+	<td>Returns a refence for read-only use.</td>
+</tr>
+
+<tr>
+	<td><pre>normal_type &amp;normal()</pre></td>
+	<td>Returns a reference to the normal.</td>
+</tr>
+
+
+</table>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

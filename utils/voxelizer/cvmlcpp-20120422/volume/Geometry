@@ -1,0 +1,237 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_GEOMETRY
+#define CVMLCPP_GEOMETRY 1
+
+#include <string>
+#include <vector>
+#include <set>
+#include <map>
+
+#include <cvmlcpp/math/Euclid>
+#include <cvmlcpp/base/IDGenerators>
+#include <cvmlcpp/volume/Facet>
+
+namespace cvmlcpp
+{
+
+template <typename T>
+class Geometry
+{
+	public:
+		typedef T				 value_type;
+		typedef Point3D<value_type>		 point_type;
+		typedef Facet<std::size_t, T>		 facet_type;
+		typedef typename facet_type::normal_type vector_type;
+		typedef typename std::set<facet_type>::const_iterator
+							 const_facet_iterator;
+		typedef typename std::set<point_type>::const_iterator
+							const_point_iterator;
+
+		/**
+			Constructors
+		*/
+		Geometry();
+
+		Geometry(const Geometry &that);
+		Geometry &operator=(const Geometry &that);
+
+		// Must be Random-Acess-Iterators!
+		template <typename PointIterator, typename NormalIterator>
+		Geometry(const PointIterator begin, const PointIterator end, const NormalIterator norm_begin);
+
+		/**
+		 *	Destructor
+		 */
+		virtual ~Geometry();
+
+		/**
+		 * Clear to empty geometry.
+		 */
+		void clear();
+
+		/**
+			Get total number of facets.
+		*/
+		std::size_t nrFacets() const { return _facets.size(); }
+
+		/**
+			Get total number of points.
+		*/
+		std::size_t nrPoints() const  { return _points.size(); }
+
+		/**
+		 * Get minimum coordinates of all points in dimension "dim".
+		 * Return value is undefined if the geometry doesn't contain
+		 * any points.
+		 */
+		value_type min(const unsigned dim) const;
+
+		/**
+		 * Get maximum coordinates of all points in dimension "dim".
+		 * Return value is undefined if the geometry doesn't contain
+		 * any points.
+		 */
+		value_type max(const unsigned dim) const;
+
+		const_point_iterator pointsBegin() const
+		{ return _points.begin(); }
+
+		const_point_iterator pointsEnd() const
+		{ return _points.end(); }
+
+		const_facet_iterator facetsBegin() const;
+
+		const_facet_iterator facetsEnd() const;
+
+		const facet_type  &facet(const std::size_t key) const;
+
+		const vector_type &facetNormal(const std::size_t key) const;
+
+		const vector_type &pointNormal(const std::size_t key) const;
+
+		const point_type  &point(const std::size_t key) const;
+
+		const std::set<std::size_t>
+				  &facetsHavingPoint(const std::size_t key) const;
+
+		// Must be Random-Acess-Iterators!
+		// nr of points must be a multiple of 3 - 3 for each facet
+		// nr of normals must be 1 per facet
+		template <typename PointIterator, typename NormalIterator>
+		bool loadGeometry(const PointIterator begin, const PointIterator end,
+						const NormalIterator normals_begin);
+
+		std::size_t addPoint(const value_type &x,
+				     const value_type &y,
+				     const value_type &z);
+
+		std::size_t addPoint(const point_type &p);
+
+		bool updatePoint(const std::size_t key, const point_type &point);
+
+		bool updatePoint(const std::size_t key, const value_type &x,
+				 const value_type &y, const value_type &z);
+
+		bool erasePoint(const std::size_t key);
+
+		std::size_t addFacet(const std::size_t a,
+				  const std::size_t b,
+				  const std::size_t c);
+
+		std::size_t addFacet(const facet_type &facet);
+
+		bool updateFacet(const std::size_t key, const std::size_t a,
+				 const std::size_t b, const std::size_t c);
+
+		bool updateFacet(const std::size_t key, const facet_type &facet);
+
+		bool eraseFacet(const std::size_t key);
+
+		/** Centers the geometry, making sure it is evenly spaced
+		*  around the origin, i.e. min(X) = -max(X) etc.
+		*/
+		void center();
+
+		void centerMass();
+
+		/** Scale geometry by multiplying all components of
+		*  all points by the given factor.
+		*/
+		void scale(const value_type factor);
+
+		/** Scales such that the longest length along an axis will
+		 * equal "maxLength".
+		 */
+		void scaleTo(const value_type maxLength = 1000.0);
+
+		/** Apply a translation to the geometry.
+		 */
+		template <class Vector>
+		void translate(const Vector &v);
+
+		void translate(	const value_type deltaX,
+				const value_type deltaY,
+				const value_type deltaZ);
+
+		/** Rotation of "angle" radials along "axis".
+		*/
+		void rotate(const std::size_t axis, const value_type angle);
+
+		bool operator==(const Geometry &that) const;
+		bool operator!=(const Geometry &that) const
+		{ return !( (*this) == that ); }
+
+		void swap(Geometry &that);
+
+	private:
+		typedef typename std::set<point_type>::iterator point_iterator;
+		typedef typename std::map<std::size_t,
+					point_iterator>::const_iterator
+							const_pointkey_iterator;
+		typedef typename std::map<std::size_t, point_iterator>::iterator
+							pointkey_iterator;
+
+		typedef typename std::set<facet_type>::iterator facet_iterator;
+		typedef typename std::map<std::size_t,
+					  facet_iterator>::const_iterator
+							const_facetkey_iterator;
+		typedef typename std::map<std::size_t, facet_iterator>::iterator
+							facetkey_iterator;
+
+		std::set<point_type> _points;
+		mutable std::map<std::size_t, point_iterator> _pointKeyMap;
+		std::set<facet_type> _facets;
+		mutable std::map<std::size_t, facet_iterator> _facetKeyMap;
+
+		mutable std::map<std::size_t, std::set<std::size_t> > _pointFacetMap;
+
+		mutable std::map<std::size_t, vector_type> _pointNormals;
+
+		mutable std::set<std::size_t> _dirtyFacetNormals;
+		mutable std::set<std::size_t> _dirtyPointNormals;
+
+		mutable vector_type _min, _max;
+		mutable bool _minMaxDirty;
+		mutable bool _facetNormalsDirty;
+		mutable bool _pointNormalsDirty;
+		KeyGenerator<std::size_t> _ptKeygen;
+		KeyGenerator<std::size_t> _ftKeygen;
+
+		void recomputeMinMax() const;
+		void recomputeFacetNormals() const;
+		void recomputePointNormals() const;
+		void setNormalsDirty();
+};
+
+} // namespace cvmlcpp
+
+#include <cvmlcpp/volume/Geometry.hpp>
+
+namespace std
+{
+
+template <typename T>
+void swap(cvmlcpp::Geometry<T> &g1, cvmlcpp::Geometry<T> &g2) { g1.swap(g2); }
+
+}
+
+#endif

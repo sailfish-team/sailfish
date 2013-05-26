@@ -1,0 +1,83 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::DirectoryTokenizer</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>DirectoryTokenizer</h1>
+
+<p>
+The <b>DirectoryTokenizer</b> is a class that can be used to recursively scan
+directories in a file-by-file manner rather than parsing the entire tree at
+once.
+</p>
+
+<h2>Interface</h2>
+
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>DirectoryTokenizer(std::string rootDirectory,&nbsp;&nbsp;
+		   std::size_t maxDepth = 255u)</pre></td>
+	<td>Creates a <i>DirectoryTokenizer</i> object set to scan the
+	specified <i>rootDirectory</i>, going at most <i>maxDepth</i> deep
+	into the tree.</td>
+</tr>
+<tr>
+	<td><pre>bool next(std::string &amp;fileName)</pre></td>
+	<td>Stores the name of the next file in <i>fileName</i> if there
+	is one available. Return <b>true</b> if a file was found and
+	<i>fileName</i> is updated; returns <b>false</b> if no next file is
+	available. Once a <b>false</b> is returned, there are no files left
+	in the directory tree and the scan is complete.</td>
+</tr>
+
+<tr>
+	<td><pre>const std::string &current_directory() const</pre></td>
+	<td>Refers to the directory of the fileName retrieved by the last call to <i>next()</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>bool ok() const</pre></td>
+	<td>Returns <b>true</b> if the object is in good state. Returns
+	<b>false</b> if, for example, the <i>rootDirectory</i> could not
+	be opened.</td>
+</tr>
+
+<tr>
+	<td><pre>bool complete() const</pre></td>
+	<td>Returns <b>true</b> if the scan has completed.</td>
+</tr>
+
+</table>
+
+<h2>Example</h2>
+<p>Printing all files in the directory tree under the current directory:</p>
+<pre>
+cvmlcpp::DirectoryTokenizer dt(".");
+std::string fileName;
+
+if (dt.ok())
+{
+	while(dt.next(fileName))
+		std::cout &lt;&lt; fileName &lt;&lt; std::endl;
+}
+else
+	std::cout &lt;&lt; "ERROR!" &lt;&lt; std::endl;
+
+</pre>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

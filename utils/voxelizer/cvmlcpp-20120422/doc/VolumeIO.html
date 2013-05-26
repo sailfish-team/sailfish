@@ -1,0 +1,124 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::VolumeIO</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>VolumeIO</h1>
+
+Input/Output for the structures describing 3D volumes, such as the
+<a href='Geometry.html'>Geometry</a> class, and voxels in 3D arrays such as
+the <a href='Matrix.html'>Matrix</a> class. Geometries can be read from
+<a href='http://en.wikipedia.org/wiki/STL_%28file_format%29'>STL</a> format,
+both binary and ascii format.
+
+<h2>Interface</h2>
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>template &lt;typename T&gt;
+  bool writeSTL(const Geometry&lt;T&gt; &amp;geometry,&nbsp;&nbsp;
+  		const std::string fileName,
+  		const bool binary = true)</pre>
+	</td>
+	<td>Write a Geometry to an STL-file in binary format (default), or,
+	if <i>binary</i> is <i>false</i> in ascii format.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T&gt;
+  bool readSTL(Geometry&lt;T&gt; &amp;geometry,&nbsp;&nbsp;
+	     const std::string fileName);</pre>
+	</td>
+	<td>Read a Geometry from an STL-file.</td>
+</tr>
+
+<tr>
+	<td><pre>
+  bool writeVoxels(const Array&lt;T, N, Aux&gt; &amp;voxels,&nbsp;&nbsp;
+		const std::string fileName,
+		const bool compress = true);</pre>
+	</td>
+	<td>Identical to <b>writeArray</b> in
+	<a href='ArrayIO.html'>ArrayIO</a>, except that compression is enabled
+	by default.
+	</td>
+</tr>
+
+<tr>
+	<td><pre>
+  bool readVoxels(Array&lt;T, N, Aux&gt; &amp;voxels,&nbsp;&nbsp;
+		const std::string fileName);</pre>
+	</td>
+	<td>Identical to <b>readArray</b> in <a href='ArrayIO.html'>ArrayIO</a>.
+	</td>
+</tr>
+
+</tbody>
+</table>
+
+<h2>Example</h2>
+
+<h3>Facets to Voxels</h3>
+<p>
+Read a 3D Geometry in facet representation from an STL file, transform it to
+voxels with the <a href='Voxelizer.html'>Voxelizer</a>, then write the 3D array
+of voxels to disk in compressed format:
+<pre>
+#include &lt;cvmlcpp/base/Matrix&gt;
+#include &lt;cvmlcpp/volume/Geometry&gt;
+#include &lt;cvmlcpp/volume/VolumeIO&gt;
+#include &lt;cvmlcpp/volume/Voxelizer&gt;
+
+using namespace cvmlcpp;
+
+Geometry&lt;float&gt; geometry;
+readSTL(geometry, "cube.stl");
+
+Matrix&lt;char, 3&gt; voxels;
+
+// Use greater precision during calculations
+Voxelizer&lt;double&gt;::voxelize(geometry, voxels, voxelSize, 1);
+writeArray(voxels, "voxels.dat");
+</pre>
+</p>
+
+<h3>Voxels to Facets</h3>
+<p>
+Read voxels from a file, transform it to facet representation with the
+<a href="SurfaceExtractor.html">SurfaceExtractor</a>.
+<pre>
+#include &lt;cvmlcpp/base/Matrix&gt;
+#include &lt;cvmlcpp/volume/Geometry&gt;
+#include &lt;cvmlcpp/volume/SurfaceExtractor&gt;
+#include &lt;cvmlcpp/volume/VolumeIO&gt;
+
+using namespace cvmlcpp;
+
+Matrix&lt;char, 3&gt; voxels;
+readArray(voxels, "voxels.dat");
+Geometry&lt;float&gt; geometry;
+
+// Use greater precision during calculations
+SurfaceExtractor&lt;double&gt;::extract(voxels, geometry);
+</pre>
+
+</p>
+
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

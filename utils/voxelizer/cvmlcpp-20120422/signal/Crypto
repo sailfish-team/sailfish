@@ -1,0 +1,84 @@
+/***************************************************************************
+ *   Copyright (C) 2008 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You shoud have received a copy of the GNU General Public License      *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_CRYPTO_H
+#define CVMLCPP_CRYPTO_H 1
+
+void UHash24 (uint8_t *msg, uint8_t *secret, std::size_t len, uint8_t *result)
+{
+	uint8_t r1 = 0, r2 = 0, r3 = 0, s1, s2, s3, byteCnt = 0, bitCnt, byte;
+
+	// for each byte in the message
+	while (len-- > 0)
+	{
+		if (byteCnt-- == 0)
+		{
+			s1 = *secret++;
+			s2 = *secret++;
+			s3 = *secret++;
+			byteCnt = 2;   
+		}
+		byte = *msg++;
+
+		// for each bit in the message ...
+		for (bitCnt = 0; bitCnt < 8; ++bitCnt)
+		{
+			if (byte & 1)
+			{
+				// msg not divisible by x
+				r1 ^= s1; // so add s * 1
+				r2 ^= s2;
+				r3 ^= s3;
+			}
+
+			byte >>= 1; // divide message by x ...
+			if (s3 & 0x80)
+			{
+				/*
+				 * ... and multiply secret with x, subtracting
+				 * the polynomial when necessary to keep it's 
+				 * order under 24
+				 */
+				s3 <<= 1;
+				if (s2 & 0x80) s3 |= 1;
+				s2 <<= 1;
+				if (s1 & 0x80) s2 |= 1;
+				s1 <<= 1;
+			
+				s1 ^= 0x1B; /* x^24 + x^4 + x^3 + x + 1 */
+			}
+			else {
+				s3 <<= 1;
+				if (s2 & 0x80) s3 |= 1;
+				s2 <<= 1;
+				if (s1 & 0x80) s2 |= 1;
+				s1 <<= 1;
+			}
+		}
+	}
+
+	*result++ ^= r1;
+	*result++ ^= r2;
+	*result++ ^= r3;
+}
+
+} // namespace
+
+#endif 

@@ -1,0 +1,309 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Communication</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Communication</h1>
+
+<p>
+The <b>Communication</b> toolkit is designed to make digital communication using
+error control codes easy. It offers a generic interface that combines elements
+of communication such as the <a href='Channel.html'>channel</a> and
+<a href='LDPCCode.html'>LDPC-codes</a>, and transparantly handles modulation
+and demodulation. Note that any binary code based on parity bits, such as
+hamming-codes and turbo-codes, can be seen as special cases of LDPC-codes.
+</p>
+
+<p>
+In short, communication following the framework implemented in
+<b>Communication</b> is considered to be comprised to the following elements and
+events. Suppose a Alice wishes to send a message to Bob.
+<ol>
+
+<li>Each message will have <i>K</i> bits. If Alice needs to communicate
+more than that, several messages have to be sent according to the same
+procedure.</li>
+
+<li> The message is first encoded with an LDPC-code to form a <i>N</i>-bit
+codeword, where <i>N &gt; K</i>. One codeword is uniquely associated with
+each mesage.</li>
+
+<li>This codeword is then modulated, which means that it is mapped onto a vector
+of symbols of a given alphabet. Each symbol represents an equal and integer
+number of bits, which implies that the cardinality of the alphabet must be a
+power of two. This vector of symbols is the channel input. Individual symbols
+will be referred to as <i>x</i>, the entire vector will be denoted as
+<i><b>x</b></i>.</li>
+
+<li>Alice will then send the channel input over the channel. The channel
+is, in a mathematical sense, essentially a mathematical model of distortions
+introduced to the channel input. Alice has now completed her part.</li>
+
+<li>The channel output is the result of the process of introducing distortions
+to the codeword by the channel, that is, according to the mathematical model
+prescribed by the definition of the channel. The channel output is in effect a
+vector of measurements of what has appeared at the end of channel, obtained by
+Bob. For each input symbol, one measurement is produced. One measurement is
+denoted as <i>y</i>, the vector of all measurements is denoted as
+<i><b>y</b></i>. In this implementation, the channel is always assumed to be in
+the class of Discrete Memoryless Channels, see <a
+href='Channel.html'>Channel</a> for details.</li>
+
+<li>The channel output <i><b>y</b></i> is then de-modulated, meaning that is is
+mapped onto <i>N</i> probabilities. For each bit of the codeword, a probability
+is generated that that bit was one in the original codeword. Each measurement
+<i>y</i> is de-modulated independently, by the assumption of the discrete
+memoryless property of the channel.</li>
+
+<li>Bob then provides the vector of probabilities as input to a decoding
+algorithm, which will try to infer which codeword was sent over the channel, and
+hence which message was sent. The final output is an estimate of the sent
+message. If the code is correctly chosen given the channel, this estimate is
+with very high probability the message sent by Alice. Thus, Bob has received
+the message and the communication is complete.</li>
+
+</ol>
+</p>
+
+<h2>Interface</h2>
+
+<p>
+The <b>Communication</b> toolkit offers a single class, <i>Communicator</i> to
+handle all the communication steps. Because the <i>Communicator</i> combines
+encoding, modulation, demodulation and decoding, is requires many template
+parameters:
+<pre>
+template &lt;std::size_t N, std::size_t K,
+	  typename Input, typename Output, std::size_t N_SYMBOLS&gt;
+class Communicator;
+</pre>
+The following table shows where the template parameters stem from:
+<table border='1'>
+<tr>
+	<td><pre> std::size_t N</pre></td>
+	<td>See <a href='LDPCCode.html'>LDPCCode</a>.</td>
+</tr>
+<tr>
+	<td><pre> std::size_t K</pre></td>
+	<td>See <a href='LDPCCode.html'>LDPCCode</a>.</td>
+</tr>
+<tr>
+	<td><pre> typename Input</pre></td>
+	<td>The type of the channel input symbols, must be an integer
+	type.</td>
+</tr>
+<tr>
+	<td><pre> typename Output</pre></td>
+	<td>The type of the channel output.</td>
+</tr>
+<tr>
+	<td><pre> std::size_t N_SYMBOLS</pre></td>
+	<td>The number of different possible channel inputs, i.e. the
+	cardinality of the channel input alphabet. Must be a power of two.</td>
+</tr>
+</table>
+</p>
+
+<p>
+A <i>Communicator</i> needs to be instanciated before it can be used, and it
+uses several components: a code, a default channel, and a set of symbols that
+comprise the alphabet of the channel input after modulation. Each of this can be
+specified during construction of a <i>Communicator</i>. The main member
+functions offered by <i>Communicator</i> are <i>encode(...)</i> and
+<i>decode(...)</i>. It is possible the specify another channel than the default
+channel during decoding.
+</p>
+
+<p>
+To ease the use of this code, some rather complicated jobs can be done
+automagically by the <b>Communication</b> toolkit:
+<ul>
+<li>Modulation and de-modulation is handled transparantly in an optimal way
+assuming that bits in codeword appear are equally distributed.</li>
+
+<li>The input alphabet can be generated uniformly distrubuted over the
+range provided by the type <i>Input</i> with maximal spacing.</li>
+
+<li>When no code is provided, a code will be automatically generated,
+which requires <i>N</i> to be a multiple of <i>K</i>.</li>
+</ul>
+The only thing that cannot be handled automatically is the selection of a
+channel.
+</p>
+
+<p>
+The class <i>Communicator</i> providef the following typedefs, constants and
+memebr functions:
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>typedef GeneratorMatrix;</pre></td>
+	<td>Typedef for a generator-matrix for the selected <i>N-K</i> code.
+	Such a code should be used with this Communicator. See
+	<a href='LDPCCode.html'>LDPCCode</a>.</td>
+</tr>
+
+<tr>
+	<td><pre>typedef ChannelPtr;</pre></td>
+	<td>Typedef for a shared-pointer to a
+	<i>Channel&lt;Input, Output&gt;</i>. Such a channel should be used with
+	this Communicator.</td>
+</tr>
+
+<tr>
+	<td><pre>typedef CodePtr;</pre></td>
+	<td>Typedef for a shared-pointer to a <i>Code&lt;N, K&gt;</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>typedef InputArray;</pre></td>
+	<td>Typedef for an STL-compliant array of length N_SYMBOLS that can be
+	used to hold all different channel input symbols.
+	</td>
+</tr>
+<!--
+<tr>
+	<td><pre>static const std::size_t P;</pre></td>
+	<td></td>
+</tr>-->
+
+<tr>
+	<td><pre>static const std::size_t LENGTH;</pre></td>
+	<td>The number of input symbols needed to represent one N-bit codeword 
+	derived from an K-bit message.</td>
+</tr>
+
+<tr>
+	<td><pre>Communicator();</pre></td>
+	<td>Default constructor that assumes a
+	<a href='Channel.html'>NoiselessChannel</a> as the default channel,
+	and generate a default code as well as the channel input alphabet
+	automatically.</td>
+</tr>
+
+<tr>
+	<td><pre>Communicator(ChannelPtr defaultChannel);</pre></td>
+	<td>Assume <i>defaultChannel</i> as the default channel, and
+	generate a code as well as the channel input alphabet
+	automatically.</td>
+</tr>
+
+<tr>
+	<td><pre>Communicator(ChannelPtr defaultChannel,         &nbsp;
+	       const GeneratorMatrix &amp;generator);</pre></td>
+	<td>Assume <i>defaultChannel</i> as the default channel, and use
+	<i>generator</i> to generate a code. The channel input alphabet is
+	generated automatically.</td>
+</tr>
+
+<tr>
+	<td>
+	<pre>Communicator(ChannelPtr defaultChannel,
+	       CodePtr code);</pre>
+	</td>
+	<td>Assume <i>defaultChannel</i> as the default channel and use
+	LDPC-code <i>code</i>. The channel input alphabet is generated
+	automatically.</td>
+</tr>
+
+<tr>
+	<td><pre>Communicator(ChannelPtr defaultChannel,
+	       const InputArray &amp;symbols);</pre></td>
+	<td>Assume <i>defaultChannel</i> as the default channel and use
+	<i>symbols</i> as the channel input alphabet. A code is generated
+	automatically.</td>
+</tr>
+
+<tr>
+	<td><pre>Communicator(ChannelPtr defaultChannel,
+	       const GeneratorMatrix &amp;generator,
+	       const InputArray &amp;symbols);</pre></td>
+	<td>Assume <i>defaultChannel</i> as the default channel, use
+	<i>generator</i> to generate a code and use <i>symbols</i> as the
+	channel input alphabet.</td>
+</tr>
+
+<tr>
+	<td><pre>Communicator(ChannelPtr defaultChannel,
+	       CodePtr code,
+	       const InputArray &amp;symbols);</pre></td>
+	<td>Assume <i>defaultChannel</i> as the default channel, use
+	LDPC-code <i>code</i> and use <i>symbols</i> as the channel input
+	alphabet.</td>
+</tr>
+
+<tr>
+	<td><pre>
+  template &lt;typename InputIterator,
+	    typename OutputIterator&gt;
+  bool encode(InputIterator first1,
+	      OutputIterator first2);</pre></td>
+	<td>Encodes and modulates a message. Reads elements starting from
+	<i>first1</i> until at least <i>K</i> message bits have been read,
+	then writes <i>LENGTH</i> symbols of type <i>Input</i> to <i>first2</i>.
+	</td>
+</tr>
+
+<tr>
+	<td><pre>
+  template &lt;typename InputIterator,
+	    typename OutputIterator&gt;
+  bool decode(InputIterator first1,
+	      OutputIterator first2,
+	      const ChannelPtr channel);</pre></td>
+	<td>Reads <i>LENGTH</i> symbols of type <i>Output</i> from
+	<i>first1</i>. De-modulates and decodes using the code supplied in
+	the constructor. Writes elements to the range starting at <i>first2</i>
+	until at least <i>K</i> bits have been written.</td>
+</tr>
+
+<tr>
+	<td><pre>
+  template &lt;typename InputIterator,
+	    typename OutputIterator&gt;
+  bool decode(InputIterator first1,
+	      OutputIterator first2);</pre></td>
+	<td>Uses the default channel model as given during construction to
+	demodulate.</td>
+</tr>
+
+<tr>
+	<td><pre>const InputArray &amp;symbols() const</pre></td>
+	<td>Returns a reference to an array of symbols used as channel inputs.</td>
+</tr>
+
+<tr>
+	<td><pre>void print() const;</pre></td>
+	<td>Print the code, see <a href='LDPCCode.html'>LDPCCode</a>.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h3>Generation of Input Alphabet</h3>
+
+<p>
+To automatically generate an input alphabet, the following function is used:
+<pre>
+template &lt;typename Input, std::size_t NInputs&gt;
+std::tr1::array&lt;Input, NInputs&gt; generateAlphabet();
+</pre>
+</p>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

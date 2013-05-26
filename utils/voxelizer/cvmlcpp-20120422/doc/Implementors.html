@@ -1,0 +1,107 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Implementors</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Notes for Implementors</h1>
+
+<p>
+The project is currently under supervision of a "Project Leader" whose birth was
+foretold by a swallow. The project leader writes code, accepts patches, and
+periodically creates new releases.
+</p>
+
+<p>
+The project leader can be contacted by email:<br />
+<i>Fokko</i> DOT <i>Beekhof</i> AT <i>unige</i> DOT <i>ch</i>
+</p>
+
+<h2>Updates to the Code</h2>
+
+<p>
+Please mail patches to the project leader! When a patch is reviewed and accepted
+it will be incorporated in the next release. Make sure you update the
+documentation and the corresponding test program as well! Updating the
+documentation is likely to take as much time as programming. The same goes for
+testing.
+</p>
+
+<p>
+Please respect the coding style:
+<ul>
+	<li>A <i>tab</i> is tab and not spaces and its width is 8.</li>
+	<li>Use 80 columns, i.e. upto 80 characters per line.</li>
+	<li>Comments, variables names etc. all in English.</li>
+</ul>
+Regarding brackets et cetera, please follow this example:
+<pre>
+	// Give example of one statement
+	for (int i = 0; i &lt; 10; ++i)
+		oneStatement();
+
+	// Show position of brackets &amp; handling of long statements.
+	if ( (aLongConditionForcesTheSecondCondidtionToTheNextLine()) ||
+	     (whatever == 7) )
+	{
+		int a = 3;
+		int b = 8;
+		....
+	}
+</pre>
+</p>
+
+<h2>Dependencies</h2>
+
+<p>
+All code is assumed to depend on the presence of the
+<a href="http://www.sgi.com/tech/stl/">Standard Template Library</a> and
+possibly <a href="http://www.boost.org/">BOOST</a>.
+</p>
+
+<p>
+Please use <i>ifdefs</i> to ensure that other dependencies can be prevented. For
+example, <a href="http://www.mpi-forum.org/">MPI</a>-related code should be
+enabled only when <i>USE_MPI</i> is defined. The code should compiler whether of
+not a <i>USE_</i> flag is defined or not, but if a flag is defined, extra
+dependencies on external libraries or headers are acceptable.
+</p>
+
+<h2>Test Code</h2>
+
+<p>
+For each module or file in CVMLCPP there should be a test program. All test
+programs live in the <i>testing</i> directory. A test program should try as much
+as possible of the functionality of a given part of the CVMLCPP and use asserts
+to verify that everything is as it should be. Print statements should be
+avoided.
+</p>
+
+<h2>Contributions</h2>
+
+<ul>
+	<li>Robert Rumpf: patch for OMPTL</li>
+	<li>Alessandro Volz: Testing various CVMLCPP trunks...</li>
+	<li>Dibyendu Das: OMPTL bugfix</li>
+	<li>Dominic Couture-Savoie: OMPTL bugfix</li>
+	<li>Bartosz Tomicki: OMPTL bugfix</li>
+	<li>Bernd Stahl: Testing the voxelizer</li>
+	<li>Joel Yliluoma: OpenMP enhancements for OMPTL</li>
+	<li>Orestis Malaspinas: Newton-Raphson procedure</li>
+	<li>Fokko Beekhof: Everything else...</li>
+</ul>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

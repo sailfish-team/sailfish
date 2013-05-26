@@ -1,0 +1,91 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Storage</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Storage</h1>
+
+The <b>Storage</b> facility allows one to store key-value pairs for any type of
+values, the keys are allways strings. Values can be associated with only a key,
+or with a key and an index, like in an array. There is only one instance of
+<b>Storage</b> in any given program, namespaces are supported to allow
+compartimentalization.
+
+<h2>Interface</h2>
+
+<p>
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>std::string &amp;nameSpace()</pre></td>
+	<td>Return the current namespace.</td>
+</tr>
+
+<tr>
+	<td><pre>void setNameSpace(std::string newNameSpace)</pre></td>
+	<td>Change to a different namespace.</td>
+</tr>
+
+<tr>
+	<td><pre>void clearNameSpace()</pre></td>
+	<td>Return to the root namespace.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;class T&gt;
+void store(const std::string key, const T value)</pre></td>
+	<td>Store the given <i>value</i> under the given <i>key</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;class T&gt;
+void store(const std::string key, const T value, std::size_t index)</pre></td>
+	<td>Store the given <i>value</i> under the given <i>key</i> with
+		the specified <i>index</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;class T&gt;
+T &amp;retrieve(std::string key)</pre></td>
+	<td>Given a <i>key</i>, return the value associated with it.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;class T&gt;
+T &amp;retrieve(std::string key, std::size_t index)</pre></td>
+	<td>Given a <i>key</i> and an <i>index</i>, return the value associated
+		with it.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;class T&gt;
+bool hasKey(const std::string key)</pre></td>
+	<td>Returns true if a stored value of type <i>T</i> exists for the
+		given <i>key</i>.</td>
+</tr>
+
+<!-- Template
+<tr>
+	<td><pre></pre></td>
+	<td>.</td>
+</tr>
+-->
+
+</table>
+</p>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

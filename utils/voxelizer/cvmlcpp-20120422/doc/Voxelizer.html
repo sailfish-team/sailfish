@@ -1,0 +1,424 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Voxelizer</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Voxelizer</h1>
+
+The <b>Voxelizer</b> uses a robust, high-performance algorithm that converts a
+surface model in 3D into voxel data, as described in
+<a href='http://www-static.cc.gatech.edu/~turk/my_papers/volumetric_simp.pdf'>
+this paper</a>, and can handle broken input fairly well. The reverse operation
+is performed by the <a href='SurfaceExtractor.html'>SurfaceExtractor</a>.
+
+<p>
+<b>Voxelizer</b> can be used with either <a href='Matrix.html'>Matrix</a>, boost's
+<a href='http://www.boost.org/libs/multi_array/doc/index.html'>multi_array</a>,
+or with <a href='http://www.oonumerics.org/blitz'>Blitz++</a>'s
+Array through <a href='BlitzArray.html'>BlitzArray</a>.
+Additionally, the Voxelizer depends on <a href='Geometry.html'>Geometry</a>.
+</p>
+
+<p>Alternatively, <b>Voxelizer</b> can output Octrees implemented as a
+3-dimensional <a href='DTree.html'>DTree</a>. This representation usually 
+requires much less memory and the voxelization is usually significantly faster.
+</p>
+
+<p>
+It is also posisble to determine which fraction of the voxels is filled by the
+geometry. A seperate function exists that produces fractions in stead of a
+binary decision.
+</p>
+
+<p>
+<b>Note:</b> <a href='http://meshlab.sourceforge.net/'>MeshLab</a> can be used
+to correct facet representations or to convert other datatypes to STL. 
+</p>
+
+<h2>Interface</h2>
+
+The Voxelizer can be partially parallelized by using
+<a href='http://www.openmp.org/'>OpenMP</a>.
+
+<p>
+<b>Note:</b> the typename <i>matrix_type</i> is used to denote either one of
+the accepted matrix types.
+</p>
+
+<p>
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>template &lt;typename Tg, typename voxel_type&gt;
+  bool voxelize(const Geometry&lt;Tg&gt; &amp;geometry,
+		matrix_type&lt;voxel_type, 3&gt; &amp;voxels,
+		const value_type voxelSize = 1.0,
+		const std::size_t	 pad = 0u,
+		const voxel_type inside = 1,
+		const voxel_type outside = 0);                </pre></td>
+	<td>Voxelize a given geometry and store a representation in voxels
+		in a 3D matrix.<br />
+	The size of the geometry and the voxels, together with the padding,
+	determine the size of the matrix. Parameters:
+	<ul>
+		<li><i>geometry</i> The geometry to voxelize.</li>
+		<li><i>matrix</i> The matrix that will contain the voxels.
+			The matrix will be resized automatically.</li>
+		<li><i>voxelSize</i> The size of voxels.</li>
+		<li><i>inValue</i> The value given to elements of the matrix
+		 		which are found to be inside the geometry.</li>
+		<li><i>outValue</i> The value given to elements of the matrix
+		  		which are found to be outside the geometry.</li>
+		<li><i>pad</i> A number of extra cells around the outer
+		  		dimensions of the geometry.</li>
+	</ul>
+	</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename Tg, typename Tf, typename voxel_type&gt;
+  bool fractionVoxelize(const Geometry&lt;Tg&gt;  &amp;geometry,       &nbsp;
+			Matrix_t&lt;Tf, 3u, A&gt; &amp;voxelFractions,
+			const double voxelSize,
+			std::size_t samples = 16u,
+			std::size_t pad = 0u)&nbsp;&nbsp;&nbsp;&nbsp;</pre></td>
+	<td>Voxelize a given geometry and store a representation in fractions of
+		voxels in a 3D matrix.<br />
+	The size of the geometry and the voxels, together with the padding,
+	determine the size of the matrix. Parameters:
+	<ul>
+		<li><i>geometry</i> The geometry to voxelize.</li>
+		<li><i>voxelFractions</i> The matrix that will contain the
+			fractions of the voxels. Type <i>Tf</i> must be a
+			floating-point type.
+			The matrix will be resized automatically.</li>
+		<li><i>voxelSize</i> The size of voxels.</li>
+		<li><i>samples</i> The number of samples along each dimension
+			 of the voxels.</li>
+		<li><i>pad</i> A number of extra cells around the outer
+		  		dimensions of the geometry.</li>
+	</ul>
+	</td>
+</tr>
+
+
+<tr>
+	<td><pre>template &lt;typename Tg, typename voxel_type&gt;
+  bool voxelize(const Geometry&lt;Tg&gt;  &amp;geometry,
+		DTree&lt;voxel_type, 3u&gt; &amp;voxels,
+		const double voxelSize,
+		const voxel_type inside = 1, 
+		const voxel_type outside = 0)&nbsp;&nbsp;&nbsp;&nbsp;</pre></td>
+	<td>Voxelize to an Octree.
+	<ul>
+		<li><i>geometry</i> The geometry to voxelize.</li>
+		<li><i>voxels</i> The Octree that will contain the voxels.</li>
+		<li><i>voxelSize</i> The size of voxels.</li>
+		<li><i>inValue</i> The value given to elements of the matrix
+		 		which are found to be inside the geometry.</li>
+		<li><i>outValue</i> The value given to elements of the matrix
+		  		which are found to be outside the geometry.</li>
+	</ul>
+	</td>
+</tr>
+
+<!-- Template
+<tr>
+	<td><pre></pre></td>
+	<td>.</td>
+</tr>
+-->
+
+</table>
+</p>
+
+<h3>Fraction Voxelizing Explained</h3>
+
+<p>
+Instead of producing a binary "in-or-out" decision, fraction voxelization will 
+sample the space taken by a voxel and determine what fraction of it lies within 
+the geometry. The complexity of the method is exponential in the precision of 
+the result.
+</p>
+
+<p>
+The output is in the range <i>[0, 1]</i>, where 0 means "completely outside",
+and 1 means "completely inside". Values inbetween correspond to the fraction of
+the voxel that is filled by the geometry.
+</p>
+
+<p>
+The advantage of the method is that it doesn't require much more memory than
+regular voxelization, nor complex analytical solutions.
+</p>
+
+<p>
+A disadvantage of the method is the complexity. The function takes a parameter
+<i>samples</i>, which is the number of samples in each of the 3 dimensions <i>X
+Y</i>. Thus, if <i>samples</i> is <i>4</i>, as used in the example section below,
+the algorithm will examine <i>4^3</i> sub-voxels per voxel, producing 64 possible 
+values, which shows that the resulting precision is 6 bits. Each sample requies 
+one "regular" voxelization, hence, the number of voxelizations equals 
+<i>samples^3</i>; and the coresponding precision will be <i>log_2(samples^3)</i>.
+<br />
+Conversely, the number of required number of voxelizations is exponential in
+the obtained precision. Therefore, anything more than 16 bit precision is
+probably not feasible.
+</p>
+
+<h3>Voxel-Center Distances</h3>
+
+<p>
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>template &lt;typename Tg, typename voxel_type, typename Td&gt;
+  bool distances(const Geometry&lt;Tg&gt; &geometry,
+	const DTree&lt;voxel_type, 3u&gt; &voxels,
+	const double voxelSize,
+	const std::vector&lt;iPoint3D&gt; &directions,
+	std::map&lt;std::size_t, /* DNode id */
+		 std::vector&lt;std::pair&lt;int, Td&gt; &gt; &gt; & distances,
+	const voxel_type inside = 1)</pre></td>
+	<td>See text.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;template &lt;typename Tm, std::size_t D, typename Aux&gt; class Matrix_t,&nbsp;&nbsp;
+	  typename Tg, typename voxel_type, typename A, typename Td&gt;
+  bool distances(const Geometry&lt;Tg&gt; &geometry,
+	const Matrix_t&lt;voxel_type, 3u, A&gt; &voxels,
+	const double voxelSize,
+	const std::vector&lt;iPoint3D&gt; &directions,
+	std::map&lt;iPoint3D, std::vector&ltstd::pair&lt;int, Td&gt; &gt; &gt; & distances,
+	const std::size_t pad = 0u, const voxel_type inside = 1)</pre></td>
+	<td>See text.</td>
+</tr>
+
+</table>
+</p>
+
+	
+<p>Given a 3D volume where 'geometry' is a facet representation and
+<i>voxels</i> an octree- or matrix representation of the same volume, the 
+function <i>distances</i> calculates the distances from the center of each 
+voxel to the nearest facet along the vectors in 'directions'. 
+</p>
+
+<p>
+Given two representations of the same 3D volume in facets and an octree
+by <i>geometry</i> and <i>voxels</i> respectively, calculate distances
+in voxel units from the center of voxels to the closest facet along
+the indicated <i>directions</i>. <i>voxelSize</i> must be the parameter
+passed to the <i>voxelize()</i> function that was used to transform
+<i>geometry</i> into <i>voxels</i>. The <i>directions</i> are vectors that
+indicate in which direction the distance to the facets is to be found. The 
+direction vectors are understood to be contained within the voxel, and 
+expressed relative to half the voxelsize, i.e. a vector [1,1,1] measures 
+from the center to a corner. The direction vectors should therefor be composed 
+out of values from the set <i>[-1, 0, 1]</i> only. The optional parameter 
+<i>inside</i> is to indicate for which voxels the distances should be 
+calculated. For matrices of voxels, the parameter <i>pad</i> should also be 
+identical to the one passed to <i>voxelize</i>, or in both cases be omitted.
+</p>
+
+<p>
+The calculated distances are in lattice units, i.e. a distance from one voxel 
+center to one directly adjacent center is one. Note that the size of the 
+lattice units varies in octrees. Due to diagonal directions, the distances are in
+the range <i>[0 ... sqrt(3)]</i>. If a distance is larger, than this is either to
+numerical error, or due to errors in the facet representation.
+</p>
+
+<p>
+The data calculated will be placed in <i>distances</i>, which is a mapping from
+a location to a vector of direction-index-and-distance pairs. For voxel 
+matrices, the location is indicated by an <i>iPoint3D</i>, for octrees, the
+location is indicated by the <i>id</i> of the node. The node can be retrieved
+from the tree using the <i>retrieve()</i> member function documented in
+<a href="DTree.html">DTree</a>. For convenience, a member function 
+<i>index_trail()</i> can be used to help deduce the location of the node in the
+tree.
+</p>
+
+<p>
+The functions return <i>true</i> if for all directions a distance was found,
+and <i>false</i> if any were missed. Facet-representations are often 
+inconsistent, or ill-formed, i.e. have missing facets, or have overlapping 
+facets, et cetera. Although the voxelization procedure is somewhat robust to
+such errors in the input, the <i>distances</i> functions are not.
+</p>
+
+<p>
+The current implementation is fairly basic, and not optimized for speed. It will
+iterate over the all voxels, all directions, and all facets, thus creating a
+5-fold nested loop. Inside this loop is a matrix inversion. There is no
+parallelization at this point.
+</p>
+
+<p>
+<b>Note:</b> The return value for the <i>distances</i> function is currently bogus.
+</p>
+
+<h2>Example</h2>
+
+<h3>Simple Voxelization</h3>
+
+Read an STL file and voxelize it:
+<pre>
+#include &lt;cvmlcpp/base/Matrix&gt;
+#include &lt;cvmlcpp/volume/Geometry&gt;
+#include &lt;cvmlcpp/volume/VolumeIO&gt;
+#include &lt;cvmlcpp/volume/Voxelizer&gt;
+
+using namespace cvmlcpp;
+
+int main(int argc, char **argv)
+{
+	Matrix&lt;int, 3u&gt; voxels;
+	Geometry&lt;float&gt; geometry;
+
+	readSTL(geometry, "cube.stl");
+
+	voxelize(geometry, voxels);
+
+	return 0;
+}
+
+</pre>
+
+<h3>Fraction Voxelization</h3>
+
+<pre>
+Geometry&lt;float&gt; geometry;
+readSTL(geometry, "cube.stl");
+
+Matrix&lt;float, 3u&gt; fract;
+std::size_t pad = 1;
+std::size_t samples = 4;
+double voxelSize = 0.1;
+fractionVoxelize(geometry, fract, voxelSize, samples, pad);
+
+double weight = 0.0;
+for (std::size_t x = 0u; x &lt; 12; ++x)
+for (std::size_t y = 0u; y &lt; 12; ++y)
+for (std::size_t z = 0u; z &lt; 12; ++z)
+	weight += fract[x][y][z];
+assert(std::abs(weight - 1000.0) &lt; 0.1);
+</pre>
+
+<h3>Voxelization to Octree</h3>
+
+<pre>
+Geometry&lt;float&gt; geometry;
+readSTL(geometry, "cube.stl");
+
+// Calculate a proper voxel size
+const double nrVoxels = 1024;
+double maxGeometrySize = 0.0;
+for (std::size_t d = 0; d &lt; 3; ++d)
+	maxGeometrySize = std::max(maxGeometrySize, double(geometry.max(d))-double(geometry.min(d)));
+const double voxelSize = maxGeometrySize / nrVoxels;
+
+DTree&lt;short int, 3u&gt; octree(0);
+voxelize(geometry, octree, voxelSize);
+
+std::cout &lt;&lt; d &lt;&lt; std::endl;
+</pre>
+
+<h3>Distances</h3>
+<p>
+<pre>
+#include &lt;cvmlcpp/base/StringTools&gt;
+#include &lt;cvmlcpp/volume/DTree&gt;
+#include &lt;cvmlcpp/volume/Geometry&gt;
+#include &lt;cvmlcpp/volume/VolumeIO&gt;
+#include &lt;cvmlcpp/volume/Voxelizer&gt;
+
+int main(int argc, char **argv)
+{
+	using namespace cvmlcpp;
+
+	// Read facet data
+	Geometry&lt;float&gt; g;
+	if (argc &gt;= 2)
+		assert(readSTL(g, argv[1]));
+	else
+		assert(readSTL(g, "cube.stl"));
+
+	// Determine voxelSize
+	double voxelSize;
+	if (argc == 3)
+		voxelSize = std::atof(argv[2]);
+	else
+		voxelSize = 0.1;
+
+	// Voxelize
+	DTree&lt;char, 3u&gt; octree(0);
+	assert(voxelize(g, octree, voxelSize));
+
+	// D3Q15, I think
+	std::vector&lt;iPoint3D&gt; directions;
+	directions.push_back(iPoint3D( 0, 0, 0));
+
+	directions.push_back(iPoint3D( 1, 0, 0));
+	directions.push_back(iPoint3D( 0, 1, 0));
+	directions.push_back(iPoint3D( 0, 0, 1));
+
+	directions.push_back(iPoint3D(-1, 0, 0));
+	directions.push_back(iPoint3D( 0,-1, 0));
+	directions.push_back(iPoint3D( 0, 0,-1));
+
+	directions.push_back(iPoint3D( 1, 1, 1));
+	directions.push_back(iPoint3D( 1, 1,-1));
+	directions.push_back(iPoint3D( 1,-1, 1));
+	directions.push_back(iPoint3D(-1, 1, 1));
+	directions.push_back(iPoint3D(-1,-1, 1));
+	directions.push_back(iPoint3D(-1, 1,-1));
+	directions.push_back(iPoint3D( 1,-1,-1));
+	directions.push_back(iPoint3D(-1,-1,-1));
+
+	// Calculate distances
+	std::map&lt;std::size_t, std::vector&lt;std::pair&lt;int, double&gt; &gt; &gt; dists;
+	assert(distances(g, octree, voxelSize, directions, dists));
+
+	typedef std::map&lt;std::size_t, std::vector&lt;std::pair&lt;int, double&gt; &gt; &gt;::const_iterator map_const_iterator;
+	for (map_const_iterator mi = dists.begin(); mi != dists.end(); ++mi)
+	{
+		const std::size_t node_id = mi-&gt;first;
+		
+		octree.retrieve(node_id);
+		const std::vector&lt;DTree&lt;char, 3u&gt;::index_t&gt;
+			trail = octree.retrieve(node_id).index_trail();
+		std::cout &lt;&lt; node_id &lt;&lt; to_string(trail.begin(), trail.end()) &lt;&lt; std::endl;
+		typedef std::vector&lt;std::pair&lt;int, double&gt; &gt;::const_iterator vec_const_iterator;
+		for (vec_const_iterator vi = mi-&gt;second.begin(); vi != mi-&gt;second.end(); ++vi)
+		{
+			const int direction_index = vi-&gt;first;
+			const double distance     = vi-&gt;second;
+			std::cout &lt;&lt; "\t" &lt;&lt; direction_index &lt;&lt; " " 
+				&lt;&lt; directions[direction_index].to_string() &lt;&lt; " " 
+				&lt;&lt; distance &lt;&lt; std::endl;
+			assert(direction_index &gt; 0); // should skip (0, 0, 0) direction
+		}
+	}
+
+	return 0;
+}
+</pre>
+</p>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+
+<!-- Begin Page -->
+
+<h1>Common Versatile Multi-purpose Library for C++</h1>
+
+<p>
+The purpose of this C++ library is to offer common useful features that are not
+already found in the
+<a href="http://www.sgi.com/tech/stl/">Standard Template Library</a> or in
+<a href="http://www.boost.org/">BOOST</a>. It is assumed that users of the
+library are familiar with both, and both are required by this library.
+</p>
+
+<p>
+See the <a href="ReleaseNotes.html">Release Notes</a> for changes and open
+issues per release.
+</p>
+
+<h2>Namespaces</h2>
+
+Everything except the OMPTL lives in the namespace <i>cvmlcpp</i>. The OMPTL
+lives in a separate namespace <i>omptl</i>.
+
+<h2>Compiling and Linking</h2>
+
+<p>
+Compiling requires the presence of <a href='http://www.boost.org/'>boost</a>'s
+headers. You may need to link programs using cvmlcpp against <i>libcvmlcpp</i>,
+i.e. use <i>-lcvmlcpp</i>, but this usually not needed.
+</p>
+
+<p>
+Cvmlcpp uses a simple <a href='Build.html'>build system</a>, this can also be
+used for external projects.
+</p>
+
+<h2>Library Structure</h2>
+
+<p>
+<table border='1'>
+<tr>
+	<td align='center'>array<br />[Array toolkit]</td>
+	<td>
+		<table border='1' width='100%'>
+		<tr>
+			<td><a href="BlitzArray.html">BlitzArray</a></td>
+			<td>Wrapper providing compatibility between CVMLCPP
+			and the
+<a href='http://www.oonumerics.org/blitz/docs/blitz_2.html#SEC34'>array</a>
+			class of the
+			<a href='http://www.oonumerics.org/blitz/'>blitz++</a>
+			object-oriented scientific computing library</td>
+		</tr>
+		<tr>
+			<td><a href="ArrayIO.html">ArrayIO</a></td>
+			<td>IO for arrays.</td>
+		</tr>
+		</table>
+	</td>
+</tr>
+
+<tr>
+	<td align='center'>base<br />[Basic structures]</td>
+	<td>
+		<table border='1' width='100%'>
+
+		<tr>
+			<td><a href="Allocators.html">Allocators</a></td>
+			<td>Memory allocators.</td>
+		</tr>
+		<tr>
+			<td><a href="COW.html">Copy-On-Write</a></td>
+			<td>Memory-efficient resource-management.</td>
+		</tr>
+		<tr>
+			<td><a href="CyclicBuffer.html">CyclicBuffer</a></td>
+			<td>A cyclic container, useful for storing the
+			last <i>N</i> values from a given source.</td>
+		</tr>
+		<tr>
+			<td><a href="DirectoryTokenizer.html">
+			DirectoryTokenizer</a></td>
+			<td>Recursive scanning of directories.</td>
+		</tr>
+		<tr>
+			<td><a href="Enums.html">Enums</a></td>
+			<td>Commonly used enumerations such as
+				<b>X Y Z</b></td>
+		</tr>
+		<tr>
+			<td><a href="Functors.html">Functors</a></td>
+			<td>Various useful functors, such as 'Select1st'.</td>
+		</tr>
+		<tr>
+			<td><a href="Holder.html">Holder</a></td>
+			<td>A framework for managing polymorphic objects
+			in containers.</td>
+		</tr>
+		<tr>
+			<td><a href="IDGenerators.html">IDGenerators</a></td>
+			<td>Various ways of generating unique identifiers
+				for different purposes.</td>
+		</tr>
+		<tr>
+			<td><a href="LogFile.html">Log</a></td>
+			<td>Log file manager.</td>
+		</tr>
+		<tr>
+			<td><a href="Matrix.html">Matrix</a></td>
+			<td>Regular and compressing resizable
+				<i>N</i>-dimensional Matrices.</td>
+		</tr>
+		<tr>
+			<td><a href="Meta.html">Meta</a></td>
+			<td>Meta-Programming tools.</td>
+		</tr>
+		<tr>
+			<td><a href="StopWatch.html">StopWatch</a></td>
+			<td>Time measurement.</td>
+		</tr>
+		<tr>
+			<td><a href="Storage.html">Storage</a></td>
+			<td>Generic storage facility for key/value pairs.</td>
+		</tr>
+		<tr>
+			<td><a href="StringTools.html">StringTools</a></td>
+			<td>Conversion of objects and ranges from and to
+				std::string.</td>
+		</tr>
+		<tr>
+			<td><a href="Vectors.html">Vectors</a></td>
+			<td>Mathematic Vectors and corresponding operators.</td>
+		</tr>
+		</table>
+	</td>
+</tr>
+
+<tr>
+	<td align='center'>math<br />[Mathematics Kit]</td>
+	<td>
+		<table border='1' width='100%'>
+		<tr>
+			<td><a href="Euclid.html">Euclid</a></td>
+			<td>Points, vectors, lines and triangles.</td>
+		</tr>
+		<tr>
+			<td><a href="Math.html">Math</a></td>
+			<td>Various Mathematical add-ons, including
+				Constants such as Pi, functions such as
+				log2(), procedures such as Newton-Raphson and
+				Runge-Kutta 4.</td>
+		</tr>
+		<tr>
+			<td><a href="Polynomial.html">Polynomial</a></td>
+			<td>Convenient representation of polynomials,
+			offers evaluation and derivation.</td>
+		</tr>
+		<tr>
+			<td><a href="Splines.html">Splines</a></td>
+			<td>Interpolation.</td>
+		</tr>
+		</table>
+	</td>
+</tr>
+
+
+<tr>
+	<td align='center'>signal<br />[Signal Processing Kit]</td>
+	<td>
+		<table border='1' width='100%'>
+
+		<tr>
+			<td><a href="Channel.html">Channel</a></td>
+			<td>A model of DMC commonucation channels.</td>
+		</tr>
+		<tr>
+			<td><a href="Communication.html">Communication</a></td>
+			<td>A toolkit for communication over a noisy channel using LDPC codes.</td>
+		</tr>
+		<tr>
+			<td><a href="Fourier.html">Fourier</a></td>
+			<td>Fourier transforms, frontend for
+			<a href='http://www.fftw.org/'>FFTW</a>.</td>
+		</tr>
+		<tr>
+			<td><a href="Histogram.html">Histogram</a></td>
+			<td>A histogram, behaving much like a container.</td>
+		</tr>
+		<tr>
+			<td><a href="LDPCCode.html">LDPCCode</a></td>
+			<td>Low-Density Parity Check Error-Correcting Codes
+			for communication.</td>
+		</tr>
+		<tr>
+			<td><a href="Processing.html">Processing</a></td>
+			<td>Standard functions such as convolution.</td>
+		</tr>
+		</table>
+	</td>
+</tr>
+
+<tr>
+	<td align='center'>volume<br />[Volume Processing Kit]</td>
+	<td>
+		<table border='1' width='100%'>
+		<tr>
+			<td><a href="DTree.html">DTree</a></td>
+			<td>Regular spatial trees such as Quadtrees and
+			Octrees.</td>
+		</tr>
+		<tr>
+			<td><a href="Facet.html">Facet</a></td>
+			<td>Facet templates for Geometry.</td>
+		</tr>
+		<tr>
+			<td><a href="Geometry.html">Geometry</a></td>
+			<td>Surface-models of 3D objects.</td>
+		</tr>
+		<tr>
+			<td><a href="VolumeIO.html">VolumeIO</a></td>
+			<td>IO for volume structures such as
+	<a href='http://en.wikipedia.org/wiki/STL_%28file_format%29'>STL</a>
+			files and 3D voxel arrays.</td>
+		</tr>
+		<tr>
+			<td><a href="GeometryTools.html">GeometryTools</a></td>
+			<td>Tools for Geometries.</td>
+		</tr>
+		<tr>
+			<td><a href="SurfaceExtractor.html">
+			SurfaceExtractor</a></td>
+			<td>Convert voxel data to a surface-model.</td>
+		</tr>
+		<tr>
+			<td><a href="Voxelizer.html">Voxelizer</a></td>
+			<td>Convert a surface-model to voxel data.</td>
+		</tr>
+		<tr>
+			<td><a href="VoxelTools.html">VoxelTools</a></td>
+			<td>Voxel-data processing tools.</td>
+		</tr>
+<!-- Template
+		<tr>
+			<td><a href=".html"></a></td>
+			<td>.</td>
+		</tr>
+-->
+		</table>
+	</td>
+</tr>
+
+<tr>
+	<td align='center'><a href='OMPTL.html'>
+		omptl</a><br />[OpenMP Template Library]</td>
+	<td>
+		<table border='1' width='100%'>
+		<tr>
+			<td>omptl_algorithm</td>
+			<td>An <a href='http://www.openmp.org/'>OpenMP</a> based
+ 			parallelization of the
+		<a href='http://www.sgi.com/tech/stl/stl_introduction.html'>
+		STL</a>'s
+<a href='http://www.sgi.com/tech/stl/table_of_contents.html'>algorithm</a>
+		library.</td>
+		</tr>
+		<tr>
+			<td>omptl_numeric</td>
+			<td>An <a href='http://www.openmp.org/'>OpenMP</a> based
+ 			parallelization of the
+		<a href='http://www.sgi.com/tech/stl/stl_introduction.html'>
+		STL</a>'s
+<a href='http://www.sgi.com/tech/stl/table_of_contents.html'>numeric</a>
+		library.</td>
+		</tr>
+		</table>
+	</td>
+
+<!-- Template
+	<td></td>
+	<td>
+		<table border='1' width='100%'>
+		<tr>
+			<td><a href=".html"></a></td>
+			<td></td>
+		</tr>
+		<tr>
+			<td><a href=".html"></a></td>
+			<td></td>
+		</tr>
+		</table>
+	</td>
+-->
+</tr>
+</table>
+</p>
+
+<h2>Contributions</h2>
+
+<p>
+Information about making contributions can be found at the page for
+<a href="Implementors.html">implementors</a>.
+</p>
+
+<h2>Disclaimer</h2>
+
+<p>
+Use at your own risk....
+</p>
+
+<!-- End Page -->
+</div>
+</body>
+</html>

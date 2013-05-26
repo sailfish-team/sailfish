@@ -1,0 +1,51 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; version 3.                              *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_STOPWATCH
+#define CVMLCPP_STOPWATCH 1
+
+#include <ctime>
+
+namespace cvmlcpp
+{
+
+class StopWatch
+{
+	public:
+		StopWatch() : start_(std::clock()) { }
+
+		void reset() { start_ = std::clock(); }
+
+		std::clock_t restart()
+		{
+			const std::clock_t end   = std::clock();
+			const std::clock_t value = end - start_;
+			start_ = end;
+			return value;
+		}
+
+		std::clock_t read() const { return std::clock() - start_; }
+
+	private:
+ 		std::clock_t start_;
+};
+
+} // End namespace
+
+#endif

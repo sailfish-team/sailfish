@@ -1,0 +1,69 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Log</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>LogFile</h1>
+
+<b>LogFile</b> provides a simple class that wraps a log file.
+
+
+<h2>Interface</h2>
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>LogFile(std::string log_file_name)</pre></td>
+	<td>Contructor.</td>
+</tr>
+
+<tr>
+	<td><pre>bool open(std::string log_file_name)</pre></td>
+	<td>Returns true if the log is successfully opened for output.</td>
+</tr>
+
+<tr>
+	<td><pre>bool ok() const</pre></td>
+	<td>Check that the log is open and ready for
+	new messages.</td>
+</tr>
+
+<tr>
+	<td><pre>bool header()</pre></td>
+	<td>Add the header to a new message to the log. Extra 
+	text can be added with <i>operator &lt;&lt;</i>. Returns
+	a call to <i>ok()</i>. </td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T&gt;
+  Log &amp;operator &lt;&lt;(const T partial_msg)</pre></td>
+	<td>Stream a partial message of any type into the log.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T&gt;
+  bool operator ()(const T msg)</pre></td>
+	<td>Stream a complete message into the log. A header at the start and 
+	a newline at the end are added. Returns	a call to <i>ok()</i>.</td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

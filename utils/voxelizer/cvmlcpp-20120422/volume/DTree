@@ -1,0 +1,914 @@
+/***************************************************************************
+ *   Copyright (C) 2008 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_DTREE
+#define CVMLCPP_DTREE 1
+
+#include <cassert>
+#include <exception>
+#include <ostream>
+#include <istream>
+#include <vector>
+
+#include <tr1/array>
+#include <tr1/memory>
+#include <cvmlcpp/base/stl_cstdint.h>
+
+#include <boost/integer_traits.hpp>
+#include <boost/static_assert.hpp>
+#include <boost/integer/static_log2.hpp>
+
+namespace cvmlcpp
+{
+
+template <typename T, std::size_t D> class DTree;
+
+template <typename T, std::size_t D> class DTreeBranchNode;
+template <typename T, std::size_t D> class DTreeLeafNode;
+
+class NoParentException: public std::exception
+{
+	virtual const char* what() const throw()
+	{ return "Root node received call to parent()."; }
+};
+
+class LeafNodeException: public std::exception
+{
+	virtual const char* what() const throw()
+	{ return "Invalid operation requested from leaf node."; }
+};
+
+class BranchNodeException: public std::exception
+{
+	virtual const char* what() const throw()
+	{ return "Invalid operation requested from branch node."; }
+};
+
+class InvalidDTreeXML: public std::exception
+{
+	virtual const char* what() const throw()
+	{ return "Invalid DTree XML data."; }
+};
+
+} // end namespace
+
+template <typename T, std::size_t D>
+std::istream& operator>>(std::istream& i_stream, cvmlcpp::DTree<T, D> &tree)
+		throw(cvmlcpp::InvalidDTreeXML);
+
+namespace cvmlcpp
+{
+
+template <typename T, std::size_t D>
+class DTreeNode;
+
+template <typename T, std::size_t D>
+std::tr1::shared_ptr<DTreeNode<T, D> >
+readDTreeBranchNode(std::istream& i_stream,
+		std::tr1::shared_ptr<DTreeNode<T, D> >& parent,
+		const bool isRoot = false) throw(InvalidDTreeXML);
+
+template <std::size_t bytes> struct SizeType
+{ typedef int64_t type; typedef uint64_t utype; typedef int64_t rtype; };
+template <> struct SizeType<1>
+{ typedef int8_t  type; typedef uint8_t  utype; typedef int rtype; };
+template <> struct SizeType<2>
+{ typedef int16_t type; typedef uint16_t utype; typedef int rtype; };
+template <> struct SizeType<3>
+{ typedef int32_t type; typedef uint32_t utype; typedef int rtype; };
+template <> struct SizeType<4>
+{ typedef int32_t type; typedef uint32_t utype; typedef int rtype; };
+
+template <std::size_t D>
+struct DTreeHelper
+{
+//	static const unsigned DimBytes = D / CHAR_BIT + (D % CHAR_BIT) ? 1 : 0;
+	static const unsigned DimBytes = D / CHAR_BIT + ( D-CHAR_BIT*(D/CHAR_BIT)) ? 1 : 0;
+	typedef typename SizeType<DimBytes>::type index_small_t;
+	typedef typename SizeType<DimBytes>::rtype index_t;
+
+	static const unsigned size_bits  = sizeof(std::size_t) * CHAR_BIT;
+	static const unsigned depth_bits = boost::static_log2<size_bits>::value;
+	static const unsigned max_index_bits = (size_bits - depth_bits) / D;
+	static const unsigned depth_offset = size_bits - depth_bits;
+
+//	static const unsigned depth_bytes = max_index_bits / CHAR_BIT +
+//					   (max_index_bits % CHAR_BIT) ? 1 : 0;
+	static const unsigned depth_bytes = max_index_bits / CHAR_BIT +
+					   (max_index_bits-CHAR_BIT*(max_index_bits/CHAR_BIT) ) ? 1 : 0;
+	public: typedef typename SizeType<depth_bytes>::utype depth_t;
+};
+
+template <typename T, std::size_t D>
+class DTreeNode
+{
+	protected:
+		typedef typename DTreeHelper<D>::index_small_t index_small_t;
+		typedef typename DTreeHelper<D>::depth_t depth_t;
+
+	public:
+		typedef typename DTreeHelper<D>::index_t index_t;
+		static const std::size_t N = 1u<<D;
+
+		typedef DTreeNode<T, D> Node;
+		typedef std::tr1::shared_ptr<Node> NodePtr;
+		typedef std::tr1::weak_ptr<Node> ParentPtr;
+
+		typedef DTreeBranchNode<T, D> Branch;
+		typedef Branch* BranchPtr;
+
+		typedef DTreeLeafNode<T, D> Leaf;
+		typedef Leaf* LeafPtr;
+
+		DTreeNode() : index_(-1)
+		{
+			BOOST_STATIC_ASSERT( (1u << D) <= std::size_t
+			    (boost::integer_traits<index_small_t>::const_max) );
+		}
+
+		DTreeNode(ParentPtr parent, const index_small_t index) :
+			parent_(parent), index_(index)
+		{ assert(this->index() >= 0); }
+
+		virtual ~DTreeNode() { }
+
+		virtual bool isLeaf() const = 0;
+
+		ParentPtr &parent() throw (NoParentException)
+		{
+			return const_cast<ParentPtr &>
+				(static_cast<const DTreeNode*>(this)->parent());
+		}
+
+		const ParentPtr &parent() const throw (NoParentException)
+		{
+			if (index_ < 0) // We are root node
+				throw(NoParentException());
+			return parent_;
+		}
+
+		index_t index() const{ return index_; }
+		std::size_t depth() const
+		{ return (index_ >= 0) ? (1+parent_.lock()->depth()) : 0; }
+
+		std::size_t id() const
+		{
+			assert(this->depth() <= DTreeHelper<D>::max_index_bits);
+			std::size_t id__ = 0;
+			if (index_ >= 0)
+				this->addID(id__);
+			id__ |= (this->depth() << DTreeHelper<D>::depth_offset);
+/*std::cout << "id() depth: " << this->depth() << " shift: " << DTreeHelper<D>::depth_offset
+		<< " size: " << (sizeof(std::size_t)*CHAR_BIT) << " result: " <<
+		(this->depth() << DTreeHelper<D>::depth_offset) << std::endl;
+*/			assert( this->depth() == 0 ||
+				this->depth() << DTreeHelper<D>::depth_offset != 0);
+			return id__;
+		}
+
+		void updateParent(NodePtr &this__)
+		{
+			assert(this->index() >= 0);
+			(*dynamic_cast<BranchPtr>(parent_.lock().get()))
+					[this->index()] = this__;
+		}
+
+		friend NodePtr
+		readDTreeBranchNode < >(std::istream& i_stream, NodePtr& parent,
+					const bool isRoot)
+			throw(InvalidDTreeXML);
+
+	private:
+		std::tr1::weak_ptr<Node> parent_;
+		const index_small_t index_;
+
+		void addID(std::size_t &id__) const
+		{
+			assert(index_ >= 0);
+			id__ <<= D;
+			id__ |= index_;
+			if (this->parent().lock()->index() != -1)
+				this->parent().lock()->addID(id__);
+		}
+};
+
+template <typename T, std::size_t D>
+class DTreeBranchNode : public DTreeNode<T, D>
+{
+	public:
+		typedef typename DTreeNode<T, D>::NodePtr NodePtr;
+		typedef typename DTreeNode<T, D>::ParentPtr ParentPtr;
+		typedef typename DTreeNode<T, D>::BranchPtr BranchPtr;
+		typedef typename DTreeNode<T, D>::LeafPtr LeafPtr;
+		static const std::size_t N = DTreeNode<T, D>::N;
+
+		DTreeBranchNode() { assert(this->index() == -1); }
+
+		DTreeBranchNode(ParentPtr parent,
+			const typename DTreeNode<T, D>::index_small_t index) :
+			DTreeNode<T, D>(parent, index) { }
+
+		virtual ~DTreeBranchNode() { }
+
+		// for SWIG
+		NodePtr &node(const std::size_t i){ return children_[i]; }
+		const NodePtr &node(const std::size_t i) const
+		{ return children_[i]; }
+
+		NodePtr &operator[](const std::size_t i){ return children_[i]; }
+		const NodePtr &operator[](const std::size_t i) const
+		{ return children_[i]; }
+
+		virtual bool isLeaf() const { return false; }
+
+	private:
+		typedef std::tr1::array<NodePtr, N> Children;
+		Children children_;
+};
+
+template <typename T, std::size_t D>
+class DTreeLeafNode : public DTreeNode<T, D>
+{
+	public:
+		typedef typename DTreeNode<T, D>::NodePtr NodePtr;
+		typedef typename DTreeNode<T, D>::ParentPtr ParentPtr;
+
+		DTreeLeafNode(const T value__) : value_(value__)
+		{ assert(this->index() == -1); }
+
+		DTreeLeafNode(ParentPtr parent,
+			const typename DTreeNode<T, D>::index_small_t index,
+			const T value__) :
+			DTreeNode<T, D>(parent, index), value_(value__) { }
+
+		virtual ~DTreeLeafNode() { }
+
+		T& value() { return value_; }
+		const T& value() const { return value_; }
+
+		virtual bool isLeaf() const { return true; }
+
+	private:
+		T value_;
+};
+
+template <typename T, std::size_t D>
+class DTreeProxy
+{
+	public:
+		typedef DTreeNode<T, D> Node;
+		typedef typename DTreeNode<T, D>::index_t index_t;
+		static const std::size_t N = DTreeNode<T, D>::N;
+
+	private:
+		typedef typename Node::NodePtr   NodePtr;
+		typedef typename Node::LeafPtr   LeafPtr;
+		typedef typename Node::BranchPtr BranchPtr;
+
+		friend class DTree<T, D>;
+#ifndef SWIG
+		friend std::istream& operator>> <> (std::istream& i_stream, DTree<T, D> &tree)
+				throw(InvalidDTreeXML);
+#endif
+	public:
+		DTreeProxy(NodePtr &node, NodePtr &root) :
+			node_(&node), root_(&root) { }
+
+		// For SWIG
+		T& value() throw(BranchNodeException)
+		{
+			if (!(*node_)->isLeaf())
+				throw(BranchNodeException());
+			return dynamic_cast<LeafPtr>(node_->get())->value();
+		}
+		const T& value() const throw(BranchNodeException)
+		{ return const_cast<DTreeProxy*>(this)->value(); }
+
+		T& operator()() throw(BranchNodeException)
+		{
+			if (!(*node_)->isLeaf())
+				throw(BranchNodeException());
+			return dynamic_cast<LeafPtr>(node_->get())->value();
+		}
+
+		const T& operator()() const throw(BranchNodeException)
+		{ return (*const_cast<DTreeProxy*>(this))(); }
+
+		// For SWIG
+		DTreeProxy node(const index_t i) throw(LeafNodeException)
+		{
+			if ((*node_)->isLeaf())
+				throw(LeafNodeException());
+
+			// inconsistent tree ?
+			assert((*dynamic_cast<BranchPtr>(node_->get()))[i] != 0);
+		 	return DTreeProxy(
+			    (*dynamic_cast<BranchPtr>(node_->get()))[i], *root_);
+		}
+		const DTreeProxy node(const index_t i) const
+					throw(LeafNodeException)
+		{ return const_cast<DTreeProxy*>(this)->node(i); }
+
+		DTreeProxy operator[](const index_t i)
+					throw(LeafNodeException)
+		{ return this->node(i); }
+		const DTreeProxy operator[](const index_t i) const
+					throw(LeafNodeException)
+		{ return const_cast<DTreeProxy*>(this)->node(i); }
+
+
+		template <typename U>
+		void expand(const U value) throw(BranchNodeException)
+		{
+			if (!(*node_)->isLeaf())
+				throw(BranchNodeException());
+
+			if ((*node_)->index() < 0) // We are root
+				*node_ = NodePtr(new DTreeBranchNode<T, D>());
+			else
+			{
+				*node_ = NodePtr(new DTreeBranchNode<T, D>
+					    ((*node_)->parent(), (*node_)->index()) );
+
+				(*node_)->updateParent(*node_);
+			}
+
+			assert(!(*node_)->isLeaf());
+			for (index_t i = 0; i < index_t(Node::N); ++i)
+				(*dynamic_cast<BranchPtr>(node_->get()))[i] =
+					NodePtr( new DTreeLeafNode<T,D>(*node_, i, value) );
+		}
+
+		void expand() throw(BranchNodeException)
+		{ this->expand(dynamic_cast<LeafPtr>(node_->get())->value()); }
+
+		template <typename It>
+		void expand(It first, It last) throw(BranchNodeException)
+		{
+			if (!(*node_)->isLeaf())
+				throw(BranchNodeException());
+			assert(std::size_t(std::distance(first, last)) ==
+				Node::N);
+
+			if ((*node_)->index() < 0) // We are root
+				*node_ = NodePtr( new DTreeBranchNode<T, D>() );
+			else
+			{
+				*node_ = NodePtr( new DTreeBranchNode<T, D>
+					    ((*node_)->parent(), (*node_)->index()) );
+
+				(*node_)->updateParent(*node_);
+			}
+
+			for (index_t i = 0; i < index_t(Node::N); ++i, ++first)
+				(*dynamic_cast<BranchPtr>(node_->get()))[i] =
+					NodePtr( new DTreeLeafNode<T, D>(*node_, i, *first) );
+		}
+
+		template <typename U>
+		void collapse(const U value) throw(LeafNodeException)
+		{
+			if ((*node_)->isLeaf())
+				throw(LeafNodeException());
+
+			if ((*node_)->index() < 0) // We are root
+				*node_ = NodePtr(new DTreeLeafNode<T, D>(value));
+			else
+			{
+				*node_ = NodePtr( new DTreeLeafNode<T, D>
+							((*node_)->parent(),
+							 (*node_)->index(),value));
+
+				(*node_)->updateParent(*node_);
+			}
+		}
+
+		bool isLeaf() const { return (*node_)->isLeaf(); }
+
+		index_t index() const throw (NoParentException)
+		{
+			if ((*node_)->index() < 0) // We are root node
+				throw(NoParentException());
+			return (*node_)->index();
+		}
+
+		std::size_t depth() const { return (*node_)->depth(); }
+
+		std::size_t max_depth() const
+		{
+			if (this->isLeaf())
+				return this->depth();
+			std::size_t max_depth_ = 0;
+			for (index_t i = 0; i < index_t(Node::N); ++i)
+				max_depth_ = std::max(max_depth_, (*this)[i].max_depth());
+//					(*dynamic_cast<BranchPtr>(node_->get()))[i].max_depth());
+			return max_depth_;
+		}
+
+		const DTreeProxy parent() const throw (NoParentException)
+		{
+			const index_t index = (*node_)->parent().lock()->index();
+
+			if (index < 0) // parent is root ?
+				return DTreeProxy( *root_, *root_ );
+
+			// To use a refence to the actual NodePtr holding
+			// the parent, we need to go via the parent's parent.
+			return DTreeProxy( (*dynamic_cast<BranchPtr>
+				((*node_)->parent().lock()->parent().lock().get()))
+					   [index], *root_ );
+		}
+
+		bool operator==(const DTreeProxy &that) const
+		{ return this->node_ == that.node_; }
+
+		bool operator!=(const DTreeProxy &that) const
+		{ return !(*this == that); }
+
+DTree<T, D> clone() const
+{
+	if (this->isLeaf())
+		return DTree<T, D>( (*this)() );
+
+	// Create a new DTree, but get rid of its own root
+	DTree<T, D> tree = DTree<T, D>(T());
+	*tree.root().node_ = NodePtr(new DTreeBranchNode<T,D>());
+
+	// Fill it with a copy of this tree instead
+	for (std::size_t i = 0; i < N; ++i)
+		copyTree((*dynamic_cast<BranchPtr>(this->node_->get()))[i],
+			 (*dynamic_cast<BranchPtr>(tree.root().node_->get()))[i],
+			 *tree.root().node_ );
+
+	return tree;
+}
+
+		std::size_t id() const { return (*node_)->id(); }
+
+		std::vector<index_t> index_trail() const
+		{
+			DTreeProxy node = *this;
+			std::vector<index_t> trail(this->depth());
+			for (int i = this->depth()-1; i >=0; --i)
+			{
+				assert(node.id() != 0);
+				trail[i] = node.index();
+				node = node.parent();
+			}
+
+			return trail;
+		}
+
+	private:
+		NodePtr * node_;
+		NodePtr * root_;
+
+static void copyTree(const NodePtr src, NodePtr& dest,
+			const NodePtr destParent)
+{
+	if (src->isLeaf()) // Copy leaf node
+	{
+		dest = NodePtr( new DTreeLeafNode<T,D>(destParent, src->index(),
+				dynamic_cast<LeafPtr>(src.get())->value()) );
+		dest->updateParent(dest);
+		return;
+	}
+
+	// Copy branch node
+	dest = NodePtr( new DTreeBranchNode<T, D>(destParent, src->index()) );
+	dest->updateParent(dest);
+
+	for (index_t i = 0; i < index_t(N); ++i)
+		copyTree( (*dynamic_cast<BranchPtr>(src .get()))[i],
+			  (*dynamic_cast<BranchPtr>(dest.get()))[i], dest );
+}
+};
+
+template <typename T, std::size_t D>
+class DTree
+{
+	public:
+		typedef DTreeProxy<T, D> DNode;
+		typedef typename DTreeNode<T, D>::NodePtr NodePtr;
+		static const std::size_t N = DTreeNode<T, D>::N;
+		typedef typename DNode::index_t index_t;
+
+		DTree(const T value = T()) :
+			root_(new DTreeLeafNode<T, D>(value)) { }
+
+		DNode operator[](const index_t i) throw(LeafNodeException)
+		{ return this->node(i); }
+		const DNode operator[](const index_t i) const
+			throw(LeafNodeException) { return this->node(i); }
+
+		// For SWIG
+		DNode node(const index_t i) throw(LeafNodeException)
+		{ return this->root().node(i); }
+		const DNode node(const index_t i) const
+			throw(LeafNodeException) { return this->root().node(i); }
+
+		DNode root() { return DNode( root_, root_ ); }
+		const DNode root() const { return DNode( root_, root_ ); }
+
+		operator DNode() { return this->root(); }
+		operator const DNode() const { return this->root(); }
+
+		// For SWIG
+		void set(const T value) throw(BranchNodeException) { this->root()() = value; }
+		const T value() const { return this->root()(); }
+
+		T& operator()() throw(BranchNodeException) { return this->root()(); }
+		const T& operator()() const throw(BranchNodeException) { return this->root()(); }
+
+		template <typename U>
+		void collapse(const U value) throw(LeafNodeException)
+		{ this->root().collapse(value); }
+
+		void expand() throw(BranchNodeException)
+		{  this->root().expand(); }
+
+		template <typename U>
+		void expand(const U value) throw(BranchNodeException)
+		{ this->root().expand(value); }
+
+		template <typename It>
+		void expand(It first, It last) throw(BranchNodeException)
+		{ this->root().expand(first, last); }
+
+		T& operator=(const T value) throw(BranchNodeException)
+		{ return this->root()() = value; }
+
+		bool operator==(const DTree &that) const
+		{ return this->root_ == that.root_; }
+
+		bool operator!=(const DTree &that) const
+		{ return !(*this == that); }
+
+		bool isLeaf() const { return this->root().isLeaf(); }
+
+		std::size_t depth() const { return 0; } // by definition
+
+		std::size_t max_depth() const { return this->root().max_depth(); }
+
+		std::size_t id() const { return 0; } // by definition
+
+		DTree<T, D> clone() const { return this->root().clone(); }
+
+		const DNode retrieve(std::size_t id__) const throw (LeafNodeException)
+		{
+			return const_cast<DTree<T, D> *>(this)->retrieve(id__);
+		}
+
+DNode retrieve(std::size_t id__) throw (LeafNodeException)
+{
+	if (id__ == this->id())
+		return this->root();
+#ifndef NDEBUG
+	const std::size_t ID = id__;
+#endif
+	typedef typename DNode::BranchPtr BranchPtr;
+
+	const std::size_t depth__ = (id__ >> DTreeHelper<D>::depth_offset) &
+				    ( (1<<DTreeHelper<D>::depth_bits)-1 );
+	assert(depth__ > 0);
+	NodePtr node = *this->root().node_;
+	for (std::size_t d = 0; d < depth__; ++d)
+	{
+		if (node->isLeaf())
+			throw(LeafNodeException());
+		node = (*dynamic_cast<BranchPtr>(node.get()))[id__& ((1<<D)-1)];
+		id__ >>= D;
+	}
+	assert(node->id() == ID);
+	assert(node->index() >= 0);
+	return DNode((*dynamic_cast<BranchPtr>(node->parent().lock().get()))
+			[node->index()], root_ );
+}
+
+#ifdef  __GXX_EXPERIMENTAL_CXX0X__
+		template <typename ...P>
+		const T& getValue(const P ...p) const
+		{
+			BOOST_STATIC_ASSERT(sizeof...(p) == D);
+			std::tr1::array<std::size_t, D> coords;
+			make_coords(coords, p...);
+			return this->getValueAtCoords(coords);
+		}
+#endif
+
+	private:
+		mutable NodePtr root_;
+
+#ifdef  __GXX_EXPERIMENTAL_CXX0X__
+		template <typename U, typename ...P>
+		static void make_coords(std::tr1::array<std::size_t, D> &coords, const U u, const P ...p)
+		{
+			coords[D-sizeof...(p)-1] = u;
+			if (sizeof...(p))
+				make_coords(coords, p...);
+		}
+		template <typename U>
+		static void make_coords(std::tr1::array<std::size_t, D> &coords, const U u)
+		{
+			coords[D-1] = u;
+		}
+
+		const T& getValueAtCoords(const std::tr1::array<std::size_t, D> &coords) const
+		{
+			const std::size_t maxLevel = this->max_depth();
+			DTree<T, D>::DNode node = this->root();
+			while (!node.isLeaf())
+			{
+				const std::size_t mask = 1ul << (maxLevel-node.depth()-1);
+
+				unsigned index = 0;
+				for (unsigned j = 0; j < D; ++j)
+					index += (coords[j] & mask) ? (1u<<j) : 0;
+				node = node[index];
+				assert(node.depth() <= maxLevel);
+			}
+			return node();
+		}
+#endif
+};
+
+struct Padder{
+	static void pad(std::ostream& o_stream, const std::size_t depth_)
+	{ for (std::size_t d = 0; d < depth_; ++d) o_stream << "\t"; }
+};
+
+} // end namespace
+
+// Should be in the same tree
+template <typename T, std::size_t D>
+bool operator<( const typename cvmlcpp::DTree<T, D>::DNode &lhs,
+		const typename cvmlcpp::DTree<T, D>::DNode &rhs)
+{ return lhs.id() < rhs.id(); }
+
+template <typename T, std::size_t D>
+std::ostream& operator<<(std::ostream& o_stream, const cvmlcpp::DTreeProxy<T, D> &node)
+{
+
+	// Open tag
+	cvmlcpp::Padder::pad(o_stream, node.depth());
+	if (node.isLeaf())
+		o_stream << "<leaf>" << std::endl;
+	else
+		o_stream << "<branch>" << std::endl;
+
+	// index
+	typename cvmlcpp::DTreeProxy<T, D>::index_t index;
+	try
+	{
+		index = node.index();
+		cvmlcpp::Padder::pad(o_stream, node.depth()+1);
+		o_stream << "<index> " << index << " </index>" << std::endl;
+	}
+	catch (cvmlcpp::NoParentException & e) { /* That was the root node */ }
+
+	if (node.isLeaf())
+	{
+		cvmlcpp::Padder::pad(o_stream, node.depth()+1);
+		o_stream << "<value> ";
+		o_stream << static_cast<const T&>(node());
+		o_stream << " </value>" << std::endl;
+	}
+	else
+		for (std::size_t i = 0; i < cvmlcpp::DTree<T, D>::DNode::N; ++i)
+			o_stream << node[i];
+
+	// Close tag
+	cvmlcpp::Padder::pad(o_stream, node.depth());
+	if (node.isLeaf())
+		o_stream << "</leaf>" << std::endl;
+	else
+		o_stream << "</branch>" << std::endl;
+
+	return o_stream;
+}
+
+template <typename T, std::size_t D>
+std::ostream& operator<<(std::ostream& o_stream, const cvmlcpp::DTree<T,D> &tree)
+{ return o_stream << tree.root(); }
+
+namespace cvmlcpp
+{
+
+template <typename T, std::size_t D>
+std::tr1::shared_ptr<DTreeNode<T, D> >
+readDTreeLeafNode(std::istream& i_stream,
+		std::tr1::shared_ptr<DTreeNode<T, D> >& parent,
+		const bool isRoot = false) throw(InvalidDTreeXML)
+{
+	bool foundIndex = false;
+	bool foundValue = false;
+
+	typename DTreeNode<T, D>::index_t index = -1;
+	T value;
+
+	// Read fields
+	std::string tag;
+	i_stream >> tag;
+	while (tag != "</leaf>")
+	{
+		if (tag == "<index>")
+		{
+			if (foundIndex)// Already found one ? Ambiguous!
+				throw cvmlcpp::InvalidDTreeXML();
+
+			i_stream >> index; // Read index
+			i_stream >> tag; // Read closing tag
+
+			// Invalid index or closing tag ?
+			if ( (index < 0) || (index >= int(1 << D)) ||
+			(tag != "</index>") )
+				throw InvalidDTreeXML();
+
+			foundIndex = true;
+		}
+		else if (tag == "<value>")
+		{
+			if (foundValue)// Already found one ? Ambiguous!
+				throw InvalidDTreeXML();
+			i_stream >> value; // Read value
+			i_stream >> tag; // Read closing tag
+
+			if (tag != "</value>")// Invalid closing tag ?
+				throw InvalidDTreeXML();
+
+			foundValue = true;
+		}
+		else // found something that shouldn't be here
+			throw InvalidDTreeXML();
+
+		// Read next tag
+		i_stream >> tag;
+	}
+
+	// Information missing ?
+	if ( (!foundIndex && !isRoot) || !foundValue )
+		throw InvalidDTreeXML();
+
+	typedef typename DTreeNode<T, D>::NodePtr NodePtr;
+	typedef typename DTreeNode<T, D>::BranchPtr BranchPtr;
+
+	if (isRoot)
+		return NodePtr( new DTreeLeafNode<T, D>(value) );
+
+	NodePtr result = NodePtr( new DTreeLeafNode<T,D>(parent,index,value) );
+	result->updateParent(result);
+
+	return result;
+}
+
+template <typename T, std::size_t D>
+std::tr1::shared_ptr<DTreeNode<T, D> >
+readDTreeNode(std::istream& i_stream,
+		std::tr1::shared_ptr<DTreeNode<T, D> >& parent)
+	throw(InvalidDTreeXML);
+
+template <typename T, std::size_t D>
+std::tr1::shared_ptr<DTreeNode<T, D> >
+readDTreeBranchNode(std::istream& i_stream,
+		std::tr1::shared_ptr<DTreeNode<T, D> >& parent,
+		const bool isRoot) throw(InvalidDTreeXML)
+{
+	assert(isRoot || !parent->isLeaf());
+
+	typedef typename DTreeNode<T, D>::NodePtr NodePtr;
+	typedef typename DTreeNode<T, D>::BranchPtr BranchPtr;
+	typedef typename DTreeHelper<D>::index_small_t index_small_t;
+
+	const std::size_t N = 1<<D;
+	std::tr1::array<bool, N> foundChildren;
+	std::fill(foundChildren.begin(), foundChildren.end(), false);
+
+	bool foundIndex = false;
+
+	// Invalid index
+	NodePtr result = isRoot ? NodePtr(new DTreeBranchNode<T, D>()) :
+				  NodePtr(new DTreeBranchNode<T, D>(parent, N));
+
+	// Read fields
+	std::string tag;
+	i_stream >> tag;
+	while (tag != "</branch>")
+	{
+		NodePtr child;
+
+		if (tag == "<index>")
+		{
+			if (isRoot || foundIndex)// Already found one ?
+				throw InvalidDTreeXML();
+
+			typename DTreeNode<T, D>::index_t index;
+			i_stream >> index; // Read index
+			i_stream >> tag; // Read closing tag
+
+			// Invalid index or closing tag ?
+			if ( (index < 0) || (index >= int(1 << D)) ||
+				(tag != "</index>") )
+				throw InvalidDTreeXML();
+
+			*const_cast<index_small_t*>(&(result->index_)) = index;
+	 		// Inform parent
+			if (!isRoot)
+				(*dynamic_cast<BranchPtr>(parent.get()))
+					[index] = result;
+			foundIndex = true;
+		}
+		else if (tag == "<leaf>")
+			child = readDTreeLeafNode<T, D>(i_stream, result);
+		else if (tag == "<branch>")
+			child = readDTreeBranchNode<T,D>(i_stream,result,false);
+		else // Found something that shouldn't be here
+			throw InvalidDTreeXML();
+
+		if ( (tag == "<leaf>") || (tag == "<branch>") )
+		{
+			if (foundChildren[child->index()]) // double
+				throw InvalidDTreeXML();
+			foundChildren[child->index()] = true;
+			(*dynamic_cast<BranchPtr>(result.get()))
+				[child->index()] = child;
+		}
+
+		// Read next tag
+		i_stream >> tag;
+	}
+
+	// Do we have everything ?
+	for (std::size_t i = 0; i < N; ++i)
+		if (!foundChildren[i])
+			throw InvalidDTreeXML();
+
+	if (!isRoot && !foundIndex)
+		throw InvalidDTreeXML();
+
+	return result;
+}
+
+template <class is, typename T, std::size_t D>
+std::tr1::shared_ptr<cvmlcpp::DTreeNode<T, D> >
+readDTreeNode(is& i_stream,
+		std::tr1::shared_ptr<cvmlcpp::DTreeNode<T, D> >& parent)
+	throw(cvmlcpp::InvalidDTreeXML)
+{
+	// Read open tag
+	std::string tag;
+	i_stream >> tag;
+
+	if (tag == "<leaf>")
+		return readDTreeLeafNode<T, D>(i_stream, parent);
+
+	if (tag != "<branch>")
+		throw cvmlcpp::InvalidDTreeXML();
+
+	return readDTreeBranchNode<T, D>(i_stream, parent);
+}
+
+} // end namespace
+
+template <typename TT, std::size_t DD>
+std::istream& operator>>(std::istream& i_stream, cvmlcpp::DTree<TT, DD> &tree)
+	throw(cvmlcpp::InvalidDTreeXML)
+{
+	typedef typename cvmlcpp::DTree<TT, DD>::DNode::NodePtr NodePtr;
+	typedef typename cvmlcpp::DTree<TT, DD>::DNode::BranchPtr BranchPtr;
+
+	// Read open tag
+	std::string tag;
+	i_stream >> tag;
+	if (tag == "<leaf>")
+		*tree.root().node_ = cvmlcpp::readDTreeLeafNode<TT, DD>
+					(i_stream, *tree.root().node_, true);
+	else if (tag == "<branch>")
+	{
+		NodePtr junk;
+		*tree.root().node_ =
+			cvmlcpp::readDTreeBranchNode<TT, DD>(i_stream, junk, true);
+	}
+	else
+		throw cvmlcpp::InvalidDTreeXML();
+
+	return i_stream;
+}
+
+#endif

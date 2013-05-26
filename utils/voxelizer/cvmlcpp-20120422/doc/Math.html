@@ -1,0 +1,546 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Math</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Math</h1>
+
+<b>Math</b> provides various useful functions and constants. A number of useful
+function objects that operate with certain procedures in this part of the
+library is available from the <a href='Functors.html'>Functors</a> section.
+
+<h2>Interface</h2>
+
+<h3>Scalar Functions</h3>
+
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>template &lt;typename T, typename U&gt;
+T round_cast(const U &amp;u)</pre></td>
+	<td>A rounding type-cast, useful when converting floating-point types to
+	integer types. When casting between floating-point types, rounding is
+	<b>not</b> applied.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T&gt;
+T log2(const T n)</pre></td>
+	<td>Returns the largest result such that <i>(2^result &lt;= n)</i>.
+	This version is intended for use with <i>integer</i> types, use
+	<i>std::tr1::log2()</i> for floating point types.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T&gt;
+bool isPower2(const T x)</pre></td>
+	<td>Returns true if <i>x</i> is a power of two. Only for integral
+	types.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T&gt;
+T clamp(const T &amp;x, const T &amp;low, const T &amp;high)</pre></td>
+	<td>Returns the value of in the range<i>[low, high]</i> closest to
+	<i>x</i>.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename T&gt;
+T factorial(const T &amp;x)</pre></td>
+	<td>Returns <i>x!</i>.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename T&gt;
+T gcd(T u, T v)</pre></td>
+	<td>Greatest common divisor.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename T&gt;
+T binomial(const T n, const T k)</pre></td>
+	<td>Binomial coefficient, choose <i>k</i> out of <i>n</i>.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename T, typename U&gt;
+U binopmf(const T n, const T k, const U p)</pre></td>
+	<td>Probability mass function for the binomial distribution for <i>k</i> experiments
+	where <i>n</i> is the total number of experiments and <i>p</i> is the probability of success per experiment.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename T, typename U&gt;
+U binocdf(const T n, const T k, const U p)</pre></td>
+	<td>Cumulative distribution function of the binomial distribution for <i>k</i> experiments
+	where <i>n</i> is the total number of experiments and <i>p</i> is the probability of success per experiment.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename T&gt;
+std::size_t binocdfinv(const T p_arg, const std::size_t n, const T p)</pre></td>
+	<td>Inverse of the binocdf, returns lowest number <i>k</i> for which <i>binocdf(n, k, p)</i> &ge; <i>p_arg</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T&gt;
+T qfunc(const T x)</pre></td>
+	<td>Returns the probability that a standard Normal random variable assumes a value larger than <i>x</i>.</td>
+</tr>
+<!--
+<tr>
+	<td><pre></pre></td>
+	<td></td>
+</tr>
+-->
+</table>
+
+<h3>Vector Functions</h3>
+
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>template &lt;typename T&gt;
+ValueType&lt;T&gt;::value_type modulus(const T &amp;x)</pre></td>
+	<td>Computes the modulus of scalars and Vectors.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename Iterator, typename T&gt;
+T average(Iterator begin, Iterator end, const T init)</pre></td>
+	<td>Returns the average of the values in the range <i>[begin,
+end]</i>.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename Iterator, typename T&gt;
+T median(Iterator begin, Iterator end, const T init)</pre></td>
+	<td>Returns the median of the values in the range <i>[begin,
+end]</i>.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename Iterator, typename T&gt;
+T deviation(Iterator begin, Iterator end, T init)</pre></td>
+	<td>Returns <i>init</i> plus the sample standard deviation using
+	the samples in the given range, computed as the square root of the
+	sample variance.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename Iterator, typename T&gt;
+T deviation(Iterator begin, Iterator end, T avg, T init)</pre></td>
+	<td>As the previous, except that the argument <i>avg</i> must be the
+	mean value of the given samples, which makes it faster to compute than
+	the version without this argument.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename Iterator, typename T&gt;
+T variance(Iterator begin, Iterator end, T init)</pre></td>
+	<td>Returns <i>init</i> plus the unbiased sample variance, i.e.
+	normalized by <i>N-1</i> rather than <i>N</i>, where <i>N</i> is the
+	number of samples in the range.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename Iterator, typename T&gt;
+T variance(Iterator begin, Iterator end, T avg, T init)</pre></td>
+	<td>As the previous, except that the argument <i>avg</i> must be the
+	mean value of the given samples, which makes it faster to compute
+	than the version without this argument.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename Iterator, typename T&gt;
+T generalizedGaussianShape(Iterator begin, Iterator end,
+			 T init)</pre>
+	</td>
+	<td>Estimates the ``shape''-parameter (alpha) of the
+<a href='http://en.wikipedia.org/wiki/Generalized_Gaussian_distribution'>
+	Generalized Gaussian Distribution</a>(GGD), based on the given samples,
+	plus <i>init</i>.
+	</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename Iterator, typename T&gt;
+T generalizedGaussianShape(Iterator begin, Iterator end,
+			 T avg, T init)</pre>
+	</td>
+	<td>As the previous, except that the argument <i>avg</i> must be the
+	mean value of the given samples, which makes it faster to compute
+	than the version without this argument.</td>
+</tr>
+<!--
+<tr>
+	<td><pre></pre></td>
+	<td></td>
+</tr>
+-->
+</table>
+
+
+<h3>Constants</h3>
+
+<p>
+Constants of different types are defined through a template class:
+<pre>template &lt;typename T&gt; struct Constants;</pre>
+</p>
+
+<p>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Alias for template parameter type T.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type pi()</pre></td>
+	<td>Pi, the ratio of a circle's circumference to its diameter,
+		i.e. 3.14.....</td>
+</tr>
+
+<tr>
+	<td><pre>value_type e()</pre></td>
+	<td>Base of the natural logarithm.</td>
+</tr>
+
+<tr>
+	<td><pre>std::complex&lt;value_type&gt; i()</pre></td>
+	<td>Complex component <i>i</i> is defined as sqrt(-1).</td>
+</tr>
+
+</table>
+<p>
+
+<h3>Compatibility Macros</h3>
+
+<p>
+Macro defined for backwards compatibility.
+</p>
+
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>PI</pre></td>
+	<td>Equal to <i>Constants&lt;double&gt;::pi()</i>.</td>
+</tr>
+
+<!-- Template
+<tr>
+	<td><pre></pre></td>
+	<td>.</td>
+</tr>
+-->
+
+</table>
+
+<h3>Procedures</h3>
+
+<h4>Optimization</h4>
+
+<pre>
+template &lt;class Function, class Derivative&gt;
+typename Function::value_type optimize(const Function &amp;f, const Derivative &amp;d,
+		typename Function::value_type low,
+		typename Function::value_type high,
+		const std::size_t N = 1024);
+</pre>
+
+<pre>
+template &lt;class Function&gt;
+typename Function::value_type optimize(const Function &amp;f,
+		typename Function::value_type low,
+		typename Function::value_type high,
+		const std::size_t N = 1024);
+</pre>
+
+
+<h4>Newton-Raphson</h4>
+
+<p>
+The Newton-Raphson procedure is a so-called "root-finding" method, which, given
+a function <i>f(x)</i>, tries to find an <i>x</i> such that <i>f(x) = 0</i>. The
+procedure is iterative, and computation stops upon convergence, i.e. when it
+appears that the solution is no longer improving. The implementation can handle
+multi-dimensional function by using <a href='Vectors.html'>Vectors</a>.
+</p>
+
+<p>
+As described <a href='http://www.nrbook.com/b/bookcpdf/c9-4.pdf'>here</a>, the
+procedure is not entirely safe, and although the implementation addresses these
+weaknesses, it may fail. As a rule of the thumb, try to provide a starting
+point close to the solution and avoid having a local minimum or maximum in the
+function between the starting point and the solution.
+</p>
+
+<p>
+There are two definitions of the classic method:
+<pre>
+template &lt;class Function, class Derivative&gt;
+bool doNewtonRaphson(const Function &amp;f, const Derivative &amp;d, Function::value_type &amp;x,
+		 std::size_t N = 100000u);
+</pre>
+<pre>
+template &lt;class Function&gt;
+bool doNewtonRaphson(const Function &amp;f, Function::value_type &amp;x, std::size_t N = 100000u);
+</pre>
+And there are two that involve a fixed range into which <i>x</i> is clamped:
+<pre>
+template &lt;class Function, class Derivative&gt;
+bool doNewtonRaphson(const Function &amp;f, const Derivative &amp;d, Function::value_type &amp;x,
+		 const Function::value_type &amp;low, const Function::value_type &amp;high,
+		 std::size_t N = 100000u);
+</pre>
+<pre>
+template &lt;class Function&gt;
+bool doNewtonRaphson(const Function &amp;f, Function::value_type &amp;x,
+		 const Function::value_type &amp;low, const Function::value_type &amp;high,
+		 std::size_t N = 100000u);
+</pre>
+The first form requires a user-defined function <i>Derivative d</i>, which must
+be the derivative of <i>Function f</i>. The second form does not require a
+user-supplied derivative but uses a numerical technique, see
+<a href='Functors.html'>Derivative</a>. The first form is recommended
+as it is expected to be both faster and more accurate. On input, the parameter
+<i>x</i> is the start-point of the procedure; on output it contains the result
+if the procedure has succesfully terminated. If the procedure has succesfully
+converged onto a solution, the return value is <b>true</b>, otherwise it is
+<b>false</b> and the contents of <i>x</i> are unspecified.
+<p>
+
+<p>
+The "clamped" versions are a bit safer, and potentially faster, as they make
+sure <i>x</i> does not leave the given range; and employ a bi-section scheme to
+speed up convergence if possible. The method works best when the function is
+smaller than zero on one side of the range and greater than zero on the other
+side.
+</p>
+
+<p>
+The template parameter classes <i>Function</i> and <i>Derivative</i> must model
+a well-behaved mathematical function, meaning that for any given parameter
+<i>x</i>, the corresponding <i>f(x)</i> is always the same. Both
+<i>Function</i> and <i>Derivative</i> must offer a typedef for <i>value_type</i> and <i>result_type</i> and an operator of the following form:
+<pre>value_type operator()(const value_type &amp;x) const</pre>
+</p>
+
+<p>
+An example:
+<pre>
+template &lt;typename T&gt;
+struct Square
+{
+	typedef T value_type;
+	T operator()(const T &amp;x) const { return x * x; }
+};
+
+template &lt;typename T&gt;
+struct SquareDerivative
+{
+	typedef T value_type;
+	T operator()(const T &amp;x) const { return T(2)*x; }
+};
+
+// Automatic Derivative
+float r1 = -10.0f;
+bool ok = doNewtonRaphson(Square&lt;float&gt;(), r1);
+assert(ok);
+
+// With User-Supplied Derivative
+double r2 = -10.0;
+ok = doNewtonRaphson(Square&lt;double&gt;(), SquareDerivative&lt;double&gt;(), r2);
+assert(ok);
+
+// Multi-Dimensional through Vectors
+StaticVector&lt;double, 2u&gt; r3 = -10.0;
+ok = doNewtonRaphson(Square&lt;StaticVector&lt;double, 2u&gt; &gt;(), r3);
+assert(ok);
+</pre>
+</p>
+
+<h4>Runge-Kutta 4</h4>
+
+<p>
+The <a href='http://en.wikipedia.org/wiki/Runge-Kutta'>Runge-Kutta 4</a>
+algorithm is an iterative method for the approximation of solutions of ordinary
+differential equations of the form:
+<pre>
+y' = f(t, y)
+y(t0) = y0
+</pre>
+In this case <i>y'</i> is the derivative of <i>y</i>, and its value in point
+<i>t</i> is given by <i>f(t, y)</i>. The so-called "initial value" is <i>y0</i>,
+and it is the value of <i>y(t0)</i>, where <i>t0</i> is a specified point. The
+procedure will produce a vector of <i>N + 1</i> values, corresponding to
+solution of the above
+<a href='http://en.wikipedia.org/wiki/Initial_value_problem'>initial-value
+problem</a> in <i>N + 1</i> points in the range <i>[t0, tN]</i>.
+</p>
+
+<p>
+The method has the following definition:
+<pre>
+template &lt;class Function&gt;
+void doRungeKutta(const Function &amp;f, const Function::value_type t0,
+		const Function::value_type tN, const std::size_t N,
+		const Function::value_type y0,
+		std::vector&lt;Function::value_type&gt; &amp;y);
+</pre>
+</p>
+
+<p>
+The template parameter class <i>Function</i> must model a well-behaved
+mathematical function, meaning that for any given parameters
+<i>t, y</i>, the corresponding <i>f(t, y)</i> is always the same.
+<i>Function</i> must offer a typedef for <i>value_type</i> and an operator of
+the following form:
+<pre>
+value_type operator()(const value_type &amp;t, const value_type &amp;y) const
+</pre>
+</p>
+
+<p>
+The parameters are defined as follows:
+<table border='1' width='100%'>
+	<tr>
+	<td><pre>const Function &amp;f</pre></td>
+	<td> A Functor giving the derivative <i>y' = f(t, y)</i>.</td>
+	</tr>
+
+	<tr>
+	<td><pre>const Function::value_type t0</pre></td>
+	<td>The position of the initial condition <i>y(t0) = y0</i>.</td>
+	</tr>
+
+	<tr>
+	<td><pre>const Function::value_type tN</pre></td>
+	<td>The final position.</td>
+	</tr>
+
+	<tr>
+	<td><pre>const std::size_t N</pre></td>
+	<td>The number of iterations.</td>
+	</tr>
+
+	<tr>
+	<td><pre>const Function::value_type y0</pre></td>
+	<td>The initial condition, i.e. y(t0)=y0.</td>
+	</tr>
+
+	<tr>
+	<td><pre>std::vector&lt;Function::value_type&gt; &amp;y</pre></td>
+	<td>The vector where the values of y will be stored.<br />
+		Upon return, <i>y</i> will contain <i>N + 1</i> values.</td>
+	</tr>
+</table>
+</p>
+
+<p>
+An example:
+<pre>
+template &lt;typename T&gt;
+struct RKSquare
+{
+	typedef T value_type;
+	typedef T result_type;
+	T operator()(const T t, const T y) const { return t*t-y; }
+};
+
+RKSquare&lt;double&gt; f;
+std::vector&lt;double&gt; result;
+
+// Compute 10 values in the range [0.0, 1.0], where y(0.0) = 3.0
+doRungeKutta(f, 0.0, 1.0, 10u, 3.0, result);
+</pre>
+</p>
+
+<h4>Least Squares</h4>
+
+Implements the well-known <a href='http://en.wikipedia.org/wiki/Least_squares'>
+least-squares</a> method. Here, the Matrix <i>A</i> is the design matrix, vector
+<i>y</i> contains observations, and the estimated parameters will be placed in
+vector <i>x</i>.
+
+<pre>
+template &lt;template &lt;typename Tm, std::size_t Dm, typename Aux> class Array_t,
+	typename Ta, typename A, class XVector_t, class YVector_t&gt;
+bool leastSquaresFit(const Array_t&lt;Ta, 2, A&gt; &amp;A, const YVector_t &amp;y, XVector_t &amp;x)
+</pre>
+
+<h4>Hungarian Algorithm</h4>
+
+<p>
+The
+<a href='http://en.wikipedia.org/wiki/Hungarian_algorithm'>hungarian algorithm</a>
+finds a matching in a bi-partite graph that minimizes
+overall cost or maximizes overall benefit. That is, given two sets of items
+<i>A</i> and <i>B</i>, the best possible set of pairs having one item from set
+<i>A</i> and one item from set <i>B</i> is found.
+</p>
+
+<p>
+The overall cost or benefit is calculated as the sum of the costs or benefits
+from the individual pairs. Should your overall cost function actually be a
+product of the individual costs or benefits, then simply provide the <i>log</i>
+of your cost function.
+</p>
+
+<p>
+<b>Note:</b> the <i>costs</i> matrix is destroyed during the calculation!
+</p>
+
+<p>
+<pre>
+template &lt;template &lt;typename Tm, std::size_t D, typename Aux&gt; class Array_t,
+	typename T, typename A&gt;
+void find_matching(Array_t&lt;T, 2, A&gt; &amp;costs,
+		   std::vector&lt;std::pair&lt;std::size_t, std::size_t&gt; &gt; &amp;matches,
+		   const bool minimize_costs = true,
+		   const bool heuristic = true);
+</pre>
+</p>
+
+<p>
+<table border='1' width='100%'>
+	<tr>
+	<td><pre>costs</pre></td>
+	<td>A 2-dimensional matrix containing at each element
+	<i>costs[a][b]</i> the cost or benefit of a match between elements
+	<i>a</i> and <i>b</i> from their respective sets.</td>
+	</tr>
+	<tr>
+	<td><pre>matches</pre></td>
+	<td>On exit, contains a set of pairs of indices <i>&lt;a,b&gt;</i> that
+	each represent a match.</td>
+	</tr>
+	<tr>
+	<td><pre>minimize_costs</pre></td>
+	<td>If <i>true</i> (default) the costs will be minimized. If
+	<i>false</i>, the costs (benefits) will be maximized.</td>
+	</tr>
+	<tr>
+	<td><pre>heuristic</pre></td>
+	<td>Indicate whether a heuristic should be used.</td>
+	</tr>
+</table>
+
+</p>
+
+<h4>Matrix Operations</h4>
+
+<table border='1' width='100%'>
+	<tr>
+	<td><pre>void transpose(Array_t&lt;T, 2u, A&gt; &amp;m)</pre></td>
+	<td>Transpose the Matrix.</td>
+	</tr>
+
+	<tr>
+	<td><pre>bool invert(Array_t&lt;T, 2u, A&gt; &amp;m)</pre></td>
+	<td>Invert the matrix. Returns <b>false</b> if inversion fails.</td>
+	</tr>
+</table>
+
+<!-- End Page -->
+
+</div>
+</body>
+
+</html>

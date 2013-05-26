@@ -1,0 +1,103 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Copy-On-Write</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Copy-On-Write</h1>
+
+<p>
+To support so-called <i>Copy-On-Write</i> constructions,
+a template class <b>COW</b> is available to manage resources of
+a given type <i>T</i>.
+</p>
+
+<p>
+Copying a <b>COW</b> object is the same as cloning the resource.
+So, when you want to modify the resource, be careful on which
+<b>COW</b> object you acquire the resource. If that is a temporary
+<b>COW</b> object, the resource will be cloned in the temporary
+object upon write, but the modified resource will subsequently be deleted if the
+temporary <b>COW</b> object is destroyed.
+</p>
+
+<h2>Interface</h2>
+
+<p>The class definition is:</p>
+
+<pre>
+template &lt;class T&gt;
+class COW;
+</pre>
+
+<p>The <b>COW</b> has the following interface:</p>
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>COW(T *resource)</pre></td>
+	<td>Create a Copy-On-Write object that will manage the given resource.
+	Do <i>not</i> delete the given pointer or modify the resource through
+	the supplied pointer!</td>
+</tr>
+
+<tr>
+	<td><pre>const T &amp;operator() const</pre></td>
+	<td>Returns a const reference to the resource that is potentially shared.</td>
+</tr>
+
+<tr>
+	<td><pre>T &amp;operator()</pre></td>
+	<td>Returns a reference to the resource that is guaranteed  not to be shared.</td>
+</tr>
+
+<tr>
+	<td><pre>bool operator==(const COW &amp;that) const</pre></td>
+	<td>Returns true if two <b>COW</b>s are managing the same resource.</td>
+</tr>
+
+<tr>
+	<td><pre>bool operator!=(const COW &amp;that) const</pre></td>
+	<td>Returns true if two <b>COW</b>s are <i>not</i> managing the same resource.</td>
+</tr>
+
+</tbody>
+</table>
+
+<h3>Example</h3>
+
+<pre>
+#include &lt;cassert&gt;
+#include &lt;cvmlcpp/base/COW&gt;
+
+int main()
+{
+	using namespace cvmlcpp;
+
+	COW&lt;int&gt; a(new int(3));
+
+	assert(a() == 3);
+	COW&lt;int&gt; b = a;
+	assert(a == b);
+	b() = 7;
+	assert(a() == 3 &amp;&amp; b() == 7);
+	assert(a != b);
+	return 0;
+}
+</pre>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

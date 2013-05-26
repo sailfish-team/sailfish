@@ -1,0 +1,78 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::VoxelTools</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>VoxelTools</h1>
+
+The collection of tools in <b>VoxelTools</b> is designed for voxel-processing.
+Voxels are assumed to be stored in 3-dimensional matrices such as
+<a href='Matrix.html'>Matrix</a> or boost's <i>multi_array</i>.
+
+<h2>Interface</h2>
+
+<p>
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>template &lt;typename voxel_type&gt;
+  void cover(Matrix_t&lt;voxel_type, 3u&gt; &amp; matrix,
+	     const voxel_type layerValue,
+	     const voxel_type insideValue = 1,
+	     const voxel_type outsideValue = 0,
+	     const bool replaceOutside = true)</pre></td>
+	<td>Given a 3D matrix of voxels, cover the structure with a
+	layer of at least one cell thick of voxels with value <i>layerValue</i>.
+	If <i>replaceOutside</i> is <b>true</b> (default), then cells with
+	<i>outsideValue</i> are replaced with <i>layerValue</i> where
+	appropriate and the number of cells with <i>insideValue</i> remains the
+	same; if <i>replaceOutside</i> is <b>false</b>, then cells with
+	<i>insideValue</i> are replaced.
+	</td>
+</tr>
+
+<tr>
+	<td><pre>
+  template &lt;template &lt;typename Tm, std::size_t Dm, typename Aux&gt;
+	    class Matrix_t,
+	  typename T, std::size_t D, typename A&gt;
+  bool expand(	const DTree&lt;T, D&gt; &amp; node,
+		Matrix_t&lt;T, D, A&gt; &amp;matrix,&nbsp;&nbsp;
+		const std::size_t depth = 0)</pre></td>
+	<td>Convert a D-dimensional tree into a D-dimensional matrix of any type
+	supported by <a href='Meta.html'>matrix-traits</a>. The matrix will automatically be
+	resized. An optional parameter <i>depth</i> can be supplied if you wish to force the matrix
+	to be of a size corresponding to the size of a tree with the given depth.</td>
+</tr>
+
+<tr>
+	<td><pre>
+  template &lt;template Vtypename Tm, std::size_t Dm, typename Aux&gt;&nbsp;&nbsp;
+	    class Matrix_t,
+	  typename T, std::size_t D, typename A&gt;
+  bool expand(	const DTree&lt;T, D&gt;::DNode &amp; node,
+		Matrix_t&lt;T, D, A&gt; &amp;matrix,
+		const std::size_t depth = 0)</pre></td>
+	<td>As the previous function, but operate on any node instead of the root node
+	of the tree.</td>
+</tr>
+
+</table>
+</p>
+
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

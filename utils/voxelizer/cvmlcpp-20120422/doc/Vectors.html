@@ -1,0 +1,457 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Vectors</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+
+<h1>Vectors</h1>
+
+<p>
+<i>Requires <a href="http://www.boost.org/">BOOST</a></i>
+</p>
+
+<b>Vectors</b> offers four template classes. The <i>StaticVector</i> and the
+<i>DynamicVector</i>, are subclasses of <i>std::tr1::array</i> and
+<i>std::vector</i> respectively, and extend those types with arithmetic
+operators. They are meant as an alternative for <i>std::valarray</i>, that, for
+example, does not have iterators.
+
+The definitions are:
+<pre>
+template &lt;typename T, std::size_t DIMS&gt;
+class StaticVector;
+</pre>
+and
+<pre>
+template &lt;typename T&gt;
+class DynamicVector;
+</pre>
+are the most common.
+
+There are similar Vectors whose values are kept in sorted order:
+<pre>
+template &lt;typename T, std::size_t DIMS&gt;
+class StaticSortedVector
+</pre>
+<pre>
+template &lt;typename T&gt;
+class DynamicSortedVector
+</pre>
+
+<p>
+These Vectors can be mixed in most operations. There is a special case,
+<i>StaticVector&lt;bool&gt;</i> that, much like <i>std::vector&lt;bool&gt;</i>
+in the STL, behaves somewhat differently.
+</p>
+
+<h2>Interface</h2>
+
+<h3>Common Interface of Vectors</h3>
+
+<p>
+There are two Vector types, StaticVector and DynamicVector. Their interfaces are
+almost identical. In the following table, substitute "Vector" with either one.
+</p>
+
+<table border='1'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>The type of the values in the vector.</td>
+</tr>
+<tr>
+	<td><pre>iterator</pre></td>
+	<td>The iterator type of this Vector</td>
+</tr>
+<tr>
+	<td><pre>const_iterator</pre></td>
+	<td>The const_iterator type of this Vector, for read-only access.</td>
+</tr>
+
+<tr>
+	<td><pre>Vector()</pre></td>
+	<td>Default Constructor</td>
+</tr>
+
+<tr>
+	<td><pre>Vector(Iterator first, Iterator last)</pre></td>
+	<td>Constructor, copies input from range (first, ..., last).</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename U&gt;
+  Vector(const U &amp;data)</pre></td>
+	<td>Copy-constructor, generalized to work with any container type or
+	data type.</td>
+</tr>
+
+<tr>
+	<td><pre>iterator begin()</pre></td>
+	<td>As in any container.</td>
+</tr>
+
+<tr>
+	<td><pre>iterator end()</pre></td>
+	<td>As in any container.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator begin()</pre></td>
+	<td>As in any container.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator end()</pre></td>
+	<td>As in any container.</td>
+</tr>
+
+<tr>
+	<td><pre>void clear()</pre></td>
+	<td>Set all elements to zero.</td>
+</tr>
+
+<tr>
+	<td><pre>const Vector &amp;operator=(const value_type value)</pre></td>
+	<td>Assign a value to every element of the Vector.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename Container&gt;
+  const Vector &amp;operator=(const Container &amp;data)</pre></td>
+	<td>Assignment operator, works with any container type.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type &amp;operator[] (std::size_t index)</pre></td>
+	<td>Access one element.</td>
+</tr>
+
+<tr>
+	<td><pre>const Vector &amp;
+  operator{+ - * / %}=(const value_type that)</pre></td>
+	<td>Standard operator{+ - * / %}, element-wise applied with
+		'value'.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename Container&gt;
+  const Vector &amp;
+  operator{+ - * / %}=(const Container &amp;that)</pre></td>
+	<td>Standard operator{+ - * / %}, applied with another container.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t size() const</td>
+	<td>The number of dimensions</td>
+</tr>
+
+<tr>
+	<td><pre>std::string to_string() const</pre></td>
+	<td>Returns a string-representation.</td>
+</tr>
+</table>
+
+
+<h3>Specific Interface of StaticVector</h3>
+
+<table border='1'>
+<tr>
+	<td><pre>StaticVector(const value_type value)</pre></td>
+	<td>Construct a StaticVector and set all elements to 'value'.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename U&gt;
+  StaticVector&lt;U, DIMS&gt; convert() const</pre></td>
+	<td>Convert to another type.</td>
+</tr>
+</table>
+
+
+<h3>Specific Interface of DynamicVector</h3>
+
+<table border='1'>
+<tr>
+	<td><pre>DynamicVector(const std::size_t DIMS)</pre></td>
+	<td>Construct a DynamicVector with DIMS dimensions.</td>
+</tr>
+
+<tr>
+	<td><pre>DynamicVector(const std::size_t DIMS, const T value)</pre></td>
+	<td>Construct a DynamicVector with DIMS dimension and set all elements
+		to 'value'.</td>
+</tr>
+
+<tr>
+	<td><pre>void resize(const std::size_t DIMS)</pre></td>
+	<td>Change the number of dimensions.</td>
+</tr>
+</table>
+
+<h3>Specific Interface of StaticVector&lt;bool&gt;</h3>
+
+<p>
+Note that StaticVector&lt;bool&gt; does <b>not</b> support operator{+, -, *, /, %}.
+</p>
+
+<table border='1'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Alias for type 'bool'</td>
+</tr>
+
+<tr>
+	<td><pre>register_type</pre></td>
+	<td>The type used to hold raw data internally.</td>
+</tr>
+<tr>
+	<td><pre>iterator</pre></td>
+	<td>Iterator for <b>raw</b> data.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator</pre></td>
+	<td>Read-only iterator for <b>raw</b> data.</td>
+</tr>
+
+<tr>
+	<td><pre>StaticVector()</pre></td>
+	<td>Default Constructor</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename Iterator&gt;
+  StaticVector(Iterator first, Iterator last)</pre></td>
+	<td>Constructs a StaticVector&lt;bool&gt;, fill it with either
+		booleans (if the input range are of type "bool"), or with
+		raw data (if the input range is of type "register_type").</td>
+</tr>
+
+<tr>
+	<td><pre>StaticVector(const std::string &amp;hex)</pre></td>
+	<td>Constructs a StaticVector&lt;bool&gt; from a string in
+		<i>lower-case</i> hexadecimal representation.</td>
+</tr>
+
+<tr>
+	<td><pre>iterator begin()</pre></td>
+	<td>An iterator to <i>raw</i> data of type "register_type".</td>
+</tr>
+
+<tr>
+	<td><pre>iterator end()</pre></td>
+	<td>An iterator to <i>raw</i> data of type "register_type".</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator begin()</pre></td>
+	<td>An iterator to <i>raw</i> data of type "register_type".</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator end()</pre></td>
+	<td>An iterator to <i>raw</i> data of type "register_type".</td>
+</tr>
+
+<tr>
+	<td><pre>void clear()</pre></td>
+	<td>Set all bit to zero.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename Iterator&gt;
+		void set(Iterator first, Iterator last)</pre></td>
+	<td>Fill with either booleans (if the input range are of type
+		"bool"), or with raw data (if the input range is
+		of type "register_type").</td>
+</tr>
+
+<tr>
+	<td><pre>void setElement(std::size_t index, bool value)</pre></td>
+	<td>Set a bit to the given value.</td>
+</tr>
+
+<tr>
+	<td><pre>const StaticVector operator~() const</pre></td>
+	<td>Flip all bits.</td>
+</tr>
+
+<tr>
+	<td><pre>void flip()</pre></td>
+	<td>Flip all bits.</td>
+</tr>
+
+<tr>
+	<td><pre>void flip(const std::size_t index)</pre></td>
+	<td>Flip bit at "index".</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t count() const</pre></td>
+	<td>Return the number of bits set to 1.</td>
+</tr>
+
+<tr>
+	<td><pre>bool odd() const</pre></td>
+	<td>Returns true if an <i>uneven</i> number of bits set to 1.</td>
+</tr>
+
+<tr>
+	<td><pre>bool even() const</pre></td>
+	<td>Returns true if an <i>even</i> number of bits set to 1.</td>
+</tr>
+
+<tr>
+	<td><pre>const StaticVector &amp;operator|=(const StaticVector &amp;that)</pre></td>
+	<td>Apply element-by-element OR.</td>
+</tr>
+
+<tr>
+	<td><pre>const StaticVector &amp;operator|=(const bool value)</pre></td>
+	<td>Apply OR to each element.</td>
+</tr>
+
+<tr>
+	<td><pre>const StaticVector &amp;operator^=(const StaticVector &amp;that)</pre></td>
+	<td>Apply element-by-element XOR.</td>
+</tr>
+
+<tr>
+	<td><pre>const StaticVector &amp;operator^=(const bool value)</pre></td>
+	<td>Apply XOR to each element.</td>
+</tr>
+
+<tr>
+	<td><pre>const StaticVector &amp;operator&amp;=(const StaticVector &amp;that)</pre></td>
+	<td>>Apply element-by-element AND.</td>
+</tr>
+
+<tr>
+	<td><pre>const StaticVector &amp;operator&amp;=(const bool value)</pre></td>
+	<td>Apply AND to each element.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t size()</pre></td>
+	<td>Returns the number of dimensions of the vector.</td>
+</tr>
+
+<tr>
+	<td><pre>std::string to_string()</pre></td>
+	<td>Returns a lower-case hexadecimal representation.</td>
+</tr>
+
+</table>
+
+<h3>Common Interface of SortedVectors</h3>
+
+<p>
+There are two types of vectors that keep their contents in sorted order,
+so-called "SortedVectors".
+In the following table, read either "StaticSortedVector" or
+"DynamicSortedVector" for "SortedVector".
+</p>
+
+<table border='1'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>The type of the elements in the SortedVector.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator</pre></td>
+	<td>A read-only iterator.</td>
+</tr>
+
+<tr>
+	<td><pre>SortedVector(const_iterator first, const_iterator last)</pre></td>
+	<td>Constructor that fill the SortedVector with values from the
+		range "first" to "last".</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator begin() const</pre></td>
+	<td>Returns a const_iterator to the first element.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator end() const</pre></td>
+	<td>Returns a const_iterator indicating the end of the
+		SortedVector.</td>
+</tr>
+
+<tr>
+	<td><pre>const value_type operator[] (std::size_t index) const</pre></td>
+	<td></td>
+</tr>
+
+<tr>
+	<td><pre>void set(const_iterator first, const_iterator last)</pre></td>
+	<td>Fill the SortedVector with values from the range "first" to
+		"last".</td>
+</tr>
+
+<tr>
+	<td><pre>bool has(const value_type value) const</pre></td>
+	<td>Returns true if any element in the SortedVector is "value".</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t size()</pre></td>
+	<td>Returns the number of dimensions of the SortedVector.</td>
+</tr>
+
+<tr>
+	<td><pre>const std::string to_string() const</pre></td>
+	<td>Returns a string-representation of the SortedVector.</td>
+</tr>
+<!--
+<tr>
+	<td></td>
+	<td></td>
+</tr>
+-->
+</table>
+
+<h3>Operators and Fuctions</h3>
+
+<table border='1'>
+<tr>
+	<td><pre>template &lt;typename T, class TOther&gt;
+  Vector&lt;T,...&gt; crossProduct(const Vector&lt;T, ...&gt; &amp;lhs, const TOther &amp;rhs)</pre></td>
+	<td>Cross-product of vectors of 3 dimensions.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T, class TOther&gt;
+  Vector&lt;T,...&gt; dotProduct(const Vector&lt;T,...&gt; &amp;lhs, const TOther &amp;rhs)</pre></td>
+	<td>Dot-product of vectors.</td>
+</tr>
+<!--
+<tr>
+	<td></td>
+	<td></td>
+</tr>
+-->
+</table>
+
+<h2>See Also</h2>
+
+<ul>
+	<li><a href="Euclid.html">Euclid</a></li>
+</ul>
+
+<!-- End Page -->
+
+</div>
+</body>
+
+</html>

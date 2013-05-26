@@ -1,0 +1,899 @@
+/***************************************************************************
+ *   Copyright (C) 2007-2010 by BEEKHOF, Fokko                             *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_PROCESSING
+#define CVMLCPP_PROCESSING 1
+
+#include <cstddef>
+#include <iostream>
+
+#include <omptl/omptl_algorithm>
+
+#include <cvmlcpp/base/use_omp.h>
+#include <cvmlcpp/signal/Fourier>
+
+#ifdef USE_THRUST
+#include <thrust/device_vector.h>
+#include <thrust/transform.h>
+#endif
+
+namespace cvmlcpp
+{
+
+namespace detail
+{
+
+template <typename T>
+struct AutoMultConjugateScale
+{
+	typedef T value_type;
+
+	AutoMultConjugateScale(T normFactor) : _normFactor(normFactor) { }
+
+#ifdef USE_THRUST
+	__host__ __device__
+#endif
+	std::complex<T> operator()(const std::complex<T> &lhs) const
+	{
+		return lhs * std::conj(lhs) * _normFactor;
+	}
+
+	private:
+		const T _normFactor;
+};
+
+template <typename T>
+struct MultConjugateScale
+{
+	typedef T value_type;
+
+	MultConjugateScale(T normFactor) : _normFactor(normFactor) { }
+
+#ifdef USE_THRUST
+	__host__ __device__
+#endif
+	std::complex<T> operator()(const std::complex<T> &lhs,
+				   const std::complex<T> &rhs) const
+	{
+		return lhs * std::conj(rhs) * _normFactor;
+	}
+
+	private:
+		const T _normFactor;
+};
+
+template <typename T>
+struct MultScale
+{
+	typedef T value_type;
+
+	MultScale(T normFactor) : _normFactor(normFactor) { }
+
+#ifdef USE_THRUST
+	__host__ __device__
+#endif
+	std::complex<T> operator()(const std::complex<T> &lhs,
+				   const std::complex<T> &rhs) const
+	{
+		return lhs * rhs * _normFactor;
+	}
+
+	private:
+		const T _normFactor;
+};
+
+template <typename T>
+struct DivScale
+{
+	typedef T value_type;
+
+	DivScale(T normFactor) : _normFactor(normFactor) { }
+
+#ifdef USE_THRUST
+	__host__ __device__
+#endif
+	std::complex<T> operator()(const std::complex<T> &lhs,
+				   const std::complex<T> &rhs) const
+	{
+		if (rhs != T(0))
+			return _normFactor * lhs / rhs;
+
+		return T(0);
+	}
+
+	private:
+		const T _normFactor;
+};
+
+template <typename T>
+struct AvgOp
+{
+	typedef T value_type;
+
+	AvgOp(T normFactor) : _normFactor(normFactor) { }
+
+#ifdef USE_THRUST
+	__host__ __device__
+#endif
+	std::complex<T> operator()(const std::complex<T> &lhs,
+				   const std::complex<T> &rhs) const
+	{
+		return std::abs(lhs) * std::abs(rhs) *
+			std::exp(std::arg(lhs)*Constants<T>::i()) * _normFactor;
+	}
+
+	private:
+		const T _normFactor;
+};
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRhs,
+	  typename Tlhs, typename Trhs,
+	  typename AuxLhs, typename AuxRhs, std::size_t N>
+std::tr1::array<std::size_t, N> find_conv_dims(const ArrayLhs<Tlhs, N, AuxLhs> &lhs,
+		    const ArrayRhs<Trhs, N, AuxRhs> &rhs)
+{
+	typedef array_traits<ArrayLhs, Tlhs, N, AuxLhs>	LHSTraits;
+	typedef array_traits<ArrayRhs, Trhs, N, AuxRhs>	RHSTraits;
+
+	std::tr1::array<std::size_t, N> convDims;
+	for (std::size_t i = 0u; i < N; ++i)
+	{
+		convDims[i] = 	LHSTraits::shape(lhs)[i] +
+				RHSTraits::shape(rhs)[i];
+		if (convDims[i] > 0)
+			--convDims[i];
+	}
+	convDims[N-1] += convDims[N-1] % 2; // make sure last dimension is even
+	return convDims;
+}
+
+template <template <typename T> class Operator>
+struct Processing
+{
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Trhs, typename Tres,
+	  typename AuxLhs, typename AuxRhs, typename AuxRes, std::size_t N>
+static bool process(const ArrayLhs<Tlhs, N, AuxLhs> &lhs,
+		    const ArrayRhs<Trhs, N, AuxRhs> &rhs,
+			  ArrayRes<Tres, N, AuxRes> &result, int threads)
+{
+	typedef typename promote_trait3<Tlhs, Trhs, Tres>::value_type float_type;
+
+	typedef Matrix<float_type, N,
+		std::vector<float_type, AlignAllocator<float_type> > > fltArray;
+	typedef array_traits<Matrix, float_type, N,
+			std::vector<float_type, AlignAllocator<float_type> > >
+								fltTraits;
+
+	typedef Matrix<std::complex<float_type>, N,
+	    		std::vector<std::complex<float_type>,
+				AlignAllocator<std::complex<float_type> > > >
+								cfltArray;
+	typedef array_traits<Matrix, std::complex<float_type>, N,
+			std::vector<std::complex<float_type>,
+				AlignAllocator<std::complex<float_type> > > >
+								cfltTraits;
+
+	typedef array_traits<ArrayLhs, Tlhs, N, AuxLhs>	LHSTraits;
+	typedef array_traits<ArrayRhs, Trhs, N, AuxRhs>	RHSTraits;
+	typedef array_traits<ArrayRes, Tres, N, AuxRes>	ResultTraits;
+
+#if defined _OPENMP && defined USE_THREADS
+ 	threads = std::max(threads, omp_get_max_threads());
+#endif
+	threads = std::max(threads, 1);
+
+	// Determine anti-aliasing bounds on dimensions
+	const std::tr1::array<std::size_t, N> convDims = find_conv_dims(lhs, rhs);
+	ResultTraits::resize(result, convDims.begin());
+
+	// Create Arrays for FFT with dimensions that are proper powers of two
+	fltArray fltLhs = fltTraits::create(convDims.begin());
+	fltArray fltRhs = fltTraits::create(convDims.begin());
+
+	cfltArray cfltLhs;
+	cfltArray cfltRhs;
+
+	// Plan Fourier Transforms
+	const std::size_t flags = FFTW_ESTIMATE | FFTW_DESTROY_INPUT;
+	DFT<float_type, N> fwdLhsDFT(fltLhs, cfltLhs, true, flags, threads);
+	DFT<float_type, N> fwdRhsDFT(fltRhs, cfltRhs, true, flags, threads);
+
+	DFT<float_type, N> backImgDFT(cfltRhs, fltRhs, false, flags, threads);
+
+	// Copy data into padded arrays
+	copy(lhs, fltLhs);
+	copy(rhs, fltRhs);
+
+	// Forward FFT
+	if (!fwdLhsDFT.execute() || !fwdRhsDFT.execute())
+		return false;
+
+	const float_type normFactor = 1.0 / fltTraits::size(fltRhs);
+	omptl::transform(cfltTraits::begin(cfltLhs), cfltTraits::end(cfltLhs),
+			 cfltTraits::begin(cfltRhs), cfltTraits::begin(cfltRhs),
+ 			 Operator<float_type>(normFactor));
+
+	// Back Transform + Normalize
+	if (!backImgDFT.execute())
+		return false;
+
+	// Copy relevant parts into final result
+	copy(fltRhs, result);
+
+	return true;
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Trhs, typename Tres,
+	  typename AuxLhs, typename AuxRhs, typename AuxRes, std::size_t N>
+static bool process(const ArrayLhs<Tlhs, N, AuxLhs> &lhs,
+		    const std::vector<ArrayRhs<Trhs, N, AuxRhs> > &rhs,
+		    std::vector<ArrayRes<Tres, N, AuxRes> > &results,
+		    int threads)
+{
+	if (rhs.empty())
+		return true;
+
+	typedef typename promote_trait3<Tlhs, Trhs, Tres>::value_type float_type;
+
+	typedef Matrix<float_type, N,
+		std::vector<float_type, AlignAllocator<float_type> > > fltArray;
+	typedef array_traits<Matrix, float_type, N,
+			std::vector<float_type, AlignAllocator<float_type> > >
+								fltTraits;
+
+	typedef Matrix<std::complex<float_type>, N,
+	    		std::vector<std::complex<float_type>,
+				AlignAllocator<std::complex<float_type> > > >
+								cfltArray;
+	typedef array_traits<Matrix, std::complex<float_type>, N,
+			std::vector<std::complex<float_type>,
+				AlignAllocator<std::complex<float_type> > > >
+								cfltTraits;
+
+	typedef array_traits<ArrayLhs, Tlhs, N, AuxLhs>	LHSTraits;
+	typedef array_traits<ArrayRhs, Trhs, N, AuxRhs>	RHSTraits;
+	typedef array_traits<ArrayRes, Tres, N, AuxRes>	ResultTraits;
+
+#if defined _OPENMP && defined USE_THREADS
+ 	threads = std::max(threads, omp_get_max_threads());
+#endif
+	threads = std::max(threads, 1);
+
+	// Determine anti-aliasing bounds on dimensions
+	std::size_t convDims[N];
+	for (std::size_t d = 0u; d < N; ++d)
+	{
+		// Search largest of rhs arrays in dimension d
+		std::size_t max_dim_rhs = 0;
+		for (std::size_t j = 0u; j < rhs.size(); ++j)
+			max_dim_rhs = std::max(max_dim_rhs, RHSTraits::shape(rhs[j])[d]);
+
+		convDims[d] = 0;
+		if (LHSTraits::shape(lhs)[d] + max_dim_rhs > 0)
+			convDims[d] = LHSTraits::shape(lhs)[d] + max_dim_rhs - 1;
+
+	}
+	convDims[N-1] += convDims[N-1] % 2; // make even
+
+	// Create Arrays for FFT with dimensions that are proper powers of two
+	fltArray fltLhs = fltTraits::create(convDims);
+	fltArray fltRhs = fltTraits::create(convDims);
+
+	cfltArray cfltLhs;
+	cfltArray cfltRhs;
+
+	// Plan Fourier Transforms
+	const std::size_t  onceFlags = FFTW_ESTIMATE | FFTW_DESTROY_INPUT;
+	const std::size_t oftenFlags = FFTW_MEASURE  | FFTW_DESTROY_INPUT;
+	DFT<float_type, N> fwdLhsDFT(fltLhs, cfltLhs, true,  onceFlags, threads);
+	DFT<float_type, N> fwdRhsDFT(fltRhs, cfltRhs, true, oftenFlags, threads);
+
+	DFT<float_type, N> backImgDFT(cfltRhs, fltRhs, false, oftenFlags, threads);
+
+	// Resize vector & arrays
+	results.clear();
+//	for (std::size_t i = 0; i < result.size(); ++i)
+//		ResultTraits::resize(result[i], convDims);
+	while (results.size() < rhs.size())
+		results.push_back(ResultTraits::create(convDims));
+
+	// Copy data into padded arrays
+	copy(lhs, fltLhs);
+
+	// Forward FFT LHS
+	if (!fwdLhsDFT.execute())
+		return false;
+
+	for (std::size_t i = 0; i < results.size(); ++i)
+	{
+		copy(rhs[i], fltRhs); // copy zero-pads
+
+		// Forward FFT on current RHS
+		if (!fwdRhsDFT.execute())
+			return false;
+
+		const float_type normFactor = 1.0 / fltTraits::size(fltRhs);
+		omptl::transform(cfltTraits::begin(cfltLhs),
+				 cfltTraits::end(cfltLhs),
+				 cfltTraits::begin(cfltRhs),
+				 cfltTraits::begin(cfltRhs),
+				 Operator<float_type>(normFactor));
+
+		// Back Transform + Normalize
+		if (!backImgDFT.execute())
+			return false;
+
+		// Copy relevant parts into final result
+		copy(fltRhs, results[i]);
+	}
+
+	return true;
+}
+
+};
+
+template <template <typename T> class Operator, bool result_type_is_float>
+struct AutoProcessing_
+{
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Tres, typename AuxLhs, typename AuxRes, std::size_t N>
+static bool process(const ArrayLhs<Tlhs, N, AuxLhs> &lhs,
+			  ArrayRes<Tres, N, AuxRes> &result,
+			  int threads)
+{
+	typedef typename promote_trait2<Tlhs, Tres>::value_type float_type;
+
+	typedef Matrix<float_type, N,
+		std::vector<float_type, AlignAllocator<float_type> > > fltArray;
+	typedef array_traits<Matrix, float_type, N,
+			std::vector<float_type, AlignAllocator<float_type> > >
+								fltTraits;
+
+	typedef Matrix<std::complex<float_type>, N,
+	    		std::vector<std::complex<float_type>,
+				AlignAllocator<std::complex<float_type> > > >
+								cfltArray;
+	typedef array_traits<Matrix, std::complex<float_type>, N,
+			std::vector<std::complex<float_type>,
+				AlignAllocator<std::complex<float_type> > > >
+								cfltTraits;
+
+	typedef array_traits<ArrayLhs, Tlhs, N, AuxLhs>	   LHSTraits;
+	typedef array_traits<ArrayRes, Tres, N, AuxRes>	ResultTraits;
+
+#if defined _OPENMP && defined USE_THREADS
+ 	threads = std::max(threads, omp_get_max_threads());
+#endif
+	threads = std::max(threads, 1);
+
+	// Determine anti-aliasing padding
+	const std::tr1::array<std::size_t, N> convDims = find_conv_dims(lhs, lhs);
+	ResultTraits::resize(result, convDims.begin());
+
+	// Create padded Arrays for FFT
+	fltArray fltLhs = fltTraits::create(convDims.begin());
+	cfltArray cfltLhs;
+
+	copy(lhs, fltLhs);
+
+	// Forward FFT
+	if (! doDFT( fltLhs, cfltLhs, threads ) )
+		return false;
+
+	const float_type normFactor = 1.0 / fltTraits::size(fltLhs);
+	omptl::transform(cfltTraits::begin(cfltLhs), cfltTraits::end(cfltLhs),
+			 cfltTraits::begin(cfltLhs), Operator<float_type>(normFactor));
+
+	// Back Transform + Normalize
+	if (! doDFT( cfltLhs, fltLhs, threads ) )
+		return false;
+
+	// Copy relevant parts into final result
+	copy(fltLhs, result);
+
+	return true;
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Tres, typename AuxLhs, typename AuxRes, std::size_t N>
+static bool process(const std::vector<ArrayLhs<Tlhs, N, AuxLhs> > &lhs,
+			  std::vector<ArrayRes<Tres, N, AuxRes> > &results,
+			  int threads)
+{
+	if (lhs.empty())
+	{
+		results.clear();
+		return true;
+	}
+
+	typedef typename promote_trait2<Tlhs, Tres>::value_type float_type;
+
+	typedef Matrix<float_type, N,
+		std::vector<float_type, AlignAllocator<float_type> > > fltArray;
+	typedef array_traits<Matrix, float_type, N,
+			std::vector<float_type, AlignAllocator<float_type> > >
+								fltTraits;
+
+	typedef Matrix<std::complex<float_type>, N,
+	    		std::vector<std::complex<float_type>,
+				AlignAllocator<std::complex<float_type> > > >
+								cfltArray;
+	typedef array_traits<Matrix, std::complex<float_type>, N,
+			std::vector<std::complex<float_type>,
+				AlignAllocator<std::complex<float_type> > > >
+								cfltTraits;
+
+	typedef array_traits<ArrayLhs, Tlhs, N, AuxLhs>	LHSTraits;
+	typedef array_traits<ArrayRes, Tres, N, AuxRes>	ResultTraits;
+
+#if defined _OPENMP && defined USE_THREADS
+ 	threads = std::max(threads, omp_get_max_threads());
+#endif
+	threads = std::max(threads, 1);
+
+	// Determine power-of-2 upper bounds on dimensions
+	std::size_t convDims[N];
+	for (std::size_t d = 0; d < N; ++d)
+	{
+		// Search largest of rhs arrays in dimension d
+		std::size_t max_dim_lhs = 0;
+		for (std::size_t j = 0; j < lhs.size(); ++j)
+			max_dim_lhs = std::max(max_dim_lhs, LHSTraits::shape(lhs[j])[d]);
+
+		convDims[d] = 0;
+		if (max_dim_lhs > 0)
+			convDims[d] = 2*max_dim_lhs - 1;
+	}
+	convDims[N-1] += convDims[N-1] % 2; // Make last dimension even
+
+	// Create Arrays for FFT with dimensions that are proper powers of two
+	fltArray fltLhs = fltTraits::create(convDims);
+
+	cfltArray cfltLhs;
+
+	// Plan Fourier Transforms
+	const std::size_t oftenFlags = FFTW_MEASURE | FFTW_DESTROY_INPUT;
+	DFT<float_type, N> fwdLhsDFT  (fltLhs, cfltLhs, true , oftenFlags, threads);
+	DFT<float_type, N> backImgDFT(cfltLhs,  fltLhs, false, oftenFlags, threads);
+
+	// Resize vector & arrays
+	results.clear();
+//	for (std::size_t i = 0; i < result.size(); ++i)
+//		ResultTraits::resize(result[i], convDims);
+	while (results.size() < lhs.size())
+		results.push_back(ResultTraits::create(convDims));
+
+	for (std::size_t i = 0; i < results.size(); ++i)
+	{
+		// Copy data into padded arrays
+		copy(lhs[i], fltLhs);
+
+		// Forward FFT on current LHS
+		if (!fwdLhsDFT.execute())
+			return false;
+
+		const float_type normFactor = 1.0 / fltTraits::size(fltLhs);
+		omptl::transform(cfltTraits::begin(cfltLhs),
+				 cfltTraits::end(cfltLhs),
+				 cfltTraits::begin(cfltLhs),
+				 Operator<float_type>(normFactor));
+
+		// Back Transform + Normalize
+		if (!backImgDFT.execute())
+			return false;
+
+		// Copy relevant parts into final result
+		copy(fltLhs, results[i]);
+	}
+
+	return true;
+}
+
+};
+
+template <template <typename T> class Operator>
+struct AutoProcessing_<Operator, true>
+{
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Tres, typename AuxLhs, typename AuxRes, std::size_t N>
+static bool process(const ArrayLhs<Tlhs, N, AuxLhs> &lhs,
+			  ArrayRes<Tres, N, AuxRes> &result,
+			  int threads)
+{
+	typedef Tres flt_t;
+
+#ifdef USE_THRUST
+	typedef thrust::device_vector<flt_t>			FDataMgr;
+	typedef thrust::device_vector<std::complex<flt_t> >	CDataMgr;
+#else
+	typedef std::vector<flt_t, AlignAllocator<flt_t> >	FDataMgr;
+	typedef std::vector<std::complex<flt_t>,
+			AlignAllocator<std::complex<flt_t> > >	CDataMgr;
+#endif
+
+	typedef Matrix<flt_t, N, FDataMgr>			fltArray;
+	typedef array_traits<Matrix, flt_t, N, FDataMgr>	fltTraits;
+
+	typedef Matrix<std::complex<flt_t>, N, CDataMgr>	cfltArray;
+	typedef array_traits<Matrix, std::complex<flt_t>, N, CDataMgr>
+								cfltTraits;
+
+#if defined _OPENMP && defined USE_THREADS
+ 	threads = std::max(threads, omp_get_max_threads());
+#endif
+	threads = std::max(threads, 1);
+
+	// Determine anti-aliasing padding
+	const std::tr1::array<std::size_t, N> convDims = find_conv_dims(lhs, lhs);
+
+	// Create padded Arrays for FFT
+	fltArray fltLhs = fltTraits::create(convDims.begin());
+	copy(lhs, fltLhs);
+
+	// Forward FFT
+	cfltArray cfltLhs;
+	if (! doDFT( fltLhs, cfltLhs, threads ) )
+		return false;
+
+	typedef array_traits<ArrayLhs, Tlhs, N, AuxLhs> LHSTraits;
+	const flt_t normFactor = 1.0 / fltTraits::size(fltLhs);
+#ifdef USE_THRUST
+	thrust::transform(cfltTraits::begin(cfltLhs), cfltTraits::end(cfltLhs),
+			 cfltTraits::begin(cfltLhs), Operator<flt_t>(normFactor));
+#else
+	omptl::transform(cfltTraits::begin(cfltLhs), cfltTraits::end(cfltLhs),
+			 cfltTraits::begin(cfltLhs), Operator<flt_t>(normFactor));
+#endif
+
+	// Back Transform + Normalize
+	return doDFT( cfltLhs, result, threads );
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Tres, typename AuxLhs, typename AuxRes, std::size_t N>
+static bool process(const std::vector<ArrayLhs<Tlhs, N, AuxLhs> > &lhs,
+			  std::vector<ArrayRes<Tres, N, AuxRes> > &results,
+		          int threads)
+{
+	if (lhs.empty())
+	{
+		results.clear();
+		return true;
+	}
+
+	typedef Tres float_type;
+
+	typedef Matrix<float_type, N,
+		std::vector<float_type, AlignAllocator<float_type> > > fltArray;
+	typedef array_traits<Matrix, float_type, N,
+			std::vector<float_type, AlignAllocator<float_type> > >
+								fltTraits;
+
+	typedef Matrix<std::complex<float_type>, N,
+	    		std::vector<std::complex<float_type>,
+				AlignAllocator<std::complex<float_type> > > >
+								cfltArray;
+	typedef array_traits<Matrix, std::complex<float_type>, N,
+			std::vector<std::complex<float_type>,
+				AlignAllocator<std::complex<float_type> > > >
+								cfltTraits;
+
+	typedef array_traits<ArrayLhs, Tlhs, N, AuxLhs>	LHSTraits;
+	typedef array_traits<ArrayRes, Tres, N, AuxRes>	ResultTraits;
+
+#if defined _OPENMP && defined USE_THREADS
+ 	threads = std::max(threads, omp_get_max_threads());
+#endif
+	threads = std::max(threads, 1);
+
+	// Determine power-of-2 upper bounds on dimensions
+	std::size_t convDims[N];
+	for (std::size_t d = 0; d < N; ++d)
+	{
+		// Search largest of rhs arrays in dimension d
+		std::size_t max_dim_lhs = 0;
+		for (std::size_t j = 0; j < lhs.size(); ++j)
+			max_dim_lhs = std::max(max_dim_lhs, LHSTraits::shape(lhs[j])[d]);
+
+		convDims[d] = 0;
+		if (max_dim_lhs > 0)
+			convDims[d] = 2*max_dim_lhs - 1;
+	}
+	convDims[N-1] += convDims[N-1] % 2; // Make last dimension even
+
+	// Create Arrays for FFT with dimensions that are proper powers of two
+	fltArray fltLhs = fltTraits::create(convDims);
+
+	cfltArray cfltLhs;
+
+	// Plan Fourier Transforms
+	const std::size_t oftenFlags = FFTW_MEASURE | FFTW_DESTROY_INPUT;
+	DFT<float_type, N> fwdLhsDFT  (fltLhs, cfltLhs, true , oftenFlags, threads);
+	DFT<float_type, N> backImgDFT(cfltLhs,  fltLhs, false, oftenFlags, threads);
+
+	// Resize vector & arrays
+	results.clear();
+//	for (std::size_t i = 0; i < result.size(); ++i)
+//		ResultTraits::resize(result[i], convDims);
+	while (results.size() < lhs.size())
+		results.push_back(ResultTraits::create(convDims));
+
+	for (std::size_t i = 0; i < results.size(); ++i)
+	{
+		// Copy data into padded arrays
+		copy(lhs[i], fltLhs);
+
+		// Forward FFT on current LHS
+		if (!fwdLhsDFT.execute())
+			return false;
+
+		const float_type normFactor = 1.0 / fltTraits::size(fltLhs);
+		omptl::transform(cfltTraits::begin(cfltLhs),
+				 cfltTraits::end(cfltLhs),
+				 cfltTraits::begin(cfltLhs),
+				 Operator<float_type>(normFactor));
+
+		// Back Transform + Normalize
+		if ( !doDFT(cfltLhs, results[i], threads) )
+			return false;
+	}
+
+	return true;
+}
+
+};
+
+template <template <typename T> class Operator>
+struct AutoProcessing
+{
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Tres, typename AuxLhs, typename AuxRes, std::size_t N>
+static bool process(const ArrayLhs<Tlhs, N, AuxLhs> &lhs,
+			  ArrayRes<Tres, N, AuxRes> &results, const int threads)
+{
+	return AutoProcessing_<Operator, std::tr1::is_floating_point<Tres>::value>
+		::process(lhs, results, threads);
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Tres, typename AuxLhs, typename AuxRes, std::size_t N>
+static bool process(const std::vector<ArrayLhs<Tlhs, N, AuxLhs> > &lhs,
+			  std::vector<ArrayRes<Tres, N, AuxRes> > &results,
+		    const int threads)
+{
+	return AutoProcessing_<Operator, std::tr1::is_floating_point<Tres>::value>
+		::process(lhs, results, threads);
+}
+
+};
+
+} // end namespace detail
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Trhs, typename Tres,
+	  typename AuxLhs, typename AuxRhs, typename AuxRes, std::size_t N>
+bool convolute( const ArrayLhs<Tlhs, N, AuxLhs> lhs,
+		const ArrayRhs<Trhs, N, AuxRhs> rhs,
+		ArrayRes<Tres, N, AuxRes> result,
+		const std::size_t threads = 0u)
+{
+	// Multiplication in the frequency domain is
+	// convolution in the space domain.
+	return detail::Processing<detail::MultScale>::process(lhs, rhs, result, threads);
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Trhs, typename Tres,
+	  typename AuxLhs, typename AuxRhs, typename AuxRes, std::size_t N>
+bool convolute( const ArrayLhs<Tlhs, N, AuxLhs> lhs,
+		const std::vector<ArrayRhs<Trhs, N, AuxRhs> > &rhs,
+		std::vector<ArrayRes<Tres, N, AuxRes> > &result,
+		const std::size_t threads = 0u)
+{
+	// Multiplication in the frequency domain is
+	// convolution in the space domain.
+	return detail::Processing<detail::MultScale>::process(lhs, rhs, result, threads);
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Trhs, typename Tres,
+	  typename AuxLhs, typename AuxRhs, typename AuxRes, std::size_t N>
+bool correlate( const ArrayLhs<Tlhs, N, AuxLhs> lhs,
+		const ArrayRhs<Trhs, N, AuxRhs> rhs,
+		ArrayRes<Tres, N, AuxRes> &result,
+		const std::size_t threads = 0u)
+{
+	// Multiplication with the complex conjugate in the frequency domain is
+	// correlation in the space domain.
+	return detail::Processing<detail::MultConjugateScale>::
+		process(lhs, rhs, result, threads);
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Tres,
+	  typename AuxLhs, typename AuxRes, std::size_t N>
+bool autocorrelate(const ArrayLhs<Tlhs, N, AuxLhs> lhs,
+		   ArrayRes<Tres, N, AuxRes> result, const std::size_t threads = 0u)
+{
+	// Multiplication with the complex conjugate in the frequency domain is
+	// correlation in the space domain.
+	return detail::AutoProcessing<detail::AutoMultConjugateScale>::
+		process(lhs, result, threads);
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Trhs, typename Tres,
+	  typename AuxLhs, typename AuxRhs, typename AuxRes, std::size_t N>
+bool correlate( const ArrayLhs<Tlhs, N, AuxLhs> lhs,
+		const std::vector<ArrayRhs<Trhs, N, AuxRhs> > &rhs,
+		std::vector<ArrayRes<Tres, N, AuxRes> > &result,
+		const std::size_t threads = 0u)
+{
+	// Multiplication with the complex conjugate in the frequency domain is
+	// correlation in the space domain.
+	return detail::Processing<detail::MultConjugateScale>::
+		process(lhs, rhs, result, threads);
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Tres, typename AuxLhs, typename AuxRes, std::size_t N>
+bool autocorrelate(const std::vector<ArrayLhs<Tlhs, N, AuxLhs> > &lhs,
+		   std::vector<ArrayRes<Tres, N, AuxRes> > &result,
+		   const std::size_t threads = 0u)
+{
+	// Multiplication with the complex conjugate in the frequency domain is
+	// correlation in the space domain.
+	return detail::AutoProcessing<detail::AutoMultConjugateScale>::
+		process(lhs, result, threads);
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Trhs, typename Tres,
+	  typename AuxLhs, typename AuxRhs, typename AuxRes, std::size_t N>
+bool deConvolute(const ArrayLhs<Tlhs, N, AuxLhs> signal,
+		 const ArrayRhs<Trhs, N, AuxRhs> psf,
+		 ArrayRes<Tres, N, AuxRes> result,
+		const std::size_t threads = 0u)
+{
+	// Multiplication in the frequency domain is
+	// convolution in the space domain.
+	return detail::Processing<detail::DivScale>::process(signal, psf,
+						  result, threads);
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayLhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Tlhs, typename Tres,
+	  typename AuxLhs, typename AuxRes, std::size_t N>
+bool localAvg(	const ArrayLhs<Tlhs, N, AuxLhs> lhs,
+		const int radius, ArrayRes<Tres, N, AuxRes> result,
+		const std::size_t threads = 0u)
+{
+	typedef typename promote_trait2<Tlhs, Tres>::value_type float_type;
+
+	typedef array_traits<ArrayLhs, Tlhs, N, AuxLhs>	LHSTraits;
+	typedef array_traits<ArrayRes, Tres, N, AuxRes>	ResultTraits;
+
+	std::size_t dims [N];
+	std::fill(dims, dims+N, 2*radius+1);
+	const float_type value = 1.0 / float_type(
+		std::accumulate(dims, dims+N, 1.0, std::multiplies<float_type>()));
+
+	cvmlcpp::Matrix<float_type, N> rhs(dims, value);
+	assert( std::abs(1.0 -
+		std::accumulate(rhs.begin(),rhs.end(),0.0,std::plus<float_type>()))
+			< 0.0001);
+
+	cvmlcpp::Matrix<float_type, N> avg;
+
+	// Use phase-less sliding window
+	if (!detail::Processing<detail::AvgOp>::process(lhs, rhs, avg, threads))
+		return false;
+
+	// Copy relevant parts into final result
+	ResultTraits::resize(result, LHSTraits::shape(lhs));
+	copy(avg, result);
+
+	return true;
+}
+
+template <template<typename T, std::size_t N, typename Aux> class ArrayRhs,
+	  template<typename T, std::size_t N, typename Aux> class ArrayRes,
+	  typename Trhs, typename Tres,
+	  typename AuxRhs, typename AuxRes, std::size_t N>
+bool localAvg(	const std::vector<ArrayRhs<Trhs, N, AuxRhs> > &rhs,
+		const std::size_t radius,
+		std::vector<ArrayRes<Tres, N, AuxRes> > &result,
+		const std::size_t threads = 0u)
+{
+	typedef typename promote_trait2<Trhs, Tres>::value_type float_type;
+	
+	typedef array_traits<ArrayRhs, Trhs, N, AuxRhs>	RHSTraits;
+	typedef array_traits<ArrayRes, Tres, N, AuxRes>	ResultTraits;
+
+	std::size_t dims [N];
+	std::fill(dims, dims+N, 2*radius+1);
+	const float_type value = 1.0 / float_type(
+		std::accumulate(dims, dims+N, 1.0, std::multiplies<float_type>()));
+
+	cvmlcpp::Matrix<float_type, N> lhs(dims, value);
+	assert( std::abs(1.0 -
+		std::accumulate(lhs.begin(),lhs.end(),0.0,std::plus<float_type>()))
+			< 0.0001);
+
+	std::vector<cvmlcpp::Matrix<float_type, N> > avg;
+
+	// Multiplication with the complex conjugate in the frequency domain is
+	// correlation in the space domain.
+	detail::Processing<detail::AvgOp>::process(lhs, rhs, avg, threads);
+	assert(avg.size() == rhs.size());
+
+	// Resize vector & arrays
+	for (std::size_t i = 0; i < result.size(); ++i)
+		ResultTraits::resize(result[i], RHSTraits::shape(rhs[i]));
+	for (std::size_t i = result.size(); i < rhs.size(); ++i)
+		result.push_back(ResultTraits::
+				 create(RHSTraits::shape(rhs[i])));
+	assert(result.size() == rhs.size());
+
+	// Copy relevant parts into final result
+	for (std::size_t i = 0; i < result.size(); ++i)
+	{
+		assert(std::equal(ResultTraits::shape(result),
+				  ResultTraits::shape(result) + N,
+				  avg.shape()));
+		copy(avg, result);
+	}
+	
+	return true;
+}
+
+} // namespace cvmlcpp
+
+#endif

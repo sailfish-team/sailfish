@@ -1,0 +1,1337 @@
+/***************************************************************************
+ *   Copyright (C) 2007, 2008 by F. P. Beekhof                             *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with program; if not, write to the                              *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_VOXELIZER
+#define CVMLCPP_VOXELIZER 1
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+#include <omptl/omptl_algorithm>
+
+#include <cmath>
+#include <cassert>
+#include <iterator>
+#include <map>
+#include <vector>
+
+#include <boost/numeric/ublas/matrix.hpp>
+#include <boost/numeric/ublas/io.hpp>
+
+#include <cvmlcpp/base/stl_cstdint.h>
+
+#include <cvmlcpp/base/Enums>
+#include <cvmlcpp/base/Functors>
+#include <cvmlcpp/base/Matrix>
+
+#include <cvmlcpp/math/Euclid>
+#include <cvmlcpp/math/Math>
+
+#include <cvmlcpp/volume/DTree>
+#include <cvmlcpp/volume/Geometry>
+
+#include <cvmlcpp/base/StringTools>
+
+
+/*
+ * ############# NOTES #############
+ *
+ * Essentially, the code calculates intersections of rays along all three axes
+ * (X, Y and Z) and facets of a geometry. The code for all three axes is the
+ * same, but we always pretend to calculate a Z-coordinate for a given facet
+ * and X and Y coordinates. The axes are renamed to obtain the desired
+ * projection. The variables "axis" and "_dm" govern this renaming.
+ *
+ * A voxel is considered "inside" or "part of" the geometry if it is found
+ * to be inside for at least 2 projections along the X, Y and Z axes.
+ *
+ * VoxelOffsets are fractions of voxels, i.e. always a number between [0-1].
+ *
+ * The Z-Buffer contains real (continuous) values in Matrix-space.
+ */
+
+
+namespace cvmlcpp
+{
+
+namespace detail
+{
+
+template <typename vector_type, unsigned axis>
+void _zBuffersToData(Matrix<unsigned char, 3u> &count,
+	const double voxelSize, const Matrix<std::vector<double>, 2u> &zBuffer,
+	const vector_type &subVoxOffset, const std::size_t pad)
+{
+	const unsigned _dm[][4] =
+	{
+		{Z, Y, X, 0u},
+		{X, Z, Y, 0u},
+		{X, Y, Z, 0u}
+	};
+
+	// Sane input ?
+	assert(axis < 3u);
+ 	for (unsigned i = 0u; i < 3; ++i)
+	{
+		assert(subVoxOffset[i] > 0.0);
+		assert(subVoxOffset[i] < 1.0);
+	}
+	assert(std::find_if(count.begin(), count.end(),
+		std::bind2nd(std::greater_equal<unsigned char>(), 3)) ==
+			count.end());
+
+#ifdef _OPENMP
+	#pragma omp parallel for
+#endif
+	for (int         x = 0; x <  int(zBuffer.extent(X)); ++x)
+	for (std::size_t y = 0; y <      zBuffer.extent(Y);  ++y)
+	{
+		unsigned v = 0u; // Value 0: we begin outside the geometry
+		std::size_t begin = 0u; // first element of this line along Z-axis
+
+		// For all intersection with facets along the ray through these X,Y coordinates
+		for (typename Matrix<std::vector<double>, 2u>::value_type::
+			const_iterator i = zBuffer[x][y].begin();
+			i != zBuffer[x][y].end(); ++i)
+		{
+			assert(*i >= 0.0);
+
+			assert(round_cast<int>(*i) >= 0);
+			const double remainder = *i - std::floor(*i);
+			const std::size_t end = pad + std::floor(*i) +
+						(remainder > subVoxOffset[axis]);
+
+			assert(end <= count.extent(_dm[axis][Z]));
+			if (v == 1) // If we're inside the geometry ...
+				for (std::size_t z = begin; z < end; ++z) // ... mark all cells
+				{
+					// Rename coordinates
+					std::size_t pi [] = {x, y, z};
+
+					const std::size_t xx = pi[_dm[axis][X]];
+					const std::size_t yy = pi[_dm[axis][Y]];
+					const std::size_t zz = pi[_dm[axis][Z]];
+
+					assert(xx < count.extent(X));
+					assert(yy < count.extent(Y));
+					assert(zz < count.extent(Z));
+
+					// Increase value when inside
+					++count[xx][yy][zz];
+					assert(count[xx][yy][zz] <= 3u);
+				}
+
+			v     = 1u - v; // Now we change from inside to outside or vice versa
+			begin = end;
+		}
+	}
+}
+
+#ifdef _OPENMP
+struct ZBufferElement
+{
+	ZBufferElement(const std::size_t x_, const std::size_t y_, const double z_) :
+		x(x_), y(y_), z(z_) {}
+	std::size_t x, y;
+	double z;
+};
+#endif
+
+
+template <typename Tg, class vector_type>
+void _buildZBuffer(const Geometry<Tg> &geometry, const double voxelSize,
+		  Matrix<std::vector<double>, 2u> &zBuffer,
+		  const vector_type &subVoxOffset,
+		  const std::size_t pad, const unsigned axis)
+{
+	typedef typename Geometry<Tg>::point_type  point_type;
+
+	const unsigned _dm[][4] =
+	{
+		{Z, Y, X, 0u},
+		{X, Z, Y, 0u},
+		{X, Y, Z, 0u}
+	};
+
+	// Sane input ?
+	assert(axis < 3u);
+ 	for (unsigned i = 0u; i < 3; ++i)
+	{
+		assert(subVoxOffset[i] > 0.0);
+		assert(subVoxOffset[i] < 1.0);
+		assert(geometry.min(i) >= 0.0);
+	}
+	assert(voxelSize > 0.0);
+
+#ifdef _OPENMP
+	std::vector<std::vector<ZBufferElement> > zBufferElements(geometry.nrFacets());
+	// For all facets ...
+	#pragma omp parallel for
+	for (int fIndex = 0; fIndex < int(geometry.nrFacets()); ++fIndex)
+#else
+	for (typename Geometry<Tg>::const_facet_iterator
+	     fIt = geometry.facetsBegin(); fIt != geometry.facetsEnd(); ++fIt)
+#endif
+	{
+
+#ifdef _OPENMP
+		typename Geometry<Tg>::const_facet_iterator fIt = geometry.facetsBegin();
+		std::advance(fIt, fIndex);
+#endif
+
+		// Get normal. Skip perpendicular facets.
+		const vector_type normal = fIt->normal();
+		const double normalZ = normal[_dm[axis][Z]];
+
+		if (normalZ == 0.0)
+			continue;
+
+		// Get the 3 points from facet_type
+		point_type p[3];
+		for (unsigned j = 0; j < 3; j++)
+			p[j] = geometry.point((*fIt)[j]);
+
+		// Order the points by X-coordinate
+		using std::swap;
+		for (unsigned k = 0; k < 2; ++k)
+			for (unsigned n = k + 1; n < 3; ++n)
+				if (p[k][_dm[axis][X]] > p[n][_dm[axis][X]])
+					swap(p[k], p[n]);
+		assert(p[0][_dm[axis][X]] <= p[1][_dm[axis][X]]);
+		assert(p[1][_dm[axis][X]] <= p[2][_dm[axis][X]]);
+
+		// Tables of the coordinates of the three points
+		// Point 0 is the leftmost point (lowest X coordinate),
+		// point 1 the middle, and point 2 the rightmost point.
+		const double xt[]   = { p[0][_dm[axis][X]],
+					p[1][_dm[axis][X]],
+					p[2][_dm[axis][X]] };
+		const double yt[]   = { p[0][_dm[axis][Y]],
+					p[1][_dm[axis][Y]],
+					p[2][_dm[axis][Y]] };
+		const double zt[]   = { p[0][_dm[axis][Z]],
+					p[1][_dm[axis][Z]],
+					p[2][_dm[axis][Z]] };
+
+		// Compute d parameter of plane equation of this facet
+		// ax + by + cz + d = 0 (or ax + by + cz = d, I forgot...)
+		const double d = dotProduct(normal, p[0]);
+
+// Starting point for voxels is the lowest X-coordinate of a voxel
+// (in Voxel coordinates) that falls into the facet.
+assert(xt[0] / voxelSize > double(-std::numeric_limits<int>::max()));
+assert(xt[0] / voxelSize < double( std::numeric_limits<int>::max()));
+int xStart = int(std::floor(xt[0] / voxelSize));
+for (int xi = xStart; true; ++xi) // xi is in integer Voxel coordinates
+{
+	// Translate integer voxel coordinate back to facet coordinate.
+	// Include subVoxelOffset to obtain sampling point inside voxel.
+	const double x = voxelSize * (double(xi) + subVoxOffset[_dm[axis][X]]);
+
+	// Due to the "floor" and numerical issues, we may start too soon
+	assert(xt[0] <= xt[2]);
+	if (x < xt[0])
+		continue;
+
+	assert(x >= 0.0);
+
+	// Stop if we are more to the right than the right-most point.
+	if (x >= xt[2])
+		break;
+
+	// Compute low and high Y-borders from line equation y = ax + b. Use
+	// lines p0-p1 and p0-p2; or p1-p2 and p0-p2.
+	const unsigned pi = static_cast<unsigned>(x >= xt[1]);
+	assert(pi < 2u);
+
+	// Robustness: Facet can be a line
+	if (!(std::abs(xt[pi+1] - xt[pi]) > 0.0))
+	{
+		assert(!(std::abs(xt[2] - xt[0]) > 0.0));
+		continue;
+	}
+
+	// y0 is lowest Y-coordinate and y1 the highest Y-coordinate
+	// given this x coordinates of the facet projected along the Z-axis
+	assert(std::abs(xt[pi+1] - xt[pi]) > 0.0);
+	double y0 = yt[pi] + (x - xt[pi]) * (yt[pi + 1] - yt[pi]) /
+				// ------------------------------------
+					(xt[pi + 1] - xt[pi]);
+
+	assert(std::abs(xt[2] - xt[0]) > 0.0);
+	double y1 = yt[0] + (x - xt[0]) * (yt[2] - yt[0]) /
+				//-----------------------------
+					   (xt[2] - xt[0]);
+
+	if (y0 > y1) // Sort to get the order right
+		swap(y0, y1);
+
+	// If there is numerical trouble we cannot determine the edges of the
+	// facet, so there isn't much useful we can do.
+	if (!(y0 <= y1))
+		continue;
+
+	assert(y0 <= y1); // Numerical trouble ?
+
+	assert(y0 >= 0.0);
+	assert(y1 >= 0.0);
+
+	// We will need this value later. It's part of the plane equation
+	const double dnx = d - normal[_dm[axis][X]] * x;
+
+	// Starting point for voxels is the lowest Y-coordinate of a voxel
+	// (in voxel coordinate-space) that falls into the facet.
+	assert(y0 / voxelSize > double(-std::numeric_limits<int>::max()));
+	assert(y0 / voxelSize < double( std::numeric_limits<int>::max()));
+	const int yStart = int(std::floor(y0 / voxelSize));
+	for (int yi = yStart; true; ++yi) // yi is in integer voxel coordinates
+	{
+		const double y = voxelSize *
+				(double(yi) + subVoxOffset[_dm[axis][Y]]);
+
+		// Due to "floor" and numerical issues, we may start too soon
+		if (y < y0)
+			continue;
+
+		assert(y >= 0.0);
+
+		// If we walk out of the facet, we are done
+		if (y >= y1)
+			break;
+
+		// Derive Z from plane equation ax + by + cz = d;
+		// where a, b, c form the plane normal.
+		// dnx is a precomputed part (optimization: loop hoisting)
+		double z = (dnx - normal[_dm[axis][Y]] * y) /
+				//------------------------------------
+					normal[_dm[axis][Z]];
+
+		// If z is NaN, take average of Z-coordinates of points of facet
+		if ( !(z <= 0.0) && !(z >= 0.0) ) // NaN
+			z = (zt[0] + zt[1] + zt[2]) / 3.0;
+
+		// Clamp inbetween legal values (this should be optimized)
+		//~ assert(z >= min(zt[0], zt[1], zt[2]));
+		//~ assert(z <= max(zt[0], zt[1], zt[2]));
+		z = clamp(z, min(zt[0],zt[1],zt[2]), max(zt[0],zt[1],zt[2]));
+
+		assert(z >= 0.0f);
+
+		// Compute indices in the matrix (matrix coordinates)
+		assert(xi + int(pad) >= 0);
+		assert(yi + int(pad) >= 0);
+		const std::size_t xIndex = xi + pad;
+		const std::size_t yIndex = yi + pad;
+
+		assert(xIndex < zBuffer.extent(X));
+		assert(yIndex < zBuffer.extent(Y));
+
+		// z-coordinate in real (continuous) matrix coordinates
+		const double voxelZ = z / voxelSize;
+#ifdef _OPENMP
+		zBufferElements[fIndex].push_back(ZBufferElement(xIndex, yIndex, voxelZ));
+#else
+		// Add the intersection of the line though (xi, yi) and the
+		// facet to the buffer of intersections.
+		zBuffer[xIndex][yIndex].push_back( voxelZ );
+#endif
+	}
+}
+	}
+
+#ifdef _OPENMP
+	// The non-parallelizable part
+	for (std::size_t fIndex = 0; fIndex < geometry.nrFacets(); ++fIndex)
+		for (typename std::vector<ZBufferElement>::const_iterator
+		     it =  zBufferElements[fIndex].begin();
+		     it != zBufferElements[fIndex].end(); ++it)
+		{
+			// Add the intersection of the line though (xi, yi) and the
+			// facet to the buffer of intersections.
+			zBuffer[it->x][it->y].push_back(it->z);
+		}
+#endif
+
+	// sort zBuffers to obtain right order of passing through facets
+	ContainerSorter<std::vector<double> > sorter;
+	omptl::for_each(zBuffer.begin(), zBuffer.end(), sorter);
+
+}
+
+template <typename Tg, typename vector_type>
+bool prepareZBuffers_(const Geometry<Tg>  &geometry,
+		     Matrix<std::vector<double>, 2u> zBuffers[3],
+		     const double voxelSize, const vector_type &subVoxOffset,
+		     const std::tr1::array<std::size_t, 3> &dimensions,
+		     const std::size_t pad = 0)
+{
+	if (!(voxelSize > 0.0f))
+	{
+		std::cout << "Invalid voxel size!" << std::endl;
+		return false;
+	}
+
+	const unsigned _dm[][4] =
+	{
+		{Z, Y, X, 0},
+		{X, Z, Y, 0},
+		{X, Y, Z, 0}
+	};
+
+	// Geometry without volume ?
+	if ( std::accumulate(dimensions.begin(), dimensions.end(), 0u) < (3u + 2u*pad) )
+		return true;
+
+	assert(dimensions[X] >= 1u + 2u*pad);
+	assert(dimensions[Y] >= 1u + 2u*pad);
+	assert(dimensions[Z] >= 1u + 2u*pad);
+
+
+#ifdef _OPENMP
+	#pragma omp parallel for
+#endif
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		const std::size_t dims [] = { dimensions[_dm[axis][X]],
+					      dimensions[_dm[axis][Y]] };
+
+		zBuffers[axis].resize(dims);
+		for (std::size_t x = 0u; x < dims[X]; ++x)
+		for (std::size_t y = 0u; y < dims[Y]; ++y)
+			assert(zBuffers[axis][x][y].empty());
+
+		// Build Z-Buffer using projection along given axis
+		_buildZBuffer(geometry, voxelSize, zBuffers[axis],
+				subVoxOffset, pad, axis);
+
+		// Sanity: nr of intersections per X,Y less-equal nr of facets
+		for (std::size_t x = 0u; x < dims[X]; ++x)
+		for (std::size_t y = 0u; y < dims[Y]; ++y)
+			assert(zBuffers[axis][x][y].size() <= geometry.nrFacets());
+	}
+/*
+for (int axis = 0; axis < 3; ++axis)
+{
+	char letter [] = {'X', 'Y', 'Z'};
+	std::cout << " ------- " << letter[axis] << " ------- " << std::endl;
+	for (int x = 0; x < dimensions[_dm[axis][X]]; ++x)
+	for (int y = 0; y < dimensions[_dm[axis][Y]]; ++y)
+	{
+		std::cout << "[" << x << " " << y << "] ";
+		for (std::size_t i = 0; i < zBuffers[axis][x][y].size(); ++i)
+			std::cout << zBuffers[axis][x][y][i] << " ";
+		std::cout << std::endl;
+	}
+	std::cout << " -------------- " << std::endl << std::endl;
+}
+*/
+	return true;
+}
+
+template<typename T, class vector_type>
+std::tr1::array<std::size_t, 3>
+calculateDims(const Geometry<T> &geometry, const double voxelSize,
+		const std::size_t pad, const vector_type &subVoxOffset)
+{
+	assert(voxelSize > 0.);
+	assert(geometry.min(X) >= 0.);
+	assert(geometry.min(Y) >= 0.);
+	assert(geometry.min(Z) >= 0.);
+
+	// Dimensions of the Voxel Matrix
+	const double sizes [] = {
+			(geometry.max(X)-geometry.min(X)) / voxelSize,
+			(geometry.max(Y)-geometry.min(Y)) / voxelSize,
+			(geometry.max(Z)-geometry.min(Z)) / voxelSize };
+//std::cout << "Pos Min " <<geometry.min(X) << " " <<geometry.min(Y) << " " << geometry.min(Z) << std::endl;
+//std::cout << "Pos Max " <<geometry.max(X) << " " <<geometry.max(Y) << " " << geometry.max(Z) << std::endl;
+//std::cout << "Sizes " <<sizes [X] << " " <<sizes [Y] << " " << sizes[Z] << std::endl;
+        assert(sizes[X] >= 0.0);
+        assert(sizes[Y] >= 0.0);
+        assert(sizes[Z] >= 0.0);
+
+	const std::size_t floorDims [] = {
+			static_cast<std::size_t>(std::floor( sizes[X] ) ),
+			static_cast<std::size_t>(std::floor( sizes[Y] ) ),
+			static_cast<std::size_t>(std::floor( sizes[Z] ) ) };
+	const double remainders [] = {
+			sizes[X] - floorDims[X],
+			sizes[Y] - floorDims[Y],
+			sizes[Z] - floorDims[Z] };
+
+	std::tr1::array<std::size_t, 3> dimensions;
+	dimensions[X] = 2u*pad + floorDims[X] + (remainders[X] > subVoxOffset[X]);
+	dimensions[Y] = 2u*pad + floorDims[Y] + (remainders[Y] > subVoxOffset[Y]);
+	dimensions[Z] = 2u*pad + floorDims[Z] + (remainders[Z] > subVoxOffset[Z]);
+//std::cout << "dims " << dimensions[X] << " " << dimensions[Y] << " " << dimensions[Z] << std::endl;
+	return dimensions;
+}
+
+template <template <typename Tm, std::size_t D, typename Aux> class Matrix_t,
+	typename Ti, typename Tg, typename A, class vector_type>
+bool voxelizePositiveGeometry_(const Geometry<Tg> &geometry,
+	Matrix_t<Ti, 3u, A> &matrix, const double voxelSize,
+	const std::size_t pad, const Ti inside, const Ti outside,
+	const vector_type &subVoxOffset)
+{
+	typedef Ti voxel_type;
+	typedef array_traits<Matrix_t, Ti, 3u, A> MTraits;
+
+        if (!(voxelSize > 0.0))
+                return false;
+
+	/*
+	 * Take snapshots from 3 perspectives.
+	 */
+	// Dimensions of the Voxel Matrix
+	const std::tr1::array<std::size_t, 3> dimensions =
+		calculateDims(geometry, voxelSize, pad, subVoxOffset);
+
+	Matrix<std::vector<double>, 2u> zBuffers[3];
+	if (!prepareZBuffers_(geometry, zBuffers, voxelSize, subVoxOffset, dimensions, pad))
+		return false;
+
+	// Set number of times a location is considered to be inside to zero.
+	typedef unsigned char count_type;
+	Matrix<count_type, 3u> count(dimensions.begin(), 0u);
+	// Do not paralellize, _zBuffersToData() is parallelized
+	for (int axis = 0; axis < 3; ++axis)
+	{
+		// Apply appropriate voxel count, using switch to apply template
+		switch(axis)
+		{
+			case X: _zBuffersToData<vector_type, X>
+						(count, voxelSize, zBuffers[axis],
+						 subVoxOffset, pad);
+				break;
+			case Y: _zBuffersToData<vector_type, Y>
+						(count, voxelSize, zBuffers[axis],
+						 subVoxOffset, pad);
+				break;
+			case Z: _zBuffersToData<vector_type, Z>
+						(count, voxelSize, zBuffers[axis],
+						 subVoxOffset, pad);
+				break;
+			default: assert(false);
+		}
+	}
+
+	// Resize matrix
+	MTraits::resize(matrix, dimensions.begin());
+
+	// Majority voting: inside if count >= 2; otherwise outside
+	typedef Chooser1op<voxel_type, count_type,
+	std::binder2nd<std::less<count_type> > > VoxelChooser;
+
+	omptl::transform(count.begin(), count.end(), MTraits::begin(matrix),
+			 VoxelChooser(std::bind2nd(std::less<count_type>(), 2),
+					outside, inside) );
+
+	return true;
+}
+
+
+/**
+ * Returns either:
+ * -1: not homogeneous
+ * 0: all outside
+ * 1: all inside
+ */
+template <typename vector_type, typename T>
+int evaluateBlock_(const std::size_t size, const T voxelSize,
+		   const vector_type &subVoxOffset,
+		   const Matrix<std::vector<T>, 2u> zBuffer,
+		   const iVector3D &offset, const unsigned axis)
+{
+	assert(size > 0);
+	const unsigned _dm[][4] = {
+		{Z, Y, X, 0},
+		{X, Z, Y, 0},
+		{X, Y, Z, 0}
+	};
+
+	typedef typename std::vector<T>::const_iterator const_iterator;
+
+	int result = -10; // not decided yet
+	for (std::size_t xi = 0; xi < size; ++xi)
+	{
+		const std::size_t x = offset[_dm[axis][X]] + xi;
+		for (std::size_t yi = 0; yi < size; ++yi)
+		{
+			const std::size_t y = offset[_dm[axis][Y]] + yi;
+
+			const double begin = offset[_dm[axis][Z]] + subVoxOffset[ _dm[axis][Z] ];
+			const double end   = begin + size - 1.;
+			assert(begin <= end);
+			const const_iterator
+				bi = lower_bound(zBuffer[x][y].begin(),
+						 zBuffer[x][y].end(),
+						 begin);
+			const const_iterator
+				ei = lower_bound(zBuffer[x][y].begin(),
+						 zBuffer[x][y].end(),
+						 end);
+//std::cout << begin << " to " << end << " ";
+
+			// Must give same result if not crossing facet
+			if (bi != ei)
+			{
+//std::cout << -1 << std::endl << std::endl;
+				return -1; // not homogeneous
+			}
+			// At least they are the same. In or out ?
+			const const_iterator zbegin = zBuffer[x][y].begin();
+			const int value = std::distance(zbegin, bi) % 2;
+			assert(value >= 0);
+//std::cout << value << std::endl;
+			if (result < 0) // if not yet initialised, do so
+				result = value;
+
+			// Already has a value but not like previous ?
+			if (result != value)
+				return -1; // then return not homogeneous
+		}
+	}
+//std::cout << std::endl;
+
+	// if not homogenous, should have been detected
+	assert( result >= 0 );
+	return result;
+}
+
+// Forward declaration
+template <typename voxel_type, typename vector_type>
+void zBuffersToDNode_(typename DTree<voxel_type, 3u>::DNode voxels,
+		 const double voxelSize, const iVector3D &offset,
+		 const vector_type &subVoxOffset,
+		 const Matrix<std::vector<double>, 2u> zBuffers[3],
+		 const std::size_t maxLevel, const std::size_t currentLevel,
+		 const voxel_type inside, const voxel_type outside);
+
+template <typename voxel_type, typename vector_type>
+void handleSubDNode__(typename DTree<voxel_type, 3u>::DNode voxels,
+		 const double voxelSize, const iVector3D &offset,
+		 const vector_type &subVoxOffset,
+		 const Matrix<std::vector<double>, 2u> zBuffers[3],
+		 const std::size_t maxLevel, const std::size_t currentLevel,
+		 const voxel_type inside, const voxel_type outside,
+		 const unsigned nodeIndex)
+{
+	const std::size_t size = 1u << (maxLevel-currentLevel);
+
+	// Create offset of subnode
+	iVector3D os = offset;
+	for (unsigned dim = 0; dim < 3u; ++dim)
+		os[dim] += ((nodeIndex & (1u<<dim)) >> dim) * size / 2u;
+/*		if (nodeIndex & (1u<<dim))
+			os[dim] += size / 2u;
+*/
+	zBuffersToDNode_<voxel_type>(voxels[nodeIndex], voxelSize, os, subVoxOffset,
+				zBuffers, maxLevel, currentLevel+1, inside, outside);
+}
+
+template <typename voxel_type, typename vector_type>
+void zBuffersToDNode_(typename DTree<voxel_type, 3u>::DNode voxels,
+		 const double voxelSize, const iVector3D &offset,
+		 const vector_type &subVoxOffset,
+		 const Matrix<std::vector<double>, 2u> zBuffers[3],
+		 const std::size_t maxLevel, const std::size_t currentLevel,
+		 const voxel_type inside, const voxel_type outside)
+{
+	assert( currentLevel <= maxLevel );
+	const std::size_t size = 1u << (maxLevel-currentLevel);
+
+	bool homogeneous = true;
+	std::size_t counted_inside = 0;
+	for (unsigned axis = 0u; axis < 3u && homogeneous; ++axis)
+	{
+		switch (evaluateBlock_( size, voxelSize, subVoxOffset,
+					zBuffers[axis], offset, axis))
+		{
+			// Not homogeneous
+			case -1: homogeneous = false; break;
+
+			// Outside
+			// ... nop ...
+
+			// Inside, increase count
+			case 1: ++counted_inside; break;
+		}
+	}
+	assert(counted_inside <= 3u);
+
+	if ( !homogeneous && currentLevel < maxLevel)
+	{
+		// Expand into subnodes to handle different content
+		voxels.expand();
+
+		// Voxelize subnodes
+#ifdef _OPENMP
+		if (omp_get_max_threads() >= 1 << (3*currentLevel))
+		{
+			#pragma omp parallel for
+			for (int i = 0; i < 8; ++i)
+				handleSubDNode__<voxel_type>(voxels,
+					voxelSize, offset, subVoxOffset, zBuffers, maxLevel,
+					currentLevel, inside, outside, i);
+		}
+		else
+#endif
+			for (unsigned i = 0u; i < 8u; ++i)
+				handleSubDNode__<voxel_type>(voxels,
+					voxelSize, offset, subVoxOffset, zBuffers, maxLevel,
+					currentLevel, inside, outside, i);
+
+		// If all underlying nodes are all leaf nodes with the same value,
+		// they can be compacted.
+		bool sub_homogeneous = true; // Must be leaf to be homogeneous
+		for (unsigned i = 0u; i < 8u && sub_homogeneous; ++i)
+			sub_homogeneous = voxels[i].isLeaf() &&
+					 (voxels[i]() == voxels[0]());
+		if (sub_homogeneous)
+			voxels.collapse(voxels[0]());
+	}
+	else
+	{
+//std::cout << "Block " << offset[X] << " " << offset[Y] << " " << offset[Z] << " size " << size << " counted " << counted_inside << std::endl;
+		// Convert to voxel values by majority voting
+		assert(voxels.isLeaf());
+		voxels() = (counted_inside >= 2) ? inside : outside;
+	}
+
+	assert(!voxels.isLeaf() || voxels() == inside || voxels() == outside);
+}
+
+template <typename voxel_type, typename vector_type>
+void zBuffersToDTree_(DTree<voxel_type, 3u> &voxels, const double voxelSize,
+		 const vector_type &subVoxOffset,
+		 const Matrix<std::vector<double>, 2u> zBuffers[3],
+		 const voxel_type inside, const voxel_type outside)
+{
+	// Clear to empty space
+	if (voxels.root().isLeaf())
+		voxels.root()() = outside;
+	else
+		voxels.collapse(outside);
+
+	const std::size_t dimension = zBuffers[0].extent(X); // all equal
+	assert( zBuffers[0].extent(X) == zBuffers[0].extent(Y) );
+	const std::size_t maxLevels = log2(dimension);
+	assert(dimension == 1u << maxLevels);
+
+	iVector3D offset(0, 0, 0);
+	zBuffersToDNode_<voxel_type>(voxels.root(), voxelSize, offset, subVoxOffset,
+		    		     zBuffers, maxLevels, 0u, inside, outside);
+}
+
+template <typename voxel_type>
+bool checkDNode_(const typename DTree<voxel_type, 3u>::DNode &voxels)
+{
+	// Convert to voxel values by majority voting
+	if (voxels.isLeaf())
+		return true;
+
+	// Treat undelying nodes
+	bool ok = true;
+	for (unsigned i = 0; i < 8u && ok; ++i)
+		ok = checkDNode_<voxel_type>(voxels[i]);
+	if (!ok)
+		return false;
+
+	// If all underlying nodes are all leaf nodes with the same value,
+	// they can be compacted.
+	bool homogeneous = true; // Must be leaf to be homogeneous
+	for (unsigned i = 0u; i < 8u && homogeneous; ++i)
+		homogeneous =   voxels[i].isLeaf() &&
+				voxels[i]() == voxels[0]();
+
+	return !homogeneous;
+}
+
+template <typename voxel_type>
+bool checkDTree_(const DTree<voxel_type, 3u> &voxels)
+{
+	return checkDNode_<voxel_type>(voxels.root());
+}
+
+} // end namespace detail
+
+template <template <typename Tm, std::size_t D, typename Aux> class Matrix_t,
+	typename Ti, typename Tg, typename A>
+bool voxelize(const Geometry<Tg>  &geometry,
+	Matrix_t<Ti, 3u, A> &matrix, const double voxelSize,
+	const std::size_t pad=0u, const Ti inside=1, const Ti outside=0)
+{
+	clear(matrix);
+	if (geometry.nrFacets() < 2)
+		return true;
+
+	Geometry<Tg> g = geometry;
+	assert(g == geometry);
+//std::cout << "Org Min " <<geometry.min(X) << " " <<geometry.min(Y) << " " << geometry.min(Z) << std::endl;
+//std::cout << "Org Max " <<geometry.max(X) << " " <<geometry.max(Y) << " " << geometry.max(Z) << std::endl;
+	g.translate(-geometry.min(X), -geometry.min(Y), -geometry.min(Z));
+//std::cout << "Trans Min " <<geometry.min(X) << " " <<geometry.min(Y) << " " << geometry.min(Z) << std::endl;
+//std::cout << "Trans Max " <<geometry.max(X) << " " <<geometry.max(Y) << " " << geometry.max(Z) << std::endl;
+
+	const typename Geometry<Tg>::vector_type subVoxOffset = 0.5;
+	return detail::voxelizePositiveGeometry_(g, matrix, voxelSize, pad,
+						 inside, outside, subVoxOffset);
+}
+
+template <template <typename Tm, std::size_t D, typename Aux> class Matrix_t,
+	typename Tf, typename Tg, typename A>
+bool fractionVoxelize(const Geometry<Tg>  &geometry,
+	Matrix_t<Tf, 3u, A> &matrix, const double voxelSize,
+	const std::size_t samples = 16u, const std::size_t pad=0u)
+{
+	clear(matrix);
+	if (geometry.nrFacets() < 2)
+		return true;
+
+	if (samples == 0u)
+		return false;
+
+	Geometry<Tg> g = geometry;
+	assert(g == geometry);
+	g.translate(-geometry.min(X), -geometry.min(Y), -geometry.min(Z));
+
+	cvmlcpp::Matrix<std::size_t, 3> voxelCount;
+	assert(voxelCount.size() == 0);
+
+	typename Geometry<Tg>::vector_type subVoxOffset;
+	const double sampleOffset = 1.0 / double(samples) / 2.0;
+
+	for (unsigned x = 0u; x < samples; ++x)
+	for (unsigned y = 0u; y < samples; ++y)
+	for (unsigned z = 0u; z < samples; ++z)
+	{
+		subVoxOffset[X] = sampleOffset + double(x) / double(samples);
+		subVoxOffset[Y] = sampleOffset + double(y) / double(samples);
+		subVoxOffset[Z] = sampleOffset + double(z) / double(samples);
+
+		for (unsigned i = 0u; i < 3; ++i)
+		{
+			assert(subVoxOffset[i] >= 0.0);
+			assert(subVoxOffset[i] <= 1.0);
+		}
+
+		cvmlcpp::Matrix<unsigned char, 3> voxels;
+		const unsigned char outside = 0;
+		const unsigned char  inside = 1;
+		if (!detail::voxelizePositiveGeometry_(g, voxels, voxelSize, pad,
+				inside, outside, subVoxOffset))
+			return false;
+
+		if (voxelCount.size() == 0)
+		{
+			voxelCount.resize(voxels.extents());
+			voxelCount = 0u;
+		}
+		else if (!std::equal(voxels.extents(), voxels.extents() + 3,
+					voxelCount.extents()))
+			voxelCount.resize(voxels.extents());
+
+		// Increase count for inside voxels
+		omptl::transform(voxelCount.begin(), voxelCount.end(),
+				 voxels.begin(), voxelCount.begin(),
+				 std::plus<unsigned>());
+	}
+
+	array_traits<Matrix_t, Tf, 3u, A>::resize(matrix, voxelCount.extents());
+
+	// Divide count (per voxel) by number of samples (per voxel)
+	const double scaleFactor = 1.0 / std::pow(double(samples), 3.0);
+	omptl::transform(voxelCount.begin(), voxelCount.end(), matrix.begin(),
+			 std::bind2nd(std::multiplies<Tf>(), scaleFactor) );
+
+	return true;
+}
+
+template <typename Tg, typename voxel_type>
+bool voxelize(const Geometry<Tg>  &geometry,
+	DTree<voxel_type, 3u> &voxels, const double voxelSize,
+	const voxel_type inside = 1, const voxel_type outside = 0)
+{
+        if (!(voxelSize > 0.0))
+                return false;
+
+	// Clear to empty space
+	if (voxels.root().isLeaf())
+		voxels.root()() = outside;
+	else
+		voxels.collapse(outside);
+
+	if (geometry.nrFacets() < 2)
+		return true;
+
+	// Put in positive coordinate space
+	Geometry<Tg> g = geometry;
+	assert(g == geometry);
+	g.translate(-geometry.min(X), -geometry.min(Y), -geometry.min(Z));
+
+	// Determine dimensions as powers of 2
+	const typename Geometry<Tg>::vector_type subVoxOffset = 0.5;
+
+	const std::tr1::array<std::size_t, 3> dims =
+		detail::calculateDims(g, voxelSize, 0, subVoxOffset);
+	const std::size_t maxDim = std::max(dims[X], std::max(dims[Y],dims[Z]));
+	const std::size_t dimension = isPower2(maxDim) ? maxDim : (2u << log2(maxDim));
+	assert(dimension >= maxDim);
+
+	std::tr1::array<std::size_t, 3> dimensions;
+	dimensions[X] = dimension;
+	dimensions[Y] = dimension;
+	dimensions[Z] = dimension;
+	
+	/*
+	 * Take snapshots from 3 perspectives.
+	 */
+	Matrix<std::vector<double>, 2u> zBuffers[3];
+	if (!detail::prepareZBuffers_(g, zBuffers, voxelSize, subVoxOffset, dimensions))
+		return false;
+
+	// Count how many times each voxel is considered inside.
+	// Majority voting: inside if count >= 2; otherwise outside
+	detail::zBuffersToDTree_(voxels, voxelSize, subVoxOffset, zBuffers, inside, outside);
+	assert(detail::checkDTree_(voxels));
+
+	return true;
+}
+
+namespace detail
+{
+
+template <typename T>
+bool calculate_tuv(const Point3D<T> &l_a, const Point3D<T> &l_b,
+		const Point3D<T> &p0, const Point3D<T> &p1, const Point3D<T> &p2,
+		boost::numeric::ublas::vector<T> &tuv)
+{
+	boost::numeric::ublas::vector<T> pv(3);
+	pv(0) = l_a.x() - p0.x();
+	pv(1) = l_a.y() - p0.y();
+	pv(2) = l_a.z() - p0.z();
+	
+	boost::numeric::ublas::matrix<T> m(3, 3);
+	for (int i = 0; i < 3; ++i) 
+		m(i, 0) = l_a[i] - l_b[i];
+	for (int i = 0; i < 3; ++i)
+		m(i, 1) = p1[i] - p0[i];
+	for (int i = 0; i < 3; ++i)
+		m(i, 2) = p2[i] - p0[i];
+	// std::cout << std::endl << m << std::endl;
+	
+	// Solve tuv = m^-1 * pv; 
+	if (!invert(m)) // Singular matrix -> line parallel to facet
+		return false;
+
+	tuv = boost::numeric::ublas::prod(m, pv);
+	
+	return true;
+}
+
+template <typename T>
+bool perpendicular(const Point3D<T> &normal, const iPoint3D &direction)
+{
+	// If the facet normal and the direction are perpendicular,
+	// the facet and the direction are parallel.
+	// See http://en.wikipedia.org/wiki/Dot_product
+	assert(std::abs(modulus(normal)-1.) < 0.0001); // Normalized normal?
+	const T dot_product = std::inner_product(normal.begin(), normal.end(), 
+						 direction.begin(), T(0));
+	//		std::cout << "direction: " << directions[d] << " normal: "
+	//		<< f->normal() << " " << dot_product << std::endl;
+	return std::abs(dot_product) < 1.0e-15;
+}
+
+template <typename T>
+class FacetHash
+{
+	public:
+		typedef const typename Geometry<T>::facet_type * facet_pointer;
+		
+		FacetHash(const Geometry<T> &geometry, const T voxelSize_) : 
+			voxelSize(voxelSize_),
+			offset(geometry.min(X), geometry.min(Y), geometry.min(Z))
+		{
+			typedef typename Geometry<T>::const_facet_iterator const_facet_iterator;
+			for (int d = 0; d < 3; ++d)
+			{
+				const T length = geometry.max(d)-geometry.min(d);
+				table[d].resize( 1 + std::ceil(length / voxelSize) );
+			}
+
+			const T e = 1.0e-15;
+			for (const_facet_iterator f = geometry.facetsBegin(); 
+			     f != geometry.facetsEnd(); ++f)
+			{
+				const Point3D<T> p0 = geometry.point( (*f)[0] );
+				const Point3D<T> p1 = geometry.point( (*f)[1] );
+				const Point3D<T> p2 = geometry.point( (*f)[2] );
+	
+				const Point3D<T> plow  = (cvmlcpp::min(p0, cvmlcpp::min(p1, p2))-offset) / voxelSize;
+				const Point3D<T> phigh = (cvmlcpp::max(p0, cvmlcpp::max(p1, p2))-offset) / voxelSize;
+				
+				for (int d = 0; d < 3; ++d)
+				{
+					const std::size_t low  = std::max( T(0), std::floor(plow[d]-e) );
+					const std::size_t high = std::min( T(table[d].size()-1), 
+									   std::ceil(phigh[d]+e) );
+					for (std::size_t i = low; i <= high; ++i)
+						table[d][i].push_back( &(*f) );
+				}
+			}
+		}
+		
+		void search(const Point3D<T> &a, const Point3D<T> &b,
+			    std::set<facet_pointer> &result) const
+		{
+			result.clear();
+			
+			const Point3D<T> plow  = (cvmlcpp::min(a, b) - offset) / voxelSize;
+			const Point3D<T> phigh = (cvmlcpp::max(a, b) - offset) / voxelSize;
+			
+			const T e = 1.0e-15;
+			std::set<facet_pointer> s[3]; 
+			for (int d = 0; d < 3; ++d)
+			{
+				const std::size_t low  = std::max( T(0), std::floor(plow[d]-e) );
+				const std::size_t high = std::min( T(table[d].size()-1), 
+								   std::ceil(phigh[d]+e) );
+				for (std::size_t i = low; i <= high; ++i)
+					s[d].insert(table[d][i].begin(), table[d][i].end());
+			}
+			
+			std::set<facet_pointer> xy;
+			std::set_intersection(s[X].begin(), s[X].end(), s[Y].begin(), s[Y].end(),
+						std::inserter(xy, xy.begin()));
+			s[X].clear(); s[Y].clear(); // save memory
+			
+			assert(result.empty());
+			std::set_intersection(xy.begin(), xy.end(), s[Z].begin(), s[Z].end(),
+						std::inserter(result, result.begin()));
+		}
+		
+	private:
+		const T voxelSize;
+		const Point3D<T> offset;
+		std::vector<std::vector<facet_pointer> > table[3];
+};
+
+} // end namespace detail
+
+/**
+ * Distance functions for boundary condition information
+ */
+template <typename Tg, typename voxel_type, typename Td>
+bool distances(const Geometry<Tg> &geometry,
+	const DTree<voxel_type, 3u> &voxels,
+	const double voxelSize,
+	const std::vector<iPoint3D> &directions,
+	std::map<std::size_t, /* DNode id */
+		 std::vector<std::pair<int, Td> > > & distances,
+	const voxel_type inside = 1)
+{
+	if (!voxelSize > 0)
+		return false;
+	distances.clear();
+	
+	Geometry<Tg> g = geometry;
+	assert(g == geometry);
+	g.translate(-geometry.min(X), -geometry.min(Y), -geometry.min(Z));
+
+	const detail::FacetHash<Tg> facet_hash( (g), voxelSize );
+	
+	const std::tr1::array<std::size_t, 3> dims =
+		detail::calculateDims(g, voxelSize, 0, Point3D<Td>(0.5));
+	const std::size_t max_dim = std::max(dims[X],std::max(dims[Y],dims[Z]));
+	const std::size_t max_depth = ((1ul<<log2(max_dim)) == max_dim) ?
+			log2(max_dim) : log2(max_dim) + 1;
+	assert(1ul << max_depth >= max_dim);
+
+	// Tolerance for numerical error
+	const Td e = 1.0e-15;
+
+	bool ok = true; // return value, initially all is fine
+
+	std::vector< std::vector<std::pair<std::size_t, Td> > >
+		all_distances(directions.size());
+	
+	typedef typename DTree<voxel_type, 3u>::DNode DNode;
+	std::vector<DNode> node_stack;
+	node_stack.push_back(voxels.root());
+	std::vector<iVector3D> offset_stack;
+	offset_stack.push_back(iVector3D(0, 0, 0));
+	while (!node_stack.empty())
+	{
+		// See where we are
+		const DNode node = node_stack.back();
+		node_stack.pop_back();
+		const iVector3D offset = offset_stack.back();
+		offset_stack.pop_back();
+		
+		const std::size_t node_size = 1ul << (max_depth-node.depth());
+		// Branch nodes, put all on the stack to explore later
+		if (!node.isLeaf())
+		{
+			for (int i = 0; i < 8; ++i)
+			{
+				node_stack.push_back(node[i]);
+
+				// Create offset of subnode
+				iVector3D os = offset;
+				const std::size_t sub_size = node_size / 2ul;
+				for (unsigned dim = 0; dim < 3u; ++dim)
+					os[dim] += ((i & (1u<<dim)) >> dim) * sub_size;
+				offset_stack.push_back(os);
+			}
+			assert(node_stack.size() == offset_stack.size());
+			continue;
+		}
+		
+		assert(node.isLeaf());
+		if (node() != inside)
+			continue;
+		
+		for (std::size_t d = 0; d < directions.size(); ++d)
+		{
+			 // won't work if vector is going nowhere
+			if (directions[d] == iPoint3D(0, 0, 0))
+				continue;
+			assert(modulus(directions[d]) > 0);
+
+			/*
+			 *  See http://en.wikipedia.org/wiki/Line-plane_intersection
+			 *  for the logic and notations here.
+			 */
+
+			// Center of voxel in facet world
+			const Point3D<Td> l_a = voxelSize *
+				(Point3D<Td>(offset.x(), offset.y(), offset.z()) + 0.5 * Td(node_size));
+
+			const Point3D<Td> l_b = l_a + directions[d].convert<Td>()*Td(node_size*voxelSize);
+
+			Td min_distance = std::numeric_limits<Td>::max();
+			// For all facets ...
+			typedef typename detail::FacetHash<Tg>::facet_pointer facet_pointer;
+			std::set<facet_pointer> facets;
+			facet_hash.search(l_a, l_b, facets);
+			for (typename std::set<facet_pointer>::const_iterator fit = facets.begin();
+				fit != facets.end(); ++fit)
+			{
+				const facet_pointer f = *fit;
+				
+				// Three points of the facet
+				const Point3D<Td> p0 = g.point( (*f)[0] );
+				const Point3D<Td> p1 = g.point( (*f)[1] );
+				const Point3D<Td> p2 = g.point( (*f)[2] );
+
+				// If the facet normal and the direction are perpendicular,
+				// the facet and the direction are parallel.
+				// See http://en.wikipedia.org/wiki/Dot_product
+				if (detail::perpendicular(f->normal(), directions[d]))
+					continue;
+
+				boost::numeric::ublas::vector<Td> tuv;
+				if (!detail::calculate_tuv(l_a, l_b, p0, p1, p2, tuv))
+					continue;
+
+				// Are we in the triangle ? See wikipedia
+				if ( tuv(0) >= -e && tuv(0) <= 1+e && // tuv(0) --> t
+				     tuv(1) >= -e && tuv(1) <= 1+e && // tuv(1) --> u
+				     tuv(2) >= -e && tuv(2) <= 1+e && // tuv(2) --> v
+				     tuv(1) + tuv(2) <= 1+e )
+				{
+					const Td t = std::max(Td(0), tuv(0));
+					// distance from center to intersection point
+					// can be calculated using t [ = tuv(0) ]
+					// Divide to convert to lattice units
+					assert(modulus(l_b-l_a) <= std::sqrt(3.)*voxelSize*node_size + e);
+					const Td distance = modulus(l_b-l_a) * t;
+					min_distance = std::min(min_distance, distance);
+				}
+			}
+			
+			/*
+			 * We are not investigation only those nodes adjacent
+			 * to an outside node, so the following assert doesn't
+			 * hold...
+			 */
+			//assert(min_distance < std::numeric_limits<Td>::max());
+
+			// Did we find an intersection ?
+			if (min_distance < std::numeric_limits<Td>::max())
+				all_distances[d].push_back(
+					std::make_pair(node.id(), min_distance));
+		}
+	}
+
+	for (std::size_t d = 0; d < directions.size(); ++d)
+	{
+		if (all_distances[d].empty())
+			continue;
+
+		typedef typename std::vector<std::pair<std::size_t, Td> >::const_iterator
+			const_iterator;
+		
+		std::size_t best_id = -1;
+		Td min_distance = std::numeric_limits<Td>::max();
+		for (const_iterator it = all_distances[d].begin();
+		     it != all_distances[d].end(); ++it)
+			if (it->second < min_distance)
+			{
+				best_id      = it->first;
+				min_distance = it->second;
+			}
+		const DNode node = voxels.retrieve(best_id);
+		const std::size_t node_size = 1ul << (max_depth-node.depth());
+		min_distance /= voxelSize * node_size; // convert to unit
+		assert(min_distance <= std::sqrt(Td(3.)) + e);
+		distances[best_id].push_back(std::make_pair(d, min_distance));
+	}
+
+	return ok;
+}
+
+template <template <typename Tm, std::size_t D, typename Aux> class Matrix_t,
+	  typename Tg, typename voxel_type, typename A, typename Td>
+bool distances(const Geometry<Tg>  &geometry,
+	const Matrix_t<voxel_type, 3u, A> &voxels,
+	const double voxelSize,
+	const std::vector<iPoint3D> &directions,
+	std::map<iPoint3D, std::vector<std::pair<int, Td> > > & distances,
+	const std::size_t pad = 0u, const voxel_type inside = 1)
+{
+	if (!voxelSize > 0)
+		return false;
+
+	distances.clear();
+	typedef array_traits<Matrix_t, voxel_type, 3u, A> MTraits;
+	
+	Geometry<Tg> g = geometry;
+	assert(g == geometry);
+	g.translate(-geometry.min(X), -geometry.min(Y), -geometry.min(Z));
+
+	const detail::FacetHash<Tg> facet_hash( (g), voxelSize );
+
+	// Get Matrix dimensions
+	std::size_t dims[3];
+	std::copy(MTraits::shape(voxels), MTraits::shape(voxels)+3, dims);
+	bool ok = true; // return value, initially all is fine
+	for (std::size_t x = pad; x < dims[X]-pad; ++x)
+	for (std::size_t y = pad; y < dims[Y]-pad; ++y)
+	for (std::size_t z = pad; z < dims[Z]-pad; ++z)
+	{
+		if (voxels[x][y][z] != inside)
+			continue;
+		
+		for (std::size_t d = 0; d < directions.size(); ++d)
+		{
+			 // won't work if vector is going nowhere
+			if (directions[d] == iPoint3D(0, 0, 0))
+				continue;
+			assert(modulus(directions[d]) > 0);
+
+			// Investigate only if we are at a border of
+			// the volume or the matrix
+			if ( (x==0 && directions[d].x() < 0) ||
+			     (y==0 && directions[d].y() < 0) ||
+			     (z==0 && directions[d].z() < 0) ||
+			     (x==dims[X]-1 && directions[d].x() > 0) ||
+			     (y==dims[Y]-1 && directions[d].y() > 0) ||
+			     (z==dims[Z]-1 && directions[d].z() > 0) ||
+			     (voxels[x+directions[d].x()] /* are we near a border ? */
+				    [y+directions[d].y()]
+				    [z+directions[d].z()] != inside) )
+			{
+				// Tolerance for numerical error
+				const Td e = 1.0e-15;
+
+				/*
+				 *  See http://en.wikipedia.org/wiki/Line-plane_intersection
+				 *  for the logic and notations here.
+				 */
+				
+				// Center of voxel in facet world
+				const Point3D<Td> l_a =
+					Point3D<Td>(0.5+x-pad, 0.5+y-pad, 0.5+z-pad) * voxelSize;
+	
+				const Point3D<Td> l_b = l_a + directions[d].convert<Td>()*voxelSize;
+
+				Td min_distance = std::numeric_limits<Td>::max();
+
+				// For all facets ...
+				typedef typename detail::FacetHash<Tg>::facet_pointer facet_pointer;
+				std::set<facet_pointer> facets;
+				facet_hash.search(l_a, l_b, facets);
+				assert(facets.size() <= g.nrFacets());
+				for (typename std::set<facet_pointer>::const_iterator fit = facets.begin();
+					fit != facets.end(); ++fit)
+				{
+					const facet_pointer f = *fit;
+					// Three points of the facet
+					const Point3D<Td> p0 = g.point( (*f)[0] );
+					const Point3D<Td> p1 = g.point( (*f)[1] );
+					const Point3D<Td> p2 = g.point( (*f)[2] );
+
+					// If the facet normal and the direction are perpendicular,
+					// the facet and the direction are parallel.
+					// See http://en.wikipedia.org/wiki/Dot_product
+					if (detail::perpendicular(f->normal(), directions[d]))
+						continue;
+
+					boost::numeric::ublas::vector<Td> tuv;
+					if (!detail::calculate_tuv(l_a, l_b, p0, p1, p2, tuv))
+						continue;
+
+					// Are we in the triangle ? See wikipedia
+					if ( tuv(0) >= -e && tuv(0) <= 1+e && // tuv(0) --> t
+					     tuv(1) >= -e && tuv(1) <= 1+e && // tuv(1) --> u
+					     tuv(2) >= -e && tuv(2) <= 1+e && // tuv(2) --> v
+					     tuv(1) + tuv(2) <= 1+e )
+					{
+						const Td t = std::max(Td(0), tuv(0));
+						// distance from center to intersection point
+						// can be calculated using t [ = tuv(0) ]
+						// Divide to convert to lattice units
+						assert(modulus(l_b-l_a) <= std::sqrt(3.)*voxelSize + e);
+						const Td distance = modulus(l_b-l_a) * t / voxelSize;
+						min_distance = std::min(min_distance, distance);
+					}
+				}
+				
+				assert(min_distance < std::numeric_limits<Td>::max());
+				// Did we find an intersection ?
+				if (min_distance < std::numeric_limits<Td>::max())
+					distances[iPoint3D(x, y, z)].push_back(std::make_pair(d, min_distance));
+
+				// Is it valid (or not found) ?
+				ok = ok && (min_distance < std::sqrt(Td(3)) + e);
+			}
+		}
+	}
+	return ok;	
+}
+
+
+} // namespace
+
+#endif

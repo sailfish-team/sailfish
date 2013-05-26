@@ -1,0 +1,825 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+	<title>CVMLCPP::Release Notes</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Release Notes</h1>
+
+<!-- Template
+<h2>Release 2012--</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li></li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li></li>
+</ul>
+
+-->
+
+<h2>Release 2012-04-22</h2>
+
+<h3>Changelog</h3>
+
+<ul>
+	<li>math/Math.hpp: bugfix in binocdf()</li>
+	<li>math/Math: added qfunc()</li>
+	<li>volume/DTree: documented max_depth()</li>
+	<li>volume/Geometry: bugfix in numeric robustness handling</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>volume/Voxelizer: The distances() function for octrees does not
+	give a meaningful return value.</li>
+	<li>build: The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>build: The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2011-12-02</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>progs/*: Added utility progs directory</li>
+	<li>base/Functor: added roughly_equal_to() for float-comparisons.</li>
+	<li>doc/*: Update css &amp; html code</li>
+	<li>volume/Geometry: added swap() function.</li>
+	<li>volume/Geometry: refactoring for simpeler Geometry construction from raw data.</li>
+	<li>volume/SurfaceExtractor: order of points in facets leads to wrong normals, should be fixed. To be tested.</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>volume/Voxelizer: The distances() function for octrees does not
+	give a meaningful return value.</li>
+	<li>build: The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>build: The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2011-11-10</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>various: Fixes for C++11 compatibility</li>
+	<li>base/DirectoryTokenizer: Fixes for boost filesystem v2 vs. v3 breakage</li>
+	<li>volume/Geometry: fixes for numerical issues</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>volume/SurfaceExtractor: order of points in facets leads to wrong normals</li>
+	<li>volume/Voxelizer: The distances() function for octrees does not
+	give a meaningful return value.</li>
+	<li>build: The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>build: The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2011-09-23</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>base/Matrix: documented binocdfinv()</li>
+	<li>base/Matrix: fixes for SymmetricMatrix</li>
+	<li>omptl/omptl_algorithm: improved parallel sort()</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>volume/SurfaceExtractor: order of points in facets leads to wrong normals</li>
+	<li>volume/Voxelizer: The distances() function for octrees does not
+	give a meaningful return value.</li>
+	<li>build: The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>build: The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2011-08-03</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>omptl/*extentions*: rename to exten<b>s</b>ions</li>
+	<li>omptl/omptl_numeric_extensions.h: bugfixes, bugs reported by Robert Rumpf</li>
+	<li>omptl/omptl_tools.h: Bugfix for bugs introduced in Release 2011-07-28</li>
+	<li>omptl/omptl_algorithm: deprecated, include &lt;omptl/algorithm&gt; instead</li>
+	<li>omptl/omptl_numeric: deprecated, include &lt;omptl/numeric&gt; instead</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>volume/SurfaceExtractor: order of points in facets leads to wrong normals</li>
+	<li>volume/Voxelizer: The distances() function for octrees does not
+	give a meaningful return value.</li>
+	<li>build: The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>build: The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2011-07-28</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>base/Meta: bugfix for C++0x code for array_traits</li>
+	<li>Makefile, build/Makefile.build: added "post-install" target</li>
+	<li>debian/*: versioned shared libraries</li>
+	<li>omptl/omptl_tools.h: bugfixes, bugs reported by Robert Rumpf</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>volume/SurfaceExtractor: order of points in facets leads to wrong normals</li>
+	<li>volume/Voxelizer: The distances() function for octrees does not
+	give a meaningful return value.</li>
+	<li>build: The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>build: The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2011-03-11</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>base/DirectoryTokenizer: added current_directory()</li>
+	<li>base/DirectoryTokenizer: rewritten using boost::filesystem</li>
+	<li>base/Matrix: Support for C++0X-style initializer lists</li>
+	<li>base/Matrix: Added new constructor to SymmetricMatrix</li>
+	<li>base/Matrix: Updated iterator behaviour SymmetricMatrix</li>
+	<li>build: increased compatibility of 'release' mode</li>
+	<li>build: added a 'fast' mode</li>
+	<li>added debian packaging</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>volume/SurfaceExtractor: order of points in facets leads to wrong normals</li>
+	<li>volume/Voxelizer: The distances() function for octrees does not
+	give a meaningful return value.</li>
+	<li>build: The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>build: The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2010-11-15</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>base/Vectors: added support for more math functions</li>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>build/Makefile.build: changed target to 'all' for Eclipse compatibility</li>
+	<li>math/Math: simplified interface of find_matching()</li>
+	<li>math/Math: fixed bugs in round_cast(), find_matching()</li>
+	<li>signal/Fourier: NVidia's CUFFT is incompatible with OpenMP</li>
+	<li>signal/Kernels: added</li>
+	<li>volume/SurfaceExtractor: speed up through reuse of datapoints</li>
+	<li>volume/Voxelizer: speed up distance() functions through hashing</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>volume/Voxelizer: The distances() function for octrees does not
+	give a meaningful return value.</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2010-08-19</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>base/Matrix: code cleanup</li>
+	<li>base/Meta: added promote_trait1, promote_trait2, promote_trait3</li>
+	<li>base/Storage: fix bugs found by clang.</li>
+	<li>base/Vectors: added support for functions such as abs, cos, sin, ...</li>
+	<li>build/SConscript: Add support for clang. "CNF=clang" is now available.</li>
+	<li>math/Math: added optimize()</li>
+	<li>math/Math: added gcd()</li>
+	<li>math/Math: added binomial()</li>
+	<li>math/Math: added binopmf()</li>
+	<li>math/Math: added binocdf()</li>
+	<li>math/Math: find_matching(): apply heurisitic only when m==n</li>
+	<li>signal/Fourier: added support for NVidia's CUFFT</li>
+	<li>volume/DTree: fix non-compliant code found by clang.</li>
+	<li>volume/DTree: added operator<() for DNodes.</li>
+	<li>volume/DTree: added index_trail() for DNodes.</li>
+	<li>volume/Voxelizer: added distances() functions</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>volume/Voxelizer: The distances() function for octrees does not
+	give a meaningful return value.</li>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2010-02-23</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>base/XMLParser: Removed, contains invalid code. Consider using
+		<a href="http://code.google.com/p/ticpp/">TinyXML++</a> instead.</li>
+	<li>build/SConscript: fixes to the build system</li>
+	<li>math/Math: addressed numerical issues in binomial functions.</li>
+	<li>math/Math: added median()</li>
+	<li>math/Math: added find_matching()</li>
+	<li>omptl/omptl_algorithm: bugfix in partial_sort() by Dominic Couture-Savoie</li>
+	<li>signal/Processing: added autocorrelate()</li>
+	<li>signal/Fourier: real-to-complex transforms require last dimension to be even.</li>
+	<li>signal/Fourier: added fftshift()</li>
+	<li>volume/Geometry, volume/Voxelizer: robustness to operations on empty Geometries.</li>
+	<li>volume/Voxelizer: use array-traits everywhere</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2009-08-06</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>volume/Voxelizer: Matrix and Octree voxelization are now identical</li>
+	<li>volume/VolumeIO: Recompute normals of text-based STL files too</li>
+	<li>volume/VoxelTools: added expand() to convert DTrees to Matrices</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2009-07-31</h2>
+
+<p>
+<b>Note:</b> This release is scheduled to coincide with the release of
+xFlows, but it should be considered a "pre-release" as there is a known
+(minor) issue with the voxelization of Octrees. Additionally, new utility
+functions in VoxelTools are available but not yet documented.
+</p>
+
+<h3>Changelog</h3>
+<ul>
+	<li>volume/Voxelizer: Bugfixes and enhancements</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>volume/Voxelizer: Matrix and Octree voxelization not identical</li>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2009-07-20</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Added base/StopWatch</li>
+	<li>Added base/COW: Copy-On-Write wrapper class.</li>
+	<li>volume/Voxelizer: improved parallelization</li>
+	<li>base/Functors: documented Gaussian</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2009-04-05</h2>
+
+<h3>Changelog</h3>
+
+<ul>
+	<li>improved support for 64-bit platforms</li>
+	<li>volume/SurfaceExtractor: fix related to
+	<a href='http://gcc.gnu.org/bugzilla/show_bug.cgi?id=39573'>gcc bug 39573</a></li>
+	<li>volume/SurfaceExtractor: improved paralellization</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2009-03-29</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Updated README</li>
+	<li>base/ArrayIO: seems fine.</li>
+	<li>volume/DTree: bugfix, include updated</li>
+	<li>volume/Voxelizer: bugfix, include updated</li>
+	<li>math/Spline: bugfix for segfaults</li>
+	<li>More optimizing setting for the Open64 compiler enabled</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2009-03-06</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>base/Matrix: added SymmetricMatrix</li>
+	<li><i>New directory layout: all source moved to 'cvmlcpp';
+		update your includes!</i></li>
+	<li>omtpl/omptl_algorithm: enhancement of sort() by Bartosz Tomicki</li>
+	<li>volume/Geometry: bug in rotate() spotted by Alessandro Volz</li>
+	<li>doc/Vector.html: documentation fix by Alessandro Volz</li>
+	<li>volume/Voxelizer: added voxelization to Octrees</li>
+	<li>base/StringTools: bugfix in to_string()</li>
+	<li>volume/DTree: doc update</li>
+	<li>volume/SurfaceExtractor: doc update</li>
+	<li>volume/VolumeIO: added writeSTL()</li>
+	<li>Added math/Polynomial</li>
+	<li>Added math/Splines</li>
+	<li>base/Matrix: added clear()</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/ArrayIO: read/writing an array appears to be buggy.</li>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2008-11-21</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Added volume/DTree</li>
+	<li>Added build/* build system</li>
+	<li>Added base/Holder</li>
+<!-- 	<li>base/Math: uBlas-based Linear Least Squares</li> -->
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/ArrayIO: read/writing an array appears to be buggy.</li>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2008-07-17</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Removed the need to define <i>USE_OMP</i>,
+		use transparant detection of OpenMP.</li>
+	<li>Added signal/Channel</li>
+	<li>Added signal/LDPCCode</li>
+	<li>Added signal/Communication</li>
+	<li>base/Math: generalizedGaussianShape()</li>
+	<li>base/Math: deviation() and variance() with average</li>
+	<li>omptl/numeric: bug-fix in accumulate()</li>
+	<li>volume/Voxelizer: bug-fixes</li>
+	<li>volume/Geometry: bug-fixes</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/ArrayIO: read/writing an array appears to be buggy.</li>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2008-06-04</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>omptl/omptl_algorithm: bug-fixes</li>
+	<li>volume/Voxelizer: bug-fixes</li>
+	<li>Removed obsolete OMPTL_OFF definitions</li>
+	<li>base/Matrix: DynamicMatrix documented</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/ArrayIO: read/writing an array appears to be buggy.</li>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2008-05-11</h2>
+
+<h3>Changelog</h3>
+<ul>
+ 	<li>base/Meta: bug-fixes</li>
+	<li>omptl: OMPTL_OFF removed, use automatic detection</li>
+	<li>signal/Fourier: Documentation fixes</li>
+	<li>Support for the Open64 compiler.</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/ArrayIO: read/writing an array appears to be buggy.</li>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>base/Matrix: Document DynamicMatrix</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2008-03-21</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>base/Matrix: Fixes for column-major mode.</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/ArrayIO: read/writing an array appears to be buggy.</li>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>base/Matrix: Document DynamicMatrix</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+	<li>The Intel compiler suffers an internal error when OpenMP and
+	asserts are used. Hence, the intel compiler cannot be used with
+	OpenMP.</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+	<li>The OpenWatcom compiler is currently too outdated to be used.</li>
+</ul>
+
+<h2>Release 2008-03-21</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>base/Euclid: More user-friendly points &amp; vectors.</li>
+	<li>Added signal/LDPCCode</li>
+	<li>base/StringTools: remove [to,from]String: is available in boost</li>
+	<li>base/Meta: removed static_log2; is available in boost</li>
+	<li>base/Meta: swap() in ArrayTraits, std::swap() specialisations</li>
+	<li>SCons based build system</li>
+	<li>base/Math: fixed variance(), deviation()</li>
+	<li>Improved code: Effective C++, 3rd edition, item 6 applied.</li>
+	<li>Preliminary support for OpenWatcom compiler. The compiler is
+	currently too outdated to be used.</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/ArrayIO: read/writing an array appears to be buggy.</li>
+	<li>base/Vectors: Operator require a cleanup</li>
+	<li>base/Matrix: Document DynamicMatrix</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+	<li>The Intel compiler suffers an internal error when OpenMP and
+	asserts are used. Hence, the intel compiler cannot be used with
+	OpenMP.</li>
+	<li>The Sun compiler has too many bugs to compile most of
+	the CVMLCPP library.</li>
+</ul>
+
+<h2>Release 2007-12-13</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>omptl/numeric: Document extentions</li>
+	<li>omptl: better transparancy when OMPTL_OFF is defined</li>
+	<li>Preliminary partial support for Sun Compiler</li>
+	<li>base/Matrix: use reference semantics</li>
+	<li>base/Math: added factorial(), average(),
+		deviation(), variance()</li>
+	<li>base/Functors: Added <i>result_type</i></li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>base/Vectors: Mixing arithmetic might lead to ambiguous code</li>
+	<li>base/Matrix: Document DynamicMatrix</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+	<li>The Intel compiler suffers an internal error when OpenMP and
+	asserts are used. Hence, the intel compiler cannot be used with
+	OpenMP.</li>
+</ul>
+
+<h2>Release 2007-11-07</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>omptl/omptl_numeric: Parallelized inner_product()</li>
+	<li>signal/Fourier: thread-safe for OpenMP programs</li>
+	<li>Reduced linking dependencies, <i>libcvmlcpp_signal</i> removed</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+	<li>The Intel compiler suffers an internal error when OpenMP and
+	asserts are used. Hence, the intel compiler cannot be used with
+	OpenMP.</li>
+</ul>
+
+<h2>Release 2007-10-19</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>omptl: Use reduction (suggested by Joel Yliluoma)</li>
+	<li>volume/Voxelizer: Added support for fractions of voxels</li>
+	<li>omptl: improved iterator type handling</li>
+	<li>Added array toolkit</li>
+	<li>BlitzArray: moved to array toolkit</li>
+	<li>Added array/ArrayIO</li>
+	<li>signal/Processing: Added localAvg</li>
+	<li>Added Matrix operators + - / * </li>
+	<li>base/Math: Added Least Squares fitting</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+</ul>
+
+<h2>Release 2007-09-29</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Bugfixes and documentation updates for Fourier</li>
+	<li>base/Meta: documentation completed</li>
+	<li>omptl/* Default arguments issue resolved</li>
+	<li>omptl: add testsuite</li>
+	<li>omptl: major bugfixes</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+</ul>
+
+<h2>Release 2007-09-24</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Bugfixes and clarification Fourier.</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>omptl/* Default arguments not working for templated function
+		parameters</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+	<li>base/Meta: documentation incomplete</li>
+</ul>
+
+<h2>Release 2007-09-18</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>base/Vector: cleanup operators</li>
+	<li>Many fixes related to blitz</li>
+	<li>base/SurfaceExtractor: replaced class by function</li>
+	<li>base/Voxelizer: replaced class by function</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>omptl/* Default arguments not working for templated function
+		parameters</li>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+	<li>base/Meta: documentation incomplete</li>
+</ul>
+
+<h2>Release 2007-09-13</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Added base/BlitzArray</li>
+	<li>base/Matrix: support for row/column-major addressing</li>
+	<li>volume/SurfaceExtractor: properly orients facets</li>
+	<li>volume/SurfaceExtractor: much faster</li>
+	<li>volume/VolumeIO: readSTL(): Bugfix for recomputation of normals</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+	<li>base/Meta: documentation incomplete</li>
+</ul>
+
+<h2>Release 2007-09-07</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>volume/GeometryIO is now volume/VolumeIO</li>
+	<li>Restored support for g++ 4.1 / icc</li>
+	<li>volume/GeometryIO: Support for Array(voxel) IO</li>
+	<li>volume/GeometryIO::readSTL(): support for ascii STL files</li>
+	<li>base/StringTools: Added toUpper(string&amp;) /
+		 toLower(string&amp;)</li>
+	<li>volume/Voxelizer: workaround for numerical issue</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>signal/Fourier: missing fftshift()</li>
+	<li>volume/VolumeIO: missing writeSTL()</li>
+</ul>
+
+<h2>Release 2007-09-04</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>base/Functors: Added missing value_type definitions</li>
+	<li>volume/GeometryIO::readSTL() Performance increased</li>
+	<li>doc/Processing: Fixed misleading example</li>
+	<li>base/Matrix: bugfix for Matrix&lt;T, 1&gt;::extents()</li>
+	<li>omptl: Improved iterator handling</li>
+	<li>base/Math: added factorial()</li>
+	<li>64/32 bits issues fixed</li>
+	<li>Intel compiler support</li>
+</ul>
+
+<h2>Release 2007-08-08</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Added a Makefile and use libraries to overcome linking
+		problems.</li>
+	<li>signal/Fourier: Bugfixes</li>
+	<li>OMPTL compatible with gcc 4.2</li>
+	<li>Added base/Storage</li>
+	<li>volume/Voxelizer: more parallelization</li>
+	<li>base/Meta : Added ArrayCopy</li>
+</ul>
+
+<h2>Release 2007-07-08</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Everything now lives in namespace "cvmlcpp"</li>
+	<li>Added volume/VoxelTools</li>
+	<li>Added base/DirectoryTokenizer</li>
+	<li>Added base/Allocators</li>
+</ul>
+
+<h2>Release 2007-07-05</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Added DynamicMatrix to base/Matrix</li>
+	<li>Bugfixes and changes to volume/Voxelizer</li>
+	<li>Bugfixes to volume/Geometry</li>
+</ul>
+
+<h2>Release 2007-06-21</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Added Meta::array_traits</li>
+	<li>Added Math::bool isPower(const T x, const T k)</li>
+	<li>Added signal kit</li>
+</ul>
+
+<h2>Release 2007-05-21</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Lots of bugfixes.</li>
+</ul>
+
+<h2>Release 2007-05-12</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Improved testing procedures.</li>
+	<li>volume/Geometry: Added operator==, operator!=</li>
+	<li>base/Math: clamp() and isPower2().</li>
+	<li>base/Math: Newton-Raphson procedures with ranges.</li>
+	<li>base/Functors: LinearFunc, QuadraticFunc Polynomial and Clamp.</li>
+	<li>base/Math: Runge-Kutta method contributed by Orestis
+		Malaspinas.</li>
+</ul>
+
+<h2>Release 2007-05-06</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Added testing/test: a script for regression testing.</li>
+	<li>Added base/Meta: Meta-Programming tools.</li>
+	<li>Added base/CyclicBuffer</li>
+	<li>base/Functors: Added "Derivative".</li>
+	<li>base/Math: Added modulus(x)</li>
+	<li>base/Math: Added Newton-Raphson procedure</li>
+	<li>Documentation: Style fixes.</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>Improve and standardize test cases.</li>
+</ul>
+
+<h2>Release 2007-04-28</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Added base/StringTools</li>
+	<li>Added base/Matrix</li>
+	<li>base/Vectors: Added operator==(Vector&lt;T&gt;, const T
+		&amp;value)</li>
+	<li>Added "volume/*" - The 3D-volume processing kit.</li>
+	<li>base/Vectors: Bugfixes to StaticVector&lt;bool&gt;</li>
+	<li>base/IDGenerators: Added KeyGenerator and IncGenerator.</li>
+	<li>Documentation: Added Implementors.html.</li>
+	<li>Documentation: now all xhtml 1.0/strict.</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>Add missing test-code.</li>
+</ul>
+
+<h2>Release 2007-04-12</h2>
+
+<h3>Changelog</h3>
+<ul>
+	<li>Largely completed documentation for existing code.</li>
+	<li>Restructured directories.</li>
+</ul>
+
+<h3>Open issues</h3>
+<ul>
+	<li>Add test-code.</li>
+	<li>Add 3D volume-processing tools.</li>
+</ul>
+
+
+<h2>Release 2007-04-05</h2>
+
+<ul>
+	<li>Initial release</li>
+</ul>
+
+<!-- End Page -->
+
+</div>
+</body>
+
+</html>

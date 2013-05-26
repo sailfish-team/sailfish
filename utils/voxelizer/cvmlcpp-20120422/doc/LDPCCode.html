@@ -1,0 +1,186 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::LDPCCode</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>LDPCCode</h1>
+
+<p>
+<b>LDPCCode</b> offers an interface for
+<a href='http://en.wikipedia.org/wiki/LDPC'>LDPC</a> communication codes and
+implementations of such codes which employ different possible decoding schemes.
+To learn more about the terminology used here, the reader is advised to read an
+introduction to <a href='http://en.wikipedia.org/wiki/Hamming_code'>Hamming
+codes</a> to get acquainted with the subject.
+</p>
+
+<p>
+In this text, the term generator matrix is slightly different from the
+<a href='http://en.wikipedia.org/wiki/Generator_matrix'>usual description</a>.
+We only consider only the <i>P</i> part to be the generator matrix and assume
+that the identity part <i>I</i> is implicit. The matrix <i>I</i> should thus be
+left out of any generator matrix used here.
+</p>
+
+<h2>Code</h2>
+
+<pre>
+template &lt;std::size_t N, std::size_t K&gt;
+class Code;
+</pre>
+
+<p>
+<table border='1'>
+<tr>
+	<td><pre> std::size_t N</pre></td>
+	<td>The number of bits in a codeword. <i>N</i> should always be
+	greater than or equal to <i>K</i>.</td>
+</tr>
+<tr>
+	<td><pre> std::size_t K</pre></td>
+	<td>The number of bits in a message.</td>
+</tr>
+</table>
+</p>
+
+<p>
+From the given parameters <i>N</i> and <i>K</i>, it follows that the rate of
+the code is <i>K / N</i>. Additionally, we can deduce the number of parity bits
+to be <i>N - K</i>. It is adviced, and in some cases required, to select
+<i>K</i> as a power of two and <i>N</i> as a multiple of <i>K</i>.
+</p>
+
+<p>
+Any code offers the following interface:
+<table border='1'>
+<tr>
+	<td><pre> std::size_t M</pre></td>
+	<td>The number of parity checks of the code, defined as <i>N-K</i>.</td>
+</tr>
+<tr>
+	<td><pre> typename G</pre></td>
+	<td>The type of the generator matrix, short for
+	<i>std::tr1::array&lt;std::bitset&lt;K&gt;, N-K&gt;</i>. A Generator
+	matrix only needs to contain entries for parity checks, the
+	<i>K</i>-by-<i>K</i> Identity matrix can be left out, it will be added
+	automatically. Hence, G contains only <i>N-K</i> vectors in stead of
+	<i>N</i>.</td>
+</tr>
+
+<tr>
+	<td><pre> typename H</pre></td>
+	<td>The type of the parity-check matrix, short for
+	<i>std::tr1::array&lt;std::bitset&lt;N&gt;, M&gt;</i>. The parity-check
+	matrix of the code will be automatically derived from the Generator
+	matrix of the code.</td>
+</tr>
+
+<tr>
+	<td><pre> bool encode(const std::bitset&lt;K&gt; &amp;message,   
+	    std::bitset&lt;N&gt; &amp;codeword) const</pre></td>
+	<td>Produces a <i>codeword</i> for a given a <i>message</i>,
+	returns <i>true</i> when successful.</td>
+</tr>
+
+<tr>
+	<td>
+<pre> bool decode(const std::tr1::array&lt;T, N&gt; &amp;channelOutput,
+	    std::bitset&lt;K&gt; &amp;message)</pre></td>
+	<td>Attempts to decode the output of the channel, which should be given
+	in floating point values in the range <i>[0...1]</i>: for each bit,
+	it should represent the probability of that bit to be <i>1</i>.
+	Depending on the particular subclass of Code that is instanciated, a
+	different decoding algorithm will be employed. If a valid codeword is
+	deduced, the corresponding the <i>message</i> is written and
+	<i>decode</i> returns <i>true</i>. If no valid codeword is found,
+	<i>false</i> is returned and the contents of <i>message</i> are
+	undefined.
+	</td>
+</tr>
+
+<tr>
+	<td><pre> void print() const</pre></td>
+	<td>Prints the code's generator and check matrices.</td>
+</tr>
+
+</table>
+</p>
+
+<h2>BPLDPCCode</h2>
+
+<p>
+The most commonly used decoding scheme, belief propagation, is implemented in
+the <i>BPLDPCCode</i>, defined as:
+<pre>
+template &lt;typename T, std::size_t N, std::size_t K&gt;
+class BPLDPCCode;
+</pre>
+Belief propagation is a sub-optimal and numerically unstable but computationally
+feasible algorithm, and is hence the recommended choice for decoding.
+</p>
+
+<p>
+BPLDPCCode offers the following constructors:
+<table border='1'>
+<tr>
+	<td><pre>BPLDPCCode(const std::size_t maxIterations = 1024u)</pre></td>
+	<td>This constructor will automatically create a generator matrix and
+	requires <i>K</i> to be a power of two and <i>N</i> to be a multiple
+	of <i>K</i>. The belief propagation algorithm will stop on convergeance,
+	or after <i>maxIterations</i> iterations.</td>
+</tr>
+<tr>
+	<td><pre>BPLDPCCode(const G &amp;generator,
+	   const std::size_t maxIterations = 1024u)</pre></td>
+	<td>The code will be defined by the user-supplied generator matrix
+	<i>generator</i>. The belief propagation algorithm will stop on
+	convergeance, or after <i>maxIterations</i> iterations.</td>
+</tr>
+</table>
+</p>
+
+<h2>MLLDPCCode</h2>
+
+<p>
+For reference, a maximum-likelihood decoder is implemented in the
+<i>MLLDPCCode</i>:
+<pre>
+template &lt;typename T, std::size_t N, std::size_t K&gt;
+class MLLDPCCode;
+</pre>
+</p>
+Although a maximum-likelyhood decoder is stable and will lead to optimal
+results, the required computation time is likely to exceed any reasonable
+limits unless <i>N</i> and <i>K</i> are very small.
+<p>
+MLLDPCCode offers the following constructors:
+<table border='1'>
+<tr>
+	<td><pre>MLLDPCCode()</pre></td>
+	<td>This constructor will automatically create a generator matrix and
+	requires <i>K</i> to be a power of two and <i>N</i> to be a multiple
+	of <i>K</i>.</td>
+</tr>
+<tr>
+	<td><pre>MLLDPCCode(const G &amp;generator)</pre></td>
+	<td>The code will be defined by the user-supplied generator matrix
+	<i>generator</i>.</td>
+</tr>
+</table>
+</p>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

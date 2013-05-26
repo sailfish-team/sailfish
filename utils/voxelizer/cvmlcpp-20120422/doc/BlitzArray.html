@@ -1,0 +1,77 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::BlitzArray</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>BlitzArray</h1>
+
+The <b>BlitzArray</b> is a wrapper for the
+<a href='http://www.oonumerics.org/blitz/'>blitz++</a> <i>Array</i> class; it
+provides compatibility with cvmlcpp.
+
+<h2>Interface</h2>
+
+The interface of <b>BlitzArray</b> should be fully compatible with that of
+<a
+href='http://www.oonumerics.org/blitz/docs/blitz_2.html#SEC34'>blitz::array</a>.
+To use the BlitzArray, either include it before including other parts of the
+<b>cvmlcpp</b>, or define <i>USE_BLITZ</i> during compilation.
+
+<h2>Example</h2>
+
+<h3>3D Fourier Transform</h3>
+<p>
+<pre>
+#include &lt;cvmlcpp/base/BlitzArray&gt;
+#include &lt;cvmlcpp/signal/Fourier&gt;
+
+using namespace cvmlcpp;
+
+// Have a blitz++ array
+blitz::Array&lt;int, 3&gt; a(3, 4, 5);
+std::fill(a.begin(), a.end(), 7);
+
+// Create a wrapper around "a" for cvmlcpp-compatibility
+BlitzArray&lt;int, 3&gt; ba(a);
+assert( (3*4*5*7) == std::accumulate(ba.begin(), ba.end(), 0));
+
+// Create output directly as a wrapper
+BlitzArray&lt;std::complex&lt;double&gt;, 3&gt; ba_fft;
+
+// Compute 3D-Fourier tranform with "fftw"
+doDFT(ba, ba_fft);
+
+// Use ba_fft as any other blitz++ array
+...
+</pre>
+</p>
+
+<h3>Problem with Constructors</h3>
+
+<p>
+The following code will <b>not</b> compile:
+<pre>
+BlitzArray&lt;std::complex&lt;double&gt;, 3&gt; bc(3, 4, 5);
+blitz::Array&lt;std::complex&lt;double&gt;, 3&gt; c(bc); /* Doesn't work */
+</pre>
+The reason is that the compiler will not use the desired constructor, and
+compilation will be aborted. Hence, you must always create a
+<i>blitz::Array&lt;...&gt;</i> first, and create a <i>BlitzArray&lt;...&gt;</i>
+after that.
+</p>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

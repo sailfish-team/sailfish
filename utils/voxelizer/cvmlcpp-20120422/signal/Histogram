@@ -1,0 +1,237 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_HISTOGRAM
+#define CVMLCPP_HISTOGRAM 1
+
+#include <cassert>
+#include <limits>
+#include <map>
+#include <functional>
+
+#include <cvmlcpp/math/Math>
+
+namespace cvmlcpp
+{
+
+template <typename T>
+class Histogram
+{
+	private:
+		typedef std::map<std::size_t, std::size_t> BaseType;
+	public:
+		typedef T value_type;
+		typedef typename BaseType::const_iterator
+			const_iterator;
+		typedef typename BaseType::const_reverse_iterator
+			const_reverse_iterator;
+
+		Histogram(const std::size_t nrBins =
+				std::numeric_limits<std::size_t>::max(),
+			  const value_type minValue = value_type(0),
+			  const value_type maxValue =
+				std::numeric_limits<value_type>::max()) :
+				_nrBins(nrBins),
+				_minValue(minValue), _maxValue(maxValue),
+				_elements(0u) { assert(_nrBins > 0u); }
+
+		template <typename InputIterator>
+		Histogram(const InputIterator first, const InputIterator last,
+			  const std::size_t nrBins,
+			  const value_type minValue = value_type(0),
+			  const value_type maxValue =
+				std::numeric_limits<value_type>::max() ) :
+				_nrBins(nrBins),
+				_minValue(minValue), _maxValue(maxValue),
+				_elements(0u)
+		{
+			assert(_nrBins > 0u);
+			this->insert(first, last);
+		}
+
+		template <typename InputIterator, class UnaryFunction>
+		Histogram(const InputIterator first, const InputIterator last,
+			  UnaryFunction op, const std::size_t nrBins,
+			  const value_type minValue = value_type(0),
+			  const value_type maxValue =
+				std::numeric_limits<value_type>::max()) :
+				_nrBins(nrBins),
+				_minValue(minValue), _maxValue(maxValue),
+				_elements(0u)
+		{
+			assert(_nrBins > 0u);
+			this->insert(first, last, op);
+		}
+
+		std::size_t size() const { return _hist.size(); }
+
+		std::size_t maxSize() const { return _nrBins; }
+
+		std::size_t elements() const { return _elements; }
+
+		/*
+		 * Given a number between 0.0 and 1.0, returns an iterator
+		 * to the lowest bin in the histogram such that
+		 * dataPercent percent of the data is in bins lower than the
+		 * returned element.
+		 */
+		const_iterator 
+		atLeastPercentGreater(const double percentElements) const
+		{
+			assert(percentElements >= 0.0);
+			assert(percentElements <= 100.0);
+			return atLeastGreater(static_cast<std::size_t>
+					(percentElements / 100.0 * _elements));
+		}
+
+		const_iterator atLeastGreater(const std::size_t elements) const
+		{
+			assert(elements < _elements);
+			std::size_t sum = 0u;
+			for (const_iterator it = this->begin();
+			     it != this->end(); ++it)
+			{
+				sum += it->second;
+				if (sum >= elements)
+					return it;
+			}
+
+			return this->end();
+		}
+
+		/*
+		 * Given a number between 0.0 and 1.0, returns an iterator
+		 * to the highest bin in the histogram such that
+		 * 'dataPercent' percent of the data is in bins higher than the
+		 * returned element.
+		 */
+		const_reverse_iterator 
+		atMostPercentGreater(const double percentElements) const
+		{
+			assert(percentElements >= 0.0);
+			assert(percentElements <= 100.0);
+			return atMostGreater(static_cast<std::size_t>
+					(percentElements / 100.0 * _elements));
+		}
+
+		const_reverse_iterator 
+		atMostGreater(const std::size_t elements) const
+		{
+			assert(elements < _elements);
+			std::size_t sum = 0u;
+			for (const_reverse_iterator it = this->rbegin();
+			     it != this->rend(); ++it)
+			{
+				sum += it->second;
+				if (sum >= elements)
+					return it;
+			}
+
+			return this->rend();
+		}
+
+		double binSize() const
+		{ return double(_maxValue - _minValue) / double(_nrBins); }
+
+		void clear() { _hist.clear(); _elements = 0u; }
+
+		void insert(const value_type &value)
+		{
+			const double frac = 	double(value) /
+					double(_maxValue-_minValue);
+			const std::size_t bin = 
+				round_cast<std::size_t>( frac * (_nrBins-1) );
+			assert(bin < _nrBins);
+			++_hist[bin];
+			++_elements;
+		}
+
+		template <typename InputIterator>
+		void insert(const InputIterator first, const InputIterator last)
+		{
+			for(InputIterator it = first; it != last; ++it)
+				this->insert(*it);
+		}
+
+		template <typename InputIterator, class UnaryFunction>
+		void insert(const InputIterator first, const InputIterator last,
+			    UnaryFunction op)
+		{
+			for(InputIterator it = first; it != last; ++it)
+				this->insert(op(*it));
+		}
+
+		std::size_t operator[](const std::size_t bin) const
+		{
+			if (_hist.count(bin))
+				return _hist[bin];
+
+			return 0u;
+		}
+
+		float operator()(const std::size_t bin) const
+		{
+			if (_hist.count(bin))
+				return float(_hist[bin]) / float(_elements);
+
+			return 0.0f;
+		}
+
+		const_iterator begin() const { return _hist.begin(); }
+		const_iterator end()   const { return _hist.end(); }
+
+		const_reverse_iterator rbegin() const { return _hist.rbegin(); }
+		const_reverse_iterator rend()   const { return _hist.rend(); }
+
+		double avg() const
+		{
+			return double(_elements) / double(this->size());
+		}
+
+		const Histogram &operator+=(const Histogram &rhs)
+		{
+			assert(this->binSize() == rhs.binSize());
+			for (const_iterator it = rhs.begin();
+			     it != rhs.end(); ++it)
+				_hist[it->first] += it->second;
+
+			this->_elements += rhs._elements;
+
+			return *this;
+		}
+
+	private:
+		const std::size_t _nrBins;
+		const value_type _minValue, _maxValue;
+		std::map<std::size_t, std::size_t> _hist;
+		std::size_t _elements;
+};
+
+template <typename T>
+Histogram<T> operator+(const Histogram<T> &lhs, const Histogram<T> &rhs)
+{
+	Histogram<T> rv(lhs);
+	rv += rhs;
+	return rv;
+}
+
+} // namespace cvmlcpp
+
+#endif

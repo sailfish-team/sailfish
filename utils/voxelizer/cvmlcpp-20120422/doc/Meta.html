@@ -1,0 +1,327 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Meta</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Meta</h1>
+
+Meta-Programming tools.
+
+<h2>Interface</h2>
+
+<h3><code>ValueType</code></h3>
+
+The class ValueType offers a typedef <i>value_type</i> which is either the type
+of the template parameter itself (for basic types) of the type of the elements
+containted within the type of the template parameter (for containers).
+The full definition is:
+<pre>template &lt;typename T&gt;
+struct ValueType;</pre>
+
+<p>
+Intended to facilitate the integration of arithmic types and containers
+of arithmic types such as <a href='Vectors.html'>Vectors</a>. The
+<b>ValueType</b> defines a <i>value_type</i>. For arithmic types, this is the
+type itself; for other types, such as containers, this is the type of elements
+in the container. The latter is implemented as an alias for
+<i>T::value_type</i>, which must be defined in the implementation of
+container-type <i>T</i>.
+</p>
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>A type definition.</td>
+</tr>
+
+</tbody>
+</table>
+
+<p>
+Consider the following example:</p>
+<pre>
+template &lt;typename T&gt;
+typename ValueType&lt;T&gt;::value_type modulus(const T &amp;arraymp;x);
+</pre>
+<p>
+The definition specifies that if <i>T</i> is an arithmetic type, the return type
+is also <i>T</i>. If <i>T</i> is <i>not</i> an arithmetic type, such as a
+<a href='Vectors.html'>Vector</a>, the return type is <i>T::value_type</i>, the
+type of the elements of <i>T</i>. Thus, if <i>T</i> is an <i>int</i>, then
+<i>ValueType&lt;T&gt;::value_type</i> is an <i>int</i>. If <i>T</i> is a
+<i>StaticVector&lt;float, 3u&gt;</i>, then
+<i>ValueType&lt;T&gt;::value_type</i> is a <i>float</i>.
+</p>
+
+<h3><code>promote_trait1, promote_trait2, promote_trait3</code></h3>
+
+Promote types to floating-point representations, if possible with a sufficiently
+long mantissa to accurately represent the original type.
+
+
+<h3><code>static_max</code></h3>
+
+<p>
+A max() function that can be used in template expressions.</p>
+<pre>
+template &lt;int lhs, int rhs&gt;
+struct static_max;
+</pre>
+<p>The struct <i>static_max</i> defines an <i>int max</i>.</p>
+
+<h3><code>static_log2</code></h3>
+
+<p>
+A function that uses template techniques to calculate the log2 of a value during
+compilation.</p>
+<pre>
+template &lt;std::size_t N&gt;
+std::size_t static_log2();
+</pre>
+<p>Contrary to dynamically executed log2 functions, the value can then be used 
+during compilation, such as for template parameters.
+</p>
+
+<h3><code>array_traits</code></h3>
+
+<p>
+The class <i>array_traits</i> offers a uniform interface to the many
+multi-dimensional array implementations available in C++, such as CVMLCPP' own
+<a href='Matrix.html'>Matrix</a>, <a href='http://www.boost.org/'>boosts</a>' 
+<a href='http://www.boost.org/libs/multi_array/doc/index.html'>multi_array</a>, and
+<a href='http://www.oonumerics.org/blitz'>blitz++</a>'s 
+<a href='http://www.oonumerics.org/blitz/'>Arrays<a/> through the
+<a href='BlitzArray.html'>BlitzArray</a> class.
+The purpose is to allow programmers the use this uniform interface in stead of
+the interfaces offered by the individual implementations. This makes it
+possible to switch from one implementation to another with significantly less
+effort.
+</p>
+
+<p>The full definition is:</p>
+<pre>
+template &lt;template &lt;typename Tm, std::size_t D, typename Aux&gt;
+	class Array_t, typename T, std::size_t N, typename A&gt;
+struct array_traits;
+</pre>
+<p><i>array_traits</i> contains both typedefs and member functions.</p>
+
+<p>
+Using <i>array_traits</i>, specialisations for <i>std::swap()</i> are offered,
+so that it always uses the most efficient swap implementation for given matrix
+arguments. The use of any form of <i>swap()</i> on matrices of different types
+is strongly discouraged as it requires copying all data.
+</p>
+
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>array_type</pre></td>
+	<td>The full type of the array, i.e. <i>Array_t&lt;T, N, A&gt;<i>.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>The type of the elements in the array, i.e. an alias for
+		template parameter <i>T</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>iterator</pre></td>
+	<td>The iterator type over the contents of the array.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator</pre></td>
+	<td>A const_iterator type (read-only) over the contents of the
+		array.</td>
+</tr>
+
+<tr>
+	<td><pre>reference</pre></td>
+	<td>The type of a reference to the elements of the array.</td>
+</tr>
+
+<tr>
+	<td><pre>const_reference</pre></td>
+	<td>The type of a read-only reference to the elements of the array.</td>
+</tr>
+
+<tr>
+	<td><pre>slice_type</pre></td>
+	<td>The type of a slice of the array. Slices have reference
+		semantics, and cannot be resized.</td>
+</tr>
+
+<tr>
+	<td><pre>slice_traits</pre></td>
+	<td>The <i>array_traits</i> type for slices of the array.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename InputIterator&gt;
+array_type create(InputIterator input)</pre></td>
+	<td>Returns a newly created array with dimensions as specified in
+	the range indicated by <i>input</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename InputIterator&gt;
+array_type create(InputIterator input, const T &amp;value)</pre></td>
+	<td>Returns a newly created array with dimensions as specified in
+	the range indicated by <i>input</i>, filled with <i>value</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename U&gt;
+array_type create(const std::initializer_list&lt;U&gt; init_list)</pre></td>
+	<td>Returns a newly created array with dimensions as specified in
+	the <i>initializer_list init_list</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename U&gt;
+  array_type create(const std::initializer_list&lt;U&gt; init_list,&nbsp;&nbsp;
+		    const T &amp;value)</pre></td>
+	<td>Returns a newly created array with dimensions as specified in
+	the <i>initializer_list init_list</i>. The array is filled with <i>value</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t size(const array_type &amp;array)</pre></td>
+	<td>The number of elements in the array.</td>
+</tr>
+<!--
+<tr>
+	<td><pre>std::size_t size(const reference &amp;array)</pre></td>
+	<td>The number of elements in the array.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t size(const const_reference &amp;array)</pre></td>
+	<td>The number of elements in the array.</td>
+</tr>
+-->
+<tr>
+	<td><pre>template &lt;typename InputIterator&gt;
+  bool resize(Array_t&lt;T, N, Aux&gt; &amp;array,
+	      InputIterator input,
+	      bool preserve = false)</pre></td>
+	<td>Resize the <i>array</i> to the dimensions specified in
+	the range indicated by <i>input</i>, trying to preserve the
+	contents only if <i>preserve</i> is <b>true</b>.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename U&gt;
+  bool resize(Array_t&lt;T, N, Aux&gt; &amp;array,
+	      const std::initializer_list&lt;U&gt; size_list,
+	      bool preserve = false)</pre></td>
+	<td>Resize the <i>array</i> to the dimensions specified in
+	the <i>initializer_list size_list</i>, trying to preserve the
+	contents only if <i>preserve</i> is <b>true</b>.</td>
+</tr>
+
+<tr>
+	<td><pre>integer_type_const_iterator
+shape(const Array_t&lt;T, N, Aux&gt; &amp;array</pre></td>
+	<td>Returns an iterator to the beginning of a range indicating the
+	shape / dimensions / extents of the <i>array</i>. The exact type
+	of <i>integer_type_const_iterator</i> depends on the 
+	implementation.</td>
+</tr>
+<!--
+<tr>
+	<td><pre>reference reference_to(array_type &amp;array)</pre></td>
+	<td>Returns a reference to the given <i>array</i>.</td>
+</tr>
+-->
+<tr>
+	<td>
+<pre>array_type &amp;copy_of(const array_type &amp;array)</pre></td>
+	<td>Returns a new array that is a copy of the given <i>array</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>iterator begin(array_type &amp;array)</pre></td>
+	<td>Returns an iterator pointing to the first element in
+	<i>array</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator begin(const array_type &amp;array)</pre></td>
+	<td>Returns a const_iterator pointing to the first element in
+	<i>array</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>iterator end(array_type &amp;array)</pre></td>
+	<td>Returns an iterator pointing to the end of <i>array</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator end(const array_type &amp;array)</pre></td>
+	<td>Returns an const_iterator pointing to the end of <i>array</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>void swap(array_type &amp;lhs, array_type &amp;rhs)</pre></td>
+	<td>Equivalent of <i>std::swap()</i>, chooses optimal
+		implementation.</td>
+</tr>
+
+<!-- Template
+<tr>
+	<td><pre></pre></td>
+	<td>.</td>
+</tr>
+-->
+
+</table>
+</p>
+
+<h3><pre>Array Functions</pre></h3>
+
+There is a special function, <i>copy()</i>, that copies arrays of 
+potentially different types and sizes. If the destination is in any 
+dimension smaller than the source, the remaining elements will not 
+be copied. If the destination is greater than the source in any 
+dimension, the destination remaining data are by default set to zero.
+This behavior can be controlled by the <i>pad_zero</i> parameter.
+
+<p>
+The template parameter <i>N</i> refers to the number of dimensions of the arrays
+to be copied.
+<pre>
+template &lt; ... &gt;
+void copy(const ArrayIn &lt;Tin,  N, AuxLhs&gt; &amp; input,
+		ArrayOut&lt;Tout, N, AuxRhs&gt; &amp;output, const bool pad_zero = true);
+</pre>
+</p>
+
+<p>
+The function <i>clear()</i> resizes the any array to zero in any dimension, effectively
+clearing it of any data.
+<pre>
+template &lt; ... &gt;
+void clear(Array&lt;T,  N, A&gt; &amp;m);
+</pre>
+</p>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,122 @@
+/***************************************************************************
+ *   Copyright (C) 2009 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_KERNELS
+#define CVMLCPP_KERNELS
+
+#include <cvmlcpp/base/Functors>
+#include <cvmlcpp/base/Matrix>
+
+namespace cvmlcpp
+{
+
+namespace detail
+{
+
+template <typename T, unsigned Dims> struct Gaussian;
+
+template <typename T>
+unsigned sigmaToSize(const T &sigma) { return 6.0 * sigma + 1; }
+
+template <typename T>
+struct Gaussian<T, 1>
+{
+	static Matrix<T, 1> gaussian(const T &sigma)
+	{
+		const unsigned size = sigmaToSize(sigma);
+		assert (size & 1); // size must be uneven
+
+		Matrix<T, 1> x(&size);
+
+		const T mu = size / 2u;
+	
+		const Gaussian<T> g(mu, sigma*sigma);
+		Matrix<T, 1> x(&size);
+		for (unsigned i = 0; i < size; ++i)
+			x[i] = g(i);
+
+		return x;
+	}
+};
+
+template <typename T>
+struct Gaussian<T, 2>
+{
+	static Matrix<T, 2> gaussian(const T &sigma)
+	{
+		const unsigned size = sigmaToSize(sigma);
+		assert (size & 1); // size must be uneven
+
+		Matrix<T, 1> base = gaussianKernel(const T &sigma);
+		Matrix<T, Dims> x(&size);
+
+		apply(sigma, x.begin(), x.end());
+
+		for (unsigned )
+
+		return x;
+	}
+
+
+
+};
+
+template <typename T, unsigned Dims>
+struct Gaussian
+{
+/*	template <typename T, unsigned Dims>
+	Matrix<T, Dims> gaussian(const T &sigma)
+	{
+		const unsigned size = 6.0 * sigma + 1;
+		assert (size & 1); // size must be uneven
+	
+		unsigned sz[Dims];
+		std::fill(sz, sz+Dims, size);
+		Matrix<T, Dims> x(&size);
+
+		for (int i = 0; i < size; ++i)
+		{
+			Matrix<T, Dims-1>::apply(sigma, x[i]);
+		}
+
+		return x;
+	}
+
+	template <typename It>
+	static void apply(const T &sigma, Matrix<T, Dims> &x,
+			  const Matrix<T, Dims-1> &y)
+	{
+		
+	}
+*/
+};
+
+} // end namespace detail
+
+template <typename T, unsigned Dims>
+Matrix<T, Dims> gaussian(const T &sigma)
+{
+	return detail::Gaussian<T, Dims>::gaussian(sigma);
+}
+
+
+} // namespace
+
+#endif

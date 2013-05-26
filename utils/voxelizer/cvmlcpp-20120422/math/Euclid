@@ -1,0 +1,159 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2u of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#pragma once
+
+#ifndef CVMLCPP_EUCLID
+#define CVMLCPP_EUCLID 1
+
+#include <cvmlcpp/base/Enums>
+#include <cvmlcpp/math/Vectors>
+
+namespace cvmlcpp
+{
+
+template <typename T>
+struct Point2D : public StaticVector<T, 2u>
+{
+	Point2D() { }
+
+	template <typename U>
+	Point2D(const U &data) : StaticVector<T, 2u>(data) { }
+
+	template <typename U1, typename U2>
+	Point2D(const U1 x, const U2 y) { this->set(x, y); }
+
+	template <typename U1, typename U2>
+	void set(const U1 x, const U2 y)
+	{
+		this->x() = x;
+		this->y() = y;
+	}
+
+	template <typename U1, typename U2>
+	Point2D jmp(const U1 dx, const U2 dy) const
+	{
+		return Point2D((*this)[X]+dx, (*this)[Y]+dy);
+	}
+
+	T &x() { return (*this)[X]; }
+	T &y() { return (*this)[Y]; }
+
+	T x() const { return (*this)[X]; }
+	T y() const { return (*this)[Y]; }
+
+	T &width()  { return (*this)[WIDTH ]; }
+	T &height() { return (*this)[HEIGHT]; }
+
+	T width()  const { return (*this)[WIDTH ]; }
+	T height() const { return (*this)[HEIGHT]; }
+};
+
+template <typename T>
+struct Point3D : public StaticVector<T, 3u>
+{
+	Point3D() { }
+
+	Point3D(const StaticVector<T, 3u> &v) : StaticVector<T, 3u>(v) { }
+
+	template <typename U>
+	Point3D(const U &data) : StaticVector<T, 3u>(data) { }
+
+	template <typename U1, typename U2, typename U3>
+	Point3D(const U1 x, const U2 y, const U3 z) { this->set(x, y, z); }
+
+	template <typename U1, typename U2, typename U3>
+	void set(const U1 x, const U2 y, const U3 z)
+	{
+		this->x() = x;
+		this->y() = y;
+		this->z() = z;
+	}
+
+	template <typename U1, typename U2, typename U3>
+	Point3D jmp(const U1 dx, const U2 dy, const U3 dz) const
+	{
+		return Point3D((*this)[X]+dx, (*this)[Y]+dy, (*this)[Z]+dz);
+	}
+
+	T &x() { return (*this)[X]; }
+	T &y() { return (*this)[Y]; }
+	T &z() { return (*this)[Z]; }
+
+	T x() const { return (*this)[X]; }
+	T y() const { return (*this)[Y]; }
+	T z() const { return (*this)[Z]; }
+};
+
+// Some standard definitions of Points, Vectors, Lines and Triangles
+typedef Point2D<int>			iPoint2D;
+typedef Point2D<int>			iVector2D;
+typedef StaticSortedVector<iPoint2D, 2>	iLine2D;
+typedef StaticSortedVector<iPoint2D, 3>	iTriangle2D;
+
+typedef Point3D<int>			iPoint3D;
+typedef Point3D<int>			iVector3D;
+typedef StaticSortedVector<iPoint3D, 2>	iLine3D;
+typedef StaticSortedVector<iPoint3D, 3>	iTriangle3Di;
+
+typedef Point2D<std::size_t>		uPoint2D;
+typedef Point2D<std::size_t>		uVector2D;
+typedef StaticSortedVector<uPoint2D, 2>	uLine2D;
+typedef StaticSortedVector<uPoint2D, 3>	uTriangle2D;
+
+typedef Point3D<int>			iPoint3D;
+typedef Point3D<int>			iVector3D;
+typedef StaticSortedVector<iPoint3D, 2>	iLine3D;
+typedef StaticSortedVector<iPoint3D, 3>	iTriangle3Di;
+
+typedef Point3D<std::size_t>		uPoint3D;
+typedef Point3D<std::size_t>		uVector3D;
+typedef StaticSortedVector<uPoint3D, 2>	uLine3D;
+typedef StaticSortedVector<uPoint3D, 3>	uTriangle3D;
+
+typedef Point2D<float>			fPoint2D;
+typedef Point2D<float>			fVector2D;
+typedef StaticSortedVector<fPoint2D, 2>	fLine2D;
+typedef StaticSortedVector<fPoint2D, 3>	fTriangle2D;
+
+typedef Point3D<float>			fPoint3D;
+typedef Point3D<float>			fVector3D;
+typedef StaticSortedVector<fPoint3D, 2>	fLine3D;
+typedef StaticSortedVector<fPoint3D, 3>	fTriangle3D;
+
+typedef Point2D<double>			dPoint2D;
+typedef Point2D<double>			dVector2D;
+typedef StaticSortedVector<dPoint2D, 2>	dLine2D;
+typedef StaticSortedVector<dPoint2D, 3>	dTriangle2D;
+
+typedef Point3D<double>			dPoint3D;
+typedef Point3D<double>			dVector3D;
+typedef StaticSortedVector<dPoint3D, 2>	dLine3D;
+typedef StaticSortedVector<dPoint3D, 3>	dTriangle3D;
+
+
+// Using indices of points in a given structure rather that
+// points themselves.
+typedef StaticSortedVector<std::size_t, 2> IndexLine;
+typedef StaticSortedVector<std::size_t, 3> IndexTriangle;
+
+} // namespace
+
+#endif

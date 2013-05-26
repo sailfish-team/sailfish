@@ -1,0 +1,66 @@
+/***************************************************************************
+ *   Copyright (C) 2009 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_COW
+#define CVMLCPP_COW 1
+
+#include <cassert>
+#include <tr1/memory>
+
+namespace cvmlcpp
+{
+
+template <class T>
+class COW
+{
+	public:
+		COW(T * const resource) : resource_(resource)
+		{ assert(resource_); }
+
+/*		const COW & operator=(T * const that)
+		{
+			resource_ = std::tr1::shared_ptr<T>(that);
+			return *this;
+		}
+*/
+		const T& operator()() const { return *resource_; }
+
+		T &operator()()
+		{
+			if (resource_.unique())
+				return *resource_;
+
+			resource_ = std::tr1::shared_ptr<T>(new T(*resource_));
+			return *resource_;
+		}
+
+		bool operator==(const COW &that) const
+		{ return this->resource_ == that.resource_; }
+
+		bool operator!=(const COW &that) const
+		{ return !(*this == that); }
+
+	private:
+		std::tr1::shared_ptr<T> resource_;
+};
+
+} // namespace
+
+#endif

@@ -1,0 +1,323 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Holder</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Holder</h1>
+
+<p>
+The <b>Holder</b> offers a framework for resource management of polymorphic
+objects. It enables the use of input and output operators, and provides a
+short-hand for dynamic casting. Using the <b>Holder</b>, it becomes easier to
+store polymorphic objects in a container than it would be using pointers.
+</p>
+
+<p>
+The framework requires the user to implement three elements:
+<ol>
+<li>The set of polymorphic classes inheriting from a chosen base class
+<i>BaseClass</i>;</li>
+<li>A Factory-method <i>Factory</i> implemented as a functor;</li>
+<li>An <i>operator&lt;&lt;(std::ostream&amp;, BaseClass&amp;);</i></li>
+</ol>
+</p>
+
+<h2>Interface</h2>
+
+<h3>Holder</h3>
+
+<p>
+The <b>Holder</b> class takes two template parameters:
+<pre>
+template &lt;class BaseClass, class Factory&gt;
+class Holder;
+</pre>
+</p>
+
+<p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>typedef BasePtr</pre></td>
+	<td>The type of pointer used to hold objects.</td>
+</tr>
+
+<tr>
+	<td><pre>Holder()</pre></td>
+	<td>Constructor, no object will be managed.</td>
+</tr>
+
+<tr>
+	<td><pre>Holder(BasePtr ptr)</pre></td>
+	<td>The object pointed to by <i>ptr</i> will be managed.</td>
+</tr>
+
+<tr>
+	<td><pre>Holder(BaseClass *ptr)</pre></td>
+	<td>The object pointed to by <i>ptr</i> will be managed.</td>
+</tr>
+
+<tr>
+	<td><pre>BasePtr &amp;operator()()</pre></td>
+	<td>Returns a pointer to the object held.</td>
+</tr>
+
+<!--<tr>
+	<td><pre>const BasePtr &amp;operator()() const</pre></td>
+	<td></td>
+</tr>-->
+
+<tr>
+	<td>
+<pre>template &lt;class DerivedClass&gt;
+  DerivedClass&amp; cast()</pre></td>
+	<td>Return a reference to the object as a <i>DerivedClass</i>.</td>
+</tr>
+
+<tr>
+	<td>
+<pre>template &lt;class DerivedClass&gt;&nbsp;&nbsp;
+  const DerivedClass&amp; cast() const </pre></td>
+	<td>Return a reference to the object as a <i>const DerivedClass</i>.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h3>Element 1: the Class Hierarchy</h3>
+
+<p>
+The class hierarchy is to be implemented freely, but it is recommended to
+include a virtual member function <i>std::string() to_string()</i> in the base
+class.
+</p>
+
+<h3>Element 2: the Factory</h3>
+<p>
+The functor <i>Factory</i> implementing the factory method should contain an
+implementation of either one of the two functions:
+<pre>Base* operator()(std::istream&amp;) throw(cvmlcpp::ParseError)</pre>
+or:
+<pre>Holder&lt;Base, Factory&gt;::BasePtr operator()(std::istream&amp;) throw(cvmlcpp::ParseError)</pre>
+</p>
+
+<h3>Element 3: the Output Operator</h3>
+
+<p>
+The output operator should be implement as a compliment of <i>Factory</i>'s
+<i>operator()(std::istream&amp;)</i>, that is, if output produced by the
+implemented <i>operator&lt;&lt;(std::ostream&amp;, BaseClass&amp;);</i> is
+given as input to the <i>Factory</i>, the object constructed by the
+<i>Factory</i> should be identical to object that produced the output. See the
+example.
+</p>
+
+<h2>Example</h2>
+
+<pre>
+#include &lt;cassert&gt;
+#include &lt;string&gt;
+#include &lt;iostream&gt;
+#include &lt;sstream&gt;
+
+#include &lt;boost/lexical_cast.hpp&gt;
+
+#include &lt;cvmlcpp/base/Holder&gt;
+#include &lt;cvmlcpp/volume/DTree&gt;
+
+/*
+ * The framework consists of 3 elements
+ *
+ * 1) The set of polymorphic classes
+ * 2) A Factory-method implemented as a Functor
+ * 3) An operator&lt;&lt;(...)
+ */
+
+// First element: The set of polymorphic classes
+struct Furniture
+{
+	int price;
+
+	virtual ~Furniture() { }
+
+	virtual std::string to_string() const = 0;
+};
+
+struct Chair : public Furniture
+{
+	int legs;
+	virtual std::string to_string() const
+	{
+		return  std::string("&lt;chair&gt; &lt;legs&gt; ") +
+			boost::lexical_cast&lt;std::string&gt;(legs) +
+			std::string(" &lt;/legs&gt; &lt;/chair&gt;");
+	}
+};
+
+struct Table : public Furniture
+{
+	int surface;
+	virtual std::string to_string() const
+	{
+		return  std::string("&lt;table&gt; &lt;surface&gt; ") +
+			boost::lexical_cast&lt;std::string&gt;(surface) +
+			std::string(" &lt;/surface&gt; &lt;/table&gt;");
+	}
+};
+
+// Second element: A Factory-method implemented as a Functor
+class FurnitureFactory
+{
+	public:
+		// The factory should produce an object from the class hierarchy
+		// given an input stream. It may throw an exception of type
+		// cvmlcpp::ParseError if the input is invalid.
+		Furniture * operator()(std::istream&amp; i_stream)
+			throw(cvmlcpp::ParseError)
+		{
+			i_stream >> tag; // read open tag
+			if (tag == "&lt;chair&gt;")
+				return parseChair(i_stream);
+			else if (tag == "&lt;table&gt;")
+				return parseChair(i_stream);
+			else throw (cvmlcpp::ParseError()); // Unknown tag
+
+			assert(false); // We should never get here
+			return (Furniture *)0;
+		}
+
+		Chair* parseChair(std::istream&amp; i_stream)
+			throw(cvmlcpp::ParseError)
+		{
+			Chair* chair = new Chair();
+
+			// This is buggy but let's keep the example simple
+			try {
+				// Read "&lt;legs&gt; value &lt;/legs&gt;"
+				i_stream &gt;&gt; tag &gt;&gt; chair-&gt;legs &gt;&gt; tag;
+				i_stream &gt;&gt; tag; // read "&lt;/chair&gt;"
+			}
+			catch (std::exception &amp;e) {
+				delete chair;
+				throw(cvmlcpp::ParseError());
+			}
+
+			return chair;
+		}
+
+		Table* parseTable(std::istream&amp; i_stream)
+			throw(cvmlcpp::ParseError)
+		{
+			Table* table = new Table();
+
+			// This is buggy but let's keep the example simple
+			try {
+				// Read "&lt;surface&gt; value &lt;/surface&gt;"
+				i_stream &gt;&gt; tag &gt;&gt; table-&gt;surface &gt;&gt; tag;
+				i_stream &gt;&gt; tag; // read "&lt;/table&gt;"
+			}
+			catch (std::exception &amp;e) {
+				delete table;
+				throw(cvmlcpp::ParseError());
+			}
+
+			return table;
+		}
+
+	private:
+		std::string tag;
+};
+
+// Third element: an output operator
+std::ostream&amp; operator&lt;&lt;(std::ostream&amp; o_stream, const Furniture &amp;furniture)
+{ return o_stream &lt;&lt; furniture.to_string(); }
+
+// Needed for test
+bool operator==(const Chair&amp; lhs, const Chair&amp; rhs)
+{ return lhs.legs == rhs.legs; }
+
+// XML representation of a DTree describing a room
+const char * roomXML =
+"&lt;branch&gt; \
+	&lt;leaf&gt; \
+		&lt;index&gt; 0 &lt;/index&gt; \
+		&lt;value&gt; \
+			&lt;chair&gt; &lt;legs&gt; 4 &lt;/legs&gt; &lt;/chair&gt; \
+		&lt;/value&gt; \
+	&lt;/leaf&gt; \
+	&lt;leaf&gt; \
+		&lt;index&gt; 1 &lt;/index&gt; \
+		&lt;value&gt; \
+			&lt;chair&gt; &lt;legs&gt; 3 &lt;/legs&gt; &lt;/chair&gt; \
+		&lt;/value&gt; \
+	&lt;/leaf&gt; \
+	&lt;leaf&gt; \
+		&lt;index&gt; 2 &lt;/index&gt; \
+		&lt;value&gt; \
+			&lt;chair&gt; &lt;legs&gt; 1 &lt;/legs&gt; &lt;/chair&gt; \
+		&lt;/value&gt; \
+	&lt;/leaf&gt; \
+	&lt;leaf&gt; \
+		&lt;index&gt; 3 &lt;/index&gt; \
+		&lt;value&gt; \
+			&lt;table&gt; &lt;surface&gt; 10 &lt;/surface&gt; &lt;/table&gt; \
+		&lt;/value&gt; \
+	&lt;/leaf&gt; \
+&lt;/branch&gt;";
+
+int main()
+{
+	using namespace std;
+	using namespace cvmlcpp;
+
+	// Description of an object
+	const string chairxml = "&lt;chair&gt; &lt;legs&gt; 4 &lt;/legs&gt; &lt;/chair&gt;";
+
+	// Create a stream
+	stringstream input(chairxml);
+
+	// Read an object from a stream and hold it
+	Holder&lt;Furniture, FurnitureFactory&gt; holder1;
+	input &gt;&gt; holder1;
+
+	// Output the object
+	stringstream output;
+	output &lt;&lt; holder1;
+
+	// Read the object back
+	Holder&lt;Furniture, FurnitureFactory&gt; holder2;
+	output &gt;&gt; holder2;
+
+	// Verify that they are equal
+	assert(holder1.cast&lt;Chair&gt;() == holder2.cast&lt;Chair&gt;());
+
+	// An XML-like source - the description of a room
+	stringstream roomStream(roomXML);
+
+	// Read a tree full of polymorphic objects from XML
+	DTree&lt;Holder&lt;Furniture, FurnitureFactory&gt;, 2&gt; room;
+	roomStream &gt;&gt; room;
+
+	cout &lt;&lt; room;
+
+	return 0;
+}
+</pre>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

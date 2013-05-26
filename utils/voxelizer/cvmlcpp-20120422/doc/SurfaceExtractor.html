@@ -1,0 +1,68 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::SurfaceExtractor</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>SurfaceExtractor</h1>
+
+The <b>SurfaceExtractor</b> does exactly the opposite of the
+<a href=Voxelizer.html'>Voxelizer</a>; it reads a matrix containing a 3D
+structure in <a href='http://en.wikipedia.org/wiki/Voxel'>voxel</a>
+-representation, and constructs a <a href='Geometry.html'>Geometry</a>, a
+<a href='Facet.html'>Facet</a>-based representation.
+
+<p>
+<b>SurfaceExtractor</b> can be used with either
+<a href='Matrix.html'>Matrix</a>, boost's
+<a href='http://www.boost.org/libs/multi_array/doc/index.html'>multi_array</a>,
+or with <a href='http://www.oonumerics.org/blitz'>Blitz++</a>'s
+Array through <a href='BlitzArray.html'>BlitzArray</a>.
+</p>
+
+<p>
+The <b>SurfaceExtractor</b> operates by the principle of an
+<a href='http://en.wikipedia.org/wiki/Isosurface'>iso-surface</a>, using the
+<a href='http://en.wikipedia.org/wiki/Marching_cubes'>Marching Cubes</a>
+algorithm. More information about the procedure, including the basis of this
+code, can be found
+<a href='http://local.wasp.uwa.edu.au/~pbourke/geometry/polygonise/'>here</a>.
+</p>
+
+<p>
+Note: <i>The generation of normals for the facets is probably wrong.</i>
+</p>
+
+<h2>Interface</h2>
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>void extractSurface(const Matrix_t &amp;matrix,
+	      Geometry_t &amp;geometry,
+	      const double isolevel = 0.5)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+	    </pre>
+	</td>
+	<td>Convert voxel-data in "matrix" into facet-data in "geometry".
+	The parameter "isolevel" determines the border between what is
+	considered "inside" voxels and "outside" voxels.</td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

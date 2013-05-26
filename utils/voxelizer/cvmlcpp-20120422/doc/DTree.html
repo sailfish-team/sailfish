@@ -1,0 +1,688 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::DTree</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>DTree</h1>
+
+<p>
+A <b>DTree</b> is a generalization of trees that devide space into regular
+partitions in <i>D</i> dimensions, such as
+<a href='http://en.wikipedia.org/wiki/Quadtree'></a> (2D) and
+<a href='http://en.wikipedia.org/wiki/Octree'>Octrees</a> (3D).
+</p>
+
+<h3>DTrees</h3>
+<p>
+The regularity of <b>DTrees</b> makes especially suitable for
+spatial information that is also regular in space such as points in a lattice,
+because any node in the tree is associated with a specific part of
+space, and thus unique associated with a point in the lattice.
+</p>
+
+<h3>Components and Defintions</h3>
+
+<p>
+<b>DTrees</b> consists of at least one node, the <i>root</i> node.
+Each node is of either one of two classes: a <i>leaf</i>-node or a
+<i>branch</i>-node. A leaf-node contains data, but has no children. A
+branch-node has children, but contains no data. Every node knows it own depth
+in the tree. Every node except the root node knows its parent and its own index
+in the parent, the index being a number between <i>0</i> and <i>N</i>. The root
+node has no parent, and consequently no index.
+</p>
+
+<p>
+Note that given a node's depth, index in the parent and the parent itself, it
+is possible to derive its corresponding partition of space. In fact, each node
+has a unique identifier that indicates its position in the tree based on this
+information. These identifiers can be used to quickly retrieve nodes from the
+tree.
+</p>
+
+<h2>Interface</h2>
+
+<p>
+A tree is the holder of the root node. It supports most methods of a node,
+forwarding them to the root node. Exceptions are the methods to obtain the
+index or parent of the root node because these don't exist by definition.
+<pre>
+template &lt;typename T, std::size_t D&gt;
+class DTree;
+</pre>
+
+<pre>
+template &lt;typename T, std::size_t D&gt;
+class DNode;
+</pre>
+</p>
+
+<p>
+Asking the root node for its parent or index will throw an exception:
+<pre>class NoParentException : public std::exception;</pre>
+Asking a branch-node for its value will throw an exception:
+<pre>class BranchNodeException : public std::exception;</pre>
+Asking a leaf-node for a child node will throw an exception:
+<pre>class LeafNodeException : public std::exception;</pre>
+Reading a DTree from invalid input:
+<pre>class InvalidDTreeXML : public std::exception;</pre>
+</p>
+
+<h3>DTree</h3>
+
+<p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>typedef DNode</pre></td>
+	<td>The type of the nodes of this tree.</td>
+</tr>
+
+<tr>
+	<td><pre>typedef index_t</pre></td>
+	<td>The type of indices in a branch-node.</td>
+</tr>
+
+<tr>
+	<td><pre>static const std::size_t N</pre></td>
+	<td>The number of children of a branch-node.</td>
+</tr>
+
+<tr>
+	<td><pre>DTree(const T value)</pre></td>
+	<td>Constructor with initial value for the root node. The root node is
+	a leaf-node.</td>
+</tr>
+
+<tr>
+	<td><pre>DNode operator[](const index_t i)
+throw(LeafNodeException)</pre></td>
+	<td>Obtain a child node of the root node. The root node must be
+	a branch-node.</td>
+</tr>
+
+<tr>
+	<td><pre>const DNode operator[](const index_t i) const
+throw(LeafNodeException)</pre></td>
+	<td>Obtain a read-only child node of the root node. The root node must
+	be a branch-node.</td>
+</tr>
+
+<tr>
+	<td><pre>DNode root()</pre></td>
+	<td>Obtain the root node.</td>
+</tr>
+
+<tr>
+	<td><pre>operator DNode()</pre></td>
+	<td>Implicitly convert the tree to the root node.</td>
+</tr>
+
+<tr>
+	<td><pre>operator const DNode() const</pre></td>
+	<td>Implicitly convert the tree to the root node, read-only.</td>
+</tr>
+
+<tr>
+	<td><pre>T&amp; operator()() throw(BranchNodeException)</pre></td>
+	<td>Explicitly convert the root node to a reference to the value it
+	holds.</td>
+</tr>
+
+<tr>
+	<td><pre>const T&amp; operator()() const throw(BranchNodeException)</pre></td>
+	<td>Explicitly convert the root  node to a read-only reference to the
+	value it holds.</td>
+</tr>
+
+<tr>
+	<td><pre>bool isLeaf() const</pre></td>
+	<td>Returns <i>true</i> if the root node is a leaf-node.</td>
+</tr>
+
+<tr>
+	<td><pre>operator const T&amp;() const throw(BranchNodeException)</pre></td>
+	<td>Implicitly convert the root node into a read-only reference to its
+	value. The root node must be a leaf-node.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename U&gt;
+void collapse(const U value) throw(LeafNodeException)</pre></td>
+	<td>Turn the root node from a branch-node into a leaf-node with the
+	given <i>value</i>, discarding all children.</td>
+</tr>
+
+<tr>
+	<td><pre>void expand() throw(BranchNodeException)</pre></td>
+	<td>Expand the root node from a leaf-node into a branch-node. The value
+	of all children will be the current value of the leaf-node.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename U&gt;
+void expand(const U value) throw(BranchNodeException)</pre></td>
+	<td>Expand the root node from a leaf-node into a branch-node. The value
+	of all children will be the given <i>value<i>.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename It&gt;
+void expand(It first, It last) throw(BranchNodeException)</pre></td>
+	<td>Expand the root node from a leaf-node into a branch-node. The value
+	of all children will be read from the first <i>elements</i> of the range
+	<i>first</i> to <i>last</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t depth() const</pre></td>
+	<td>Return the depth of the tree at the root node, which is by
+	definition zero.</td>
+</tr>
+<tr>
+	<td><pre>std::size_t max_depth() const</pre></td>
+	<td>Return the maximum depth of the tree, i.e. the number of levels of decomposition.</td>
+</tr>
+
+<tr>
+	<td><pre>bool operator==(const DTree &amp;that) const</pre></td>
+	<td>Test if two DTrees refer to the same data - not if they
+	actually contain the same data.</td>
+</tr>
+
+<tr>
+	<td><pre>bool operator!=(const DTree &amp;that) const</pre></td>
+	<td>Negation of <i>operator==</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>DTree&lt;T, D&gt; clone() const</pre></td>
+	<td>Return DTree containg a copy of <i>this</i> tree.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t id() const</pre></td>
+	<td>Return a unique identifier associated with the root node.
+	By definition, that is zero.</td>
+</tr>
+
+<tr>
+	<td><pre>const DNode retrieve(std::size_t id) const throw (LeafNodeException)</pre></td>
+	<td>Return the DNode associated with the unique identifier
+	<i>id</i>. Providing an invalid identifier might cause an exception
+	to be thrown.</td>
+</tr>
+
+<tr>
+	<td><pre>DNode retrieve(std::size_t id) throw (LeafNodeException)</pre></td>
+	<td>Return the DNode associated with the unique identifier
+	<i>id</i>. Providing an invalid identifier might cause an exception
+	to be thrown.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h3>DTree::DNode</h3>
+
+<p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>typedef index_t</pre></td>
+	<td>The type of indices in a branch-node.</td>
+</tr>
+
+<tr>
+	<td><pre>static const std::size_t N</pre></td>
+	<td>The number of children of a branch-node.</td>
+</tr>
+
+<tr>
+	<td><pre>T&amp; operator()() throw(BranchNodeException)</pre></td>
+	<td>Explicitly convert a node to a reference to the value it
+	holds.</td>
+</tr>
+
+<tr>
+	<td><pre>const T&amp; operator()() const throw(BranchNodeException)</pre></td>
+	<td>Explicitly convert a node to a read-only reference to the value it
+	holds.</td>
+</tr>
+
+<tr>
+	<td><pre>DNode operator[](const index_t i)
+throw(LeafNodeException)</pre></td>
+	<td>Obtain a child node of the node. The node must be a
+	branch-node.</td>
+</tr>
+
+<tr>
+	<td><pre>const DNode operator[](const index_t i) const
+throw(LeafNodeException)</pre></td>
+	<td>Obtain a read-only child node of the node. The node must
+	be a branch-node.</td>
+</tr>
+
+<tr>
+	<td><pre>bool isLeaf() const</pre></td>
+	<td>Returns <i>true</i> if the node is a leaf-node.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename U&gt;
+void collapse(const U value) throw(LeafNodeException)</pre></td>
+	<td>Turn the node from a branch-node into a leaf-node with the
+	given <i>value</i>, discarding all children.</td>
+</tr>
+
+<tr>
+	<td><pre>void expand() throw(BranchNodeException)</pre></td>
+	<td>Expand a leaf-node into a branch-node. The value of all children
+	will be the current value of the leaf-node.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename U&gt;
+void expand(const U value) throw(BranchNodeException)</pre></td>
+	<td>Expand a leaf-node into a branch-node. The value of all children
+	will be the given <i>value<i>.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename It&gt;
+void expand(It first, It last) throw(BranchNodeException)</pre></td>
+	<td>Expand a leaf-node into a branch-node. The value of all children
+	will be read from the first <i>elements</i> of the range <i>first</i>
+	to <i>last</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>bool operator==(const DTree &amp;that) const</pre></td>
+	<td>Test if to DNodes are equal DNodes frmo the same tree - not if they
+	actually contain the same data.</td>
+</tr>
+
+<tr>
+	<td><pre>bool operator!=(const DTree &amp;that) const</pre></td>
+	<td>Negation of <i>operator==</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>index_t index() const throw (NoParentException)</pre></td>
+	<td>Return the index of <i>this</i> node in its parent node.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t depth() const</pre></td>
+	<td>Return the depth of the tree at this node.</td>
+</tr>
+
+<tr>
+	<td><pre>DNode parent() throw (NoParentException)</pre></td>
+	<td>Return the parent node. The root node has no parent and
+	requesting it will throw an exception.</td>
+</tr>
+
+<tr>
+	<td><pre>const DNode parent() const throw (NoParentException)</pre></td>
+	<td>Return the parent node, read-only. The root node has no parent and
+	requesting it will throw an exception.</td>
+</tr>
+
+<tr>
+	<td><pre>DTree&lt;T, D&gt; clone() const</pre></td>
+	<td>Return DTree containg a copy of part of the tree using the copy of
+	<i>this</i> node as its root.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t id() const</pre></td>
+	<td>Return a unique identifier associated with <i>this</i> node.</td>
+</tr>
+
+<tr>
+	<td><pre>std::vector&lt;index_t&gt; index_trail() const</pre></td>
+	<td>Return a `trail' of indices to take from the root node to
+	the current node.</td>
+</tr>
+
+<!--
+<tr>
+	<td><pre></pre></td>
+	<td></td>
+</tr>
+-->
+
+</tbody>
+</table>
+</p>
+
+<h3>Comparison</h3>
+
+<p>
+To support interaction with datatypes that require comparison, such as <i>std::map</i>,
+a less-than-comparable operator is defined on <i>DNodes</i> in a DTree. It compares the nodes by
+their <i>id()</i>, which guaratees that the values are unique if the nodes are part of the same tree.
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>template &lt;typename T, std::size_t D&gt;
+bool operator&lt;(const DTree&lt;T, D&gt;::DNode &amp;lhs, const DTree&lt;T, D&gt;::DNode &amp;rhs);</pre>
+	</td>
+	<td>Returns true if the <i>id()</i> of <i>lhs</i> is smaller than that of <i>rhs</i>.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h3>I / O</h3>
+
+<p>
+There are output operators for both entire DTrees and DNodes. An input operator
+only exists for entire DTrees, as an input operator for DNodes could lead to
+inconsistencies.
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>template &lt;typename T, std::size_t D&gt;
+std::istream&amp; operator&gt;&gt;(std::istream&amp; i_stream,
+			DTree&lt;T, D&gt; &amp;tree)
+		throw(cvmlcpp::InvalidDTreeXML)</pre></td>
+	<td>Write a DTree to <i>o_stream</i> in formatted XML-like syntax.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T, std::size_t D&gt;
+std::ostream&amp; operator&lt;&lt;(std::ostream&amp; o_stream,
+		const DNode&lt;T, D&gt; &amp;node)</pre></td>
+	<td>Write a DNode, potentially with sub-nodes, to <i>o_stream</i> in
+	formatted XML-like syntax.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename T, std::size_t D&gt;
+std::istream&amp; operator&gt;&gt;(std::istream&amp; i_stream,
+			DTree&lt;T, D&gt; &amp;tree)
+	throw(cvmlcpp::InvalidDTreeXML)</pre></td>
+	<td>Read a DTree in XML format from <i>i_stream</i>.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+
+<h2>Examples</h2>
+
+For an example of a DTree holding items from a class-hierarchy, see
+<a href="Holder.html">Holder</a>.
+
+<h3>A test-program</h3>
+
+<pre>
+#include &lt;cvmlcpp/volume/DTree&gt;
+
+int main()
+{
+	typedef cvmlcpp::DTree&lt;int, 3&gt; OctTreeInt;
+
+	// Initialize the tree with a value
+	OctTreeInt tree(7);
+	assert(tree.root()() == 7);
+
+	// The tree implicitly converts to its root node
+	assert(tree.root() == tree);
+
+	// Assign new value
+	tree() = 1; // implicitly assigned to the root node
+	tree.root()() = 5; // explicitly assigned to the root node
+	assert(tree.root()() == 5);
+
+	// Expanding a node without giving a value copies the current value
+	// to all new children.
+	tree.root().expand();
+	for (std::size_t i = 0; i &lt; OctTreeInt::N; ++i)
+		assert(tree[i]() == 5);
+
+	// Change one leaf node of the root and expand it to a branch node.
+	// The children of that node now all contain "3", the other children of
+	// the root node still have their original value
+	tree[0]() = 3;
+	tree[0].expand();
+	for (OctTreeInt::index_t i = 1; i &lt; OctTreeInt::N; ++i)
+		assert(tree[i]() == 5);
+	for (OctTreeInt::index_t i = 0; i &lt; OctTreeInt::N; ++i)
+		assert(tree[0][i]() == 3);
+
+	// Test if we can find a node by walking its trail of indices from
+	// the root node.
+	for (OctTreeInt::index_t i = 0; i &lt; OctTreeInt::N; ++i)
+	{
+		const std::vector&lt;OctTreeInt::index_t&gt; trail = tree[0][i].index_trail();
+		OctTreeInt::DNode node = tree.root();
+		for (OctTreeInt::index_t j = 0; j &lt; trail.size(); ++j)
+			node = node[ trail[j] ];
+		assert(node == tree[0][i]);
+	}
+
+	// Collapse the expanded node and assign it a value of 6
+	tree[0].collapse(6);
+	assert(tree[0]() == 6);
+
+	// Collapse the whole tree and assign it a value of 6
+	tree.collapse(4);
+	assert(tree.root()() == 4);
+
+	// Collapse nodes with grand-children
+	tree.expand();
+	tree[0].expand();
+	tree[0][0]() = 2;
+	tree.collapse(-2);
+	assert(tree.root()() == -2);
+	// Expand the tree, assign all children different values.
+	int values [] = {0, 1, 2, 3, 4, 5, 6, 7};
+	tree.expand(values, values+OctTreeInt::N);
+	assert(tree[3]() == 3);
+
+	// Grab a node in the tree
+	typedef OctTreeInt::DNode DNode8i;
+	DNode8i node = tree[3];
+
+	// See if all is consistent
+	assert(node != tree[2]);
+	assert(node == tree[3]);
+	assert(node.parent() == node.parent());
+	assert(node.parent() == tree.root());
+	assert(node != tree.root());
+
+	// Wrong things should throw
+	try { // Root node has no index!
+		assert(node.parent().index() >= 0);
+		assert(false); // previous should throw
+	}
+	catch(cvmlcpp::NoParentException &amp;e) {
+	}
+
+	try { // Root node has no parent
+		DNode8i n = node.parent().parent();
+		assert(false); // previous should throw
+	}
+	catch(cvmlcpp::NoParentException &amp;e) {
+	}
+
+	// Expand the node and fill with N different values
+	assert(node.isLeaf());
+	node.expand(values, values+OctTreeInt::N);
+	assert(!node.isLeaf());
+
+	// Verify that the i-th child of the node is the i-th child of the
+	// 3th child of the root.
+	for (OctTreeInt::index_t i = 0; i &lt; OctTreeInt::N; ++i)
+	{
+		// This compares the nodes - NOT the values
+		assert(node[i] == tree[3][i]);
+
+		// Although the nodes are different ...
+		assert(node[i] != tree[i]);
+
+		// ... the values should be identical, except the expanded node.
+		if (i != 3)
+		{
+			// A value is obtained with operator()
+			assert(node[i]() == tree[i]());
+		}
+	}
+
+	// Copying data
+	OctTreeInt tree2 = tree.clone(); // Full tree copy
+	assert(tree2 != tree);
+
+	OctTreeInt tree3 = tree[3].clone(); // Partial tree copy;
+	for (OctTreeInt::index_t i = 0; i &lt; OctTreeInt::N; ++i)
+	{
+		assert(tree [3][i]() == tree2[3][i]()); // all values equal
+		assert(tree3[i]() == tree2[3][i]()); // all values equal
+		assert(tree3[i].index() == tree2[3][i].index());
+		assert(tree3[i].index() == int(i));
+		assert(tree [3][i].depth() == 2u);
+		assert(tree2[3][i].depth() == 2u);
+		assert(tree3[i].depth() == 1u);
+	}
+
+	// Nodes can be identified with their ID. This ID indicates a
+	// position, it is valid in a copy of the tree.
+	for (OctTreeInt::index_t i = 0; i &lt; OctTreeInt::N; ++i)
+	{
+		// Can we find ourselves ?
+		assert( tree[3][i] == tree.retrieve(tree[3][i].id()) );
+
+		// Equal in other tree (by value) ?
+		assert( tree[3][i]() == tree2.retrieve(tree[3][i].id())() );
+	}
+
+	// I/O
+	std::ofstream out("/tmp/tree.xml");
+	out &lt;&lt; tree;
+	out.close();
+
+	OctTreeInt tree4;
+	std::ifstream in("/tmp/tree.xml");
+	in &gt;&gt; tree4;
+	in.close();
+	// Equal to other tree (by value) ?
+	for (OctTreeInt::index_t i = 0; i &lt; OctTreeInt::N; ++i)
+	{
+		if (i != 3)
+			assert( tree[i]() == tree4.retrieve(tree[i].id())() );
+		assert( tree[3][i]() == tree4.retrieve(tree[3][i].id())() );
+	}
+
+	return 0;
+}
+</pre>
+
+<h3>A DTree in XML format.</h3>
+
+<p>
+The XML fragment below encodes a <i>DTree&lt;int, 3&gt;</i>, i.e. an Octree
+filled with integers:
+
+<pre>
+&lt;branch&gt;
+        &lt;leaf&gt;
+                &lt;index&gt; 0 &lt;/index&gt;
+                &lt;value&gt; 0 &lt;/value&gt;
+        &lt;/leaf&gt;
+        &lt;leaf&gt;
+                &lt;index&gt; 1 &lt;/index&gt;
+                &lt;value&gt; 1 &lt;/value&gt;
+        &lt;/leaf&gt;
+        &lt;leaf&gt;
+                &lt;index&gt; 2 &lt;/index&gt;
+                &lt;value&gt; 2 &lt;/value&gt;
+        &lt;/leaf&gt;
+        &lt;branch&gt;
+                &lt;index&gt; 3 &lt;/index&gt;
+                &lt;leaf&gt;
+                        &lt;index&gt; 0 &lt;/index&gt;
+                        &lt;value&gt; 0 &lt;/value&gt;
+                &lt;/leaf&gt;
+                &lt;leaf&gt;
+                        &lt;index&gt; 1 &lt;/index&gt;
+                        &lt;value&gt; 1 &lt;/value&gt;
+                &lt;/leaf&gt;
+                &lt;leaf&gt;
+                        &lt;index&gt; 2 &lt;/index&gt;
+                        &lt;value&gt; 2 &lt;/value&gt;
+                &lt;/leaf&gt;
+                &lt;leaf&gt;
+                        &lt;index&gt; 3 &lt;/index&gt;
+                        &lt;value&gt; 3 &lt;/value&gt;
+                &lt;/leaf&gt;
+ 		&lt;leaf&gt;
+			&lt;index&gt; 4 &lt;/index&gt;
+			&lt;value&gt; 4 &lt;/value&gt;
+		&lt;/leaf&gt;
+		&lt;leaf&gt;
+			&lt;index&gt; 5 &lt;/index&gt;
+			&lt;value&gt; 5 &lt;/value&gt;
+		&lt;/leaf&gt;
+		&lt;leaf&gt;
+			&lt;index&gt; 6 &lt;/index&gt;
+			&lt;value&gt; 6 &lt;/value&gt;
+		&lt;/leaf&gt;
+		&lt;leaf&gt;
+			&lt;index&gt; 7 &lt;/index&gt;
+			&lt;value&gt; 7 &lt;/value&gt;
+		&lt;/leaf&gt;
+	&lt;/branch&gt;
+	&lt;leaf&gt;
+		&lt;index&gt; 4 &lt;/index&gt;
+		&lt;value&gt; 4 &lt;/value&gt;
+	&lt;/leaf&gt;
+	&lt;leaf&gt;
+		&lt;index&gt; 5 &lt;/index&gt;
+		&lt;value&gt; 5 &lt;/value&gt;
+	&lt;/leaf&gt;
+	&lt;leaf&gt;
+		&lt;index&gt; 6 &lt;/index&gt;
+		&lt;value&gt; 6 &lt;/value&gt;
+	&lt;/leaf&gt;
+	&lt;leaf&gt;
+		&lt;index&gt; 7 &lt;/index&gt;
+		&lt;value&gt; 7 &lt;/value&gt;
+	&lt;/leaf&gt;
+&lt;/branch&gt;
+</pre>
+
+Note that the format is not fully XML-compliant:
+<ul>
+<li>the introductory "Doctype" header etc. is missing;</li>
+<li>spaces are required between tags and the values between them;</li>
+<li>a DTD is missing.</li>
+</ul>
+</p>
+
+</div>
+
+<!-- End Page -->
+
+</body>
+</html>

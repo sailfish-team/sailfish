@@ -1,0 +1,45 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Allocators</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Allocators</h1>
+
+The <b>Allocators</b> offer allocators - C++ structures for memory allocation.
+A <a href='http://g.oswego.edu/dl/html/malloc.html'>general introduction</a>
+into the subject of memory allocation might be useful. When looking for an
+allocator, you should probably first consider the
+<a href='http://gcc.gnu.org/onlinedocs/libstdc++/manual/bk01pt12ch32.html'>
+allocators in the GNU libstdc++</a>.
+
+
+<h2>AlignAllocator</h2>
+
+The <i>AlignAllocator</i> allocates memory that is aligned on a chosen
+boundary. The alignment is by default chosen on an address divisable by <i>4 * N
+* sizeof(T)</i>, where <i>N</i> is a specified number of elements. This
+alignment allows SIMD instruction such as MMX, SSE and SSE2 to be used on the
+data, thus providing significant speedup over non-aligned data. The allocation
+is done using the <i>posix_memalign</i> system call.
+
+The formal definition is:
+<pre>
+template&lt;typename _Tp, std::size_t N = 4u&gt;
+class AlignAllocator;
+</pre>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

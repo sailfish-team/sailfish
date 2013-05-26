@@ -1,0 +1,49 @@
+/***************************************************************************
+ *   Copyright (C) 2005, 2006, 2007 by F. P. Beekhof                       *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with program; if not, write to the                              *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_VOXEL_TOOLS
+#define CVMLCPP_VOXEL_TOOLS 1
+
+#include <cvmlcpp/volume/DTree>
+
+namespace cvmlcpp
+{
+
+template <  template <typename Tm, std::size_t D, typename Aux> class Matrix_t,
+	    typename Ti, typename A>
+void cover(Matrix_t<Ti, 3u, A> & matrix, const Ti layerValue,
+		const Ti insideValue = 1,
+		const Ti outsideValue = 0,
+		const bool replaceOutside = true);
+
+template <template <typename Tm, std::size_t Dm, typename Aux> class Matrix_t,
+	  typename T, std::size_t D, typename A>
+bool expand(const typename DTree<T, D>::DNode & node, Matrix_t<T, D, A> &matrix,
+		const std::size_t depth = 0);
+
+template <template <typename Tm, std::size_t Dm, typename Aux> class Matrix_t,
+	  typename T, std::size_t D, typename A>
+bool expand(const DTree<T, D> & tree, Matrix_t<T, D, A> &matrix, const std::size_t depth = 0);
+
+} // namespace
+
+#include <cvmlcpp/volume/VoxelTools.hpp>
+
+#endif

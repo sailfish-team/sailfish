@@ -1,0 +1,201 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_ARRAYIO
+#define CVMLCPP_ARRAYIO 1
+
+#include <fstream>
+#include <vector>
+#include <string>
+
+#include <cvmlcpp/base/stl_cstdint.h>
+
+#include <cvmlcpp/base/Meta>
+
+namespace cvmlcpp
+{
+
+template <template <typename Tm, std::size_t D, typename A> class Array,
+	  typename T, std::size_t N, typename Aux>
+bool writeArray(const Array<T, N, Aux> &array, const std::string fileName,
+		const bool compress = false)
+{
+	typedef array_traits<Array, T, N, Aux> ArrayTraits;
+
+	const char NORMAL	= 0;
+	const char COMPRESSED	= 1;
+
+	std::ofstream f(fileName.c_str(),
+			std::ios::out|std::ios::binary|std::ios::trunc);
+	if (!f.good())
+		return false;
+
+	// Write file mode
+	if (compress)
+		f.write(&COMPRESSED, 1);
+	else
+		f.write(&NORMAL, 1);
+	if (!f.good())
+	{
+		f.close();
+		return false;
+	}
+
+	uint64_t shape[N];
+	std::copy(ArrayTraits::shape(array),ArrayTraits::shape(array)+N, shape);
+	f.write(reinterpret_cast<char *>(shape), N * sizeof(uint64_t));
+
+	if (compress)
+	{
+		typename
+		ArrayTraits::const_iterator it = ArrayTraits::begin(array);
+
+		T currVal;
+		uint64_t count = 0u;
+		if (it != ArrayTraits::end(array))
+		{
+			currVal	= *it;
+			count	= 1u;
+			++it;
+		}
+
+		for ( /* nop */ ; it != ArrayTraits::end(array); ++it)
+		{
+			const T nextVal = *it;
+			if (nextVal == currVal)
+				++count;
+			else
+			{
+				f.write(reinterpret_cast<char *>(&count),
+					sizeof(uint64_t));
+				f.write(reinterpret_cast<char *>(&currVal),
+					sizeof(T));
+				if (!f.good())
+				{
+					f.close();
+					return false;
+				}
+				currVal	= nextVal;
+				count	= 1u;
+			}
+		}
+
+		if (count > 0u)
+		{
+			f.write(reinterpret_cast<char *>(&count), sizeof(uint64_t));
+			f.write(reinterpret_cast<char *>(&currVal), sizeof(T));
+		}
+	}
+	else
+	{
+		// Normal procedure: write one big binary blob
+		f.write(reinterpret_cast<const char *>
+			(&(*ArrayTraits::begin(array))),
+			sizeof(T) * ArrayTraits::size(array));
+	}
+
+	const bool ok = f.good();
+
+	f.close();
+
+	return ok;
+}
+
+template <
+	template <typename Tm, std::size_t D, typename A> class Array,
+	typename T, std::size_t N, typename Aux>
+bool readArray(Array<T, N, Aux> &array, const std::string fileName)
+{
+	typedef array_traits<Array, T, N, Aux> ArrayTraits;
+
+	const unsigned char NORMAL	= 0;
+	const unsigned char COMPRESSED	= 1;
+
+	std::ifstream f(fileName.c_str(), std::ios::in|std::ios::binary);
+	if (!f.good())
+	{
+		f.close();
+		return false;
+	}
+
+	// Read file mode
+	char mode;
+	f.read(&mode, 1);
+	if (!f.good())
+	{
+		f.close();
+		return false;
+	}
+
+	// Read shape
+	uint64_t shape[N];
+	f.read(reinterpret_cast<char *>(shape), N * sizeof(uint64_t));
+	if (!f.good())
+	{
+		f.close();
+		return false;
+	}
+	ArrayTraits::resize(array, shape);
+
+	bool ok = true;
+	if (mode == NORMAL)
+	{
+		// Normal procedure: read one big binary blob
+		f.read(reinterpret_cast<char*>(&(*ArrayTraits::begin(array))),
+			sizeof(T) * ArrayTraits::size(array));
+		ok = static_cast<std::size_t>(f.gcount()) == sizeof(T)*ArrayTraits::size(array);
+	}
+	else
+	{
+		assert(mode == COMPRESSED);
+		typename ArrayTraits::iterator b = ArrayTraits::begin(array);
+
+		std::size_t count = 0u;
+		while (count < ArrayTraits::size(array))
+		{
+			uint64_t n;
+			f.read(reinterpret_cast<char *>(&n), sizeof(uint64_t));
+			T value;
+			f.read(reinterpret_cast<char *>(&value), sizeof(T));
+			if (!f.good())
+			{
+				f.close();
+				return false;
+			}
+
+			typename ArrayTraits::iterator e = b;
+			std::advance(e, n);
+			omptl::fill(b, e, value);
+			b = e;
+			count += n;
+		}
+		assert(b == ArrayTraits::end(array));
+	}
+
+	ok = ok && !f.fail();
+
+	f.close();
+
+	return ok;
+}
+
+} // end namespace
+
+#endif

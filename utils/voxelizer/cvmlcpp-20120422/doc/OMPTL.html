@@ -1,0 +1,498 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::OMPTL</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>OMPTL</h1>
+
+The OpenMP Multi-Threaded Template Library, or <b>OMPTL</b>, provides
+transparant parallelization.
+
+<p>
+With <a href="http://en.wikipedia.org/wiki/Dual_core">"Dual-Core"</a> and
+<a href="http://en.wikipedia.org/wiki/Hyperthreading"> "HyperThreading"</a>
+processors on many desktops, and more to come, current software must be
+parallelized to take advantage of the available hardware. Parallelizing
+programs is a non-trival task. The OMPTL re-implements part of the Standard
+Template Library of C++. The range is partitioned, then the computation is
+executed in parallel. The OMPTL uses <a href="http://www.openmp.org">OpenMP</a>
+for parallelization.
+</p>
+
+<p>
+The OMPTL requires that compile your programs with an OpenMP-capable compiler,
+for example the Intel(C) compiler or GCC 4.2:
+<pre>
+	icc -I/path/to/omptl/ -openmp myprog.cpp
+</pre>
+</p>
+
+<p>
+Contrarily to what one might expect, the OMPTL is not at all eager to execute
+tasks in parallel. The truth of the matter is that paralellization tends to
+introduce overhead and a loss of efficiency, or it may saturate memory bandwith;
+therefor, it could even result in a <i>loss</i> of performance. In many cases,
+using a serial version of an algorithm is simply the better choice, a testimony
+to the excellent quality of the Standard Template Library. Even if parts are
+executed in parallel, the application will only undergo a significant speedup if
+the parallelized work represents a significant part of the computation required
+by your application. Thirdly, each call to an algorithm must be on a
+sufficiently large range, and not successive calls on small ranges. The fourth
+restrictions is that only calls to STL's "algorithm" and "numeric" are
+parallelized, so if your code does not use these, it will not benefit. And the
+last bad news: not all algorithms are parallelized yet, and some never will be.
+</p>
+
+<p>
+Having said all these bad things, there is no penalty for using the OMPTL, and
+changing your code to use the OMPTL is extremely easy, so you really have only
+to gain from using it. If your application uses time-consuming operations on
+large data, such as in Image Processing, you will definately be interested.
+</p>
+
+<p>
+The OMPTL is available under the
+<a href="http://www.gnu.org/licenses/lgpl.html">LGPL</a>, the "Lesser GNU Public
+License". This license is the authorative text, here follows a non-authorative
+summary:
+<object>
+<ul>
+	<li>You are allowed to use the OMPTL library in
+		your all your software. Your software does not need to
+		be open-source or free.</li>
+	<li>If you make changes and improvements to the OMPTL itself,
+		you are required to make these changes available.</li>
+	<li>You may not claim or pretend to own the code in whole or in parts,
+		violate the copyright, or remove the license notes.</li>
+	<li>Use of this software is entirely at your own risk.</li>
+
+</ul>
+</object>
+</p>
+
+<h2>Using OMPTL</h2>
+
+<h3>OMPTL Programming</h3>
+<p>
+Imagine the following piece of code, which is serial:
+<pre>
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+
+int main (int argc, char * const argv[])
+{
+	std::vector&lt;int&gt; v1(100000);
+
+	std::sort(v1.begin(), v1.end());
+
+	return 0;
+}
+</pre>
+This example is the parallel code with OMPTL:
+<pre>
+#include &lt;vector&gt;
+#include &lt;omptl_algorithm&gt;
+
+int main (int argc, char * const argv[])
+{
+	// Number of threads is derived from environment
+	// variable "OMP_NUM_THREADS"
+
+	std::vector&lt;int&gt; v1(100000);
+
+	omptl::sort(v1.begin(), v1.end());
+
+	return 0;
+}
+</pre>
+</p>
+
+<h3>Compiling &amp; Linking</h3>
+
+<p>
+The OMPTL will automatically detect if OpenMP can be used; if not, it will
+divert all calls to serial code. No code changes are necessary. The OMPTL
+is entirely based on templates, no linking is be needed.
+</p>
+
+
+<h2>Function Details</h2>
+
+<h3>Algorithm</h3>
+
+<p>
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>adjacent_find</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>binary_search</pre></td>
+	<td>Parallelized, efficiency loss.</td>
+</tr>
+<tr>
+	<td><pre>copy</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>copy_backward</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>count</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>count_if</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>equal</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>equal_range</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>fill</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>fill_n</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>find</pre></td>
+	<td>Parallelized, efficiency loss.</td>
+</tr>
+<tr>
+	<td><pre>find_if</pre></td>
+	<td>Parallelized, efficiency loss.</td>
+</tr>
+<tr>
+	<td><pre>find_end</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>find_first_of</pre></td>
+	<td>Parallelized, efficiency loss.</td>
+</tr>
+<tr>
+	<td><pre>for_each</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>generate</pre></td>
+	<td>Not parallelized. The function <i>generate</i> is explicitly
+	expected to change the state of the <i>Generator</i>, so
+	parallellization is not possible. See the extention <i>par_generate</i>
+	for a parallel version.</td>
+</tr>
+<tr>
+	<td><pre>push_heap</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>pop_heap</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>make_heap</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>sort_heap</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>includes</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>lexicographical_compare</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>lower_bound</pre></td>
+	<td>Parallelized, efficiency loss.</td>
+</tr>
+<tr>
+	<td><pre>merge</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>min_element</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>max_element</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>mismatch</pre></td>
+	<td>Parallelized, efficiency loss.</td>
+</tr>
+<tr>
+	<td><pre>nth_element</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>partial_sort</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>partial_sort_copy</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>partition</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>stable_partition</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>next_permutation</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>prev_permutation</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>random_shuffle</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>remove</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>remove_copy</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>remove_if</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>remove_copy_if</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>replace</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>replace_copy_if</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>replace_copy</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>replace_if</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>reverse</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>reverse_copy</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>rotate</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>rotate_copy</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>search</pre></td>
+	<td>Parallelized, efficiency loss.</td>
+</tr>
+<tr>
+	<td><pre>search_n</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>set_difference</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>set_intersection</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>set_symmetric_difference</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>set_union</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>sort</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>stable_sort</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>swap_ranges</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>transform</pre></td>
+	<td>Parallelized.</td>
+</tr>
+<tr>
+	<td><pre>unique</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>unique_copy</pre></td>
+	<td>Not parallelized.</td>
+</tr>
+<tr>
+	<td><pre>upper_bound</pre></td>
+	<td>Parallelized.</td>
+</tr>
+
+</table>
+</p>
+
+<h4>Extentions to <i>Algorithm</i></h4>
+<p>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>template &lt;class ForwardIterator, class Generator&gt;
+void par_generate(ForwardIterator first, ForwardIterator last, Generator gen,
+		  const std::size_t P = omp_get_max_threads())</pre></td>
+	<td></td>
+</tr>
+</table>
+</p>
+
+<h3>Numeric</h3>
+
+<p>
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>accumulate</pre></td>
+	<td>Parallelized for addition and multiplication.</td>
+</tr>
+<tr>
+	<td><pre>adjacent_difference</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+<tr>
+	<td><pre>inner_product</pre></td>
+	<td>Parallelized for addition and multiplication.</td>
+</tr>
+
+<tr>
+	<td><pre>partial_sum</pre></td>
+	<td>Not (yet) parallelized.</td>
+</tr>
+</table>
+</p>
+
+<h4>Extentions to <i>Numeric</i></h4>
+
+<p>
+<table border='1' width='100%'>
+<tr>
+	<td>
+<pre>template &lt;class InputIterator1, class InputIterator2&gt;
+typename ::std::iterator_traits&lt;InputIterator1&gt;::value_type
+L1(InputIterator1 first1, InputIterator1 last1,
+   InputIterator2 first2, const std::size_t P = omp_get_max_threads())
+</pre></td>
+	<td>"Manhattan" distance between two sets of data.</td>
+</tr>
+<tr>
+	<td>
+<pre>template &lt;class InputIterator1, class InputIterator2&gt;
+typename ::std::iterator_traits&lt;InputIterator1&gt;::value_type
+L2(InputIterator1 first1, InputIterator1 last1,
+   InputIterator2 first2, const std::size_t P = omp_get_max_threads())
+</pre></td>
+	<td>"Euclidean" distance between two sets of data.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;class InputIterator&gt;
+typename ::std::iterator_traits&lt;InputIterator&gt;::value_type
+L2(InputIterator first, InputIterator last,
+   const std::size_t P = omp_get_max_threads())</pre></td>
+	<td>Euclidean vector length.</td>
+</tr>
+<tr>
+	<td><pre>
+template &lt;class Iterator, class T,
+	   class UnaryFunction, class BinaryFunction&gt;
+T transform_accumulate(Iterator first, Iterator last, T init,
+		UnaryFunction unary_op, BinaryFunction binary_op,
+		const std::size_t P = omp_get_max_threads())</pre></td>
+	<td>A combination of <i>transform</i> and accumulate. Applies
+		<i>unary_op</i> to every element in the range
+		<i>[first ... last]</i>, and accumulates the results using
+		<i>binary_op</i>.
+	</td>
+</tr>
+<tr>
+	<td><pre>
+template &lt;class Iterator, class T, class UnaryFunction&gt;
+T transform_accumulate(Iterator first, Iterator last, T init,
+			UnaryFunction unary_op,
+			const std::size_t P = omp_get_max_threads())</pre></td>
+	<td>A combination of <i>transform</i> and accumulate. Applies
+		<i>unary_op</i> to every element in the range
+		<i>[first ... last]</i>, and accumulates by addition.</td>
+</tr>
+<!--
+
+<tr>
+	<td><pre></pre></td>
+	<td></td>
+</tr>
+<tr>
+	<td><pre></pre></td>
+	<td></td>
+</tr>
+<tr>
+	<td><pre></pre></td>
+	<td></td>
+</tr>
+<tr>
+	<td><pre></pre></td>
+	<td></td>
+</tr>
+-->
+</table>
+</p>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

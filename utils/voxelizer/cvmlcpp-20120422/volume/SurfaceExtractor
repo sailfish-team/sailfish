@@ -1,0 +1,306 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_SURFACE_EXTRACTOR
+#define CVMLCPP_SURFACE_EXTRACTOR 1
+
+#include <cvmlcpp/math/Euclid>
+#include <cvmlcpp/base/Meta>
+#include <cvmlcpp/volume/Geometry>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+namespace cvmlcpp
+{
+
+namespace detail
+{
+
+extern int  _pairTable[][2];
+extern int  _edgeTable[];
+extern char _triTable[][16];
+
+/**
+ * Linearly interpolate the position where an isosurface cuts
+ * an edge between two vertices, each with their own scalar value
+ */
+template <typename voxel_type, typename Tg>
+inline void _VertexInterp(const double &isolevel,
+		const iPoint3D &p1, const iPoint3D &p2,
+		const voxel_type &valp1, const voxel_type &valp2,
+		Point3D<Tg> &pOut)
+{
+	assert ( ( (valp1 <= isolevel) && (isolevel <= valp2) ) ||
+		( (valp2 <= isolevel) && (isolevel <= valp1) ) );
+	assert(std::abs(valp2 - valp1) > 0.0);
+
+	Tg mu = (isolevel - double(valp1)) / double(valp2 - valp1);
+
+	if (! ((mu >= 0.0) && (mu <= 1.0)) )
+		mu = 0.5;
+
+	pOut = p1.convert<Tg>() + (p2 - p1).convert<Tg>() * mu;
+}
+
+template <
+    template <typename Tm, std::size_t D, typename Aux> class Matrix_t,
+    typename Ti, typename A>
+class MatrixSurfaceAdaptor_
+{
+	public:
+		typedef Ti value_type;
+		MatrixSurfaceAdaptor_(const Matrix_t<Ti, 3u, A> &matrix) : matrix_(matrix) { }
+		Ti operator()(std::size_t x, std::size_t y, std::size_t z) const
+		{ return matrix_[x][y][z]; }
+
+		template <typename It>
+		void dims(It dims_) const
+		{
+			typedef array_traits<Matrix_t, Ti, 3u, A> MTraits;
+			std::copy(MTraits::shape(matrix_), MTraits::shape(matrix_)+3, dims_);
+		}
+
+	private:
+		const Matrix_t<Ti, 3u, A> &matrix_;
+};
+
+} // end namespace detail
+
+/*
+template <typename Ti>
+class OctreeSurfaceAdaptor_
+{
+	public:
+		typedef Ti value_type;
+		OctreeSurfaceAdaptor_(const DTree<Ti, 3u> &octree) : octree_(octree) { }
+		Ti operator()(std::size_t x, std::size_t y, std::size_t z) const
+		{ return ; }
+
+		template <typename It>
+		void dims(It dims_) const
+		{
+		}
+
+	private:
+		const DTree<Ti, 3u> &octree_;
+};
+*/
+
+template <class Adapter, typename Tg>
+void extractSurfaceFromAdapter(const Adapter &adapter,
+			   Geometry<Tg> &geometry, const double isolevel)
+{
+// Based on code from:
+// http://astronomy.swin.edu.au/~pbourke/modelling/polygonise/
+
+	typedef typename Adapter::value_type		voxel_type;
+	typedef typename Geometry<Tg>::facet_type	facet_type;
+	typedef typename Geometry<Tg>::vector_type	vector_type;
+
+	std::size_t dim[3];
+	adapter.dims(dim);
+
+	geometry.clear();
+	if (dim[X] < 1 || dim[Y] < 1 || dim[Z] < 1 )
+		return;
+
+	std::vector<std::vector<Point3D<Tg> > > points(dim[X]-1);
+	std::vector<std::vector<vector_type> > normals(dim[X]-1);
+
+#ifdef _OPENMP
+	const std::vector<Adapter> adapters(omp_get_max_threads(), adapter);
+#else
+	const Adapter matrix = adapter;
+#endif
+
+	//int invs = 0;
+	#ifdef _OPENMP
+	#pragma omp parallel for //reduction (+:invs)
+	#endif
+	for (int x = 0u; x < int(dim[X]-1); ++x)
+	{
+		#ifdef _OPENMP
+		const Adapter &matrix = adapters[omp_get_thread_num()];
+		#endif
+		voxel_type val[8];
+
+		for (std::size_t y = 0u; y < dim[Y] - 1u; ++y)
+		{
+			// Boundary conditions
+			val[2] = matrix(x+1,   y, 0);
+			val[3] = matrix(  x,   y, 0);
+			val[6] = matrix(x+1, y+1, 0);
+			val[7] = matrix(  x, y+1, 0);
+
+			for (std::size_t z = 0u; z < dim[Z] - 1u; ++z)
+			{
+				val[0] = val[3];
+				val[3] = matrix(  x,   y, z+1);
+				val[1] = val[2];
+				val[2] = matrix(x+1,   y, z+1);
+				val[4] = val[7];
+				val[7] = matrix(  x, y+1, z+1);
+				val[5] = val[6];
+				val[6] = matrix(x+1, y+1, z+1);
+				assert(val[0] == matrix(    x,    y,    z));
+				assert(val[1] == matrix(x + 1,    y,    z));
+				assert(val[2] == matrix(x + 1,    y,z + 1));
+				assert(val[3] == matrix(    x,    y,z + 1));
+				assert(val[4] == matrix(    x,y + 1,    z));
+				assert(val[5] == matrix(x + 1,y + 1,    z));
+				assert(val[6] == matrix(x + 1,y + 1,z + 1));
+				assert(val[7] == matrix(    x,y + 1,z + 1));
+
+				// Determine the index into the edge table which
+				// tells us which vertices are inside of the
+				// surface
+				std::size_t cubeIndex = 0u;
+				for (unsigned i = 0u; i < 8u; ++i)
+					if (val[i] < isolevel)
+						cubeIndex |= (1u << i);
+
+				// Cube is entirely in/out of the surface
+				using namespace cvmlcpp::detail;
+				if (_edgeTable[cubeIndex] == 0u)
+					continue;
+
+				// Prepare points of cube relative to point in matrix.
+				static
+				const typename iPoint3D::value_type offset [8] [3] = {
+					{0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1},
+					{0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1} };
+
+				const iPoint3D here(std::size_t(x), y, z);
+				iPoint3D pts[8];
+				for (unsigned i = 0; i < 8; ++i)
+					pts[i] = here.jmp(offset[i][X], offset[i][Y], offset[i][Z]);
+
+				// Find the vertices where the surface intersects the cube
+				typedef typename Geometry<Tg>::point_type point_t;
+				point_t vertlist[12];
+				for (std::size_t i = 0; i < 12u; ++i)
+					if (_edgeTable[cubeIndex] & (1u << i))
+						_VertexInterp(isolevel,
+							pts[_pairTable[i][0]],
+							pts[_pairTable[i][1]],
+							val[_pairTable[i][0]],
+							val[_pairTable[i][1]], vertlist[i]);
+
+				// Prepare points and facets
+				for (unsigned i = 0u; _triTable[cubeIndex][i] != -1; i += 3u)
+				{
+					assert(_triTable[cubeIndex][i+1] != -1);
+					assert(_triTable[cubeIndex][i+2] != -1);
+
+					// Determine points
+					const point_t a = vertlist[int(_triTable[cubeIndex][i  ])];
+					const point_t b = vertlist[int(_triTable[cubeIndex][i+1])];
+					const point_t c = vertlist[int(_triTable[cubeIndex][i+2])];
+
+					// Compute normal
+					vector_type normal = crossProduct(b-a, c-a);
+					normal /= modulus(normal);
+/*
+					// check normal orientation
+					const vector_type center = (a+b+c) / Tg(3.0);
+					const vector_type loc = normal + center;
+
+					const std::size_t xx = x + (normal.x() >= 0);
+					const std::size_t yy = y + (normal.y() >= 0);
+					const std::size_t zz = z + (normal.z() >= 0);
+
+					const bool invert = matrix(xx, yy, zz) < isolevel;
+					if (invert)
+					{
+						std::cout << "("<<x<<", "<<y<<", "<<z<<") --> ("<<xx<<", "<<yy<<", "<<zz<<") " << matrix(xx, yy, zz) << std::endl;
+						std::cout << "ABC " << a << b << c << std::endl;
+						std::cout << "normal " << normal << " complement " << crossProduct(c-a, b-a) << std::endl;
+						for (int k = 0; k < 8; ++k)
+							std::cout << k << " " << val[k] << std::endl;
+						std::cout << std::endl;
+					}
+
+					if (invert)
+					{
+						++invs;
+						normal *= -1.0;
+						using std::swap; // reverse order of points
+						swap(b, c);
+					}
+*/
+					// Save facet
+					normals[x].push_back(normal);
+
+					points[x].push_back(a);
+					points[x].push_back(b);
+					points[x].push_back(c);
+				}
+			}
+		}
+	}
+	//std::cout << invs << std::endl;
+	std::size_t Npoints = points[0].size();
+	for (std::size_t i = 1; i < points.size(); ++i)
+		Npoints += points[i].size();
+	assert(Npoints % 3 == 0);
+
+	std::vector<Point3D<Tg> > all_points;
+	all_points.reserve(Npoints);
+	for (std::size_t i = 0; i < points.size(); ++i)
+		all_points.insert(all_points.end(), points[i].begin(), points[i].end());
+
+#ifndef NDEBUG
+	std::size_t Nnormals = normals[0].size();
+	for (std::size_t i = 1; i < normals.size(); ++i)
+		Nnormals += normals[i].size();
+	assert(Npoints == 3 *Nnormals);
+#endif
+
+	std::vector<vector_type> all_normals;
+	all_normals.reserve(Npoints / 3);
+	for (std::size_t i = 0; i < normals.size(); ++i)
+		all_normals.insert(all_normals.end(), normals[i].begin(), normals[i].end());
+
+	geometry.loadGeometry(all_points.begin(), all_points.end(), all_normals.begin());
+}
+
+template <
+    template <typename Tm, std::size_t D, typename Aux> class Matrix_t,
+    typename Ti, typename A, typename Tg>
+void extractSurface(const Matrix_t<Ti, 3u, A> &matrix,
+		    Geometry<Tg> &geometry, const double isolevel = 0.5)
+{
+	extractSurfaceFromAdapter(detail::MatrixSurfaceAdaptor_<Matrix_t, Ti, A>((matrix)), geometry, isolevel);
+}
+
+/*
+template <typename Ti, typename Tg>
+void extractSurface(const DTree<Ti, 3u> &octree,
+			   Geometry<Tg> &geometry, const double isolevel = 0.5)
+{
+	extractSurface_(OctreeSurfaceAdaptor_((octree)), geometry, isolevel);
+}
+*/
+
+} // namespace
+
+#endif

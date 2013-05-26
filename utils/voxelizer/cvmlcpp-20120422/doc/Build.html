@@ -1,0 +1,317 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Build</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Build System</h1>
+
+<p>
+The idea behind the system is that the power of
+<a href='http://www.scons.org/'>SCons</a> should be exploited, but
+should be placed behind the more commonly known
+<a href='http://www.gnu.org/software/make/'>make</a>. The user should be
+able to control the build as much as possible from the command line. The
+system offers ready-made configurations for different compilers in two
+different modes: <i>release</i> mode and <i>debug</i> mode.
+</p>
+
+<p>
+By default, the configuration will be <i>gcc</i> in <i>release</i> mode.
+The user can configure the compiler, compiler flags et cetera by
+choosing one of the standard configurations, or, alternatively, the
+user can use any settings as desired by exporting environment variables
+that are listed below.
+</p>
+
+<p>
+Contrary to the Makefile, users should not need to touch the SConstruct file.
+The developers of a project should write the SConstruct file, and it should not
+require any changes. Instead, it should receive its parameters from make.
+</p>
+
+<p>
+Developers that want to use the CVMLCPP build system should create a
+Makefile and an SConstruct file, and let both use the scripts offered
+by CVMLCPP. An example project is given below.
+</p>
+
+<h2>Users</h2>
+
+
+<h3>Pre-defined Configurations</h3>
+
+<p>Possible values for the configuration <i>CNF</i>:</p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>gcc</pre></td>
+	<td>Use <i>g++</i>, the C++-compiler from the
+	<a href='http://gcc.gnu.org/'>Gnu Compiler Collection</a>.</td>
+</tr>
+
+<tr>
+	<td><pre>icc</pre></td>
+	<td>The
+<a href='http://www.intel.com/cd/software/products/asmo-na/eng/compilers/284132. htm'>Intel compiler</a>.</td>
+</tr>
+
+<tr>
+	<td><pre>open64</pre></td>
+	<td>The <a href='http://www.open64.net/'>Open64</a> compiler.</td>
+</tr>
+
+<tr>
+	<td><pre>clang</pre></td>
+	<td>The <a href='http://llvm.org'>clang / LLVM</a> compiler.</td>
+</tr>
+
+<tr>
+	<td><pre>sun</pre></td>
+	<td>The C++ compiler of the
+	<a href='http://developers.sun.com/sunstudio/'>Sun Studio</a>. This
+	compiler has too many bugs to compile CVMLCPP.</td>
+</tr>
+
+<tr>
+	<td><pre>watcom</pre></td>
+	<td>The <a href='http://www.openwatcom.org/'>OpenWatcom</a> compiler.
+	This compiler is too outdated to compile CVMLCPP.</td>
+</tr>
+
+</tbody>
+</table>
+
+<p>Possible values for <i>MODE</i>:</p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>release</pre></td>
+	<td>Enable optimization, disable asserts. This is the default.</td>
+</tr>
+
+<tr>
+	<td><pre>fast</pre></td>
+	<td>Enable optimization, disable asserts. The selected optimizations 
+	include options	that are CPU-specific for the current host, and possibly
+	mathematical approximations.</td>
+</tr>
+
+<tr>
+	<td><pre>debug</pre></td>
+	<td>Disable optimization, enable debugging symbols and asserts.</td>
+</tr>
+
+</tbody>
+</table>
+
+<h3>Environment Variables</h3>
+
+<p>Environment variables to control the build:</p>
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>CXX</pre></td>
+	<td>The C++ compiler to use.</td>
+</tr>
+
+<tr>
+	<td><pre>CXXFLAGS</pre></td>
+	<td>The compiler flags.</td>
+</tr>
+
+<tr>
+	<td><pre>LD</pre></td>
+	<td>The linker to use. These values will only be used if <i>LINK</i> is
+	not set.</td>
+</tr>
+
+<tr>
+	<td><pre>LINK</pre></td>
+	<td>The linker to use. These values will override those of <i>LD</i>.
+	</td>
+</tr>
+
+<tr>
+	<td><pre>LDFLAGS</pre></td>
+	<td>Linker flags. These values will only be used if <i>LINKFLAGS</i> is
+	not set.</td>
+</tr>
+
+<tr>
+	<td><pre>LINKFLAGS</pre></td>
+	<td>Linker flags. These values will override those of <i>LDFLAGS</i>.
+	</td>
+</tr>
+
+</tbody>
+</table>
+
+<h3>Examples</h3>
+
+<p>Default configuration:</p>
+
+<pre>
+$ make; sudo make install
+</pre>
+<hr />
+
+<p>Using the pre-defined configuration for the open64 compiler:</p>
+<pre>
+$ make CNF=open64; sudo make CNF=open64 install
+</pre>
+<hr />
+
+<p>Default configuration, but in debugging mode:</p>
+<pre>
+$ make MODE=debug; sudo make  MODE=debug install
+</pre>
+<hr />
+
+<p>Explicitly taking the pre-defined gcc configurationin debugging mode:</p>
+<pre>
+$ make CNF=gcc MODE=debug; sudo make CNF=gcc MODE=debug install
+</pre>
+<hr />
+
+<p>Use the environment variables to control the build:</p>
+<pre>
+$ export CXXFLAGS=-I/path/to/includes -Wall -Os
+$ make; sudo make install
+</pre>
+<hr />
+
+<h2>Implementors</h2>
+
+<p>
+This section shows how to incorporate the build system into your own
+project by means of an example.
+</p>
+
+<p>
+The Makefile file of an external project, in this case a library, should be the
+only part users ever have to look into. Potentially users can change some
+settings here. It could look like this:</p>
+<pre>
+##########################
+## Parameters for Users ##
+##########################
+VERSION=20110728
+
+# Install directory (used by CVMLCPP's build system)
+TARGET=/where/you/want/this/software/to/be/installed
+# For Debian/Ubuntu packaging, uncomment next line
+#TARGET=$(DESTDIR)/usr
+
+# Number of jobs to launch in parallel (used by CVMLCPP's build system)
+NCPU=2
+
+# Installation directory of CVMLCPP
+export CVMLCPP_PREFIX=/where/cvmlcpp/is/currently/installed
+# For Debian/Ubuntu packaging, uncomment next line
+#export CVMLCPP_PREFIX=/usr
+
+#################################
+## Users: Do not change below! ##
+#################################
+
+# The "EXTRA" parameter of this project is composed of only one thing, a
+# parameter that lets users choose a backend. Valid values should be in the
+# documentation of this project.
+EXTRA=BACKEND=${BACKEND}
+
+# Include the CVMLCPP build system's Makefile part
+include ${CVMLCPP_PREFIX}/share/cvmlcpp/build/Makefile.build
+
+# We need to provide our own "uninstall" target
+uninstall:
+	rm -f $(TARGET)/lib/libili.a $(TARGET)/lib/libili.so
+	rm -rf $(TARGET)/include/ililib $(TARGET)/share/doc/ililib
+
+post-install:
+	mv $(TARGET)/lib/libili.so $(TARGET)/lib/libili.so.$(VERSION)
+	ln -s libili.so.$(VERSION) $(TARGET)/lib/libili.so
+
+</pre>
+
+<p>
+In this example, the build of the software can be controlled from the
+command line with an extra parameter <i>BACKEND</i>.
+</p>
+
+<p>
+As mentioned before, users should not need to touch the SConstruct file.
+The SConstruct file could look like this:</p>
+<pre>
+#####################################
+## Users: Do not change this file! ##
+#####################################
+
+# Receive from Makefile: Location of CVMLCPP Installation
+CVMLCPP_PREFIX = ARGUMENTS.get( 'CVMLCPP_PREFIX',   '/usr/local' )
+
+# Have a building environment contructed by CVMLCPP build system
+env = SConscript(CVMLCPP_PREFIX+'/share/cvmlcpp/build/SConscript')
+
+# Receive from Makefile: Directory to install
+TARGET = ARGUMENTS.get('TARGET', '/usr/local')
+
+# Receive from Makefile: Which backend should we use ?
+backend = ARGUMENTS.get('BACKEND', '')
+if backend != '':
+	if backend == 'opencv':
+		env['CXXFLAGS'] += " -DUSE_OPENCV"
+		if env.has_key('LIBS'):
+			env['LIBS'] = [env['LIBS'], 'cv', 'highgui']
+		else:
+			env['LIBS'] = ['cv', 'highgui']
+	else:
+		if backend == 'magick':
+			env['CXXFLAGS'] += " -DUSE_MAGICK"
+			if env.has_key('LIBS'):
+				env['LIBS'] = [env['LIBS'], 'Magick++']
+			else:
+				env['LIBS'] = ['Magick++']
+
+# Magick++ is the default
+env.SetDefault(LIBS = 'Magick++')
+
+
+# Install Directories
+TARGETLIB = TARGET + '/lib'
+TARGETINC = TARGET + '/include/ililib'
+TARGETDOC = TARGET + '/share/doc/ililib'
+
+SRC    = ['src/IliLib', 'src/IliLib.hh', 'src/IliLibMagick.h',
+	  'src/IliLibMagick.hh', 'src/IliLibOpenCV.h',
+	  'src/IliLibToolkit', 'src/IliLibToolkit.hh',
+	  'src/IliLibRaw', 'src/IliLibRaw.hh', 'src/Spot', 'src/Locator']
+LIBSRC = ['src/IliLib.cc', 'src/IliLibToolkit.cc']
+
+staticIliLib = env.StaticLibrary( 'ili', LIBSRC)
+sharedIliLib = env.SharedLibrary( 'ili', LIBSRC)
+
+env.Install( TARGETDOC, 'doc' )
+env.Install( TARGETINC, SRC )
+env.Install( TARGETLIB, [staticIliLib, sharedIliLib] )
+env.Alias('install', [TARGETINC, TARGETLIB])
+</pre>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

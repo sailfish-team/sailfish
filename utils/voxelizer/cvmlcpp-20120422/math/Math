@@ -1,0 +1,328 @@
+/***************************************************************************
+ *   Copyright (C) 2007,2008 by BEEKHOF, Fokko                             *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_MATH
+#define CVMLCPP_MATH 1
+
+#include <cassert>
+#include <complex>
+#include <cmath>
+#include <vector>
+
+#include <tr1/type_traits>
+
+namespace cvmlcpp
+{
+
+/**
+ * Type-conversion, with rounding if applicable.
+ */
+template <typename T, typename U>
+T round_cast(const U &u);
+
+/**
+ * Returns smallest result such that (2^result >= n)
+ */
+template <typename T>
+T log2(const T n);
+
+/**
+ * Only reliable for integral types.
+ */
+template <typename T>
+bool isPower2(const T x)
+{
+	assert(std::tr1::is_integral<T>::value);
+	return !(x & (x - 1)) && x;
+}
+
+/**
+ * The Minimum of 3 values
+ */
+template <typename T>
+T min(const T &a, const T &b, const T &c)
+{
+	using std::min;
+	return min(a, min(b, c));
+}
+
+/**
+ * The Maximum of 3 values
+ */
+template <typename T>
+T max(const T &a, const T &b, const T &c)
+{
+	using std::max;
+	return max(a, max(b, c));
+}
+
+/**
+ * Only reliable for std::size_t integral types.
+ */
+template <typename T>
+bool isPower(const T x, const T k)
+{
+	if ( (x == k) || (x == 1) )
+		return true;
+
+	if (x%k != 0u)
+		return false;
+
+	return isPower(x/k, k);
+}
+
+template <typename T, typename U>
+T clamp(const T x, const U low, const U high)
+{
+	using std::min;
+	using std::max;
+	return min(static_cast<T>(high), max(x, static_cast<T>(low)));
+}
+
+template <typename T>
+T factorial(const T &x);
+
+template <typename T>
+T gcd(T u, T v);
+
+template <typename T>
+T binomial(const T n, const T k);
+
+template <typename T>
+T binopmf(const std::size_t n, const std::size_t k, const T p);
+
+template <typename T>
+T binocdf(const std::size_t n, const std::size_t k, const T p);
+
+template <typename T, typename U>
+std::size_t binocdfinv(const T p_arg, const std::size_t n, const U p);
+
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+template <typename T>
+T qfunc(const T x);
+#endif
+
+/**
+ * Famous Constants
+ */
+template <typename T>
+class Constants
+{
+	public:
+		typedef T value_type;
+
+		// Pi, the ratio of a circle's circumference to its diameter.
+		static inline value_type pi() { return static_cast<value_type>
+			(3.14159265358979323846264338327950288419716939937510);
+		}
+
+		// Base of natural logarithm
+		static inline value_type e() { return static_cast<value_type>
+			(2.71828182845904523536028747135266249775724709369995);
+		}
+
+		// i = sqrt(-1)
+		static inline const std::complex<value_type> i()
+		{
+			return std::complex<value_type>(value_type(0),
+							value_type(1));
+		}
+
+		// Euler's (Euler-Mascheroni) Constant
+		static inline value_type g() { return static_cast<value_type>
+			(0.57721566490153286060651209008240243104215933593992);
+		}
+
+		static inline value_type goldenRatio()
+		{
+			return static_cast<value_type>
+				(1.61803398874989484820458683436563811);
+		}
+};
+
+
+template <typename Iterator, typename T>
+T generalizedGaussianShape(Iterator begin, Iterator end, const T init);
+
+template <typename Iterator, typename T>
+T generalizedGaussianShape(Iterator begin, Iterator end,
+			   const T avg, const T init);
+
+/**
+ *
+ */
+
+template <class Function, class Derivative>
+typename Function::value_type optimize(const Function &f, const Derivative &d,
+		typename Function::value_type low,
+		typename Function::value_type high,
+		const std::size_t N = 1024);
+
+template <class Function>
+typename Function::value_type optimize(const Function &f,
+			const typename Function::value_type low,
+			const typename Function::value_type high,
+			const std::size_t N = 1024);
+
+/**
+ * Newton-Raphson root-finding method.
+ *
+ * "f": A functor with the function of which you want to find the root.
+ * "x": the point from where we begin to iterate.
+ */
+template <class Function>
+bool doNewtonRaphson(const Function &f, typename Function::value_type &x,
+		const std::size_t N = 100000u);
+
+template <class Function, class Derivative>
+bool doNewtonRaphson(const Function &f, const Derivative &d,
+	typename Function::value_type &x, const std::size_t N = 100000u);
+
+template <class Function>
+bool doNewtonRaphson(const Function &f, typename Function::value_type &x,
+			const typename Function::value_type low,
+			const typename Function::value_type high,
+			const std::size_t N = 100000u);
+
+template <class Function, class Derivative>
+bool doNewtonRaphson(const Function &f, const Derivative &d,
+			typename Function::value_type &x,
+			const typename Function::value_type low,
+			const typename Function::value_type high,
+			const std::size_t N = 100000u);
+
+/**
+ * To be as general as possible you have to define
+ * f(t,y) outside the class.
+ * "t0": is the initial condition position (y(t0)=y0)
+ * "tN": is the end of the computed range
+ * "N": is the length of the integration in "grid" units
+ *      (i.e. there will be N+1 points in y)
+ * "y0": the initial condition, y(t0)=y0
+ * "y": the vector where the values of y will be stored.
+ */
+template <class Function>
+void doRungeKutta(const Function &f,
+		const typename Function::value_type t0,
+		const typename Function::value_type tN,
+		const std::size_t N,
+		const typename Function::value_type y0,
+		std::vector<typename Function::value_type> &y);
+
+/*
+ * The Hungarian algorithm for finding a minimum overall-cost matching
+ * in a bi-partite graph.
+ */
+template <template <typename Tm, std::size_t D, typename Aux> class Matrix_type,
+	typename T, typename A>
+void find_matching(Matrix_type<T, 2, A> &costs,
+		   std::vector<std::pair<std::size_t, std::size_t> > &matches,
+		   const bool minimize_costs = true,
+		   const bool heuristic = true);
+
+} // end namespace
+
+
+#include <cvmlcpp/base/Meta>
+
+namespace cvmlcpp
+{
+
+/**
+ * Modulus
+ */
+
+template <typename T>
+typename ValueType<T>::value_type modulus(const T &x);
+
+/**
+ * Simple Statistics
+ */
+
+template <typename Iterator, typename T>
+typename promote_trait1<T>::value_type average(Iterator begin, Iterator end, const T init);
+
+template <typename Iterator, typename T>
+T median(Iterator begin, Iterator end, const T init);
+
+template <typename Iterator, typename T>
+typename promote_trait1<T>::value_type deviation(Iterator begin, Iterator end, const T init);
+
+template <typename Iterator, typename T, typename U>
+typename promote_trait1<T>::value_type deviation(Iterator begin, Iterator end, const T avg, const U init);
+
+template <typename Iterator, typename T>
+typename promote_trait1<T>::value_type variance(Iterator begin, Iterator end, const T init);
+
+template <typename Iterator, typename T, typename U>
+typename promote_trait1<T>::value_type variance(Iterator begin, Iterator end, const T mean, const U init);
+
+} // namespace
+
+
+/**
+ * Linear Algebra
+ */
+#include <boost/numeric/ublas/matrix.hpp>
+#include <cvmlcpp/base/Matrix>
+#include <cvmlcpp/math/Vectors>
+
+namespace cvmlcpp
+{
+
+template <template <typename Tm, std::size_t D, typename Aux> class Array_t,
+	  typename T, typename A>
+void identity(Array_t<T, 2u, A> &m, const std::size_t N);
+
+template <template <typename Tm, std::size_t D, typename Aux> class Array_t,
+	  typename T, typename A>
+bool invert(Array_t<T, 2u, A> &m);
+
+template <template <typename Tm, std::size_t D, typename Aux> class Array_t,
+	  typename T, typename A>
+void transpose(Array_t<T, 2u, A> &m);
+
+/*
+ * Linear Least Squares.
+ * Finds an x such that y = Ax + e, where "e" is a minimized error.
+ *
+ * "A" is the Design matrix; "y" are the observation, and "x" will be the
+ * vector of estimated parameters.
+ */
+template <template <typename Tm, std::size_t Dm, typename A> class Array_t,
+	  typename Ta, typename Aux, class XVector_t, class YVector_t>
+bool leastSquaresFit(const Array_t<Ta, 2, Aux> &A, const YVector_t &y,
+		     XVector_t &x);
+
+template<class T, class F, class A>
+bool invert(boost::numeric::ublas::matrix<T, F, A>& m);
+
+} // namespace
+
+#include <cvmlcpp/math/Math.hpp>
+
+/*
+ * Compatibility/Convenience Macros
+ */
+#ifndef PI
+#  define PI cvmlcpp::Constants<double>::pi()
+#endif
+
+#endif

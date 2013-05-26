@@ -1,0 +1,258 @@
+/***************************************************************************
+ *   Copyright (C) 2009 by F. P. Beekhof                                   *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with program; if not, write to the                              *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_POLYNOMIAL
+#define CVMLCPP_POLYNOMIAL 1
+
+#ifdef USE_GSL
+#include <gsl/gsl_errno.h>
+#include <gsl/gsl_poly.h>
+#endif
+
+namespace cvmlcpp
+{
+
+namespace detail
+{
+
+template <typename T, typename It>
+inline T polyEvalStd(T x, It first, const It last)
+{
+	assert(first != last);
+	T r = *first;
+	while(++first != last)
+	{
+		r += *first * x;
+		x *= x;
+	}
+
+	return r;
+}
+
+template <typename T, const std::size_t degree>
+struct PolyEval
+{
+	template <typename It>
+	inline static const T polyEval(const T x, It first)
+	{ return polyEvalStd(x, first, first + degree); }
+};
+
+template <const std::size_t degree>
+struct PolyEval<double, degree>
+{
+	template <typename It>
+	inline static const double polyEval(const double x, It first)
+	{
+#ifdef USE_GSL
+		return gsl_poly_eval(first, degree, x);
+#else
+		return polyEvalStd(x, first, first + degree);
+#endif
+	}
+};
+
+} // end namespace detail
+
+// A Polynomial function: y = \sum a[i]*x^i
+template <typename T, const std::size_t degree>
+class Polynomial
+{
+	public:
+		typedef T value_type;
+		typedef T result_type;
+		typedef T * iterator;
+		typedef const T * const_iterator;
+		typedef Polynomial<T, degree-1> Derivative;
+
+		Polynomial()
+/*
+#ifdef USE_GSL
+			: w(NULL)
+#endif */
+		{}	
+		template <typename Iterator>
+		Polynomial(Iterator begin, Iterator end)
+		{
+			//assert(std::distance(begin, end) == degree+1u);
+			std::copy(begin, end, a_);
+		}
+/*
+#ifdef USE_GSL
+		~Polynomial()
+		{
+			if (w != NULL)
+				gsl_poly_complex_workspace_free (w);
+		}
+#endif
+*/
+		inline const T operator()(T x) const
+		{
+			return detail::PolyEval<T, degree>::polyEval(x, this->begin());
+		}
+
+		T &operator[](const std::size_t i) { return a_[i]; }
+		const T &operator[](const std::size_t i) const { return a_[i]; }
+
+		iterator const begin() { return &a_[0]; }
+		iterator const end()   { return this->begin()+degree+1u; }
+
+		const_iterator const begin() const { return &a_[0]; }
+		const_iterator const end()   const { return this->begin()+degree+1u; }
+
+		Derivative derivative() const
+		{
+			Polynomial<T, degree-1> d;
+			d[0] = a_[1];
+			for (std::size_t i = 2; i <= degree; ++i)
+				d[i-1] = a_[i] * T(i);
+			return d;
+		}
+/*
+#ifdef USE_GSL
+		bool roots()
+		{
+			if (w == NULL)
+			{
+				w = gsl_poly_complex_workspace_alloc(degree);
+				if (w == NULL)
+					return false;
+			}
+
+			if (GSL_SUCCESS != gsl_poly_complex_solve(a_, degree, this->w, gsl_complex_packed_ptr z))
+				return false;
+		}
+#endif
+*/
+
+	private:
+		T a_[degree+1];
+/*
+#ifdef USE_GSL
+		gsl_poly_complex_workspace *w;
+#endif
+*/
+};
+
+
+template <typename T>
+class Polynomial<T, 0>
+{
+	public:
+		typedef T value_type;
+		typedef T result_type;
+		typedef T * iterator;
+		typedef const T * const_iterator;
+		typedef Polynomial<T, 0> Derivative;
+
+		Polynomial() { } 
+	
+		template <typename Iterator>
+		Polynomial(Iterator begin, Iterator end) { a_ = *begin; }
+
+		const T operator()(T x) const { return a_; }
+
+		T &operator[](const std::size_t i) { return a_; }
+		const T &operator[](const std::size_t i) const { return a_; }
+
+		iterator const begin() { return &a_; }
+		iterator const end()   { return this->begin()+1u; }
+
+		const_iterator const begin() const { return &a_; }
+		const_iterator const end() const { return this->begin()+1u; }
+
+		Derivative derivative() const
+		{
+			const T zero [] = { 0 };
+			return Derivative(zero, zero+1);
+		}
+
+	private:
+		T a_;
+};
+
+template <typename T, const std::size_t Ldegree, const std::size_t Rdegree>
+const Polynomial<T, Ldegree+Rdegree>
+operator*(const Polynomial<T, Ldegree> &lhs,
+	  const Polynomial<T, Rdegree> &rhs)
+{
+	Polynomial< T, Ldegree+Rdegree> prod;
+	std::fill(prod.begin(), prod.end(), 0);
+	
+	for (std::size_t l = 0; l <= Ldegree; ++l)
+	for (std::size_t r = 0; r <= Rdegree; ++r)
+		prod[l+r] += lhs[l] * rhs[r];
+	
+	return prod;
+}
+
+template <typename T, const std::size_t degree>
+const Polynomial<T, degree>
+operator+(const Polynomial<T, degree> &lhs,
+	  const Polynomial<T, degree> &rhs)
+{
+	Polynomial< T, degree> sum;
+	
+	std::transform(lhs.begin(), lhs.end(), rhs.begin(), sum.begin(),
+			std::plus<T>());
+	
+	return sum;
+}
+
+template <typename T, const std::size_t degree>
+const Polynomial<T, degree>
+operator-(const Polynomial<T, degree> &lhs,
+	  const Polynomial<T, degree> &rhs)
+{
+	Polynomial< T, degree> difference;
+	
+	std::transform(lhs.begin(), lhs.end(), rhs.begin(), 
+			difference.begin(), std::minus<T>());
+	
+	return difference;
+}
+
+template <typename T, const std::size_t degree>
+const Polynomial<T, degree>
+operator*(Polynomial<T, degree> lhs, const T &rhs)
+{
+	std::transform( lhs.begin(), lhs.end(), lhs.begin(),
+			std::bind2nd(std::multiplies<T>(), rhs) );
+	return lhs;
+}
+
+template <typename T, const std::size_t degree>
+const Polynomial<T, degree>
+operator+(Polynomial<T, degree> lhs, const T &rhs)
+{
+	lhs[0] += rhs;	
+	return lhs;
+}
+
+template <typename T, const std::size_t degree>
+const Polynomial<T, degree>
+operator-(Polynomial<T, degree> lhs, const T &rhs)
+{
+	lhs[0] -= rhs;	
+	return lhs;
+}
+
+} // namespace
+
+#endif

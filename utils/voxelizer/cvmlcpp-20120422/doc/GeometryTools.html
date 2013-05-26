@@ -1,0 +1,62 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::GeometryTools</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>GeometryTools</h1>
+
+<p>
+Tools to process <a href='Geometry.html'>Geometries</a>, such as detecting
+errors and correcting them. However, if possible, we recommend the use of
+more advanced software, i.e. <a href='http://meshlab.sourceforge.net/'>MeshLab</a>. 
+MeshLab can be used to correct facet representations or to convert other datatypes to STL. 
+</p>
+
+<h2>Interface</h2>
+
+<table border='1' width='100%'>
+<tbody>
+<!--
+<tr>
+	<td><pre></pre>
+	</td>
+	<td>NOT IMPLEMENTED</td>
+</tr>
+-->
+
+<tr>
+	<td><pre>template &lt;typename T&gt;
+  void fixGeometry(Geometry&lt;T&gt; &amp;geometry,&nbsp;&nbsp;&nbsp;&nbsp;
+		   const T sampleSize = 1.0)</pre></td>
+	<td> Fix a potentially incorrect Geometry. Selecting a smaller
+	"sampleSize" will result in more facets in the resulting Geometry.
+	</td>
+</tr>
+
+</tbody>
+</table>
+
+<h2>Extra Information</h2>
+
+<h3>Fixing Geometries</h3>
+The procedure to fix geometries is described in
+<a href='http://www-static.cc.gatech.edu/~turk/my_papers/volumetric_simp.pdf'>
+this paper</a>. The "sampleSize" parameter corresponds to the "voxelSize"
+parameter in the <a href='Voxelizer.html'>Voxelizer</a>.
+
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

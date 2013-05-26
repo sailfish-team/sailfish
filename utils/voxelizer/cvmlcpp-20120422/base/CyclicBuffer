@@ -1,0 +1,107 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; version 3.                              *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_CYCLICBUFFER
+#define CVMLCPP_CYCLICBUFFER 1
+
+#include <cassert>
+#include <vector>
+#include <algorithm>
+#include <numeric>
+
+namespace cvmlcpp
+{
+
+template <typename T>
+class CyclicBuffer
+{
+	public:
+		typedef T value_type;
+
+		CyclicBuffer(const std::size_t N = 64u) :
+			_data(N, value_type(0.0)), _i(0u),
+			_n(0u), _sum(value_type(0.0))
+		{ assert(N > 0u); }
+
+		std::size_t size() const { return _n; }
+
+		std::size_t capacity() const { return _data.size(); }
+
+		void resize(const std::size_t N)
+		{
+			if (N == this->capacity())
+				return;
+			else if (N >= _n)
+			{
+				_data.resize(N);
+				std::fill(_data.begin()+_n, _data.end(), T(0));
+			}
+			else
+			{
+				assert(N < _n);
+				std::vector<value_type> _d(N);
+				for (std::size_t i = 0u; i < N; ++i)
+					_d[i] = (*this)[i]; // copy latest only
+				_data.swap(_d);
+				_i = N-1u;
+			}
+			_n = std::min(_n, N);
+			_sum = std::accumulate(_data.begin(), _data.begin()+_n,
+						value_type(0));
+		}
+
+		void clear()
+		{ _n = 0u; _i = 0u; _sum = value_type(0); }
+
+		void add(const value_type x)
+		{
+			_sum += x;		// Add new value
+			_sum -= _data[_i];	// Remove oldest value
+			_data[_i] = x;		// Store new Value
+			_n = std::min(std::size_t(1u+_n), _data.size()); // Count values
+			++_i; _i %= _data.size();	// Update ptr
+			if (_i == 0u)		// Recompute periodically
+				_sum = std::accumulate(_data.begin(),
+							_data.end(), T(0));
+		}
+
+		value_type avg() const
+		{
+			if (_n > 0u)
+				return _sum / value_type(_n);
+
+			return T(0);
+		}
+
+		// "index" goes back in time.
+		value_type operator[](const std::size_t index) const
+		{
+			assert (index < _n);
+			return _data[(_i+ _data.size()+index) % _data.size()];
+		}
+
+	private:
+		std::vector<value_type> _data;
+		std::size_t _i, _n;
+		value_type _sum;
+};
+
+} // namespace
+
+#endif

@@ -1,0 +1,14 @@
+all:
+	scons -j ${NCPU} CNF=${CNF} MODE=${MODE} ${EXTRA}
+
+clean:
+	scons -j ${NCPU} CNF=${CNF} MODE=${MODE} ${EXTRA} -c
+	rm -f `find . -name "*~"`
+	rm -f `find . -name a.out`
+	rm -f `find . -name "*.err"`
+	rm -f `find . -name "*.rej"`
+	rm -f `find . -name ".sconsign*"`
+
+install:
+	scons -j ${NCPU} CNF=${CNF} MODE=${MODE} TARGET=${TARGET} ${EXTRA} install
+	make post-install

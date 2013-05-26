@@ -1,0 +1,161 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_ID_GENERATORS
+#define CVMLCPP_ID_GENERATORS 1
+
+#include <cstdlib>
+#include <boost/random/mersenne_twister.hpp>
+#include <ctime>
+
+#include <cvmlcpp/base/stl_cstdint.h>
+
+namespace cvmlcpp
+{
+
+template <typename T>
+T _bit_reverse(T k)
+{
+	T n	= CHAR_BIT * sizeof(T);
+	T mask	= ~T(0);
+
+	// n is an 8-fold, so unroll 8-ways
+	while ( (n >>= 1u) > 0u )
+	{
+		mask ^= (mask << n);
+		k = ((k >> n) & mask) | ((k << n) & ~mask);
+
+		n >>= 1u;
+		mask ^= (mask << n);
+		k = ((k >> n) & mask) | ((k << n) & ~mask);
+
+		n >>= 1u;
+		mask ^= (mask << n);
+		k = ((k >> n) & mask) | ((k << n) & ~mask);
+
+		n >>= 1u;
+		mask ^= (mask << n);
+		k = ((k >> n) & mask) | ((k << n) & ~mask);
+
+		n >>= 1u;
+		mask ^= (mask << n);
+		k = ((k >> n) & mask) | ((k << n) & ~mask);
+
+		n >>= 1u;
+		mask ^= (mask << n);
+		k = ((k >> n) & mask) | ((k << n) & ~mask);
+
+		n >>= 1u;
+		mask ^= (mask << n);
+		k = ((k >> n) & mask) | ((k << n) & ~mask);
+
+		n >>= 1u;
+		mask ^= (mask << n);
+		k = ((k >> n) & mask) | ((k << n) & ~mask);
+	}
+
+	return k;
+}
+
+/**
+ * GUIDGenerator generates Globally Unique IDentification numbers
+ */
+class GUIDGenerator
+{
+	public:
+		typedef boost::uint64_t value_type;
+
+		GUIDGenerator() : _count(0) { }
+
+		value_type generate()
+		{
+			return (value_type(_rng()) << value_type(32)) + 
+				 value_type(time(0)) + (++_count);
+		}
+
+		value_type operator()()	{ return this->generate(); }
+
+		std::size_t  count() const { return _count; }
+
+	private:
+		boost::mt19937 _rng;
+		value_type _count;
+};
+
+/**
+ * KeyGenerator generates keys for binary-tree-based structures such as
+ * STL's "map".
+ *
+ * Generally, binary trees have logarithmic time for certain operations,
+ * based on the assumption that the tree is balanced.
+ * Inserting items in sorted order in a tree results in a maximally un-balanced
+ * tree, i.e. a structure resembling a linked list rather than a tree.
+ * As a result, operations that usually run in logarithmic time require linear
+ * time. The KeyGenerator is designed to generate values that should result in
+ * a balanced tree when inserted sequentially.
+ */
+template <typename T = std::size_t>
+class KeyGenerator
+{
+	public:
+		typedef T value_type;
+
+		KeyGenerator() : _count(0) { }
+
+		value_type operator()() { return this->generate(); }
+
+		// Simply bit-reverse count
+		value_type generate() { return _bit_reverse(++_count); }
+
+		void reset() { _count = 0; }
+
+		std::size_t count() const { return _count; }
+
+	private:
+		std::size_t _count;
+};
+
+/**
+ * IncGenerator generates incremental values: 0, 1, 2, ...
+ */
+template <typename T = std::size_t>
+class IncGenerator
+{
+	public:
+		typedef T value_type;
+
+		IncGenerator() : _count(0u) { }
+
+		value_type operator()() { return this->generate(); }
+
+		// Simply bit-reverse count
+		value_type generate() { return _count++; }
+
+		void reset() { _count = 0u; }
+
+		std::size_t count() const { return _count; }
+
+	private:
+		std::size_t _count;
+};
+
+} // namespace cvmlcpp
+
+#endif

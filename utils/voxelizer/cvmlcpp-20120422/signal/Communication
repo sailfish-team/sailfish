@@ -1,0 +1,270 @@
+/***************************************************************************
+ *   Copyright (C) 2007,2008 by BEEKHOF, Fokko                             *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You shoud have received a copy of the GNU General Public License      *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#pragma once
+
+#ifndef CVMLCPP_COMMUNICATION
+#define CVMLCPP_COMMUNICATION 1
+
+#include <limits>
+#include <climits>
+#include <iostream>
+#include <utility>
+#include <bitset>
+
+#include <tr1/memory>
+#include <tr1/array>
+
+#include <boost/static_assert.hpp>
+#include <boost/integer_traits.hpp>
+#include <boost/tuple/tuple.hpp>
+
+#include <cvmlcpp/signal/Code.h>
+#include <cvmlcpp/signal/LDPCCode>
+#include <cvmlcpp/signal/Channel>
+#include <cvmlcpp/signal/MoDem.h>
+
+namespace cvmlcpp
+{
+
+template <std::size_t N, std::size_t K,
+	  typename Input, typename Output, std::size_t N_SYMBOLS>
+class Communicator;
+
+template <typename Input, std::size_t NInputs>
+std::tr1::array<Input, NInputs> generateAlphabet()
+{
+	std::tr1::array<Input, NInputs> symbols;
+	const std::size_t step =
+		(boost::integer_traits<Input>::const_max -
+			boost::integer_traits<Input>::const_min -
+			NInputs + 1u) / (NInputs - 1u) + 1u;
+
+	for (std::size_t i = 0; i < NInputs; ++i)
+		symbols[i] = i * step;
+
+	return symbols;
+}
+
+template <std::size_t N, std::size_t K,
+	  typename Input, typename Output, std::size_t N_SYMBOLS>
+class Communicator
+{
+	public:
+		typedef typename Code<N, K>::G GeneratorMatrix;
+		typedef std::tr1::shared_ptr<Channel<Input,Output> > ChannelPtr;
+		typedef std::tr1::shared_ptr<Code<N, K> > CodePtr;
+		typedef std::tr1::array<Input, N_SYMBOLS> InputArray;
+
+		static const std::size_t P=boost::static_log2<N_SYMBOLS>::value;
+		static const std::size_t LENGTH = N / P;
+
+		Communicator() :
+			defaultChannel_(new NoiselessChannel<Input, Output>()),
+			code_(mkCode()),
+			symbols_(generateAlphabet<Input, N_SYMBOLS>()) { }
+
+		Communicator(ChannelPtr defaultChannel) :
+			defaultChannel_(defaultChannel), code_(mkCode()),
+			symbols_(generateAlphabet<Input, N_SYMBOLS>()) { }
+
+		Communicator(const GeneratorMatrix &generator) :
+			defaultChannel_(new NoiselessChannel<Input, Output>()),
+			code_(mkCode(generator)),
+			symbols_(generateAlphabet<Input,N_SYMBOLS>()) {}
+
+		Communicator(CodePtr code) :
+			defaultChannel_(new NoiselessChannel<Input, Output>()),
+			code_(code),
+			symbols_(generateAlphabet<Input,N_SYMBOLS>()) {}
+
+		Communicator(ChannelPtr defaultChannel,
+			     const GeneratorMatrix &generator) :
+				defaultChannel_(defaultChannel),
+				code_(mkCode(generator)),
+				symbols_(generateAlphabet<Input,N_SYMBOLS>()) {}
+
+		Communicator(ChannelPtr defaultChannel, CodePtr code) :
+				defaultChannel_(defaultChannel), code_(code),
+				symbols_(generateAlphabet<Input, N_SYMBOLS>()){}
+
+		Communicator(ChannelPtr defaultChannel,
+			     const InputArray &symbols) :
+				defaultChannel_(defaultChannel),
+				code_(mkCode()), symbols_(symbols) { }
+
+		Communicator(ChannelPtr defaultChannel,
+			     const GeneratorMatrix &generator,
+			     const InputArray &symbols) :
+				defaultChannel_(defaultChannel),
+				code_(mkCode(generator)),
+				symbols_(symbols) { }
+
+		Communicator(ChannelPtr defaultChannel, CodePtr code,
+			const InputArray &symbols) :
+				defaultChannel_(defaultChannel), code_(code),
+				symbols_(symbols) { }
+
+		void print() const { code_->print(); }
+
+// first1: message begin, last1: message end (upto K bits data)
+// first2: Channel Input begin, LENGTH Inputs will be written
+template <typename InputIterator, typename OutputIterator>
+bool encode(InputIterator first1, OutputIterator first2)
+{
+	typedef typename ::std::iterator_traits<InputIterator>::value_type MT;
+
+	BOOST_STATIC_ASSERT(N == P * LENGTH);
+	BOOST_STATIC_ASSERT(N_SYMBOLS == 1u << P);
+	BOOST_STATIC_ASSERT(boost::integer_traits<MT>::is_integral);
+
+	const std::size_t MT_BITS  = CHAR_BIT * sizeof(MT);
+	BOOST_STATIC_ASSERT((K % MT_BITS) == 0);
+
+	const InputIterator last1 = first1 + K / MT_BITS;
+
+	std::bitset<K> mesg(0u);
+	for (std::size_t b = 0u; first1 != last1; ++first1)
+	{
+		// FIXME This is not little-endian / big-endian safe!
+		for (std::size_t i = 0; i < MT_BITS && b < K; ++i, ++b)
+			mesg.set(b, (*first1 & (1u << i)) != 0 );
+	}
+
+	std::bitset<N> codeword;
+	if (!code_->encode(mesg, codeword))
+		return false;
+//std::cout << "Communicator::encode() M:  " << mesg << std::endl;
+//std::cout << "Communicator::encode() CW: " << codeword << std::endl;
+	std::tr1::array<std::size_t, LENGTH> chunks;
+	_split<N, P>(codeword, chunks);
+
+	omptl::transform(chunks.begin(), chunks.end(), first2,
+			 GrayModulator<Input, N_SYMBOLS>(symbols_));
+//std::cout << "Communicator::encode() CI: " << cvmlcpp::to_string(first2, first2+LENGTH) << std::endl;
+
+	return true;
+}
+
+// first1: Channel Output begin, LENGTH Inputs will be read
+// first2: message begin, upto K bits data will be written
+template <typename InputIterator, typename OutputIterator>
+bool decode(InputIterator first1, OutputIterator first2,
+	    const ChannelPtr channel)
+{
+	typedef typename ::std::iterator_traits<OutputIterator>::value_type MT;
+
+	BOOST_STATIC_ASSERT(N == P * LENGTH);
+	BOOST_STATIC_ASSERT(N_SYMBOLS == 1u << P);
+	BOOST_STATIC_ASSERT(boost::integer_traits<MT>::is_integral);
+
+	const std::size_t MT_BITS  = CHAR_BIT * sizeof(MT);
+
+	std::tr1::array<typename GrayDemodulator<Input, Output, N_SYMBOLS>::
+		     Quantization, LENGTH> symbolQuantizations;
+
+//std::cout << "Communicator::decode() symbols: " << cvmlcpp::to_string(symbols_.begin(), symbols_.end()) << std::endl;
+//std::cout << "Communicator::decode() CO: " << cvmlcpp::to_string(first1, first1+LENGTH) << std::endl;
+
+	omptl::transform(first1, first1+LENGTH, symbolQuantizations.begin(),
+			GrayDemodulator<Input, Output, N_SYMBOLS>
+						(symbols_, channel));
+
+	std::tr1::array<double, N> quantization;
+	std::size_t n = 0u;
+	for (std::size_t l = 0u; l < LENGTH; ++l)
+	for (std::size_t p = 0u; p < P; ++p, ++n)
+		quantization[n] = symbolQuantizations[l][p];
+	assert(n == N);
+
+#ifdef USE_DBG_OUTPUT
+std::cout << "Communicator::decode() Quantized Channel Output: ";
+for (int i = N-1; i >= 0; --i)
+	std::cout << quantization[i] << " "; 
+std::cout << std::endl;
+
+std::cout << "Communicator::decode() Binary Channel Output: ";
+std::bitset<N> codeword;
+for (int i = N-1; i >= 0; --i)
+	codeword[i] = quantization[i] >= 0.5;
+std::cout << codeword << std::endl;
+#endif
+
+	std::bitset<K> mesg(0u);
+ 	const bool ok = code_->decode(quantization, mesg);
+
+#ifdef USE_DBG_OUTPUT
+std::cout << "Communicator::decode() decoding " << (ok?"succeeded":"failed") << std::endl; 
+std::cout << "Communicator::decode() M:  " << mesg.to_string() << std::endl;
+std::cout << "-----------------------------------------------" << std::endl;
+#endif
+	// Write mesg to first2
+	const std::bitset<K> mask( (1u << MT_BITS) - 1u );
+
+	for (std::size_t b = 0u; b < K; ++first2)
+	{
+		*first2 = 0;
+		for (std::size_t i = 0; i < MT_BITS && b < K; ++i, ++b)
+			if (mesg[b])
+				*first2 |= MT(1u << i);
+	}
+
+	return ok;
+}
+
+		// first1: Channel Output begin, LENGTH Inputs will be read
+		// first2: message begin, upto K bits data will be written
+		template <typename InputIterator, typename OutputIterator>
+		bool decode(InputIterator first1, OutputIterator first2)
+		{
+			return this->decode(first1, first2, defaultChannel_);
+		}
+
+		const InputArray &symbols() const
+		{ return symbols_; }
+
+	private:
+		const ChannelPtr	defaultChannel_;
+		const CodePtr		code_;
+		const InputArray	symbols_;
+
+		static Code<N, K> * mkCode()
+		{
+#ifdef USE_ML_DECODER
+			return new MLLDPCCode<N, K>();
+#else
+			return new BPLDPCCode<N, K>();
+#endif
+		}
+
+		static Code<N, K> * mkCode(const GeneratorMatrix &generator)
+		{
+#ifdef USE_ML_DECODER
+			return new MLLDPCCode<N, K>(generator);
+#else
+			return new BPLDPCCode<N, K>(generator);
+#endif
+		}
+
+};
+
+} // namespace
+
+#endif 

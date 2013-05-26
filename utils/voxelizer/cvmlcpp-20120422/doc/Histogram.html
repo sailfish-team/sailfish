@@ -1,0 +1,200 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns='http://www.w3.org/1999/xhtml'>
+<head>
+	<title>CVMLCPP::Histogram</title>
+	<meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Histogram</h1>
+
+A <b>Histogram</b> is just that, more precisely, it is:
+<pre>
+template &lt;typename T&gt;
+class Histogram;
+</pre>
+
+<p>
+It can be used to count how many elements of type T, from a source of input,
+fall into certain bins.
+</p>
+
+<h2>Interface</h2>
+
+<p>
+Iterators providing access to the elements of a Histogram are all read-only.
+Dereferencing an iterator yields a type
+'const std::pair&lt;std::size_t, std::size_t&gt;' where 'first' is the number
+of the bin, and 'second' in the number of times an element fell into the bin.
+</p>
+
+<table border='1' width='100%'>
+
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>The type of object that are being counted.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator</pre></td>
+	<td>A read-only iterator that passes over all non-empty bins.</td>
+</tr>
+
+<tr>
+	<td><pre>const_reverse_iterator</pre></td>
+	<td>A read-only iterator that passes over all non-empty bins.</td>
+</tr>
+
+<tr>
+	<td><pre>Histogram(const std::size_t nrBins =
+			std::numeric_limits&lt;std::size_t&gt;::max(),
+	  const value_type minValue = value_type(0),
+	  const value_type maxValue =
+			std::numeric_limits&lt;value_type&gt;::max())</pre></td>
+	<td>Default constructor, by default, the number of bins is
+		std::numeric_limits&lt;std::size_t&gt;::max(), <i>minValue</i> is zero
+		and <i>maxValue</i> is
+		std::numeric_limits&lt;std::size_t&gt;::max().</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename InputIterator&gt;
+Histogram(const InputIterator first, const InputIterator last,
+	  const std::size_t nrBins,
+	  const value_type minValue = value_type(0),
+	  const value_type maxValue =
+			 std::numeric_limits&lt;value_type&gt;::max())</pre></td>
+	<td>Constructs a Histogram, and fills it based on the input given
+		by InputIterator <i>first</i> and <i>last</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t size() const</pre></td>
+	<td>Returns the number of non-empty bins.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t maxSize() const</pre></td>
+	<td>Returns the maximum number of non-empty bins, i.e. the largest
+		value that size() can return.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t elements() const</pre></td>
+	<td>The number of elements that has been inserted, or the sum of
+		all bins.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator
+atLeastPercentGreater(const double percentElements) const</pre></td>
+	<td>Given a number between 0.0 and 1.0, returns an iterator
+		to the lowest bin in the histogram such that dataPercent percent
+		of the data is in bins lower than the returned element.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator atLeastGreater(const std::size_t elements) const</pre></td>
+	<td>Returns an iterator to a bin such that the sum of the previous
+		bins at least equals <i>elements</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>const_reverse_iterator
+atMostPercentGreater(const double percentElements) const</pre></td>
+	<td>Given a number between 0.0 and 1.0, returns an iterator to the
+	highest bin in the histogram such that <i>percentElements</i> percent of
+	the data is in bins higher than the returned element.</td>
+</tr>
+
+<tr>
+	<td><pre>const_reverse_iterator
+atMostGreater(const std::size_t elements) const</pre></td>
+	<td>Returns an iterator to a bin such that there are at least
+	<i>elements</i> in the bins higher than the returned bin.</td>
+</tr>
+
+<tr>
+	<td><pre>double binSize() const</pre></td>
+	<td>Return the 'width' of one bin.</td>
+</tr>
+
+<tr>
+	<td><pre>void clear()</pre></td>
+	<td>Remove all data from the Histogram.</td>
+</tr>
+
+<tr>
+	<td><pre>void insert(const value_type &amp;value)</pre></td>
+	<td>Insert <i>value</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename InputIterator&gt;
+void insert(const InputIterator first, const InputIterator last)</pre></td>
+	<td>Insert all elements in the range <i>first</i> to <i>last</i>.</td>
+</tr>
+
+<tr>
+	<td>
+	<pre>template &lt;typename InputIterator, class UnaryFunction&gt;
+void insert(const InputIterator first, const InputIterator last,
+	    UnaryFunction op)</pre></td>
+	<td>For all elements in the range <i>first</i> to <i>last</i>: apply
+		<i>op</i>, then insert.</td>
+</tr>
+
+<tr>
+	<td><pre>float operator()(const std::size_t bin) const</pre></td>
+	<td>The fraction of the all the elements that are in <i>bin</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator begin()</pre></td>
+	<td>A const_iterator: begin.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator end()</pre></td>
+	<td>A const_iterator: end.</td>
+</tr>
+
+<tr>
+	<td><pre>const_reverse_iterator rbegin()</pre></td>
+	<td>A const_reverse-iterator: begin.</td>
+</tr>
+
+<tr>
+	<td><pre>const_reverse_iterator rend()</pre></td>
+	<td>A const_reverse-iterator: end.</td>
+</tr>
+
+<tr>
+	<td><pre>double avg() const</pre></td>
+	<td>The average value of the non-empty bins.</td>
+</tr>
+
+<tr>
+	<td><pre>Histogram &amp;operator+=(const Histogram &amp;rhs)</pre></td>
+	<td>Merge the results in another Histogram.</td>
+</tr>
+<!-- Template
+<tr>
+	<td></td>
+	<td></td>
+</tr>
+-->
+</table>
+
+<!-- End Page -->
+
+</div>
+</body>
+
+</html>

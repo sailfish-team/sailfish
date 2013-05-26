@@ -1,0 +1,21 @@
+body { width: 1000px; font-family: Verdana, Helvetica, Arial; font-size:12pt; margin: auto}
+
+td { padding: 10px;}
+
+A:link, A:visited { text-decoration: none; color:#d57b09}
+A:hover { text-decoration: underline; }
+
+h1 { font-family: "Trebuchet MS", Verdana, Helvetica, Arial, Lucida;
+font-size:26pt; text-decoration: none; text-align: center;}
+h2 { font-family: "Trebuchet MS", Tahoma, Verdana, Helvetica, Arial, Lucida;
+font-size:22pt; text-decoration: none; text-align: center;}
+h3 { font-family: "Trebuchet MS", Tahoma, Verdana, Arial, Helvetica, Lucida;
+font-size:18pt;}
+h4 { font-family: Verdana, Helvetica, Arial, Lucida; font-size:12pt;
+text-decoration: none;}
+h5 { font-family: Verdana, Helvetica, Arial, Lucida; font-size:12pt;
+text-decoration: none;}
+h6 { font-family: Verdana, Helvetica, Arial, Lucida; font-size:9pt;
+text-decoration: none; font-style:italic;  text-align: center; color:#808080;}
+
+p { text-align:justify; }

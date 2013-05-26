@@ -1,0 +1,116 @@
+/***************************************************************************
+ *   Copyright (C) 2005, 2006, 2007 by BEEKHOF, Fokko                      *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#pragma once
+
+#ifndef CVMLCPP_FACET
+#define CVMLCPP_FACET 1
+
+#include <cvmlcpp/math/Euclid>
+
+namespace cvmlcpp
+{
+
+// With normal vector included
+template <typename I, typename T>
+class Facet : public std::tr1::array<I, 3>
+{
+	public:
+		typedef T		value_type;
+		typedef std::tr1::array<I, 3>	triange_type;
+		typedef Point3D<T>	normal_type;
+
+		typedef typename triange_type::iterator iterator;
+		typedef typename triange_type::const_iterator const_iterator;
+
+		Facet()  : _norm(0) { }
+
+		template <typename U>
+		Facet(const U a, const U b, const U c, const normal_type normal = 0) : _norm(normal)
+		{
+			(*this)[0] = a;
+			(*this)[1] = b;
+			(*this)[2] = c;
+		}
+
+		template <typename U>
+		void set(const U a, const U b, const U c)
+		{
+			(*this)[0] = a;
+			(*this)[1] = b;
+			(*this)[2] = c;
+		}
+
+		const normal_type &normal() const { return _norm; }
+		normal_type &normal() { return _norm; }
+
+		bool has(const T point) const
+		{
+			return  (*this)[0] == point ||
+				(*this)[1] == point ||
+				(*this)[2] == point;
+		}
+
+		bool operator==(const Facet &that) const
+		{
+			return this->has(that[0]) && this->has(that[1]) && this->has(that[2]);
+		}
+
+		bool operator!=(const Facet &that) const
+		{ return !( (*this) == that ); }
+
+/*
+		USING THIS CODE CAUSES MEMORY CORRUPTION ISSUES TO APPEAR !!!
+		virtual bool operator<(const Facet &that) const
+		{
+			using std::min;
+			using std::max;
+			const T this_min = min(min((*this)[0], (*this)[1]), (*this)[2]);
+			const T that_min = min(min(that[0], that[1]), that[2]);
+
+			if (this_min < that_min)
+				return true;
+			else if (that_min > this_min)
+				return false;
+
+			const T this_middle = min(max((*this)[0], (*this)[1]), (*this)[2]);
+			const T that_middle = min(max(that[0], that[1]), that[2]);
+
+			if (this_middle < that_middle)
+				return true;
+			else if (that_middle > this_middle)
+				return false;
+
+			const T this_max = max(max((*this)[0], (*this)[1]), (*this)[2]);
+			const T that_max = max(max(that[0], that[1]), that[2]);
+
+			if (this_max < that_max)
+				return true;
+
+			return false;
+		}
+*/
+	private:
+ 		normal_type _norm;
+};
+
+} // namespace
+
+#endif

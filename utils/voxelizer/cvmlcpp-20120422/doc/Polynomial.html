@@ -1,0 +1,137 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Polynomial</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Polynomial</h1>
+
+<p>
+<b>Polynomial</b> offers a single class that is easily integrated with other
+pieces of the cvmlcpp:
+<pre>
+template &lt;T, std::size_t degree&gt;
+Polynomial;
+</pre>
+<i>Polynomial</i> can be used with basic types as a template parameter, but
+also with vector-like types that support multiplication and addition such as
+those in <a href='Vector.html'>Vector</a>, the classes derived from those in
+<a href='Euclid.html'>Euclid</a>, or C++'s own
+<a href='http://www.cplusplus.com/reference/std/valarray/'>valarray</a>.
+</p>
+
+<p>
+<i>Polynomial</i> is also a
+<a href='http://www.sgi.com/tech/stl/functors.html'>functor</a>, and it can be
+used for example with the <a href='Math.html'>Newton-Raphson</a> procedure.
+This method will benefit of <i>Polynomial</i>'s ability of creating
+its derivate.
+</p>
+
+<p>
+<i>Note: an n-th degree polynomial has actually n+1 parameters. Hence a
+Polynomial can be addressed with indices 0 to n, instead of the usual 0 to
+n-1.</i>
+</p>
+
+<h2>Interface</h2>
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Alias for template parameter <i>T</i></td>
+</tr>
+
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Alias for template parameter <i>T</i></td>
+</tr>
+
+<tr>
+	<td><pre>iterator</pre></td>
+	<td>Read/write iterator over the list of coefficients.</td>
+</tr>
+
+<tr>
+	<td><pre> const_iterator </pre></td>
+	<td>Read-only iterator over the list of coefficients.</td>
+</tr>
+
+<tr>
+	<td><pre> Derivative </pre></td>
+	<td>A polynomial of the type of the derivative of <i>this</i> polynomial. This
+	is a Polynomial of degree <i>n-1</i>, except when <i>n</i> already is zero.</td>
+</tr>
+
+<tr>
+	<td><pre> Polynomial()</pre></td>
+	<td>Default constructor, does not initialize coefficients.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename Iterator&gt;
+  Polynomial(Iterator begin, Iterator end)</pre></td>
+	<td>Constructor, coefficients are initialized with values in the
+	range <i>begin</i> to <i>end</i>. The coefficent at <i>begin</i> corresponds
+	to the coefficient of the zero-degree term.</td>
+</tr>
+
+<tr>
+	<td><pre>T operator()(T x) const</pre></td>
+	<td>Evaluate the polynomial at <i>x</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>T &operator[](const std::size_t i)</pre></td>
+	<td>Returns a reference to the coefficient of the term <i>x^i</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>const T &operator[](const std::size_t i)</pre></td>
+	<td>Returns the coefficient of the term <i>x^i</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>iterator begin()</pre></td>
+	<td>Returns an iterator to the range of coefficients.</td>
+</tr>
+
+<tr>
+	<td><pre>iterator end()</pre></td>
+	<td>Returns an iterator ending the range of coefficients.</td>
+</tr>
+
+<tr>
+	<td><pre>const_iterator const begin()</pre></td>
+	<td>Returns a const_iterator to the range of coefficients.</td>
+</tr>
+
+<tr>
+	<td><pre> const_iterator const end() </pre></td>
+	<td>Returns a const_iterator ending the range of coefficients.</td>
+</tr>
+
+<tr>
+	<td><pre>Derivative derivative() const</pre></td>
+	<td>Returns a new Polynomial that is the derivative of <i>this</i> polynomial.</td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

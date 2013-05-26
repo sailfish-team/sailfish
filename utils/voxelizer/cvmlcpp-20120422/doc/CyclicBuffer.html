@@ -1,0 +1,92 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::CyclicBuffer</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>CyclicBuffer</h1>
+
+A <b>CyclicBuffer</b> stores can store a number of successive values. Once the
+buffer is full, adding a new value will overwrite the oldest value in the
+buffer. It can be used, for instance, to store the last <i>N</i> measurements
+from a given source.
+
+<h2>Interface</h2>
+
+<p>
+The full class definition:
+<pre>
+template &lt;typename T&gt;
+CyclicBuffer&lt;T&gt;;
+</pre>
+</p>
+
+<p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Alias for template parameter <i>T</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>CyclicBuffer&lt;T&gt;(const std::size_t N = 64u)</pre></td>
+	<td>Constructor,<i>N</i> is the desired capacity of the buffer.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t size() cons</pre></td>
+	<td>Number of element currently in the buffer.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t capacity() const</pre></td>
+	<td>Maximum capacity of the buffer.</td>
+</tr>
+
+<tr>
+	<td><pre>void resize(const std::size_t N)</pre></td>
+	<td>Change the capacity of the buffer.</td>
+</tr>
+
+<tr>
+	<td><pre>void clear()</pre></td>
+	<td>Remove all elements from the buffer.</td>
+</tr>
+
+<tr>
+	<td><pre>void add(const value_type x)</pre></td>
+	<td>Add an element to the buffer.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type avg() const</pre></td>
+	<td>Return the average value of all the elements in the buffer.</td>
+</tr>
+
+<tr>
+	<td><pre>value_type operator[](const std::size_t index) const</pre></td>
+	<td>Access previously stored elements. For <i>index</i> equal to
+	zero, retrieve the last added element; for <i>index</i> equals one,
+	return the last-but-one added element; et cetera.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

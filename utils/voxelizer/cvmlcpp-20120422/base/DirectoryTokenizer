@@ -1,0 +1,137 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_DIRECTORY_TOKENIZER
+#define CVMLCPP_DIRECTORY_TOKENIZER
+
+#include <cassert>
+#include <cstdio>
+#include <algorithm>
+#include <string>
+#include <cstring>
+#include <vector>
+
+#include <boost/filesystem.hpp>
+
+#ifndef BOOST_FILESYSTEM_VERSION
+#define BOOST_FILESYSTEM_VERSION 2
+#endif
+
+namespace cvmlcpp
+{
+
+class DirectoryTokenizer
+{
+	public:
+		DirectoryTokenizer(std::string rootDirectory) : _ok(false),
+			current_directory_error("DirectoryTokenizer NOT OK, no current_directory")
+		{
+			using namespace boost::filesystem; 
+			path p(rootDirectory);
+			_ok = is_directory(p); 
+			if (_ok)
+			{
+				directory_entry_stack.push_back( directory_iterator(p) );
+				current_directory_.push_back( rootDirectory );
+			}
+		}
+
+		bool next(std::string &fileName)
+		{
+			fileName.clear();
+
+			if ( !this->ok() )
+				return false;
+
+			const bool foundFile = this->findNextFile();
+			if (foundFile)
+			{
+#if BOOST_FILESYSTEM_VERSION >= 3
+				fileName = current_entry.path().filename().string();
+#else
+				fileName = current_entry.path().filename();
+#endif
+			}
+			return foundFile;
+		}
+
+		bool ok() const { return _ok; }
+
+		const std::string &current_directory() const
+		{ return this->ok() ? current_directory_.back() : current_directory_error; }
+		
+	private:
+		bool _ok;
+		std::vector<boost::filesystem::directory_iterator> directory_entry_stack;
+		std::vector<std::string> current_directory_;
+		boost::filesystem::directory_entry current_entry;
+		const std::string current_directory_error;
+
+		bool findNextFile()
+		{
+			assert(!directory_entry_stack.empty());
+			assert(_ok);
+	
+			using namespace boost::filesystem; 
+
+			// Prepare next entry
+			while ( directory_entry_stack[0] != directory_iterator() )
+			{
+				assert(!directory_entry_stack.empty());
+				assert(_ok);
+
+				// End of current directory ?
+				if (directory_entry_stack.back() == directory_iterator())
+				{
+					// Cannot escape from root directory
+					if (directory_entry_stack.size() > 1)
+					{
+						directory_entry_stack.pop_back();
+						current_directory_.pop_back();
+//						assert(directory_entry_stack.back() != directory_iterator());
+//						current_directory_ = directory_entry_stack.back()->path().parent_path().string();
+					}
+					continue;
+				}
+				
+				assert(directory_entry_stack.back() != directory_iterator());
+				current_entry = *directory_entry_stack.back();
+				++directory_entry_stack.back();
+
+				if (is_directory(current_entry.path()))
+				{
+					// enter the directory
+					directory_entry_stack.push_back( directory_iterator(current_entry.path()) );
+					current_directory_.push_back( current_entry.path().string() );
+				}
+				else if (is_regular_file(current_entry.path()))
+				{
+					// Found a file!
+					return true;
+				}
+			}
+	
+			return false; // No files left
+		}
+};
+
+} // namespace
+
+#endif

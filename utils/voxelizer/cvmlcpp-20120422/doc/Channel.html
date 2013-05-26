@@ -1,0 +1,288 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Channel</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Channel</h1>
+
+<p>
+<b>Channel</b> offers an interface to implement 
+<a href='http://cnx.org/content/m10173/latest/'>Discrete Memoryless
+Channels</a>, which are a class of communication 
+<a href='http://en.wikipedia.org/wiki/Channel_(communications)'>channels</a>, 
+as well as a number of pre-defined channels. A number of well-known channels are
+already implemented.
+</p>
+
+<p>
+
+</p>
+
+<h2>Interface</h2>
+
+
+
+<h3>Channel Base Class</h3>
+
+<p>
+Each channel inherits from the channel base class template:
+<pre>
+template &lt;typename Input, typename Output&gt;
+struct Channel;
+</pre>
+<i>Input</i> is the type of objects that enter the channel, <i>Output</i> is
+the type of objects that emerge from the channel, i.e. the channel output.
+</p>
+
+<p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>virtual ~Channel()</pre></td>
+	<td>Make sure to always define a virtual destructor, see
+	Scott Meyers' ``effective C++''.</td>
+</tr>
+
+<tr>
+	<td><pre>virtual
+  double probabilityOf(Output &amp;channelOutput,      &nbsp;
+		       Input &amp;channelInput) const;</pre>
+	</td>
+	<td>Return the probability that the channel output is
+	<i>channelOutput</i> when the input to the channel is
+	<i>channelInput</i>.</td>
+</tr>
+
+
+</tbody>
+</table>
+</p>
+
+<p>
+Unless explicity stated otherwise each channel given below is a template class
+and inherits from the base class as in this example:
+<pre>
+template &lt;Input, Output&gt;
+struct ExampleChannel : public Channel&lt;Input, Output&gt;
+{
+	// ... Overload destructor and <i>probabilityOf(...)</i> ...
+};
+</pre>
+You can create your own channels in the same way.
+</p>
+
+<h3>NoiselessChannel</h3>
+
+<p>
+A channel that models noiseless communication. Thus, the channel output is
+always equal to the channel input; equivalently, <i>probabilityOf(...)</i>
+returns 1 if <i>channelOutput</i> equals <i>channelInput</i> and zero otherwise.
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>NoiselessChannel();</pre></td>
+	<td>Only a default Constructor is available.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h3>ShiftChannel</h3>
+
+<p>
+Models a channel where the output is a shifted version of the input.
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>ShiftChannel(double offset);</pre></td>
+	<td>The <i>offset</i> is the shift introduced by the channel, i.e.
+	<i>channelOutput = channelInput + offset</i>.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h3>AWGNChannel</h3>
+
+<p>
+The well-known <a href='http://en.wikipedia.org/wiki/AWGN'>Additive White
+Gaussian Noise</a> channel. If the mean of the noise is zero, and a given
+variance, the AWGNChannel with that variance is the worst possible kind of
+additive noise. Hence if the actual probability model of the noise is not known,
+but the mean is zero and the variance is known, the AWGNChannel is equivalent to
+a worst-case scenario.
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>AWGNChannel(double variance);</pre></td>
+	<td>The <i>variance</i> refers to the variance of the noise.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h3>AGNChannel</h3>
+
+<p>
+The AGNChannel models an Additive Gaussian Noise channel. Unlike the
+AWGNChannel, the mean does not have to be zero, otherwise it is equivalent.
+Hence, it is a combination of the ShiftChannel and AWGNChannel. To be used like
+the AWGNChannel when the mean of the noise is not equal to zero.
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>AGNChannel(double mean, double variance); &nbsp;
+	</pre></td>
+	<td>The parameters are the <i>mean</i> and <i>variance</i> of the
+	noise.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h3>AGGNChannel</h3>
+
+<p>
+Models additive noise distributed according to the 
+<a href='http://en.wikipedia.org/wiki/Generalized_gaussian_distribution'>
+Generalized Gaussian distribution</a>. In addition to the parameters <i>mean</i>
+and <i>variance</i>, which are equivalent to those in the Gaussian channels,
+the <i>shape</i> parameter is unique to the Generalized Gaussian distribution
+and is often denoted as alpha. Note that there is procedure
+<i>generalizedGaussianShape(...)</i> to estimate the shape parameter from a
+dataset in <a href='Math.html'>Math</a>.
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>AGGNChannel(double mean, double variance,
+	      double shape = 2.0);</pre></td>
+	<td>The input to the constructor are simply the parameters of the
+	distribution of the noise. By default the <i>shape</i> is <i>2.0</i>
+	which makes the distribution Gaussian.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h3>MultiChannel</h3>
+
+<p>
+Unlike most channels in <b>Channel</b>, MultiChannel is not an existing
+channel model. It allows one to create a channel that behaves differently for
+each input by associating a particular channel with each possible input.
+</p>
+
+<p>
+In the table below, CHANNEL_MAP, the type of the parameter to the constructor is
+in fact:
+<pre>
+std::map&lt;Input, std::tr1::shared_ptr&lt; Channel&lt;Input,Output&gt; &gt; &gt;
+</pre>
+This is only to simplify the documentation, CHANNEL_MAP is not defined in the 
+code.
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>MultiChannel(CHANNEL_MAP channels)</pre></td>
+	<td>The constructor requires a map from each possible valid
+	<i>Input</i> to an associated shared-pointer to a channel to be used
+	to obtain the likelihood of the channel output for a given input symbol.
+	</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+
+<h3>BinarySymmetricChannel</h3>
+
+<p>
+The <a href='http://en.wikipedia.org/wiki/Binary_symmetric_channel'>
+Binary Symmetric Channel</a> is a well-known channel that takes bits
+as input and produces bits as output, flipping the bits during transport with a
+certain probability that is usually denoted as <i>p</i>.
+</p>
+
+<p>
+By exception, <i>BinarySymmetricChannel</i> is not a template class as the
+channel input symbols and the channel output are defined to be booleans, and
+hence the definition is:
+<pre>
+class BinarySymmetricChannel : public Channel&lt;bool, bool&gt; ...
+</pre>
+</p>
+
+<p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>BinarySymmetricChannel(double pFlip);</pre></td>
+	<td>Constructor, the probability that a bit is flipped is
+	<i>pFlip</i>.</td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<!--
+<h3></h3>
+
+<p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre></pre></td>
+	<td></td>
+</tr>
+
+</tbody>
+</table>
+</p>
+
+<h3></h3>
+
+<p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre></pre></td>
+	<td></td>
+</tr>
+
+</tbody>
+</table>
+</p>
+-->
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

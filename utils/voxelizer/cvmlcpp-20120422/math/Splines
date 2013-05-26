@@ -1,0 +1,236 @@
+/***************************************************************************
+ *   Copyright (C) 2009 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_SPLINES
+#define CVMLCPP_SPLINES 1
+
+#include <vector>
+#include <cassert>
+#include <cmath>
+#include <algorithm>
+#include <tr1/array>
+#include <tr1/memory>
+
+#include <cvmlcpp/base/Enums>
+#include <cvmlcpp/math/Polynomial>
+
+namespace cvmlcpp
+{
+
+template <typename T, std::size_t Dims>
+class NaturalCubicSpline
+{
+	public:
+		NaturalCubicSpline() {}
+
+		template <typename It>
+		NaturalCubicSpline(It first, It last)
+		{ this->init(first, last); }
+	
+		template <typename It>
+		void init(It first, It last)
+		{
+			using std::vector;
+
+			const std::size_t N = std::distance(first,last);
+
+			s.resize( N );
+	
+			for (std::size_t i = 0; i < N; ++i, ++first)
+			for (std::size_t d = 0; d < Dims; ++d)
+				s[i][A][d] = (*first)[d];
+
+			assert(first == last);
+
+			vector<typename T::value_type> alpha( N-1 ); 
+			vector<typename T::value_type> l ( N );
+			vector<typename T::value_type> mu( N );
+			vector<typename T::value_type> z ( N );
+
+for (std::size_t d = 0; d < Dims; ++d)
+{
+	for (std::size_t i = 1; i < N-1; ++i)
+		alpha[i]=3.0*(s[i+1][A][d]-2.0*s[i][A][d]+s[i-1][A][d]);
+
+	l[0] = 1.0;
+	z[0] = mu[0] = 0.0;
+
+	for (std::size_t i = 1; i < N-1; ++i)
+	{
+		l[i] = 4.0 - mu[i-1];
+		mu[i]= 1.0 / l [i];
+		z[i] = (alpha[i] - z[i-1]) / l[i];
+	}
+	l[N-1] = 1.0;
+	z[N-1] = s[N-1][C][d] = 0.0;
+	for (long int j = N-2; j >= 0; --j)
+	{
+		s[j][C][d] = z[j] - mu[j]*s[j+1][C][d];
+		s[j][B][d] = s[j+1][A][d] - s[j][A][d] -
+			    (s[j+1][C][d]+2.0*s[j][C][d]) / 3.0;
+		s[j][D][d] = (s[j+1][C][d] - s[j][C][d]) / 3.0;
+	}
+}
+			// There's one element to many left, used
+			// during computation
+			s.pop_back();
+			assert(s.size() == N-1);
+		}
+
+		const T operator() (const typename T::value_type t) const
+		{
+			typedef typename T::value_type VT;
+
+			const size_t index =
+				std::min( std::max(VT(0), std::floor(t)),
+					  VT(this->size()-1) );
+			assert(index < s.size());
+			T result;
+			for (std::size_t d = 0; d < Dims; ++d)
+				result[d] = s[index][A][d];
+
+			const VT t01 = t - index;
+			assert( (t01 >= 0.0) && (t01 <= 1.0) );
+//std::cout << "t " << t << " idx " << index << " sum = " << s[index][A][X];
+			VT tt = t01;
+			for (std::size_t i = B; i <= D; ++i, tt *= t01)
+//{
+//std::cout << " + " << s[index][i][X] << "*" << tt;
+			for (std::size_t d = 0; d < Dims; ++d)
+				result[d] += s[index][i][d] * tt;
+//}
+//std::cout << " = " << result[X] << std::endl;
+			return result;
+		}
+
+		std::size_t size() const { return s.size(); }
+
+		const Polynomial<T, 3> &
+		operator [](const std::size_t patch) const
+		{ return s[patch]; }
+
+		typename std::vector<Polynomial<T, 3> >::const_iterator
+		begin() const { return s.begin(); }
+
+		typename std::vector<Polynomial<T, 3> >::const_iterator
+		end() const { return s.end(); }
+
+	private:
+		std::vector<Polynomial<T, 3> > s;
+};
+
+template <typename T>
+class NaturalCubicSpline<T, 1>
+{
+	public:
+		NaturalCubicSpline() {}
+
+		template <typename It>
+		NaturalCubicSpline(It first, It last)
+		{ this->init(first, last); }
+
+		template <typename It>
+		void init(It first, It last)
+		{
+			using std::vector;
+
+			const std::size_t N = std::distance(first,last);
+
+			s.resize( N );
+	
+			for (typename vector<Polynomial<T, 3> >
+			     ::iterator it = s.begin(); it != s.end();
+			     ++it, ++first)
+				(*it)[A] = *first;
+			assert(first == last);
+
+			vector<T> alpha( N-1 );
+			vector<T> l ( N );
+			vector<T> mu( N );
+			vector<T> z ( N );
+
+			for (std::size_t i = 1; i < N-1; ++i)
+				alpha[i]= 3.0 * (s[i+1][A] - 
+					  2.0 * s[i][A] + s[i-1][A]);
+
+			l[0] = 1.0;
+			z[0] = mu[0] = 0.0;
+
+			for (std::size_t i = 1; i < N-1; ++i)
+			{
+				l[i] = 4.0 - mu[i-1];
+				mu[i]= 1.0 / l [i];
+				z[i] = (alpha[i] - z[i-1]) / l[i];
+			}
+			l[N-1] = 1.0;
+			z[N-1] = s[N-1][C] = 0.0;
+			for (long int j = N-2; j >= 0; --j)
+			{
+				s[j][C] = z[j] - mu[j]*s[j+1][C];
+				s[j][B] = s[j+1][A] - s[j][A] -
+					  (s[j+1][C]+2.0*s[j][C]) / 3.0;
+				s[j][D] = (s[j+1][C] - s[j][C]) / 3.0;
+			}
+			// There's one element to many left, used
+			// during computation
+			s.pop_back();
+			assert(s.size() == N-1);
+		}
+
+		const T operator() (const T t) const
+		{
+			const std::size_t index =
+				std::min( std::max(T(0), std::floor(t)),
+					  T(this->size()-1) );
+
+			assert(index < s.size());
+			T result = s[index][A];
+			const T t01 = t - index;
+			assert( (t01 >= 0.0) && (t01 <= 1.0) );
+			T tt = t01;
+			for (std::size_t i = B; i <= D; ++i, tt *= t01)
+				result += s[index][i] * tt;
+
+			return result;
+		}
+
+		std::size_t size() const { return s.size(); }
+
+		const Polynomial<T, 3> &
+		operator [](const std::size_t patch) const
+		{ return s[patch]; }
+
+		typename std::vector<Polynomial<T, 3> >::const_iterator
+		begin() const { return s.begin(); }
+
+		typename std::vector<Polynomial<T, 3> >::const_iterator
+		end() const { return s.end(); }
+
+	private:
+		std::vector<Polynomial<T, 3> > s;
+};
+
+// Cannot exist, force compilation error
+template <typename T>
+class NaturalCubicSpline<T, 0> { };
+
+} // end namespace
+
+#endif

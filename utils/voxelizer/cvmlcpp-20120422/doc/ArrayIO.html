@@ -1,0 +1,56 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::ArrayIO</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>ArrayIO</h1>
+
+Read and write arrays of different implementations to disk.
+
+<h2>Interface</h2>
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>
+bool writeArray(const Array&lt;T, N, Aux&gt; &amp;array,
+		const std::string fileName,
+		const bool compress = false);</pre>
+	</td>
+	<td>Write a 3D <i>array</i> to a file named <i>fileName</i>.
+	If <i>compress</i> is <b>true</b>, a scheme will be used that represents
+	the array as ranges, which, if there are many continuous ranges, will
+	result in a smaller file size.
+	</td>
+</tr>
+
+<tr>
+	<td><pre>
+bool readArray( Array&lt;T, N, Aux&gt; &amp;array,
+		const std::string fileName);</pre>
+	</td>
+	<td>Read a 3D <i>array</i> from a file named <i>fileName</i>.
+	Compressed files will be automatically detected. The <i>array</i> should
+	preferably be of the same type as was used to write the file.
+	</td>
+</tr>
+
+</tbody>
+</table>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

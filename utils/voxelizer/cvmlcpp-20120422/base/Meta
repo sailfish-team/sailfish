@@ -1,0 +1,893 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_META
+#define CVMLCPP_META 1
+
+#include <algorithm>
+#include <cassert>
+#include <limits>
+
+#include <tr1/array>
+#include <tr1/type_traits>
+
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+#include <initializer_list>
+#endif
+
+#ifdef USE_THRUST
+#include <thrust/copy.h>
+#include <thrust/fill.h>
+#endif
+
+namespace cvmlcpp
+{
+
+template <int lhs, int rhs>
+struct static_max { static const int max = (lhs < rhs) ? rhs : lhs; };
+
+namespace detail
+{
+	
+template <typename T, bool is_arithmetic>
+struct ValueType_
+{
+	typedef typename T::value_type value_type;
+};
+
+template <typename T>
+struct ValueType_<T, true>
+{
+	typedef T value_type;
+};
+
+} // end namespace detail
+
+template <typename T>
+struct ValueType
+{
+	typedef typename detail::ValueType_<T,
+		std::tr1::is_arithmetic<T>::value >::value_type
+		value_type;
+};
+
+namespace detail
+{
+
+template <std::size_t size> struct size_to_float_type {  }; // default unsupported
+/*
+template <> struct size_to_float_type<sizeof(long double)> { typedef long double value_type; };
+template <> struct size_to_float_type<sizeof(     double)> { typedef      double value_type; };
+template <> struct size_to_float_type<sizeof(     float )> { typedef       float value_type; };
+*/
+template <> struct size_to_float_type<16> { typedef long double value_type; };
+template <> struct size_to_float_type<12> { typedef long double value_type; };
+template <> struct size_to_float_type< 8> { typedef      double value_type; };
+template <> struct size_to_float_type< 4> { typedef       float value_type; };
+template <> struct size_to_float_type< 2> { typedef size_to_float_type<sizeof(float)>::value_type value_type; };
+template <> struct size_to_float_type< 1> { typedef size_to_float_type<sizeof(float)>::value_type value_type; };
+
+//template <> struct size_to_float_type<2*sizeof(long double)> { typedef size_to_float_type<sizeof(long double)>::value_type value_type; }; // default unsupported
+
+template <bool is_integer, typename T>
+struct arithmetic_to_float { typedef typename size_to_float_type<2*sizeof(T)>::value_type value_type; };
+
+template <typename T>
+struct arithmetic_to_float<false, T> { typedef T value_type; };
+
+template <bool is_arithmetic, typename T>
+struct to_float { typedef typename arithmetic_to_float<std::tr1::is_integral<T>::value, T>::value_type value_type; };
+
+template <typename T>
+struct to_float<false, T>
+{
+	typedef typename ValueType<T>::value_type VT;
+	typedef typename to_float<std::tr1::is_arithmetic<T>::value, VT>::value_type value_type;
+};
+
+} // end namespace detail
+
+template <typename T>
+struct promote_trait1
+{ typedef typename detail::to_float<std::tr1::is_arithmetic<T>::value, T>::value_type value_type; };
+/*
+template <typename T>
+struct promote_trait1<std::complex<T> >
+{
+	private:
+		typedef typename detail::to_float<std::numeric_limits<T>::is_integer, T>::value_type FT;
+		typedef typename detail::size_to_float_type<sizeof(FT)>::value_type VT;
+	public:
+		typedef std::complex<VT> value_type;
+};
+*/
+template <typename T1, typename T2>
+struct promote_trait2
+{
+	private:
+		typedef typename promote_trait1<T1>::value_type FT1;
+		typedef typename promote_trait1<T2>::value_type FT2;
+	public:
+		typedef typename detail::size_to_float_type< static_max<sizeof(FT1), sizeof(FT2)>::max >::value_type value_type;
+};
+
+template <typename T1, typename T2, typename T3>
+struct promote_trait3
+{
+	private:
+		typedef typename promote_trait1<T1>::value_type FT1;
+		typedef typename promote_trait1<T2>::value_type FT2;
+		typedef typename promote_trait1<T3>::value_type FT3;
+	public:
+		typedef typename detail::size_to_float_type< 
+			static_max<sizeof(FT3), static_max<sizeof(FT1), sizeof(FT2)>::max >::max>::value_type value_type;
+};
+
+
+// Forward Declaration
+template <template <typename Tm, std::size_t D, typename A> class Array_t,
+	  typename T, std::size_t N, typename Aux = int>
+struct array_traits { };
+
+template <template<typename T,std::size_t D,typename Aux> class ArrayIn,
+	  template<typename T,std::size_t D,typename Aux> class ArrayOut,
+	  typename Tin, typename Tout, typename AuxLhs, typename AuxRhs,
+	  std::size_t N>
+struct ArrayCopy_
+{
+	template <typename LHS, typename RHS>
+	static void copy(LHS input, RHS output, const bool padding, const Tout pad_value)
+	{
+		assert(N != 0u); // Do not use on 0-dimension Arrays!
+
+		typedef array_traits<ArrayIn,  Tin,  N, AuxLhs> InTraits;
+		typedef array_traits<ArrayOut, Tout, N, AuxRhs> OutTraits;
+		const std::size_t si = *InTraits ::shape(input);
+		const std::size_t so = *OutTraits::shape(output);
+		const std::size_t n = std::min(si, so);
+
+		for (std::size_t i = 0; i < n; ++i)
+			ArrayCopy_<ArrayIn, ArrayOut, Tin, Tout, AuxLhs, AuxRhs, N-1u>::
+				copy(input[i], output[i], padding, pad_value);
+	}
+};
+
+template <template<typename T,std::size_t D,typename Aux> class ArrayIn,
+	  template<typename T,std::size_t D,typename Aux> class ArrayOut,
+	 typename Tin, typename Tout, typename AuxLhs, typename AuxRhs>
+struct ArrayCopy_<ArrayIn, ArrayOut, Tin, Tout, AuxLhs, AuxRhs, 1u>
+{
+	template <typename LHS, typename RHS>
+	static void copy(LHS input, RHS output, const bool padding, const Tout pad_value)
+	{
+#ifdef USE_THRUST
+		const std::ptrdiff_t dist =
+			std::min(thrust::distance(input.begin(),  input.end()),
+				 thrust::distance(output.begin(), output.end()));		
+#else
+		using std::distance;
+		const std::ptrdiff_t dist =
+			std::min(distance(input.begin(),  input.end()),
+				 distance(output.begin(), output.end()));
+#endif
+
+		// Copy relevant parts
+#ifdef USE_THRUST
+		thrust::copy(input.begin(), input.begin() + dist, output.begin());
+#else
+		using std::advance;
+		const typename LHS::const_iterator begin = input.begin();
+		      typename LHS::const_iterator end   = input.begin();
+		advance(end, dist);
+		using std::copy;
+		copy(begin, end, output.begin());
+#endif
+
+		// Fill up the rest with zeroes
+		if (padding)
+		{
+#ifdef USE_THRUST
+			thrust::fill(output.begin() + dist, output.end(), pad_value);
+#else
+			typename RHS::iterator begin = output.begin();
+			advance(begin, dist);
+			using std::fill;
+			fill(begin, output.end(), pad_value);
+#endif
+
+		}
+	}
+};
+
+template <std::size_t N>
+struct ArrayCopy
+{
+	template <
+		template<typename T,std::size_t D,typename Aux> class ArrayIn,
+		template<typename T,std::size_t D,typename Aux> class ArrayOut,
+		  typename Tin, typename Tout, typename AuxLhs, typename AuxRhs>
+	static void copy( const ArrayIn <Tin,  N, AuxLhs> &input,
+				ArrayOut<Tout, N, AuxRhs> &output, const bool padding, const Tout pad_value)
+	{
+		assert(N != 0u); // Do not use on 0-dimension Arrays!
+
+		typedef array_traits<ArrayIn, Tin,  N, AuxLhs> InTraits;
+		typedef array_traits<ArrayOut, Tout, N, AuxRhs> OutTraits;
+		const std::ptrdiff_t n =
+		  std::min(	std::ptrdiff_t(*InTraits::shape(input)),
+				std::ptrdiff_t(*OutTraits::shape(output)));
+
+#ifdef _OPENMP
+		#pragma omp parallel for
+#endif
+		for (int i = 0; i < n; ++i)
+		{
+			assert(i < std::ptrdiff_t(* InTraits::shape( input)));
+			assert(i < std::ptrdiff_t(*OutTraits::shape(output)));
+			ArrayCopy_<ArrayIn, ArrayOut, Tin, Tout,
+				   AuxLhs, AuxRhs, N-1u>::
+					copy(input[i], output[i], padding, pad_value);
+		}
+	}
+};
+
+template <>
+struct ArrayCopy<1u>
+{
+
+	template <typename LHS, typename RHS, typename T>
+	static void copy(LHS &input, RHS &output,
+			 const bool padding, const T pad_value)
+	{
+		using std::distance;
+		const std::ptrdiff_t dist =
+			std::min(distance(input.begin(),  input.end()),
+				 distance(output.begin(), output.end()));
+
+		// Copy relevant parts
+		using std::copy;
+		copy(input.begin(), input.begin() + dist, output.begin());
+
+		// Fill up the rest with given padding value
+		if (padding)
+		{
+#ifdef USE_THRUST
+			thrust::fill(output.begin()+dist, output.end(), pad_value);
+#else
+			using std::fill;
+			fill(output.begin()+dist, output.end(), pad_value);
+#endif
+		}
+	}
+
+	template <template<typename T,std::size_t D,typename Aux> class Array_t,
+		  typename Tin, typename Tout, typename AuxLhs, typename AuxRhs>
+	static void copy(const Array_t<Tin,  1u, AuxLhs> &input,
+			       Array_t<Tout, 1u, AuxRhs> &output,
+			 const bool padding, const Tout pad_value)
+	{
+		using std::distance;
+		const std::ptrdiff_t dist =
+			std::min(distance(input.begin(),  input.end()),
+				 distance(output.begin(), output.end()));
+
+		// Copy relevant parts
+#ifdef USE_THRUST
+		thrust::copy(input.begin(), input.begin() + dist, output.begin());
+#else
+		using std::copy;
+		copy(input.begin(), input.begin() + dist, output.begin());
+#endif
+
+		if (padding)
+		{
+			// Fill up the rest with zeroes
+#ifdef USE_THRUST
+			thrust::fill(output.begin()+dist, output.end(), pad_value);
+#else
+			using std::fill;
+			fill(output.begin()+dist, output.end(), pad_value);
+#endif
+		}
+	}
+};
+
+template <
+	template<typename T, std::size_t D, typename Aux> class ArrayIn,
+	template<typename T, std::size_t D, typename Aux> class ArrayOut,
+	  typename Tin, typename Tout, typename AuxLhs, typename AuxRhs, std::size_t N>
+void copy( const ArrayIn <Tin,  N, AuxLhs> &input,
+		 ArrayOut<Tout, N, AuxRhs> &output,
+		 const bool padding = true, const Tout pad_value = 0)
+{
+	ArrayCopy<N>::copy(input, output, padding, pad_value);
+}
+
+template < template<typename T, std::size_t D, typename Aux> class Array,
+	  typename T, std::size_t N, typename A>
+void clear(Array<T, N, A> &matrix)
+{
+	std::tr1::array<std::size_t, N> zeros;
+	zeros.assign(0);
+	array_traits<Array, T, N, A>::resize(matrix, zeros.begin());
+	assert( (array_traits<Array, T, N, A>::size(matrix) == 0) );
+}
+
+} // namespace
+
+/*
+ * Swap functions in std namespace, as recommended by Effective C++
+ */
+namespace std
+{
+
+template <template<typename T, std::size_t D, typename Aux> class Array_t,
+	  typename T, std::size_t D, class Aux>
+void swap(Array_t<T, D, Aux> &lhs, Array_t<T, D, Aux> &rhs)
+{
+	cvmlcpp::array_traits<Array_t, T, D, Aux>::swap(lhs, rhs);
+}
+
+template <template<typename T, std::size_t D, typename Aux> class ArrayLHS,
+	  template<typename T, std::size_t D, typename Aux> class ArrayRHS,
+	  typename T, std::size_t D, class AuxLHS, class AuxRHS>
+void swap(ArrayLHS<T, D, AuxLHS> &lhs, ArrayRHS<T, D, AuxRHS> &rhs)
+{
+	typedef cvmlcpp::array_traits<ArrayLHS, T, D, AuxLHS> ATLHS;
+	typedef cvmlcpp::array_traits<ArrayRHS, T, D, AuxRHS> ATRHS;
+
+	ArrayLHS<T, D, AuxLHS> newLhs = ATLHS::create(ATRHS::extents(rhs));
+	ArrayRHS<T, D, AuxRHS> newRhs = ATRHS::create(ATLHS::extents(lhs));
+
+	cvmlcpp::ArrayCopy<D>::copy(lhs, newRhs);
+	cvmlcpp::ArrayCopy<D>::copy(rhs, newLhs);
+
+	using std::swap;
+	swap(lhs, newRhs);
+	swap(rhs, newLhs);
+}
+
+} // namespace std
+
+#include <cvmlcpp/base/Matrix>
+#include <boost/multi_array.hpp>
+
+#ifdef USE_BLITZ
+#include <cvmlcpp/array/BlitzArray>
+#endif
+
+namespace cvmlcpp
+{
+
+// CVMLCPP Matrix implementation
+template<typename T, std::size_t N, typename Aux>
+struct array_traits<Matrix, T, N, Aux>
+{
+	static const std::size_t rank = N;
+
+	typedef Matrix<T, N, Aux>				array_type;
+	typedef typename Matrix<T, N, Aux>::value_type		value_type;
+	typedef typename Matrix<T, N, Aux>::iterator		iterator;
+	typedef typename Matrix<T, N, Aux>::const_iterator	const_iterator;
+	typedef typename Matrix<T, N, Aux>::reference		reference;
+	typedef typename Matrix<T, N, Aux>::const_reference	const_reference;
+
+	typedef Matrix<T, N-1u, Aux>				slice_type;
+	typedef array_traits<Matrix, T, N-1u, Aux>		slice_traits;
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input)
+	{ return array_type(input); }
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input, const T &value)
+	{ return array_type(input, value); }
+
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list)
+	{ return create(init_list.begin() ); }
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list, const T &value)
+	{ return create(init_list.begin(), value); }
+#endif
+
+	static std::size_t size(const array_type &a) { return a.size(); }
+
+	template <typename InputIterator>
+	static bool resize(Matrix<T, N, Aux> &a, InputIterator it,
+			   bool preserve = false)
+	{
+		if (preserve) // preserve is not implemented in Matrix
+		{
+			Matrix<T, N, Aux> b =
+				array_traits<Matrix, T, N, Aux>::create(it);
+
+			copy(a, b);
+			a.swap(b);
+		}
+		else
+			a.resize(it, preserve);
+		return true;
+	}
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static bool resize(Matrix<T, 1u, Aux> &a,
+			   const std::initializer_list<U> init_list,
+			   bool preserve = false)
+	{ return resize(a, init_list.begin(), preserve); }
+#endif
+
+	template <typename MatrixOrReference>
+	static typename std::tr1::array<std::size_t, N>::const_iterator
+	shape(const MatrixOrReference &a)
+	{ return a.extents(); }
+
+	static array_type copy_of(const array_type &a) { return a.clone(); }
+
+	static iterator begin(array_type &a) { return a.begin(); }
+	static const_iterator begin(const array_type &a) { return a.begin(); }
+
+	static iterator end(array_type &a) { return a.end(); }
+	static const_iterator end(const array_type &a) { return a.end(); }
+
+	static void swap(array_type &lhs, array_type &rhs) { lhs.swap(rhs); }
+};
+
+template<typename T, typename Aux>
+struct array_traits<Matrix, T, 1u, Aux>
+{
+	static const std::size_t rank = 1u;
+
+	typedef Matrix<T, 1u, Aux> array_type;
+	typedef typename Matrix<T, 1u, Aux>::value_type	value_type;
+	typedef typename Matrix<T, 1u, Aux>::iterator	iterator;
+	typedef typename Matrix<T, 1u, Aux>::const_iterator	const_iterator;
+	typedef typename Matrix<T, 1u, Aux>::reference	reference;
+	typedef typename Matrix<T, 1u, Aux>::const_reference	const_reference;
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input)
+	{ return array_type(input); }
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input, const T &value)
+	{ return array_type(input, value); }
+
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list)
+	{ return create(init_list.begin() ); }
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list, const T &value)
+	{ return create(init_list.begin(), value); }
+#endif
+
+	static std::size_t size(const array_type &a) { return a.size(); }
+
+	template <typename InputIterator>
+	static bool resize(Matrix<T, 1u, Aux> &a, InputIterator it,
+			   bool preserve = false)
+	{
+		if (preserve) // preserve is not implemented in Matrix
+		{
+			Matrix<T, 1u, Aux> b =
+				array_traits<Matrix, T, 1u, Aux>::create(it);
+
+			copy(a, b);
+			a.swap(b);
+		}
+		else
+			a.resize(it, preserve);
+		return true;
+	}
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static bool resize(Matrix<T, 1u, Aux> &a,
+			   const std::initializer_list<U> init_list,
+			   bool preserve = false)
+	{ return resize(a, init_list.begin(), preserve); }
+#endif
+
+	template <typename MatrixOrReference>
+	static typename std::tr1::array<std::size_t, 1u>::const_iterator
+	shape(const MatrixOrReference &a)
+	{ return a.extents(); }
+
+	static array_type copy_of(const array_type &a) {return a.clone();}
+
+	static iterator begin(array_type &a) { return a.begin(); }
+	static const_iterator begin(const array_type &a) { return a.begin(); }
+
+	static iterator end(array_type &a) { return a.end(); }
+	static const_iterator end(const array_type &a) { return a.end(); }
+
+	static void swap(array_type &lhs, array_type &rhs) { lhs.swap(rhs); }
+};
+
+/*
+ * Boost's multi_array
+ */
+
+template <std::size_t D, std::size_t E = 1>
+struct _boostExtentsGen
+{
+	template <typename InputIterator>
+	static typename boost::detail::multi_array::extent_gen<D>
+	gen(InputIterator it)
+	{
+		return _boostExtentsGen<D, E+1>::gen(boost::extents[*it], it+1);
+	}
+
+	template <typename InputIterator>
+	static typename boost::detail::multi_array::extent_gen<D>
+	gen (boost::detail::multi_array::extent_gen<E-1> ext, InputIterator it)
+	{
+		return _boostExtentsGen<D, E+1>::gen(ext[*it], it+1);
+	}
+};
+
+template <std::size_t D>
+struct _boostExtentsGen<D, D>
+{
+	template <typename InputIterator>
+	static typename boost::detail::multi_array::extent_gen<D>
+	gen (boost::detail::multi_array::extent_gen<D-1> ext, InputIterator it)
+	{ return ext[*it]; }
+};
+
+template<typename T, std::size_t N, typename Aux>
+struct array_traits<boost::multi_array, T, N, Aux>
+{
+	static const std::size_t rank = N;
+
+	typedef boost::multi_array<T, N, Aux>			array_type;
+	typedef typename boost::multi_array<T, 1u, Aux>::value_type
+								value_type;
+	typedef T*						iterator;
+	typedef const T*					const_iterator;
+	typedef typename boost::multi_array<T, N+1u, Aux>::reference
+								reference;
+	typedef typename boost::multi_array<T, N+1u, Aux>::const_reference
+								const_reference;
+
+	typedef boost::multi_array<T, N-1u, Aux>		slice_type;
+	typedef array_traits<boost::multi_array, T, N-1u, Aux>	slice_traits;
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input)
+	{
+		std::vector<std::size_t> extents(input, input + N);
+		array_type a = array_type(extents);
+		return a;
+	}
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input, const T &value)
+	{
+		array_type a = create(input);
+		std::fill(begin(a), end(a), value);
+		return a;
+	}
+
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list)
+	{ return create(init_list.begin() ); }
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list, const T &value)
+	{ return create(init_list.begin(), value); }
+#endif
+
+	static std::size_t size(const array_type &a){ return a.num_elements(); }
+
+	template <typename InputIterator>
+	static bool resize(array_type &a, InputIterator it, bool preserve=false)
+	{
+		if (preserve)
+		{
+			boost::multi_array<T, N, Aux> b =
+				array_traits<boost::multi_array, T, N, Aux>::
+					create(it);
+
+			copy(a, b);
+			using std::swap;
+			swap(a, b);
+// 			a.swap(b);
+		}
+		else
+			a.resize(_boostExtentsGen<N>::gen(it));
+
+		return true;
+	}
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static bool resize(boost::multi_array<T, 1u, Aux> &a,
+			   const std::initializer_list<U> init_list,
+			   bool preserve = false)
+	{ return resize(a, init_list.begin(), preserve); }
+#endif
+
+	template <typename MatrixOrReference>
+	static const typename boost::multi_array<T, N+1u, Aux>::size_type *
+	shape (const MatrixOrReference &a) { return a.shape(); }
+
+	static array_type copy_of(const array_type &a) { return a; }
+
+	static iterator begin(array_type &a) { return a.data(); }
+	static const_iterator begin(const array_type &a) { return a.data(); }
+
+	static iterator end(array_type &a) { return a.data() + size(a); }
+	static const_iterator end(const array_type &a)
+	{ return a.data() + size(a); }
+
+	static void swap(array_type &lhs, array_type &rhs)
+	{ std::swap(lhs, rhs); }
+};
+
+// Boost's multi_array
+template<typename T, typename Aux>
+struct array_traits<boost::multi_array, T, 1u, Aux>
+{
+	static const std::size_t rank = 1u;
+
+	typedef boost::multi_array<T, 1u, Aux>			array_type;
+	typedef typename boost::multi_array<T, 1u, Aux>::value_type
+								value_type;
+	typedef T*						iterator;
+	typedef const T*					const_iterator;
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input)
+	{
+		std::vector<std::size_t> extents(input, input + 1u);
+		array_type a = array_type(extents);
+		return a;
+	}
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input, const T &value)
+	{
+		array_type a = create(input);
+		std::fill(begin(a), end(a), value);
+		return a;
+	}
+
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list)
+	{ return create(init_list.begin() ); }
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list, const T &value)
+	{ return create(init_list.begin(), value); }
+#endif
+
+	static std::size_t size(const array_type &a){ return a.num_elements(); }
+
+	template <typename InputIterator>
+	static bool resize(array_type &a, InputIterator it, bool preserve=false)
+	{
+		if (preserve)
+		{
+			boost::multi_array<T, 1u, Aux> b =
+				array_traits<boost::multi_array, T, 1u, Aux>::
+					create(it);
+
+			copy(a, b);
+			using std::swap;
+			swap(a, b);
+// 			a.swap(b);
+		}
+		else
+			a.resize(_boostExtentsGen<1u>::gen(it));
+
+		return true;
+	}
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static bool resize(boost::multi_array<T, 1u, Aux> &a,
+			   const std::initializer_list<U> init_list,
+			   bool preserve = false)
+	{ return resize(a, init_list.begin(), preserve); }
+#endif
+
+	template <typename MatrixOrReference>
+	static const typename boost::multi_array<T, 2u, Aux>::size_type*
+	shape (const MatrixOrReference &a) { return a.shape(); }
+
+	static array_type copy_of(const array_type &a) { return a.copy(); }
+
+	static iterator begin(array_type &a) { return a.data(); }
+	static const_iterator begin(const array_type &a) { return a.data(); }
+
+	static iterator end(array_type &a) { return a.data() + size(a); }
+	static const_iterator end(const array_type &a)
+	{ return a.data() + size(a); }
+
+	static void swap(array_type &lhs, array_type &rhs)
+	{ std::swap(lhs, rhs); }
+};
+
+
+// Blitz++ Array
+#ifdef USE_BLITZ
+template<typename T, std::size_t N, typename Aux>
+struct array_traits<BlitzArray, T, N, Aux>
+{
+	static const std::size_t rank = N;
+
+	typedef BlitzArray<T, N>				array_type;
+	typedef typename BlitzArray<T, N>::T_numtype		value_type;
+	typedef value_type& reference;
+	typedef const value_type& const_reference;
+	typedef typename BlitzArray<T, N>::iterator		iterator;
+	typedef typename BlitzArray<T, N>::const_iterator 	const_iterator;
+
+	typedef BlitzArray<T, N-1>				slice_type;
+	typedef array_traits<BlitzArray, T, N-1, Aux>		slice_traits;
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input)
+	{
+		blitz::TinyVector<std::size_t, N> dims;
+		std::copy(input, input + N, dims.begin());
+
+		return array_type(dims);
+	}
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input, const T &value)
+	{
+		array_type a = create(input);
+		a = value;
+		return a;
+	}
+
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list)
+	{ return create(init_list.begin() ); }
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list, const T &value)
+	{ return create(init_list.begin(), value); }
+#endif
+
+	static std::size_t size(const array_type &a) { return a.size(); }
+
+	template <typename InputIterator>
+	static bool resize(BlitzArray<T, N> &a, InputIterator input,
+			   bool preserve = false)
+	{
+		blitz::TinyVector<std::size_t, N> dims;
+		std::copy(input, input + N, dims.begin());
+		if (preserve)
+			a.resizeAndPreserve(dims);
+		else
+			a.resize(dims);
+
+		return true;
+	}
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static bool resize(BlitzArray<T, 1u, Aux> &a,
+			   const std::initializer_list<U> init_list,
+			   bool preserve = false)
+	{ return resize(a, init_list.begin(), preserve); }
+#endif
+
+	template <typename MatrixOrReference>
+	//~ static typename blitz::TinyVector<std::size_t, N>::const_iterator
+ 	static typename blitz::TinyVector<int, N>::const_iterator
+	shape(const MatrixOrReference &a) { return a.shape().begin(); }
+
+	static array_type copy_of(const array_type &a) { return a.copy(); }
+
+	static iterator begin(array_type &a) { return a.begin(); }
+	static const_iterator begin(const array_type &a) { return a.begin(); }
+
+	static iterator end(array_type &a) { return a.end(); }
+	static const_iterator end(const array_type &a) { return a.end(); }
+
+	static void swap(array_type &lhs, array_type &rhs)
+	{ blitz::swap(lhs, rhs); }
+};
+
+template<typename T, typename Aux>
+struct array_traits<BlitzArray, T, 1u, Aux>
+{
+	static const std::size_t rank = 1u;
+
+	typedef BlitzArray<T, 1u, Aux>			array_type;
+	typedef typename BlitzArray<T, 1u, Aux>::T_numtype value_type;
+	typedef value_type& reference;
+	typedef const value_type& const_reference;
+	typedef typename BlitzArray<T, 1u, Aux>::iterator iterator;
+	typedef typename BlitzArray<T, 1u, Aux>::const_iterator	const_iterator;
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input)
+	{
+		blitz::TinyVector<std::size_t, 1u> dims;
+		std::copy(input, input + 1u, dims.begin());
+
+		return array_type(dims);
+	}
+
+	template <typename InputIterator>
+	static array_type create(InputIterator input, const T &value)
+	{
+		array_type a = create(input);
+		a = value;
+		return a;
+	}
+
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list)
+	{ return create(init_list.begin() ); }
+	template <typename U>
+	static array_type create(const std::initializer_list<U> init_list, const T &value)
+	{ return create(init_list.begin(), value); }
+#endif
+
+	static std::size_t size(const array_type &a) { return a.size(); }
+
+	template <typename InputIterator>
+	static bool resize(BlitzArray<T, 1u, Aux> &a,
+			   InputIterator input, bool preserve = false)
+	{
+		blitz::TinyVector<std::size_t, 1u> dims;
+		std::copy(input, input + 1u, dims.begin());
+		if (preserve)
+			a.resizeAndPreserve(dims);
+		else
+			a.resize(dims);
+
+		return true;
+	}
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+	template <typename U>
+	static bool resize(BlitzArray<T, 1u, Aux> &a,
+			   const std::initializer_list<U> init_list,
+			   bool preserve = false)
+	{ return resize(a, init_list.begin(), preserve); }
+#endif
+
+	template <typename MatrixOrReference>
+//	static typename blitz::TinyVector<std::size_t, 1u>::const_iterator
+ 	static typename blitz::TinyVector<int, 1u>::const_iterator
+	shape(const MatrixOrReference &a) { return a.shape().begin(); }
+
+	static array_type copy_of(const array_type &a)	{ return a.copy(); }
+
+	static iterator begin(array_type &a) { return a.begin(); }
+	static const_iterator begin(const array_type &a) { return a.begin(); }
+
+	static iterator end(array_type &a) { return a.end(); }
+	static const_iterator end(const array_type &a) { return a.end(); }
+
+	static void swap(array_type &lhs, array_type &rhs)
+	{ blitz::swap(lhs, rhs); }
+};
+#endif // USE_BLITZ
+
+} // namespace cvmlcpp
+
+#endif // META

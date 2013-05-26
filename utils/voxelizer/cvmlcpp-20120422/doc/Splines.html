@@ -1,0 +1,187 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Splines</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Splines</h1>
+
+<p>
+<b>Splines</b> offers a standardized framework for interpolation of 
+numeric data. Currently, only "natural cubic splines" are implemented,
+although many other forms exist.
+</p>
+
+<pre>
+template &lt;typename T, std::size_t D&gt;
+class NaturalCubicSpline;
+</pre>
+
+<p>
+The behaviour is largely determined by template parameter <i>D</i>, 
+which specifies the dimensionality of the data.
+</p>
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr><td><b>D</b></td> <td><b>Result</b></td></tr>
+<tr>
+	<td>&nbsp;&nbsp;0</td><td>Compilation error; there cannot be any data.</td>
+</tr>
+<tr>
+	<td>&nbsp;&nbsp;1</td><td>Template parameter <i>T</i> should refer to a
+	basic type suitable for numeric computation.</td>
+</tr>
+<tr>
+	<td>&nbsp;&nbsp;&ge; 2&nbsp;&nbsp;</td><td>Template parameter 
+	<i>T</i> should refer to a container type holding at least
+	<i>D</i> values of a basic type suitable for numeric computation.</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+If <i>D &gt;= 2</i> and <i>T</i> must be a container type holding the
+vector data, that container must at least provide the following:
+</p>
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>typename value_type</pre></td>
+	<td>The basic type of the numeric values in the vector.</td>
+</tr>
+
+<tr>
+	<td><pre>T::value_type &amp;operator[] (int i) const&nbsp;&nbsp;</pre></td>
+	<td>Return a reference to the <i>i</i>th element in the container.</td>
+</tr>
+
+</tbody>
+</table>
+<p>
+Typical containers might be <i>tr1/array</i> or CVMLCPP's 
+<a href='Euclid.html'>Euclidean Points</a>.
+</p>
+
+
+
+<h2>Interface</h2>
+
+<h3>Multi-Dimensional Data</h3>
+
+<p>
+If the data is multi-dimensional, it is assumed that the data is
+stored in containers.
+</p>
+
+<table border='1' width='100%'>
+<tbody>
+
+<tr>
+	<td><pre>template &lt;typename It&gt;
+  NaturalCubicSpline(It first, It last)</pre></td>
+	<td>Creates a new spline based on the vector data in the range <i>first</i>
+	to <i>last</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>const T operator() (const typename T::value_type t) const</pre></td>
+	<td>Returns an interpolated data-point for a given <i>t</i>
+	between zero and the value returned by <i>size()</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t size() const</pre></td>
+	<td>The number of segments, which is also an upper limit on the
+	interpolation parameter <i>t</i> for <i>operator()</i>.</td>
+</tr>
+</tbody>
+</table>
+
+<h3>One-Dimensional Data</h3>
+
+<p>
+If the data is one-dimensional, it is assumed that the data is not 
+stored in containers.
+</p>
+
+<table border='1' width='100%'>
+<tbody>
+<tr>
+	<td><pre>template &lt;typename It&gt;
+  NaturalCubicSpline(It first, It last)</pre></td>
+	<td>Creates a new spline based on the scalar data in the range <i>first</i>
+	to <i>last</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>const T operator() (const T t) const</pre></td>
+	<td>Returns an interpolated data-point for a given <i>t</i>
+	between zero and the value returned by <i>size()</td>
+</tr>
+
+<tr>
+	<td><pre>std::size_t size() const</pre></td>
+	<td>The number of segments, which is also an upper limit on the
+	interpolation parameter <i>t</i> for <i>operator()</i>.</td>
+</tr>
+
+</tbody>
+</table>
+
+<h2>Examples</h2>
+
+<pre>
+#include &lt;cassert&gt;
+#include &lt;iostream&gt;
+#include &lt;cvmlcpp/math/Splines&gt;
+#include &lt;cvmlcpp/math/Euclid&gt;
+
+int main()
+{
+	using namespace cvmlcpp;
+	
+	// 1-dimensional: template parameter T is a double
+	double data [] = {0, 1, 2, 3};
+	NaturalCubicSpline&lt;double, 1&gt; spline(data, data+4);
+
+	for (double d = 0.0; d &lt;= spline.size()+0.05; d += 0.1)
+		std::cout &lt;&lt; spline(d) &lt;&lt; " ";
+	std::cout &lt;&lt; std::endl;
+	for (int i = 0; i &lt; 4; ++i)
+		assert(spline(i) == i);
+
+	// 2-dimensional: template parameter T is a vector holding doubles
+	std::vector&lt;dPoint2D&gt; data2;
+	for (int i = 0; i &lt; 4; ++i)
+		data2.push_back( dPoint2D(i, 2*i) );
+	NaturalCubicSpline&lt;dPoint2D, 2&gt; spline2(data2.begin(), data2.end());
+	
+	for (double d = 0.0; d &lt;= spline.size()+0.05; d += 0.1)
+		std::cout &lt;&lt; spline2(d) &lt;&lt; " " &lt;&lt; std::endl;
+	for (int i = 0; i &lt; 4; ++i)
+	{
+		assert(spline2(i).x() == i);
+		assert(spline2(i).y() == 2*i);
+	}
+
+	return 0;
+}
+</pre>
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>

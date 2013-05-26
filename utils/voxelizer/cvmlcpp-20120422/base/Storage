@@ -1,0 +1,87 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; version 3.                              *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_STORAGE
+#define CVMLCPP_STORAGE 1
+
+#include <string>
+
+namespace cvmlcpp
+{
+
+/*
+struct _NameSpace
+{
+	static std::string &nameSpace()
+	{
+		static std::string nameSpace = std::string("");
+		
+		return nameSpace;
+	}
+};
+
+template <typename T>
+void setNameSpace(T newNameSpace)
+{
+	_NameSpace::nameSpace() = toString(newNameSpace);
+}
+
+void clearNameSpace()
+{
+	setNameSpace("");
+}
+*/
+
+std::string &nameSpace();
+void setNameSpace(std::string newNameSpace);
+void clearNameSpace();
+
+/*
+ * Store objects, possibly associated with an index of choice.
+ */
+template <class T>
+void store(const std::string key, const T value);
+
+template <class T>
+void store(std::string key, const T value, std::size_t index);
+
+/*
+ * Retrieve stored objects, possibly associated with an index of choise.
+ * Requesting objects that have not been stored will result in an error.
+ */
+template <class T>
+T retrieve(const std::string key);
+
+template <class T>
+T retrieve(std::string key, std::size_t index);
+
+/*
+ * Check whether a certain key exists
+ */
+template <class T>
+bool hasKey(const std::string key);
+
+template <class T>
+bool hasKey(std::string key, std::size_t index);
+
+} // end namespace
+
+#include <cvmlcpp/base/Storage.hpp>
+
+#endif

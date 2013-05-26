@@ -1,0 +1,134 @@
+import os
+
+GCC='gcc'
+ICC='icc'
+O64='open64'
+SUN='sun'
+WTC='watcom'
+CLG='clang'
+NIL='none'
+
+RELEASE_MODE='release'
+FAST_MODE='fast'
+DEBUG_MODE='debug'
+
+# Parameters, to be passed by command line
+CNF = ARGUMENTS.get( 'CNF', NIL )
+MODE = ARGUMENTS.get( 'MODE', RELEASE_MODE )
+if CNF == '':
+	CNF = NIL
+if MODE == '':
+	MODE = RELEASE_MODE
+
+
+COMPILERS = {	GCC : 'g++',
+		ICC : 'icc',
+		O64 : 'openCC',
+		SUN : 'sunCC',
+		WTC : 'owcc',
+		CLG : 'clang' }
+
+LINKERS = COMPILERS
+
+RELEASEFLAGS = {
+		GCC : '-pipe -I. -Wall -O3 -funroll-loops -fopenmp -DNDEBUG -std=c++0x',
+		ICC : '-I. -O3 -funroll-loops -axN -openmp -ipo -DNDEBUG',
+		O64 : '-I. -Wall -O3 -DNDEBUG -fopenmp -ipa -apo',
+		SUN : '-I. -xopenmp=parallel -fast -native -library=stlport4 \
+			-features=tmplife -features=tmplrefstatic \
+			-Qoption ccfe -complextmplexp',
+		WTC : '-x c++ -I. -mtune=686 -fptune=686 -Wall \
+			-Wc,-xs -O3 -fsigned-char -funroll-loops -mthreads \
+			-frerun-optimizer -DNDEBUG',
+		CLG : '-pipe -I. -DNDEBUG' }
+
+RELEASELDFLAGS = {
+		GCC : '-fopenmp',
+		ICC : '-openmp',
+		O64 : '-fopenmp',
+		SUN : '',
+		WTC : '',
+		CLG : ''}
+
+FASTFLAGS = {
+		GCC : '-pipe -I. -Wall -O3 -funroll-loops -fopenmp \
+			-march=native -DNDEBUG -std=c++0x',
+		ICC : '-I. -O3 -funroll-loops -axN -openmp -ipo -DNDEBUG',
+		O64 : '-I. -Wall -O3 -DNDEBUG -march=auto -fopenmp -ipa -apo',
+		SUN : '-I. -xopenmp=parallel -fast -native -library=stlport4 \
+			-features=tmplife -features=tmplrefstatic \
+			-Qoption ccfe -complextmplexp',
+		WTC : '-x c++ -I. -mtune=686 -fptune=686 -Wall \
+			-Wc,-xs -O3 -fsigned-char -funroll-loops -mthreads \
+			-frerun-optimizer -DNDEBUG',
+		CLG : '-pipe -I. -DNDEBUG' }
+
+FASTLDFLAGS = {
+		GCC : '-fopenmp',
+		ICC : '-openmp',
+		O64 : '-fopenmp',
+		SUN : '',
+		WTC : '',
+		CLG : ''}
+
+DEBUGFLAGS = {	GCC : '-pipe -I. -Wall -g -fopenmp -std=c++0x',
+		ICC : '-I. -g -openmp -ipo',
+		O64 : '-I. -Wall -g -fopenmp',
+		SUN : '-I. -xopenmp=parallel -native -library=stlport4 \
+			-features=tmplife -features=tmplrefstatic \
+			-Qoption ccfe -complextmplexp',
+		WTC : '-x c++ -I. -mtune=686 -fptune=686 -Wall \
+			-Wc,-xs -g -fsigned-char -mthreads',
+		CLG : '-pipe -I. -Wall -g -fopenmp' }
+
+DEBUGLDFLAGS = {
+		GCC : '-g -fopenmp',
+		ICC : '-g -openmp',
+		O64 : '-fopenmp',
+		SUN : '',
+		WTC : '',
+		CLG : ''}
+
+
+env = Environment(ENV = os.environ)
+if CNF != NIL:
+	env.Replace(CXX  = COMPILERS[CNF])
+	env.Replace(LINK = LINKERS  [CNF])
+	if MODE == RELEASE_MODE:
+		env.Replace(CXXFLAGS  = RELEASEFLAGS  [CNF])
+		env.Replace(LINKFLAGS = RELEASELDFLAGS[CNF])
+	else:
+		env.Replace(CXXFLAGS  = DEBUGFLAGS[CNF])
+		env.Replace(LINKFLAGS = DEBUGLDFLAGS[CNF])
+else:
+	if os.environ.has_key('CXX'):
+		env['CXX'] = os.environ['CXX']
+	else:
+		env['CXX'] = COMPILERS[GCC]
+	if os.environ.has_key('CXXFLAGS'):
+		env['CXXFLAGS'] = os.environ['CXXFLAGS']
+	else:
+		if MODE == RELEASE_MODE:
+			env.Replace(CXXFLAGS  = RELEASEFLAGS[GCC])
+		else:
+			env.Replace(CXXFLAGS  = DEBUGFLAGS[GCC])
+
+	if os.environ.has_key('LINK'): # Prefer settings for SCons...
+		env['LINK'] = os.environ['LINK']
+	else:
+		if os.environ.has_key('LD'): # ...else try settings for make.
+			env['LINK'] = os.environ['LD']
+		else:
+			env['LINK'] = LINKERS[GCC]
+	if os.environ.has_key('LINKFLAGS'): # Prefer settings for SCons...
+		env['LINKFLAGS'] = os.environ['LINKFLAGS']
+	else:
+		if os.environ.has_key('LDFLAGS'): # ...else try settings for make.
+			env['LINKFLAGS'] = os.environ['LDFLAGS']
+		else:
+			if MODE == RELEASE_MODE:
+				env.Replace(LINKFLAGS = RELEASELDFLAGS[GCC])
+			else:
+				env.Replace(LINKFLAGS = DEBUGLDFLAGS[GCC])
+
+Return('env')

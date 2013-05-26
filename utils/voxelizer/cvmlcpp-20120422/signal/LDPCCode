@@ -1,0 +1,279 @@
+/***************************************************************************
+ *   Copyright (C) 2007,2008 by BEEKHOF, Fokko                             *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_LDPC_CODE
+#define CVMLCPP_LDPC_CODE 1
+
+#include <bitset>
+
+#include <tr1/array>
+#include <tr1/memory>
+
+#include <boost/static_assert.hpp>
+
+#include <cvmlcpp/signal/BeliefPropagator.h>
+#include <cvmlcpp/signal/MLDecoder.h>
+#include <cvmlcpp/signal/Code.h>
+
+namespace cvmlcpp
+{
+
+template <std::size_t N, std::size_t P>
+inline void _split(const std::bitset<N> &ldpcData,
+				std::tr1::array<std::size_t, N/P> &chunks)
+{
+	const std::bitset<N> mask = (1u << P) - 1u;
+	#ifdef _OPENMP
+	#pragma omp parallel for
+	#endif
+	for (int i = 0u; i < int(N/P); ++i)
+		chunks[i] = ((ldpcData >> (i*P)) & mask).to_ulong();
+}
+
+template <std::size_t K>
+void _splitShuffle(std::tr1::array<std::size_t, K> &idx)
+{
+	std::tr1::array<std::size_t, K> newIdx;
+	
+	#ifdef _OPENMP
+	#pragma omp parallel for
+	#endif
+	for (int k = 0; k < int(K/2u); ++k)
+		newIdx[2*k+1] = idx[k];
+
+	#ifdef _OPENMP
+	#pragma omp parallel for
+	#endif
+	for (int k = 0; k < int(K/2u); ++k)
+		newIdx[2*k] = idx[K/2u+k];
+
+	idx.swap(newIdx);
+// std::cout << to_string(idx.begin(), idx.end()) << std::endl;
+}
+
+template <std::size_t N, std::size_t K>
+void _genParCheck(const std::size_t L, const std::size_t offset,
+		  const std::tr1::array<std::size_t, K> &idx,
+		  std::tr1::array<std::bitset<K>, N-K> &gen)
+{
+	for (std::size_t i = 0; i < K; ++i)
+		assert(gen[offset+i].none());
+
+	std::size_t checks  = 0u;
+	for (std::size_t l = L; l > 0u; --l)
+	{
+		const std::size_t Nchecks = 1u << l; // Nr checks at this level
+		assert(Nchecks <= K/2u);
+
+		const std::size_t blockSize = Nchecks;
+		assert(blockSize > 1u);
+
+		const std::size_t Nblocks   = K / Nchecks;
+		assert(Nblocks > 1u);
+
+		 // For each check ...
+		for (std::size_t chk = 0u; chk < Nchecks; ++chk, ++checks)
+		for (std::size_t b = 0u; b < Nblocks; ++b)
+		{
+			const std::size_t shift = (b*blockSize) / (2u*blockSize);
+
+			 // ... mark a member of each group.
+			assert(checks < N-K);
+			assert(b*blockSize+(chk+shift+b)%blockSize < K);
+			gen[offset+checks].set(idx[b*blockSize+
+						(chk+shift)%blockSize],true);
+		}
+	}
+
+	assert(checks == K-2);
+	// 1st half of the bits 
+	for (std::size_t i = 0; i < K/2u; ++i)
+		gen[offset+checks  ].set(idx[i], true); 
+
+	// 2nd half of the bits
+	for (std::size_t i = K/2u; i < K; ++i)
+		gen[offset+checks+1].set(idx[i], true); 
+}
+
+template <std::size_t N, std::size_t K>
+std::tr1::shared_ptr<std::tr1::array<std::bitset<K>, N-K> > generateCode()
+{
+	// Power of 2 ?
+	BOOST_STATIC_ASSERT(K == 1u << boost::static_log2<K>::value);
+	BOOST_STATIC_ASSERT(N % K == 0u); // Rate is a natural number
+	BOOST_STATIC_ASSERT(N / K > 1u); // Rate greater than one
+
+	const std::size_t R = (N-K) / K;
+	const std::size_t L = boost::static_log2<K>::value - 1u; // level
+
+	std::tr1::shared_ptr<std::tr1::array<std::bitset<K>, N-K> > gen
+		(new std::tr1::array<std::bitset<K>, N-K>());
+
+#ifdef _OPENMP
+	#pragma omp parallel for
+#endif
+	for (int i = 0; i < int(N-K); ++i)
+		(*gen)[i].reset();
+// 	omptl::for_each(gen.begin(), gen.end(),
+// 			std::mem_fun(&std::bitset<K>::reset));
+
+	std::tr1::array<std::size_t, K> idx;
+#ifdef _OPENMP
+	#pragma omp parallel for
+#endif
+	for (int k = 0; k < int(K); ++k)
+		idx[k] = k;
+
+	for (std::size_t r = 0u; r < R; ++r)
+	{
+		_genParCheck<N, K>(L, r*K, idx, *gen);
+		_splitShuffle(idx);
+	}
+
+	return gen;
+}
+
+
+template <std::size_t N, std::size_t K>
+class BPLDPCCode : public Code<N, K>
+{
+	public:
+		static const std::size_t M = Code<N, K>::M;
+		typedef typename Code<N, K>::G G;
+
+		BPLDPCCode(const unsigned maxIterations = 2048u) :
+			Code<N, K>(*generateCode<N, K>()),
+			_maxIterations(maxIterations), _configured(false) { }
+
+		BPLDPCCode(const G &generator,
+			   const unsigned maxIterations = 2048u) :
+			Code<N, K>(generator),
+			_maxIterations(maxIterations), _configured(false) { }
+
+	protected:
+		virtual bool correct(const
+				std::tr1::array<double, N> &quantization,
+				std::bitset<N> &codeword)
+		{
+			this->configure();
+			_bp.init(quantization.begin(), quantization.end());
+			std::bitset<N> prev = codeword;
+			for (unsigned i = 0; i < _maxIterations; ++i)
+			{
+				_bp.update();
+				_bp.belief(codeword);
+
+				if (this->verify(codeword))
+					return true;
+
+				if (prev == codeword) // convergence ?
+				{
+// std::cout << "Convergence! [" << i << "] iterations" << std::endl;
+					return false;
+				}
+				prev = codeword;
+			}
+
+			return false;
+		}
+
+	private:
+		const unsigned _maxIterations;
+		bool _configured;
+		LLBeliefPropagator<N, M> _bp;
+
+		void configure()
+		{
+			if (_configured)
+				return;
+
+			for (std::size_t chk = 0u; chk < M; ++chk)
+			{
+				assert(this->h(chk)[chk]);
+
+				_bp.link(chk, chk); // link parity bit
+
+				// link relevant message bits
+				for (unsigned j = 0u; j < K; ++j)
+					if (this->h(chk)[M+j])
+						_bp.link(M+j, chk);
+			}
+
+			_configured = true;
+// 			_bp.print();
+		}
+};
+
+template <std::size_t N, std::size_t K>
+class MLLDPCCode : public Code<N, K>
+{
+	public:
+		static const std::size_t M = Code<N, K>::M;
+		typedef typename Code<N, K>::G G;
+
+		MLLDPCCode() : Code<N, K>(*generateCode<N, K>()),
+			_configured(false) { }
+
+		MLLDPCCode(const G &generator) :
+			Code<N, K>(generator),  _configured(false) { }
+
+	protected:
+		virtual bool correct(const
+				     std::tr1::array<double, N> &quantization,
+					std::bitset<N> &codeword)
+		{
+			this->configure();
+			const bool ok = _mldec.correct(quantization.begin(),
+						quantization.end(), codeword);
+
+			assert(ok == this->verify(codeword));
+			return ok;
+		}
+
+	private:
+		bool _configured;
+		MLDecoder<N, M> _mldec;
+
+		void configure()
+		{
+			if (_configured)
+				return;
+
+			for (std::size_t chk = 0u; chk < M; ++chk)
+			{
+				assert(this->h(chk)[chk]);
+
+				_mldec.link(chk, chk); // link parity bit
+
+				// link relevant message bits
+				for (std::size_t j = 0u; j < K; ++j)
+					if (this->h(chk)[M+j])
+						_mldec.link(M+j, chk);
+			}
+
+			_configured = true;
+// 			this->print();
+// 			_mldec.print();
+		}
+};
+
+} // namespace
+
+#endif

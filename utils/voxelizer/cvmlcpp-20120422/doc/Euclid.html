@@ -1,0 +1,304 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Euclid</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel="stylesheet" href="stylesheet.css" type="text/css" />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Euclid</h1>
+
+<b>Euclid</b> provides some standard definitions of points, lines and triangles
+based on <b><a href="Vectors.html">Vectors</a></b>. Points and Vectors are
+subclasses of StaticVectors, whereas Lines and Triangles are StaticSortedVectors
+containing Points. Exceptions are the IndexLine and the IndexTriangles.
+
+<h2>Classes</h2>
+
+The principal classes of Euclid are the template classes <i>Point2D</i> and
+<i>Point3D</i>.
+
+<h3><pre>template &lt;typename T&gt; struct Point2D;</pre></h3>
+
+<p>
+Point2D a subclass of <i>StaticVector&lt;T, 2&gt;</i>, see also
+<a href='Vectors.html'>Vectors</a>.
+</p>
+
+<p>
+<table border="1" width="100%">
+
+<tr>
+	<td><pre>Point2D()</pre></td>
+	<td>Default constructor.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename U&gt;
+  Point2D(const U &amp;data)</pre></td>
+	<td>Initialize with a scalar or data from a container.</td>
+</tr>
+
+<tr>
+	<td><pre>Point2D(const U x, const U y)</pre></td>
+	<td>Initialize with the given coordinates.</td>
+</tr>
+
+<tr>
+	<td><pre>void set(const U x, const U y)</pre></td>
+	<td>Set to the given coordinates.</td>
+</tr>
+
+<tr>
+	<td><pre>Point2D jmp(const U dx, const U dy) const</pre></td>
+	<td>Return a Point with <i>dx</i> and <i>dy</i> <b>relative</b> to the
+	coordinates of the point, i.e., <i>dx</i> and <i>dy</i> are offsets from
+	the values returned by <i>x()</i> and <i>y()</i>.
+	</td>
+</tr>
+
+<tr>
+	<td><pre>T &amp;x()</pre></td>
+	<td>The <i>X</i> coordinate; p.x() is an alias for <i>p[X]</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>T &amp;y()</pre></td>
+	<td>The <i>Y</i> coordinate; p.y() is an alias for <i>p[Y]</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>T &amp;height()</pre></td>
+	<td>The <i>HEIGHT</i> coordinate; p.height() is an alias for
+	<i>p[HEIGHT]</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>T &amp;width()</pre></td>
+	<td>The <i>WIDTH</i> coordinate; p.width() is an alias for
+	<i>p[WIDTH]</i>.</td>
+</tr>
+
+</table>
+</p>
+
+<h3><pre>template &lt;typename T&gt; struct Point3D;</pre></h3>
+
+<p>
+Point3D a subclass of <i>StaticVector&lt;T, 3&gt;</i>, see also
+<a href='Vectors.html'>Vectors</a>.
+</p>
+
+<p>
+<table border="1" width="100%">
+
+<tr>
+	<td><pre>Point3D()</pre></td>
+	<td>Default constructor.</td>
+</tr>
+
+<tr>
+	<td><pre>template &lt;typename U&gt;
+  Point3D(const U &amp;data)</pre></td>
+	<td>Initialize with a scalar or data from a container.</td>
+</tr>
+
+<tr>
+	<td><pre>Point3D(const U x, const U y, const U z)</pre></td>
+	<td>Initialize with the given coordinates.</td>
+</tr>
+
+<tr>
+	<td><pre>void set(const U x, const U y, const U z)</pre></td>
+	<td>Set to the given coordinates.</td>
+</tr>
+
+<tr>
+	<td>
+<pre>Point2D jmp(const U dx, const U dy, const U z) const</pre></td>
+	<td>Return a Point with <i>dx</i>, <i>dy</i> and <i>dz</i>
+	<b>relative</b> to the coordinates of the point, i.e., <i>dx</i>,
+	<i>dy</i> and <i>dz</i> are offsets from the values returned by
+	<i>x()</i>, <i>y()</i> and <i>z()</i>.
+	</td>
+</tr>
+
+<tr>
+	<td><pre>T &amp;x()</pre></td>
+	<td>The <i>X</i> coordinate; p.x() is an alias for <i>p[X]</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>T &amp;y()</pre></td>
+	<td>The <i>Y</i> coordinate; p.y() is an alias for <i>p[Y]</i>.</td>
+</tr>
+
+<tr>
+	<td><pre>T &amp;z()</pre></td>
+	<td>The <i>Z</i> coordinate; p.z() is an alias for <i>p[Z]</i>.</td>
+</tr>
+
+</table>
+</p>
+
+<h3>Predefined Typedefs</h3>
+
+<p>
+<table border="1" width="100%">
+
+<tr>
+	<td><pre>iPoint2D</pre></td>
+	<td>Alias for Point2D&lt; T&gt;.</td>
+</tr>
+
+<tr>
+	<td><pre>iVector2D</pre></td>
+	<td>A vector in 2D space defined by two "int"s.</td>
+</tr>
+
+<tr>
+	<td><pre>iLine2D</pre></td>
+	<td>A line in 2D space between two "iPoint2D"s.</td>
+</tr>
+
+<tr>
+	<td><pre>iTriangle2D</pre></td>
+	<td>A triangle in 2D space that consists of three "iPoint2D"s.</td>
+</tr>
+
+<tr>
+	<td><pre>fPoint2D</pre></td>
+	<td>A point in 2D space defined by two "float"s.</td>
+</tr>
+
+<tr>
+	<td><pre>fVector2D</pre></td>
+	<td>A vector in 2D space defined by two "float"s.</td>
+</tr>
+
+<tr>
+	<td><pre>fLine2D</pre></td>
+	<td>A line in 2D space between two "fPoint2D"s.</td>
+</tr>
+
+<tr>
+	<td><pre>fTriangle2D</pre></td>
+	<td>A triangle in 2D space that consists of three "fPoint2D"s.</td>
+</tr>
+
+<tr>
+	<td><pre>dPoint2D</pre></td>
+	<td>A point in 2D space defined by two "double"s.</td>
+</tr>
+
+<tr>
+	<td><pre>dVector2D</pre></td>
+	<td>A vector in 2D space defined by two "double"s.</td>
+</tr>
+
+<tr>
+	<td><pre>dLine2D</pre></td>
+	<td>A line in 2D space between two "dPoint2D"s.</td>
+</tr>
+
+<tr>
+	<td><pre>dTriangle2D</pre></td>
+	<td>A triangle in 2D space that consists of three "dPoint2D"s.</td>
+</tr>
+
+<!-- 3D starts here -->
+
+<tr>
+	<td><pre>iPoint3D</pre></td>
+	<td>A point in 3D space defined by three "int"s.</td>
+</tr>
+
+<tr>
+	<td><pre>iVector3D</pre></td>
+	<td>A vector in 3D space defined by three "int"s.</td>
+</tr>
+
+<tr>
+	<td><pre>iLine3D</pre></td>
+	<td>A line in 3D space between three "iPoint3D"s.</td>
+</tr>
+
+<tr>
+	<td><pre>iTriangle3D</pre></td>
+	<td>A triangle in 3D space that consists of three "iPoint3D"s.</td>
+</tr>
+
+<tr>
+	<td><pre>fPoint3D</pre></td>
+	<td>A point in 3D space defined by three "float"s.</td>
+</tr>
+
+<tr>
+	<td><pre>fVector3D</pre></td>
+	<td>A vector in 3D space defined by three "float"s.</td>
+</tr>
+
+<tr>
+	<td><pre>fLine3D</pre></td>
+	<td>A line in 3D space between three "fPoint3D"s.</td>
+</tr>
+
+<tr>
+	<td><pre>fTriangle3D</pre></td>
+	<td>A triangle in 3D space that consists of three "fPoint3D"s.</td>
+</tr>
+
+<tr>
+	<td><pre>dPoint3D</pre></td>
+	<td>A point in 3D space defined by three "double"s.</td>
+</tr>
+
+<tr>
+	<td><pre>dVector3D</pre></td>
+	<td>A vector in 3D space defined by three "double"s.</td>
+</tr>
+
+<tr>
+	<td><pre>dLine3D</pre></td>
+	<td>A line in 3D space between three "dPoint3D"s.</td>
+</tr>
+
+<tr>
+	<td><pre>dTriangle3D</pre></td>
+	<td>A triangle in 3D space that consists of three "dPoint3D"s.</td>
+</tr>
+
+<tr>
+	<td><pre>IndexLine</pre></td>
+	<td>Essentially a set of two <i>std::size_t</i>s, assumed to identify
+		points in an external data structure.</td>
+</tr>
+
+<tr>
+	<td><pre>IndexTriangle</pre></td>
+	<td>Essentially a set of three <i>std::size_t</i>s, assumed to identify
+		points in an external data structure.</td>
+</tr>
+
+<!-- Template
+<tr>
+	<td></td>
+	<td></td>
+</tr>
+-->
+
+</table>
+</p>
+
+<!-- End Page -->
+
+</div>
+</body>
+
+</html>

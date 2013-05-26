@@ -1,0 +1,404 @@
+// -*- C++ -*-
+/***************************************************************************
+ * blitz/matrix.h    Wrapper around of the BlitzArray<P_numtype, N_rank> class
+ *
+ * Written by F.P.Beekhof, based on:
+ * $Id: array-impl.h,v 1.25 2005/10/13 23:46:43 julianc Exp $
+ *
+ * Copyright (C) 1997-2001 Todd Veldhuizen <tveldhui@oonumerics.org>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * Suggestions:          blitz-dev@oonumerics.org
+ * Bugs:                 blitz-bugs@oonumerics.org
+ *
+ * For more information, please see the Blitz++ Home Page:
+ *    http://oonumerics.org/blitz/
+ *
+ ***************************************************************************/
+
+
+#ifndef CVMLCPP_BLITZ_ARRAY
+#define CVMLCPP_BLITZ_ARRAY 1
+
+#ifndef USE_BLITZ
+#define USE_BLITZ 1
+#endif
+
+#include <blitz/array.h>
+
+namespace cvmlcpp
+{
+
+template<typename P_numtype, std::size_t N_rank, typename Junk=int>
+class BlitzArray;
+
+template <std::size_t N_rank>
+struct _BlitzArraySlicer
+{
+	// To be imlpemented
+};
+
+template <>
+struct _BlitzArraySlicer<2>
+{
+	template <typename P_numtype, typename Junk>
+	static BlitzArray<P_numtype, 1, Junk>
+	slice(const BlitzArray<P_numtype, 2, Junk> & a, unsigned i)
+	{
+		return BlitzArray<P_numtype, 1, Junk>
+					( a(i, blitz::Range::all()) );
+	}
+};
+
+template <>
+struct _BlitzArraySlicer<3>
+{
+	template <typename P_numtype, typename Junk>
+	static
+	BlitzArray<P_numtype, 2, Junk>
+	slice(const BlitzArray<P_numtype, 3, Junk> & a, unsigned i)
+	{
+		return BlitzArray<P_numtype, 2, Junk>( a(i,
+				blitz::Range::all(), blitz::Range::all()) );
+	}
+};
+
+template <>
+struct _BlitzArraySlicer<4>
+{
+	template <typename P_numtype, typename Junk>
+	static
+	BlitzArray<P_numtype, 3, Junk>
+	slice(const BlitzArray<P_numtype, 4, Junk> & a, unsigned i)
+	{
+		return BlitzArray<P_numtype, 3, Junk>( a(i,
+				blitz::Range::all(), blitz::Range::all(),
+				blitz::Range::all()) );
+	}
+};
+
+template <>
+struct _BlitzArraySlicer<5>
+{
+	template <typename P_numtype, typename Junk>
+	static
+	BlitzArray<P_numtype, 4, Junk>
+	slice(const BlitzArray<P_numtype, 5> & a, unsigned i)
+	{
+		return BlitzArray<P_numtype, 4, Junk>( a(i,
+				blitz::Range::all(), blitz::Range::all(),
+				blitz::Range::all(), blitz::Range::all() ) );
+	}
+};
+
+template <>
+struct _BlitzArraySlicer<6>
+{
+	template <typename P_numtype, typename Junk>
+	static
+	BlitzArray<P_numtype, 5, Junk>
+	slice(const BlitzArray<P_numtype, 6, Junk> & a, unsigned i)
+	{
+		return BlitzArray<P_numtype, 5, Junk>( a(i,
+				blitz::Range::all(), blitz::Range::all(),
+				blitz::Range::all(), blitz::Range::all(),
+				blitz::Range::all() ) );
+	}
+};
+
+
+
+template<typename P_numtype, std::size_t N_rank, typename Junk>
+class BlitzArray : public blitz::Array<P_numtype, N_rank>
+{
+public:
+	typedef P_numtype                value_type;
+
+	typedef P_numtype                T_numtype;
+	typedef blitz::TinyVector<std::size_t, N_rank>  T_index;
+	typedef BlitzArray<T_numtype, N_rank, Junk> T_array;
+	typedef blitz::FastArrayIterator<T_numtype, N_rank> T_iterator;
+
+	typedef blitz::ArrayIterator<T_numtype,N_rank> iterator;
+	typedef blitz::ConstArrayIterator<T_numtype,N_rank> const_iterator;
+
+private:
+	typedef blitz::Array<P_numtype, N_rank> A_t;
+
+public:
+    /*
+     * Construct an array from an array expression.
+     */
+
+    template<typename T_expr>
+    explicit BlitzArray(blitz::_bz_ArrayExpr<T_expr> expr) : A_t(expr)
+	{}
+
+    /*
+     * Any missing length arguments will have their value taken from the
+     * last argument.  For example,
+     *   BlitzArray<int,3> A(32,64);
+     * will create a 32x64x64 array.  This is handled by setupStorage().
+     */
+
+    BlitzArray(blitz::GeneralArrayStorage<N_rank> storage =
+		blitz::GeneralArrayStorage<N_rank>()) : A_t(storage) {}
+		
+
+    explicit BlitzArray(int length0,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(length0, storage) {}
+
+    BlitzArray(int length0, int length1,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(length0, length1, storage) {}
+
+    BlitzArray(int length0, int length1, int length2,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(length0, length1, length2, storage) {}
+
+    BlitzArray(int length0, int length1, int length2, int length3,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(length0, length1, length2, length3, storage) {}
+
+    BlitzArray(int length0, int length1, int length2, int length3, int length4,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(length0, length1, length2, length3, length4, storage) {}
+
+    BlitzArray(int length0, int length1, int length2, int length3, int length4,
+        int length5,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(length0, length1, length2, length3, length4, length5,
+			storage) {}
+
+    BlitzArray(int length0, int length1, int length2, int length3, int length4,
+        int length5, int length6,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(length0, length1, length2, length3, length4, length5,
+			length6, storage) {}
+
+    BlitzArray(int length0, int length1, int length2, int length3, int length4,
+        int length5, int length6, int length7,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(length0, length1, length2, length3, length4, length5,
+			length6, length7, storage) {}
+
+    BlitzArray(int length0, int length1, int length2, int length3, int length4,
+        int length5, int length6, int length7, int length8,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(length0, length1, length2, length3, length4, length5,
+			length6, length7, length8, storage) {}
+
+    BlitzArray(int length0, int length1, int length2, int length3, int length4,
+        int length5, int length6, int length7, int length8, int length9,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(length0, length1, length2, length3, length4, length5,
+			length6, length7, length8, length9, storage) {}
+
+    BlitzArray(int length0, int length1, int length2, int length3, int length4,
+        int length5, int length6, int length7, int length8, int length9,
+        int length10,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(length0, length1, length2, length3, length4, length5,
+			length6, length7, length8, length9, length10,
+			storage) {}
+
+    BlitzArray(T_numtype* restrict dataFirst,
+	blitz::TinyVector<std::size_t, N_rank> shape,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(dataFirst, shape, storage) {}
+
+    BlitzArray(T_numtype* restrict dataFirst,
+	blitz::TinyVector<std::size_t, N_rank> shape,
+        blitz::TinyVector<std::size_t, N_rank> stride, 
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(dataFirst, shape, stride, storage) {}
+
+   BlitzArray(T_numtype* restrict dataFirst,
+	blitz::TinyVector<std::size_t, N_rank> shape,
+        blitz::preexistingMemoryPolicy deletionPolicy,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(dataFirst, shape, deletionPolicy, storage) {}
+
+    BlitzArray(T_numtype* restrict dataFirst,
+	blitz::TinyVector<std::size_t, N_rank> shape,
+        blitz::TinyVector<std::size_t, N_rank> stride,
+        blitz::preexistingMemoryPolicy deletionPolicy,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(dataFirst, shape, stride, deletionPolicy, storage) {}
+
+    BlitzArray(const blitz::TinyVector<std::size_t, N_rank>& extent,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(extent, storage) {}
+
+    /*
+     * This construct takes a vector of bases (lbounds) and a vector of
+     * extents.
+     */
+   BlitzArray(const blitz::TinyVector<std::size_t, N_rank>& lbounds,
+        const blitz::TinyVector<std::size_t, N_rank>& extent,
+        const blitz::GeneralArrayStorage<N_rank>& storage 
+           = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(lbounds, extent, storage)	{}
+
+    /*
+     * These constructors allow arbitrary bases (starting indices) to be set.
+     * e.g. BlitzArray<int,2> A(blitz::Range(10,20), blitz::Range(20,30))
+     * will create an 11x11 array whose indices are 10..20 and 20..30
+     */
+    BlitzArray(blitz::Range r0,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(r0, storage) {}
+
+    BlitzArray(blitz::Range r0, blitz::Range r1,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(r0, r1, storage) {}
+
+    BlitzArray(blitz::Range r0, blitz::Range r1, blitz::Range r2,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(r0, r1, r2, storage) {}
+
+    BlitzArray(blitz::Range r0, blitz::Range r1, blitz::Range r2, blitz::Range r3,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(r0, r1, r2, r3, storage) {}
+
+    BlitzArray(blitz::Range r0, blitz::Range r1, blitz::Range r2, blitz::Range r3, blitz::Range r4,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(r0, r1, r2, r3, r4, storage) {}
+
+    BlitzArray(blitz::Range r0, blitz::Range r1, blitz::Range r2, blitz::Range r3, blitz::Range r4, blitz::Range r5,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(r0, r1, r2, r3, r4, r5, storage) {}
+
+    BlitzArray(blitz::Range r0, blitz::Range r1, blitz::Range r2, blitz::Range r3, blitz::Range r4, blitz::Range r5,
+        blitz::Range r6,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(r0, r1, r2, r3, r4, r5, r6, storage) {}
+
+    BlitzArray(blitz::Range r0, blitz::Range r1, blitz::Range r2, blitz::Range r3, blitz::Range r4, blitz::Range r5,
+        blitz::Range r6, blitz::Range r7,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(r0, r1, r2, r3, r4, r5, r6, r7, storage) {}
+
+    BlitzArray(blitz::Range r0, blitz::Range r1, blitz::Range r2, blitz::Range r3, blitz::Range r4, blitz::Range r5,
+        blitz::Range r6, blitz::Range r7, blitz::Range r8,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(r0, r1, r2, r3, r4, r5, r6, r7, r8, storage) {}
+
+    BlitzArray(blitz::Range r0, blitz::Range r1, blitz::Range r2, blitz::Range r3, blitz::Range r4, blitz::Range r5,
+        blitz::Range r6, blitz::Range r7, blitz::Range r8, blitz::Range r9,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, storage) {}
+
+    BlitzArray(blitz::Range r0, blitz::Range r1, blitz::Range r2, blitz::Range r3, blitz::Range r4, blitz::Range r5,
+        blitz::Range r6, blitz::Range r7, blitz::Range r8, blitz::Range r9, blitz::Range r10,
+        blitz::GeneralArrayStorage<N_rank> storage = blitz::GeneralArrayStorage<N_rank>())
+		: A_t(r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, storage) {}
+
+   /*
+     * Create a reference of another array
+     */
+    BlitzArray(const blitz::Array<T_numtype, N_rank>& array)
+		: A_t(array) {}
+
+    /*
+     * These constructors are used for creating interlaced arrays (see
+     * <blitz/arrayshape.h>
+     */
+   BlitzArray(const blitz::TinyVector<std::size_t,N_rank-1>& shape,
+        int lastExtent, const blitz::GeneralArrayStorage<N_rank>& storage)
+		: A_t(shape, lastExtent, storage) {}
+
+    /*
+     * These constructors make the array a view of a subportion of another
+     * array.  If there fewer than N_rank blitz::Range arguments provided, no
+     * slicing is performed in the unspecified ranks.
+     * e.g. blitz::Array<int,3> A(20,20,20);
+     *      blitz::Array<int,3> B(A, blitz::Range(5,15));
+     * is equivalent to:
+     *      blitz::Array<int,3> B(A, blitz::Range(5,15), blitz::Range::all(), blitz::Range::all());
+     */
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array, blitz::Range r0)
+	: A_t(array, r0) {}
+
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array, blitz::Range r0, blitz::Range r1)
+	: A_t(array, r0, r1) {}
+
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array, blitz::Range r0, blitz::Range r1, blitz::Range r2)
+	: A_t(array, r0, r1, r2) {}
+
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array, blitz::Range r0, blitz::Range r1, blitz::Range r2,
+        blitz::Range r3)
+	: A_t(array, r0, r1, r2, r3) {}
+
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array, blitz::Range r0, blitz::Range r1, blitz::Range r2,
+        blitz::Range r3, blitz::Range r4)
+	: A_t(array, r0, r1, r2, r3, r4) {}
+
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array, blitz::Range r0, blitz::Range r1, blitz::Range r2,
+        blitz::Range r3, blitz::Range r4, blitz::Range r5)
+	: A_t(array, r0, r1, r2, r3, r4, r5) {}
+
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array, blitz::Range r0, blitz::Range r1, blitz::Range r2,
+        blitz::Range r3, blitz::Range r4, blitz::Range r5, blitz::Range r6)
+	: A_t(array, r0, r1, r2, r3, r4, r5, r6) {}
+
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array, blitz::Range r0, blitz::Range r1, blitz::Range r2,
+        blitz::Range r3, blitz::Range r4, blitz::Range r5, blitz::Range r6, blitz::Range r7)
+	: A_t(array, r0, r1, r2, r3, r4, r5, r6, r7) {}
+
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array, blitz::Range r0, blitz::Range r1, blitz::Range r2,
+        blitz::Range r3, blitz::Range r4, blitz::Range r5, blitz::Range r6, blitz::Range r7, blitz::Range r8)
+        : A_t(array, r0, r1, r2, r3, r4, r5, r6, r7, r8) {}
+
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array, blitz::Range r0, blitz::Range r1, blitz::Range r2,
+        blitz::Range r3, blitz::Range r4, blitz::Range r5, blitz::Range r6, blitz::Range r7, blitz::Range r8, blitz::Range r9)
+	: A_t(array, r0, r1, r2, r3, r4, r5, r6, r7, r8, r9) {}
+
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array, blitz::Range r0, blitz::Range r1, blitz::Range r2,
+        blitz::Range r3, blitz::Range r4, blitz::Range r5, blitz::Range r6, blitz::Range r7, blitz::Range r8, blitz::Range r9,
+        blitz::Range r10)
+       : A_t(array, r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10) {}
+
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array,
+        const blitz::RectDomain<N_rank>& subdomain)
+       : A_t(array, subdomain) {}
+
+    /* Constructor added by Julian Cummings */
+    BlitzArray(blitz::Array<T_numtype, N_rank>& array,
+        const blitz::StridedDomain<N_rank>& subdomain)
+       : A_t(array, subdomain) {}
+
+    /*
+     * This constructor is invoked by the operator()'s which take
+     * a combination of integer and blitz::Range arguments.  It's not intended
+     * for end-user use.
+     */
+    template<std::size_t N_rank2, typename R0, typename R1, typename R2,
+	typename R3, typename R4, typename R5, typename R6, typename R7,
+	typename R8, typename R9, typename R10>
+    BlitzArray(blitz::Array<T_numtype,N_rank2>& array, R0 r0, R1 r1, R2 r2,
+        R3 r3, R4 r4, R5 r5, R6 r6, R7 r7, R8 r8, R9 r9, R10 r10)
+        : A_t(array, r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10) {}
+
+	const BlitzArray<P_numtype, N_rank-1> operator[](unsigned i) const
+	{
+		return _BlitzArraySlicer<N_rank>::slice(*this, i);
+	}
+
+	private:
+		Junk _junk;
+};
+
+} // End namespace
+
+#endif

@@ -1,0 +1,755 @@
+/***************************************************************************
+ *   Copyright (C) 2007 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#ifndef CVMLCPP_FOURIER
+#define CVMLCPP_FOURIER 1
+
+#include <cstddef>
+#include <complex>
+#include <cassert>
+#include <cstdio>
+#include <string>
+
+#include <tr1/memory>
+#include <tr1/type_traits>
+
+#include <cvmlcpp/math/Math>
+#include <cvmlcpp/base/Meta>
+
+#include <omptl/omptl_algorithm>
+
+
+/*
+ * Select DFT library
+ */
+#if !defined (USE_FFTW) && !defined (USE_CUFFT)
+#define USE_FFTW
+#endif
+
+#ifdef USE_CUFFT
+  #include <cvmlcpp/signal/FourierCUFFT.h>
+#else
+  #include <cvmlcpp/signal/FourierFFTW.h>
+#endif
+
+
+namespace cvmlcpp
+{
+
+namespace detail
+{
+
+/*
+ * PlanHolder simplyfies plan management. It calls destroyPlan()
+ * in the destructor, so no-one will ever forget to do that.
+ */
+template <typename T>
+class PlanHolder
+{
+	public:
+		typedef FFTPlan<T> plan_type;
+
+		PlanHolder(plan_type plan) : plan_(plan) {}
+
+		~PlanHolder() { FFTLib<T>::destroyPlan(plan_); }
+
+		plan_type &plan() { return plan_; }
+
+	private:
+		plan_type plan_;
+};
+
+/*
+ * Management object for PlanHolder, offers easy interface to FFT lib.
+ * A shared-pointer to the PlanHolder makes sure that the PlanHolder
+ * object dies only once, and thus the plan is destroyed only once.
+ */
+template <typename T>
+class FFTW
+{
+	public:
+		FFTW(PlanHolder<T>* plan) : planHolder(plan) {  }
+
+		bool execute()
+		{
+			return detail::FFTLib<T>::execute(planHolder->plan());
+		}
+
+		bool execute(std::string wisdom)
+		{
+			FFTLib<T>::loadWisdom(wisdom);
+			const bool ok = FFTLib<T>::execute(planHolder->plan());
+			FFTLib<T>::saveWisdom(wisdom);
+			return ok;
+		}
+
+		/* 
+		 * These routines cause complications due to padding in,
+		 * for example cross-correlations. Zero-padding is bad anyway. 
+		 * Let the user do that if needed.
+		 */
+		static std::size_t optimalSize(const std::size_t ext)
+		{
+			if (isPower2(ext))
+				return ext;
+
+			const std::size_t primes [] = { 2, 3, 5, 7, 11, 13};
+			const std::size_t Nprimes = 6;
+
+			const std::size_t logExt = log2(ext) + 1;
+			for (std::size_t f = ext; f <= (std::size_t(1) << logExt); ++f)
+			{
+				std::size_t e = f;
+				std::size_t score = 0;
+
+				for (std::size_t p = 0; p < Nprimes; ++p)
+					while ( (e % primes[p]) == 0)
+					{
+						e /= primes[p];
+						++score;
+					}
+				if ( (e == 1) && (logExt-score <= (logExt/2ul)) )
+					return f;
+			}
+
+			return ext;
+		}
+
+		template <std::size_t N, typename It1, typename It2>
+		static void optimalSize(It1 shapeIn, It2 shapeOut)
+		{
+			for (std::size_t i; i < N; ++i, ++shapeIn, ++shapeOut)
+				*shapeOut = optimalSize(*shapeIn);
+		}
+
+	protected:
+		std::tr1::shared_ptr<PlanHolder<T> > planHolder;
+};
+
+template <typename T>
+class Planner
+{
+	public:
+	template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+		std::size_t N, typename AuxIn>
+	static FFTPlan<T>
+	makeDFTPlan(ArrayIn<std::complex<T>, N, AuxIn> &inout,
+		    bool forward, unsigned flags, unsigned threads)
+	{
+		#if defined _OPENMP && defined USE_THREADS
+		threads = std::max(threads,
+			static_cast<unsigned>(omp_get_max_threads()));
+		#endif
+
+		if (threads < 1u)
+			threads = 1u;
+		FFTLib<T>::init();
+
+		FFTLib<T>::plan_with_nthreads(threads);
+		FFTPlan<T> plan; assert(!plan.ok());
+		#ifdef _OPENMP
+		#pragma omp critical(CVMLCPP_FFT)
+		#endif
+		{
+			plan = makeDFTPlan_(inout, forward, flags);
+		}
+
+		return plan;
+	}
+
+	template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+		std::size_t N, typename Tin, typename Tout,
+		typename AuxIn, typename AuxOut>
+	static FFTPlan<T>
+	makeDFTPlan(ArrayIn<Tin, N, AuxIn> &in, ArrayOut<Tout, N, AuxOut> &out,
+		    bool forward, unsigned flags, unsigned threads)
+	{
+		typedef typename ValueType<Tin> ::value_type VTin;
+		typedef typename ValueType<Tout>::value_type VTout;
+
+		#if defined _OPENMP && defined USE_THREADS
+		threads = std::max(threads,
+			static_cast<unsigned>(omp_get_max_threads()));
+		#endif
+
+		if (threads < 1u)
+			threads = 1u;
+		FFTLib<T>::init();
+
+		FFTLib<T>::plan_with_nthreads(threads);
+		FFTPlan<T> plan; assert(!plan.ok());
+		#ifdef _OPENMP
+		#pragma omp critical(CVMLCPP_FFT)
+		#endif
+		{
+			plan = makeDFTPlan_(in, out, forward, flags);
+		}
+
+		return plan;
+	}
+
+	private:
+	// Any dimension; complex --> complex
+	template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+		std::size_t N, typename AuxIn>
+	static FFTPlan<T>
+	makeDFTPlan_(ArrayIn<std::complex<T>, N, AuxIn> &inout,
+			bool forward, unsigned flags)
+	{
+		typedef array_traits<ArrayIn,  std::complex<T>, N, AuxIn> at1;
+
+		int dims[N];
+		std::copy(at1::shape(inout), at1::shape(inout)+N, dims);
+		return FFTLib<T>::plan_dft(N, dims, &(*at1::begin(inout)), 
+					&(*at1::begin(inout)), forward, flags);
+	}
+
+	// Any dimension; complex --> complex
+	template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+		std::size_t N, typename AuxIn, typename AuxOut>
+	static FFTPlan<T>
+	makeDFTPlan_(ArrayIn <std::complex<T>, N, AuxIn> &in,
+		     ArrayOut<std::complex<T>, N, AuxOut> &out,
+			bool forward, unsigned flags)
+	{
+		typedef array_traits<ArrayIn,  std::complex<T>, N, AuxIn> at1;
+		typedef array_traits<ArrayOut, std::complex<T>, N, AuxOut>at2;
+
+		int dims[N];
+		std::copy(at1::shape(in), at1::shape(in)+N, dims);
+
+		// Resize output
+		at2::resize(out, dims);
+
+		return FFTLib<T>::plan_dft(N, dims, &(*at1::begin(in)), 
+					&(*at2::begin(out)), forward, flags);
+	}
+
+	// Any dimension; real --> complex
+	template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+		std::size_t N, typename AuxIn, typename AuxOut>
+	static FFTPlan<T>
+	makeDFTPlan_(ArrayIn<T, N, AuxIn> &in,
+			ArrayOut<std::complex<T>, N, AuxOut> &out,
+			const bool forward, const unsigned flags)
+	{
+		assert(forward); // User input inconsistent ?
+		typedef array_traits<ArrayIn,  T, N, AuxIn> at1;
+		typedef array_traits<ArrayOut, std::complex<T>, N, AuxOut>at2;
+
+		// Last dimension must be even!
+//		if (at1::shape(in)[N-1] % 2u)
+//			return 0;
+
+		int dimsIn[N], dimsOut[N];
+		std::copy(at1::shape(in), at1::shape(in)+N, dimsIn);
+
+		// Resize output, last dimension is special
+		// See http://fftw.org/fftw3_doc/The-1d-Real_002ddata-DFT.html
+		std::copy(dimsIn, dimsIn+N, dimsOut);
+		dimsOut[N-1] = 1 + dimsOut[N-1]/2u; 
+		at2::resize(out, dimsOut);
+
+		typename at2::iterator outBegin = at2::begin(out);
+
+		return FFTLib<T>::plan_dft_r2c(N, dimsIn,
+		    static_cast<T*>(&(*at1::begin(in))), &(*outBegin), flags);
+	}
+
+	// Any dimension; complex --> real
+	template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+		std::size_t N, typename AuxIn, typename AuxOut>
+	static FFTPlan<T>
+	makeDFTPlan_(ArrayIn<std::complex<T>, N, AuxIn> &in,
+				ArrayOut<T, N, AuxOut> &out,
+				bool forward, unsigned flags)
+	{
+		assert(!forward); // User input inconsistent ?
+		typedef array_traits<ArrayIn,  std::complex<T>, N, AuxIn> at1;
+		typedef array_traits<ArrayOut, T, N, AuxOut> at2;
+
+		int dimsIn[N], dimsOut[N];
+		std::copy(at1::shape(in), at1::shape(in)+N, dimsIn);
+		std::copy(at1::shape(in), at1::shape(in)+N, dimsOut);
+		dimsOut[N-1] = (dimsOut[N-1]-1)*2;
+
+		// Resize output
+		at2::resize(out, dimsOut);
+
+		return FFTLib<T>::plan_dft_c2r(N, dimsOut, 
+				     &(*at1::begin(in )),
+				     &(*at2::begin(out)), flags);
+	}
+};
+
+} // end namespace detail
+
+/*
+ * Creating an DFT object creates an FFTW plan and adjusts the size/shape of
+ * the output "out" as required.
+ */
+template <typename T, std::size_t N>
+struct DFT : public detail::FFTW<T>
+{
+	// In-place complex-to-complex
+	template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+		typename AuxIn>
+		DFT(ArrayIn<std::complex<T>, N, AuxIn> &in,
+		    bool forward = true, std::size_t flags = FFTW_ESTIMATE,
+		    const int threads = 0u) :
+			detail::FFTW<T>(new detail::PlanHolder<T>(
+ 		detail::Planner<T>::makeDFTPlan(in, in, forward, flags, threads)))
+		{ }
+
+	// Out-of-place C2C
+	template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+		typename AuxIn, typename AuxOut>
+		DFT(ArrayIn<std::complex<T>, N, AuxIn> &in, ArrayOut<std::complex<T>, N, AuxOut> &out,
+		    bool forward = true, std::size_t flags = FFTW_ESTIMATE,
+		    const int threads = 0u) :
+			detail::FFTW<T>(new detail::PlanHolder<T>(
+ 		detail::Planner<T>::makeDFTPlan(in, out, forward, flags, threads)))
+		{ }
+
+	// Out-of-place R2C
+	template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+		typename AuxIn, typename AuxOut>
+		DFT(ArrayIn<T, N, AuxIn> &in, ArrayOut<std::complex<T>, N, AuxOut> &out,
+		    bool forward = true, std::size_t flags = FFTW_ESTIMATE,
+		    const int threads = 0u) :
+			detail::FFTW<T>(new detail::PlanHolder<T>(
+ 		detail::Planner<T>::makeDFTPlan(in, out, forward, flags, threads)))
+		{ }
+
+	// Out-of-place C2R
+	template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+		typename AuxIn, typename AuxOut>
+		DFT(ArrayIn<std::complex<T>, N, AuxIn> &in, ArrayOut<T, N, AuxOut> &out,
+		    bool forward = true, std::size_t flags = FFTW_ESTIMATE,
+		    const int threads = 0u) :
+			detail::FFTW<T>(new detail::PlanHolder<T>(
+ 		detail::Planner<T>::makeDFTPlan(in, out, forward, flags, threads)))
+		{ }
+};
+
+namespace detail
+{
+
+/*
+ * doDFT_ in an internal wrapper that handles the complications
+ * arising from wanting to FFT integer data etc.
+ */
+
+// Int-to-Int and Float-to-Int do not exists!
+template <bool inIsFloat, bool OutIsFloat>
+struct doDFT_ { };
+
+// Float-to-float
+template<>
+struct doDFT_<true, true>
+{
+	// Complex to Complex
+template <
+	template <typename Tm, std::size_t D, typename Aux> class Array_t,
+	typename T, std::size_t N, typename AuxIn>
+	static bool execute(Array_t<std::complex<T>, N, AuxIn> &inout,
+			    const bool forward, const int threads)
+	{
+		typedef array_traits<Array_t, std::complex<T>, N, AuxIn>  Traits;
+
+		DFT<T, N> dft(inout, forward, FFTW_ESTIMATE, threads);
+
+		if (!forward)
+		{
+			const T invSize = 1.0 / T(Traits::size(inout));
+			omptl::transform(Traits::begin(inout), Traits::end(inout),
+				Traits::begin(inout),
+				std::bind2nd(std::multiplies<std::complex<T> >(), invSize));
+		}
+
+		return dft.execute();
+	}
+
+template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+	typename T, std::size_t N,
+	typename AuxIn, typename AuxOut>
+	static bool execute(ArrayIn <std::complex<T>, N, AuxIn > &in,
+			    ArrayOut<std::complex<T>, N, AuxOut> &out,
+			    const bool forward, const int threads)
+	{
+		typedef array_traits<ArrayIn,  T, N, AuxIn>  InTraits;
+		typedef array_traits<ArrayOut, T, N, AuxOut> OutTraits;
+
+		OutTraits::resize(out, InTraits::shape(in));
+		DFT<T, N> dft(out, forward, FFTW_ESTIMATE, threads);
+
+		if (forward)
+			std::copy(InTraits::begin(in), InTraits::end(in),
+				  OutTraits::begin(out));
+		else
+		{
+			const T invSize = 1.0 / T(OutTraits::size(out));
+			omptl::transform(InTraits::begin(in), InTraits::end(in),
+				OutTraits::begin(out),
+				std::bind2nd(std::multiplies<T>(), invSize));
+		}
+
+		return dft.execute();
+	}
+
+	// Real to complex
+template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+	typename T, std::size_t N,
+	typename AuxIn, typename AuxOut>
+	static bool execute(/*const*/ ArrayIn<T, N, AuxIn> &in,
+			ArrayOut<std::complex<T>, N, AuxOut> &out,
+			const int threads)
+	{
+		// A Real-to-Complex transform is always forward
+		DFT<T, N> dft(in, out, true, // it's a forward transform
+				FFTW_ESTIMATE, threads);
+
+		return dft.execute();
+	}
+
+	// Complex to Real
+template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+	typename T, std::size_t N,
+	typename AuxIn, typename AuxOut>
+	static bool execute(/*const*/ ArrayIn<std::complex<T>, N, AuxIn> &in,
+			ArrayOut<T, N, AuxOut> &out,
+			const int threads)
+	{
+		// A Complex-to-Real transform is always backward
+		typedef array_traits<ArrayIn, std::complex<T>, N, AuxIn>
+					InTraits;
+		typedef array_traits<ArrayOut, T, N, AuxOut> OutTraits;
+
+		DFT<T, N> dft(in, out, false, // it's a backward transform
+			      FFTW_ESTIMATE, threads);
+
+		if (!dft.execute())
+			return false;
+			
+		const T invSize = 1.0 / T(OutTraits::size(out));
+		omptl::transform(OutTraits::begin(out), OutTraits::end(out),
+				 OutTraits::begin(out),
+			std::bind2nd(std::multiplies<T>(), invSize));
+
+		return true;
+	}
+
+};
+
+// Int-to-float
+template <>
+struct doDFT_<false, true>
+{
+	// Real to Complex
+template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+	typename Tin, typename Tout, std::size_t N,
+	typename AuxIn, typename AuxOut>
+	static bool execute(/*const*/ ArrayIn<Tin, N, AuxIn> &in,
+			ArrayOut<std::complex<Tout>, N, AuxOut> &out,
+			const int threads)
+	{
+		// A Real-to-Complex transform is always forward
+		typedef array_traits<ArrayIn, Tin, N, AuxIn> InTraits;
+
+		// Convert input to floating point
+		Matrix<Tout, N> copyOfIn(InTraits::shape(in));
+		DFT<Tout, N> dft(copyOfIn, out, true, // it's a forward transform
+				FFTW_ESTIMATE|FFTW_DESTROY_INPUT, threads);
+
+		std::copy(InTraits::begin(in), InTraits::end(in), copyOfIn.begin());
+		return dft.execute();
+	}
+};
+
+// Float-to-Int
+template <>
+struct doDFT_<true, false>
+{
+	// Complex to Real
+template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+	typename Tin, typename Tout, std::size_t N,
+	typename AuxIn, typename AuxOut>
+	static bool execute(/*const*/ ArrayIn<std::complex<Tin>, N, AuxIn> &in,
+			ArrayOut<Tout, N, AuxOut> &out,
+			const int threads)
+	{
+		typedef array_traits<ArrayIn, std::complex<Tin>, N, AuxIn>
+					InTraits;
+		typedef array_traits<ArrayOut, Tout, N, AuxOut> OutTraits;
+
+		Matrix<Tin, N> copyOfOut; // Tin is the float type
+		DFT<Tin, N> dft(in, copyOfOut, false, // it's a backward transform
+				FFTW_ESTIMATE|FFTW_DESTROY_INPUT, threads);
+
+		if (!dft.execute())
+			return false;
+
+		// Normalize
+		const Tin invSize = 1.0 / Tin(OutTraits::size(out));
+		omptl::transform(copyOfOut.begin(), copyOfOut.end(), copyOfOut.begin(),
+			std::bind2nd(std::multiplies<Tin>(), invSize));
+
+		// Convert to integer type
+		OutTraits::resize(out, copyOfOut.extents());
+		omptl::transform(copyOfOut.begin(), copyOfOut.end(),
+				 OutTraits::begin(out), round_cast<Tout, Tin>);
+
+		return true;
+	}
+};
+
+} // end namespace detail
+
+/*
+ * Easy public interface for the execution of one FFT
+ */
+
+// Complex-to-complex out-of-place
+template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+	typename Tin, typename Tout, std::size_t N,
+	typename AuxIn, typename AuxOut>
+bool doDFT(/*const*/ ArrayIn<std::complex<Tin>, N, AuxIn> &in, ArrayOut<std::complex<Tout>, N, AuxOut> &out,
+	   const bool forward, const int threads = 0u)
+{
+	return detail::doDFT_< std::tr1::is_floating_point<Tin>::value,
+		std::tr1::is_floating_point<Tout>::value>::
+			execute(in, out, forward, threads);
+}
+
+// Complex-to-complex out-of-place
+template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	typename T, std::size_t N, typename AuxIn>
+bool doDFT(ArrayIn<std::complex<T>, N, AuxIn> &inout,
+	   const bool forward, const int threads = 0u)
+{
+	return detail::doDFT_< std::tr1::is_floating_point<T>::value,
+		std::tr1::is_floating_point<T>::value>::
+			execute(inout, forward, threads);
+}
+
+// Real-to-Complex
+template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+	typename Tin, typename Tout, std::size_t N,
+	typename AuxIn, typename AuxOut>
+bool doDFT(/*const*/ ArrayIn<Tin, N, AuxIn> &in, ArrayOut<std::complex<Tout>, N, AuxOut> &out,
+	   const int threads = 0u)
+{
+	return detail::doDFT_< std::tr1::is_floating_point<Tin>::value,
+		std::tr1::is_floating_point<Tout>::value>::
+			execute(in, out, threads);
+}
+
+// Complex-to-Real
+template <
+	template <typename Tm, std::size_t D, typename Aux> class ArrayIn,
+	template <typename Tm, std::size_t D, typename Aux> class ArrayOut,
+	typename Tin, typename Tout, std::size_t N,
+	typename AuxIn, typename AuxOut>
+bool doDFT(/*const*/ ArrayIn<std::complex<Tin>, N, AuxIn> &in, ArrayOut<Tout, N, AuxOut> &out,
+	   const int threads = 0u)
+{
+	return detail::doDFT_< std::tr1::is_floating_point<Tin>::value,
+		std::tr1::is_floating_point<Tout>::value>::
+			execute(in, out, threads);
+}
+
+
+/*
+template <std::size_t N, typename Tin, typename Tout>
+class DCT : public detail::FFTW
+{
+	public:
+		template <template <typename Tm, std::size_t D> class ArrayIn,
+			  template <typename Tm, std::size_t D> class ArrayOut>
+		DCT(ArrayIn<Tin, N, AuxIn> &in, ArrayOut<Tout, N, AuxOut> &out,
+		    bool forward = true,
+		    std::size_t flags = FFTW_ESTIMATE,
+		    bool normalize = true) :
+			detail::FFTW(new detail::PlanHolder(
+				_makeDFTPlan<ArrayIn, ArrayOut,N, Tin, Tout>
+					(in, out, forward, flags)))
+		{ }
+};
+*/
+
+
+namespace detail
+{
+
+template <std::size_t N>
+struct FFTShift
+{
+	template <template <typename Type, std::size_t Dim, typename Aux> class Array,
+		  typename T, typename A>
+	static void fftshift(Array<T, N, A> &a)
+	{
+		typedef array_traits<Array, T, N, A> AT;
+		const std::size_t n = AT::shape(a)[0];
+		const int half = n / 2u;
+		const std::size_t uneven = n % 2u;
+//std::cout << N << " uneven " << uneven << std::endl;
+		if (uneven)
+		{
+			Matrix<T, N-1> temp(AT::shape(a)+1);
+			std::copy(a[0].begin(), a[0].end(), temp.begin());
+			for (int i = 0; i <= half; ++i)
+			{
+				//std::swap(temp, a[ (half+1+i)%n ] );
+				//std::swap(a[i+1], temp );
+				FFTShift<N-1>::fftshift(temp, a[ (half+1+i)%n ],
+					array_traits<Array, T, N, A>::shape(a)+1);
+				FFTShift<N-1>::fftshift(temp, a[ 1+i ],
+					array_traits<Array, T, N, A>::shape(a)+1);
+			}
+		}
+		else
+		{
+			#ifdef _OPENMP
+			#pragma omp parallel for
+			#endif
+			for (int i = 0; i < half; ++i)
+				FFTShift<N-1>::fftshift(a[i], a[ half+i ],
+					array_traits<Array, T, N, A>::shape(a)+1);
+		}
+	}
+	
+	template <class SliceL, class SliceH, class It>
+	static void fftshift(SliceL low, SliceH high, const It shape)
+	{
+		const std::size_t n = *shape;
+		const std::size_t half = n / 2u;
+		const std::size_t uneven = n % 2u;
+/*		if (uneven)
+			;
+		else
+*/			for (std::size_t i = 0; i < n; ++i)
+				FFTShift<N-1>::fftshift/*_even*/(low[i], high[ (half+uneven+i)%n ], shape+1);
+	}
+};
+
+template <>
+struct FFTShift<1>
+{
+	template <template <typename Type, std::size_t Dim, typename Aux> class Array,
+		  typename T, typename A>
+	static void fftshift(Array<T, 1, A> &a)
+	{
+		const std::size_t n = array_traits<Array, T, 1, A>::size(a);
+		const int half = n / 2u;
+		const std::size_t uneven = n % 2u;
+		if (uneven)
+		{
+			T temp = a[0];
+			for (int i = 0; i < half+1; ++i)
+			{
+				std::swap(temp, a[ (half+1+i)%n ] );
+				std::swap(a[i+1], temp );
+			}
+		}
+		else
+		{
+			#ifdef _OPENMP
+			#pragma omp parallel for
+			#endif
+			for (int i = 0; i < half; ++i)
+				std::swap(a[i], a[ half+i ] );
+		}
+	}
+
+	template <class SliceL, class SliceH, class It>
+	static void fftshift(SliceL low, SliceH high, const It shape)
+	{
+		const std::size_t n = *shape;
+		const std::size_t half = n / 2u;
+		const std::size_t uneven = n % 2u;
+//std::cout << "1 uneven " << uneven << std::endl;
+		if (uneven)
+		{
+			typename SliceL::value_type temp = low[half];
+			for (std::size_t i = 0; i < n; ++i)
+			{
+				std::swap(low[i], temp );
+				std::swap(temp, high[ (half+1+i)%n ] );
+			}
+		}
+		else
+			for (std::size_t i = 0; i < n; ++i)
+				std::swap(low[i], high[ (half+i)%n ] );
+	}
+};
+
+template <>
+struct FFTShift<0> 
+{
+	template <template <typename Type, std::size_t Dim, typename Aux> class Array,
+		  typename T, typename A>
+	static void fftshift(Array<T, 0, A> &a) { /* nop */ } 
+};
+
+
+} // end namespace detail
+
+template <template <typename Type, std::size_t D, typename Aux> class Array,
+	  typename T, std::size_t N, typename A>
+void fftshift(Array<T, N, A> &a)
+{
+	detail::FFTShift<N>::fftshift(a);
+}
+
+} // namespace cvmlcpp
+
+#endif

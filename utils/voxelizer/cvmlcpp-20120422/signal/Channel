@@ -1,0 +1,209 @@
+/***************************************************************************
+ *   Copyright (C) 2008 by BEEKHOF, Fokko                                  *
+ *   fpbeekhof@gmail.com                                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You shoud have received a copy of the GNU General Public License      *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ ***************************************************************************/
+
+#pragma once
+
+#ifndef CVMLCPP_CHANNEL_H
+#define CVMLCPP_CHANNEL_H 1
+
+#include <map>
+#include <cmath>
+
+#include <tr1/memory>
+
+#include <cvmlcpp/base/stl_cmath.h>
+#include <cvmlcpp/math/Math>
+
+namespace cvmlcpp
+{
+
+template <typename Input, typename Output>
+struct Channel
+{
+	virtual ~Channel() { }
+
+	virtual	double probabilityOf(const Output channelOutput,
+				     const Input  channelInput) const = 0;
+};
+
+template <typename Input, typename Output>
+class NoiselessChannel : public Channel<Input, Output>
+{
+	public:
+		virtual ~NoiselessChannel() { }
+
+		virtual	double probabilityOf(const Output channelOutput,
+					     const Input  channelInput) const
+		{
+			const Output ci = static_cast<Output>(channelInput);
+
+			return (channelOutput==ci) ? 1.0 : 0.0;
+		}
+};
+
+template <typename Input, typename Output>
+class ShiftChannel : public Channel<Input, Output>
+{
+	public:
+		ShiftChannel(const double offset) : offset_(offset) { }
+
+		virtual ~ShiftChannel() { }
+
+		virtual	double probabilityOf(const Output channelOutput,
+					     const Input  channelInput) const
+		{
+			const double ci = static_cast<double>(channelInput);
+
+			return (channelOutput==ci-offset_) ? 1.0 : 0.0;
+		}
+
+	private:
+		const double offset_;
+};
+
+template <typename Input, typename Output>
+class AWGNChannel : public Channel<Input, Output>
+{
+	public:
+		AWGNChannel(const double variance) :
+			halfInvVariance_(.5 / variance),
+			twoPiDeviation_(std::sqrt(variance) *
+				std::sqrt(2.0 * Constants<double>::pi())) {}
+
+		virtual ~AWGNChannel() { }
+
+		virtual	double probabilityOf(const Output channelOutput,
+					     const Input  channelInput) const
+		{
+			const double ci = static_cast<double>(channelInput);
+			const double dSq = std::pow(channelOutput-ci, 2.0);
+
+			return std::exp( -halfInvVariance_ * dSq ) /
+				// ----------------------------------
+					twoPiDeviation_;
+		}
+
+	private:
+		const double halfInvVariance_, twoPiDeviation_;
+};
+
+template <typename Input, typename Output>
+class AGNChannel : public Channel<Input, Output>
+{
+	public:
+		AGNChannel(const double mean, const double variance) :
+			mean_(mean), halfInvVariance_( -1./(2.*variance) ),
+			invTwoPiDeviation_(1. / std::sqrt(variance * 2.0 * Constants<double>::pi())) { }
+
+		virtual ~AGNChannel() { }
+
+		virtual	double probabilityOf(const Output channelOutput,
+					     const Input  channelInput) const
+		{
+			const double ci = double(channelInput);
+			const double co = double(channelOutput) - mean_;
+			const double dSq= std::pow(co - ci, 2.0);
+
+			const double p = std::exp( halfInvVariance_ * dSq ) * invTwoPiDeviation_;
+
+			return p;
+		}
+
+	private:
+		const double mean_, halfInvVariance_, invTwoPiDeviation_;
+};
+
+template <typename Input, typename Output>
+class AGGNChannel : public Channel<Input, Output>
+{
+	public:
+		AGGNChannel(const double mean, const double variance,
+			    const double shape = 2.0) :
+			mean_(mean), shape_(shape),
+			b_(std::sqrt( variance * std::tr1::tgamma(1.0/shape) /
+				          std::tr1::tgamma(3.0/shape) )),
+			a_( 1.0 / (2.0*std::tr1::tgamma(1.0 + 1.0/shape)*b_) )
+		{ }
+
+		virtual ~AGGNChannel() { }
+
+		virtual	double probabilityOf(const Output channelOutput,
+					     const Input  channelInput) const
+		{
+			const double x = channelOutput - Output(channelInput);
+
+			return a_ * std::exp(
+				- std::pow( std::abs( (x-mean_)/b_ ), shape_) );
+		}
+
+	private:
+		const double mean_, shape_, b_, a_;
+};
+
+
+template <typename Input, typename Output>
+class MultiChannel : public Channel<Input, Output>
+{
+	public:
+		MultiChannel(std::map<Input,
+				std::tr1::shared_ptr<Channel<Input, Output> > >
+				channels) : channels_(channels) { }
+
+		virtual ~MultiChannel() { }
+
+		virtual	double probabilityOf(const Output channelOutput,
+					     const Input  channelInput) const
+		{
+			return channels_[channelInput]->
+				probabilityOf(channelOutput, channelInput);
+		}
+
+	private:
+		mutable std::map<Input,
+				std::tr1::shared_ptr<Channel<Input, Output> > >
+						channels_;
+};
+
+class BinarySymmetricChannel : public Channel<bool, bool>
+{
+	public:
+		BinarySymmetricChannel(const double pFlip) : pFlip_(pFlip) 
+		{
+			assert(pFlip >= 0.0);
+			assert(pFlip <= 1.0);
+		}
+
+		virtual ~BinarySymmetricChannel() { }
+
+		virtual	double probabilityOf(const bool channelOutput,
+					     const bool channelInput) const
+		{
+			return (channelOutput==channelInput) ?
+					(1.0 - pFlip_) : pFlip_;
+		}
+
+	private:
+		const double pFlip_;
+};
+
+
+} // namespace
+
+#endif

@@ -1,0 +1,646 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>CVMLCPP::Functors</title>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	<link rel='stylesheet' href='stylesheet.css' type='text/css' />
+</head>
+
+<body>
+<div>
+
+<!-- Begin Page -->
+
+<h1>Functors</h1>
+
+<p>
+<b>Functors</b> offers a number of
+<a href='http://www.sgi.com/tech/stl/functors.html'>Function Objects</a> for
+various purposes. The functors are grouped in several categories.
+</p>
+
+<p>
+Some mathematic functions will try to use the
+<a href='http://www.gnu.org/software/gsl/'>GSL</a> if <i>USE_GSL</i> is defined.
+In that case, you will have to link against GSL libraries.
+</p>
+
+<h2>List of functors</h2>
+
+<h3>Common</h3>
+<!-- Functor -->
+<h4><pre>template &lt;typename TSrc, typename TDest&gt;
+StaticCaster</pre></h4>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>,
+	alias for <i>TSrc</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for <i>TDest</i>.</td>
+</tr>
+<tr>
+	<td><pre>StaticCaster&lt;TSrc, TDest&gt;()</pre></td>
+	<td>Constructor.</td>
+</tr>
+<tr>
+	<td><pre>TDest operator()(const TSrc &amp;src) const</pre></td>
+	<td>Return static_cast&lt;TDest&gt;(src)</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;T&gt;
+Printer</pre></h4>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, i.e. <i>void</i>.</td>
+</tr>
+<tr>
+	<td><pre>Printer&lt;T&gt;(std::string _delimiter = " ")</pre></td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td><pre>void operator()(const T &amp;item) const</pre></td>
+	<td>Prints "item" and a delimiter to the stdout.</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;T, U&gt;
+Select1st</pre></h4>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for
+	<i>std::pair&lt;T, U&gt;</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>Select1st&lt;T, U&gt;()</pre></td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td>
+<pre>T operator()(const std::pair&lt;T, U&gt; &amp;p) const</pre></td>
+	<td>Returns "p.first".</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;T1, T2&gt;
+Select2nd</pre></h4>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for
+	<i>std::pair&lt;T, U&gt;</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>U</i>.</td>
+</tr>
+<tr>
+	<td><pre>Select2nd&lt;T, U&gt;()</pre></td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td>
+<pre>U operator()(const std::pair&lt;T, U&gt; &amp;p) const</pre></td>
+	<td>Returns "p.second".</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;R&gt;
+Chooser1</pre></h4>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>R</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>R</i>.</td>
+</tr>
+<tr>
+	<td><pre>Chooser1&lt;R&gt;(R trueValue, R falseValue)</pre></td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td><pre>R operator()(const bool &amp;b) const</pre></td>
+	<td>Returns "b ? trueValue : falseValue", chooses one of the
+	specified values depending on the input.</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;T, R, Operator&gt;
+Chooser1Op</pre></h4>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>R</i>.</td>
+</tr>
+<tr>
+	<td>
+	<pre>Chooser1Op&lt;R&gt;(Operator op, R trueValue, R falseValue)</pre>
+	</td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td><pre>R operator()(const T &amp;o)</pre></td>
+	<td>Returns "op(o) ? trueValue : falseValue", applies the specified
+	Operator to the input and chooses one of the specified values.</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;T, R, Operator&gt;
+Chooser2Op</pre></h4>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>R</i>.</td>
+</tr>
+<tr>
+	<td>
+	<pre>Chooser2&lt;R&gt;(Operator op, R trueValue, R falseValue)</pre>
+	</td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td><pre>R operator()(const T &amp;lhs, const T &amp;rhs)</td>
+	<td>Returns "op(lhs, rhs) ? trueValue : falseValue", applies the
+	specified binary Operator to the input and chooses one of the specified
+	values.</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;T&gt;
+binary_not</pre></h4>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>binary_not&lt;T&gt;()</pre></td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td>
+<pre>T operator()(const T &amp;o) const</pre></td>
+	<td>Returns <i>~o</i>, the binary operator NOT applied to <i>o</i>.
+	</td>
+</tr>
+</table>
+<br /><h3>Binary Functions</h3>
+
+<h4><pre>template &lt;T&gt;
+binary_and</pre></h4>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>binary_and&lt;T&gt;()</pre></td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td>
+<pre>T operator()(const T &amp;lhs, const T &amp;rhs) const</pre></td>
+	<td>Returns "lhs &amp; rhs", the binary operator AND applied to
+	"lhs" and "rhs".</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;T&gt;
+binary_or</pre></h4>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>binary_or&lt;T&gt;()</pre></td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td>
+<pre>T operator()(const T &amp;lhs, const T &amp;rhs) const</pre></td>
+	<td>Returns "lhs | rhs", the binary operator OR applied to
+	"lhs" and "rhs".</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;T&gt;
+binary_xor</pre></h4>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>binary_xor&lt;T&gt;()</pre></td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td>
+<pre>T operator()(const T &amp;lhs, const T &amp;rhs) const</pre></td>
+	<td>Returns <i>lhs ^ rhs</i>, the binary operator XOR applied to
+	"lhs" and "rhs".</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;T&gt;
+roughly_equals</pre></h4>
+
+<p>Replacement for operator <i>equal_to</i> for floating-point numbers. For integer numbers, identical to operator <i>equal_to</i>.</p>
+
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for <i>bool</i>.</td>
+</tr>
+<tr>
+	<td><pre>&lt;T&gt;()</pre></td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td><pre>T operator()() const</pre></td>
+	<td>Returns <i>true</i> if <i>lhs</i> and <i>rhs</i> are close within roundoff error.
+	</td>
+</tr>
+</table>
+<br />
+
+<h3>Math</h3>
+
+<h4>
+<pre>template &lt;class Vector, typename register_type = Vector::value_type&gt;
+Rotator3D</pre></h4>
+
+<p>
+A <i>Rotator3D</i> applies a 3D rotation along the specified axis to a 3D
+Vector. The <i>Vector</i> class can essientially be any container whose size
+equals 3. The template parameter <i>register_type</i> corresponds to the type
+used for calculations, for example, one may choose to have a Vector of ints,
+but let the calculations be performed as floats.
+</p>
+
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Alias for <i>value_type</i> for template parameter
+	<i>Vector</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template parameter
+	<i>Vector</i>.</td>
+</tr>
+<tr>
+	<td>
+	<pre>Rotator3D&lt;Vector&gt;(std::size_t axis, register_type angle)</pre>
+	</td>
+	<td>Constructor. Vectors will be rotated <i>angle</i> radians around the
+	given <i>axis</i>.</td>
+</tr>
+<tr>
+	<td><pre>Vector operator()(const Vector &amp;v) const</pre></td>
+	<td>Rotates <i>v</i> and returns the result.</td>
+</tr>
+</table>
+<br />
+
+<!-- Functor -->
+<h4><pre>template &lt;class Function&gt;
+Derivative</pre></h4>
+
+The template parameters class <i>Function</i> must offer a typedef for
+<i>value_type</i> and an operator of the following form:
+<pre>value_type operator()(const value_type &amp;x) const</pre>
+The class <i>Function</i> is thus assumed to model a mathematic function with
+fixed behaviour, which is enforced by the constness of the operator.
+
+<p>
+The <i>Derivative</i> computes a numerical approximation of the derivative of a
+given function, taking care of numerical precision and stability.
+</p>
+
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>An alias for typename "Function::value_type".</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>.</td>
+</tr>
+<tr>
+	<td><pre>Derivative&lt;Function&gt;(const Function &amp;f)</pre></td>
+	<td>Constructor. Parameter <i>f</i> must be a functor implementing a
+	Function as specified.
+	</td>
+</tr>
+<tr>
+	<td><pre>value_type operator()(const value_type &amp;x) const</pre></td>
+	<td>Returns the derivative of Function <i>f</i> in point <i>x</i>.</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;typename T&gt;
+class LinearFunc</pre></h4>
+
+Models the function <i>y = ax + b</i>.
+
+<p>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>LinearFunc&lt;T&gt;(const T a, const T b)</pre></td>
+	<td>Constructor.</td>
+</tr>
+<tr>
+	<td><pre>T operator()(const T &amp;x) const</pre></td>
+	<td>Returns <i>ax + b</i>.</td>
+</tr>
+</table>
+</p>
+<br />
+
+<h4><pre>template &lt;typename T&gt;
+class QuadraticFunc</pre></h4>
+
+Models the function <i>y = ax^2 + bx + c</i>.
+
+<p>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>QuadraticFunc&lt;T&gt;(const T a, const T b, const T c)</pre>
+	</td>
+	<td>Constructor.</td>
+</tr>
+<tr>
+	<td><pre>T operator()(const T &amp;x) const</pre></td>
+	<td>Returns <i>ax^2 + bx + c</i>.</td>
+</tr>
+</table>
+</p>
+<br />
+
+<h4><pre>template &lt;typename T, std::size_t n&gt;
+class Polynomial</pre></h4>
+
+Models an <i>n</i>th degree polynomial function. Keep in mind that an
+<i>n</i>th degree polynomial has <i>n + 1</i> coefficients.
+
+<p>
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>template &lt;typename Iterator&gt;
+Polynomial&lt;T, n&gt;(Iterator begin, Iterator end)</pre></td>
+	<td>Constructor. The elements in the range <i>begin</i> to <i>end</i>
+	are the coefficients of the polynomial function <i>y</i>, where the
+	<i>i</i>th element in the range corresponds to the coefficient of
+	<i>x^i</i>. Keep in mind that there must be <i>n + 1</i> elements in
+	the given range!</td>
+</tr>
+<tr>
+	<td><pre>T operator()(T x) const</pre></td>
+	<td>Returns the value of <i>y</i> at point <i>x</i>.</td>
+</tr>
+</table>
+</p>
+<br />
+
+<h4><pre>template &lt;typename T&gt;
+class Gaussian</pre></h4>
+
+
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>Gaussian(const T mu, const T sigmaSq)</pre></td>
+	<td>Constructor, <i>mu</i>is the mean af the distribution and the
+	variance is given by <i>sigmaSq</i>.</td>
+</tr>
+<tr>
+	<td><pre>T operator()(const T &amp;x) const</pre></td>
+	<td>Returns value of the standard Gaussian probability density function
+	at location <i>x</i>.</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;typename T&gt;
+class Clamp</pre></h4>
+
+Clamp a value between two specified values.
+
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>Clamp&lt;T&gt;(const T low, const T high)</pre></td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td><pre>T operator()(const T &amp;x) const</pre></td>
+	<td>Returns the value in the range <i>[low, high]</i> that is closest
+	to <i>x</i>.</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>template &lt;typename T&gt;
+struct Square</pre></h4>
+
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the parameters for <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>T operator()(const T &amp;x) const</pre></td>
+	<td>Return the square of <i>x</i>.</td>
+</tr>
+</table>
+<br />
+
+<h4><pre>
+template &lt;typename T, typename U, class Operator = std::less&lt;T&gt; &gt;
+class PairFirstCompare</pre></h4>
+
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Type of the objects to be compared, alias for template
+	parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>result_type</pre></td>
+	<td>Return type of <i>operator()</i>.</td>
+</tr>
+<tr>
+	<td><pre>T operator()(const T &amp;lhs, const std::pair&lt;T, U&gt; &amp;rhs) const</pre>
+	</td>
+	<td>Compares <i>lhs</i> to <i>rhs.first</i>.</td>
+</tr>
+<tr>
+	<td><pre>T operator()(const std::pair&lt;T, U&gt; &amp;lhs, const T &amp;rhs) const</pre>
+	</td>
+	<td>Compares <i>lhs.first</i> to <i>rhs</i>.</td>
+</tr>
+<tr>
+	<td><pre>T operator()(const std::pair&lt;T, U&gt; &amp;lhs,
+	     const std::pair&lt;T, U&gt; &amp;rhs) const</pre>
+	</td>
+	<td>Compares <i>lhs.first</i> to <i>rhs.first</i>.</td>
+</tr>
+</table>
+<br />
+
+<!-- Template
+<h4><pre></pre></h4>
+
+<table border='1' width='100%'>
+<tr>
+	<td><pre>value_type</pre></td>
+	<td>Alias for template parameter <i>T</i>.</td>
+</tr>
+<tr>
+	<td><pre>&lt;&gt;()</pre></td>
+	<td>Constructor</td>
+</tr>
+<tr>
+	<td><pre>T operator()(const  &amp;) const</pre></td>
+	<td></td>
+</tr>
+</table>
+<br />
+-->
+
+
+
+<!-- End Page -->
+
+</div>
+
+</body>
+</html>
