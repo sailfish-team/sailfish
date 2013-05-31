@@ -278,6 +278,9 @@ class LBSimulationController(object):
         group.add_argument('--from', dest='from_',
             help='save/visualize simulation results from N iterations ', metavar='N',
             type=int, default=0)
+        group.add_argument('--perf_stats_every',
+                           help='how often to display performance stats',
+                           metavar='N', type=int, default=0)
         group.add_argument('--max_iters',
             help='number of iterations to run; use 0 to run indefinitely',
             type=int, default=0)

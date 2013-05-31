@@ -1297,6 +1297,10 @@ class SubdomainRunner(object):
                 self._sim.iteration))
 
     def need_quit(self):
+        if (self.config.max_iters > 0 and
+            self._sim.iteration >= self.config.max_iters):
+            return True
+
         # The quit event is used by the visualization interface.
         if self._quit_event.is_set():
             self.config.logger.info("Simulation termination requested.")
@@ -1345,6 +1349,8 @@ class SubdomainRunner(object):
                                         if node_type else nt._NTFluid)
         self.backend.to_buf(self._gpu_geo_map)
 
+
+    t_prev_checkpoint = 0.0
     def main(self):
         is_quit = False
 
@@ -1356,6 +1362,7 @@ class SubdomainRunner(object):
                 output_req = self._sim.need_output()
                 sync_req, fields_req = self._sim.need_sync_fields()
 
+                # Distribution dumping.
                 if sync_req and self.config.debug_dump_dists:
                     bufs = []
                     for i in range(len(self._sim.grids)):
@@ -1363,28 +1370,44 @@ class SubdomainRunner(object):
                     self._output.dump_dists(bufs, self._sim.iteration)
                     del bufs
 
+                # Updates the iteration number.
                 self.step(fields_req)
 
                 if sync_req:
                     self._fields_to_host()
 
-                if (self.config.max_iters > 0 and self._sim.iteration >=
-                        self.config.max_iters) or self.need_quit():
+                # Periodically log effective performance.
+                pse = self.config.perf_stats_every
+                if (pse > 0 and self._sim.iteration % pse == 0):
+                    t_now = time.time()
+                    if self.t_prev_checkpoint > 0.0:
+                        dt = t_now - self.t_prev_checkpoint
+                        mlups = self._spec.num_nodes * pse / dt * 1e-6
+                        self.config.logger.info(
+                            "iteration:{0}  speed:{1:.2f} MLUPS".format(
+                                self._sim.iteration, mlups))
+                    self.t_prev_checkpoint = t_now
+
+                if self.need_quit():
                     break
 
+                # External geometry updates (from the frontend).
                 if self._spec.geo_queue is not None:
                     self._handle_geo_updates()
 
+                # Wait for calculations to complete. All code handling misc host
+                # tasks should be above this line to minimize performance
+                # impact.
                 self.backend.sync_stream(self._data_stream, self._calc_stream)
 
                 if output_req:
-                    if self.config.check_invalid_results_host:
-                        if not self._output.verify():
-                            self.config.logger.error("Invalid value detected in "
-                                    "output for iteration {0}".format(
-                                    self._sim.iteration))
-                            self._quit_event.set()
-                            break
+                    if (self.config.check_invalid_results_host and
+                        not self._output.verify()):
+                        self.config.logger.error("Invalid value detected in "
+                                "output for iteration {0}".format(
+                                self._sim.iteration))
+                        self._quit_event.set()
+                        break
                     self._output.save(self._sim.iteration)
                 self._profile.end_step()
 
