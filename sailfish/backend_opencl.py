@@ -137,7 +137,7 @@ class OpenCLBackend(object):
         return cl.Program(self.ctx, preamble + source).build() #'-cl-single-precision-constant -cl-fast-relaxed-math')
 
     def get_kernel(self, prog, name, block, args, args_format, shared=0,
-            needs_iteration=False):
+            needs_iteration=False, more_shared=False):
         """
         :param needs_iteration: if True, the kernel needs access to the current iteration
             number, which will be provided to it as the last argument
