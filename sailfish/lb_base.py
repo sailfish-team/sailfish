@@ -15,6 +15,18 @@ FieldPair = namedtuple('FieldPair', 'abstract buffer')
 ForcePair = namedtuple('ForcePair', 'numeric symbolic')
 KernelPair = namedtuple('KernelPair', 'primary secondary')
 
+class LBMixIn(object):
+    """Provides additional functionliaty to a simulation class.
+
+    Some attributes of objects descentant from this class are processed
+    in addition to the corresponding attribution from a simulation class
+    (LBSim descentant). These are:
+        - aux_code
+        - before_main_loop
+        - fields
+    """
+
+
 class LBSim(object):
     """Describes a specific type of a lattice Boltzmann simulation."""
 
@@ -109,20 +121,28 @@ class LBSim(object):
         self._scalar_fields = []
         self._vector_fields = []
         self._fields = {}
-        for field in self.fields():
-            if type(field) is ScalarField:
-                f = runner.make_scalar_field(name=field.name, async=True,
-                                             gpu_array=field.gpu_array)
-                f[:] = field.init
-                self._scalar_fields.append(FieldPair(field, f))
-            elif type(field) is VectorField:
-                f = runner.make_vector_field(name=field.name, async=True,
-                                             gpu_array=field.gpu_array)
-                self._vector_fields.append(FieldPair(field, f))
-                for i in range(0, self.grid.dim):
-                    setattr(self, field.name + suffixes[i], f[i])
-            setattr(self, field.name, f)
-            self._fields[field.name] = FieldPair(field, f)
+
+        sources = [self]
+        # Scan for mixin classes adding their own fields.
+        for c in self.__class__.mro()[1:]:
+            if issubclass(c, LBMixIn) and hasattr(c, 'fields'):
+                sources.append(c)
+
+        for src in sources:
+            for field in src.fields():
+                if type(field) is ScalarField:
+                    f = runner.make_scalar_field(name=field.name, async=True,
+                                                 gpu_array=field.gpu_array)
+                    f[:] = field.init
+                    self._scalar_fields.append(FieldPair(field, f))
+                elif type(field) is VectorField:
+                    f = runner.make_vector_field(name=field.name, async=True,
+                                                 gpu_array=field.gpu_array)
+                    self._vector_fields.append(FieldPair(field, f))
+                    for i in range(0, self.grid.dim):
+                        setattr(self, field.name + suffixes[i], f[i])
+                setattr(self, field.name, f)
+                self._fields[field.name] = FieldPair(field, f)
 
     def verify_fields(self):
         """Verifies that fields have not accidentally been overridden."""

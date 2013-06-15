@@ -405,7 +405,8 @@ class LBSimulationController(object):
             len(lb_class.__bases__) > 1):
             first_base = lb_class.__bases__[0]
             for base_class in lb_class.__bases__[1:]:
-                if base_class not in first_base.mro():
+                if (base_class not in first_base.mro() and
+                    'add_options' in base_class.__dict__):
                     base_class.add_options(group, self.dim)
 
         group = self._config_parser.add_group('Geometry settings')

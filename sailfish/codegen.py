@@ -11,6 +11,7 @@ import mako.exceptions
 from mako.lookup import TemplateLookup
 from mako.template import Template
 
+from sailfish.lb_base import LBMixIn
 import sailfish.io
 
 def _convert_to_double(src):
@@ -130,7 +131,16 @@ class BlockCodeGenerator(object):
             print mako.exceptions.text_error_template().render()
             return ''
 
-        for aux in self._sim.aux_code:
+        aux_sources = list(self._sim.aux_code)
+        # Allow mixin classes to provide their own aux_code values.
+        for c in self._sim.__class__.mro()[1:]:
+            if issubclass(c, LBMixIn) and hasattr(c, 'aux_code'):
+                for fn in c.aux_code:
+                    # Do not allow duplicate files.
+                    if fn not in aux_sources:
+                        aux_sources.append(fn)
+
+        for aux in aux_sources:
             if aux.count('\n') > 0:
                 code_tmpl = Template(aux)
             else:

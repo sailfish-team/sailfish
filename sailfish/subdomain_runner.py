@@ -13,6 +13,7 @@ import time
 import numpy as np
 import zmq
 from sailfish import codegen, io
+from sailfish.lb_base import LBMixIn
 from sailfish.profile import profile, TimeProfile
 from sailfish.subdomain_connection import ConnectionBuffer, MacroConnectionBuffer
 import sailfish.node_type as nt
@@ -1300,6 +1301,11 @@ class SubdomainRunner(object):
             self.initialize()
 
         self._sim.before_main_loop(self)
+        # Allow mix-ins to have their own before_main_loop routines.
+        for c in self._sim.__class__.mro()[1:]:
+            if issubclass(c, LBMixIn) and hasattr(c, 'before_main_loop'):
+                c.before_main_loop(self._sim, self)
+
         self.config.logger.info("Starting simulation.")
         self.main()
 
