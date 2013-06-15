@@ -56,7 +56,7 @@
 
 ## Defines local indices for kernels that do not distinguish between
 ## bulk and boundary regions.
-<%def name="local_indices()">
+<%def name="local_indices(no_outside=True)">
 	int lx = get_local_id(0);	// ID inside the current block
 	%if dim == 2:
 		int gx = get_global_id(0);
@@ -78,15 +78,17 @@
 
 	int gi = ${get_global_idx()};
 
-	// Nothing to do if we're outside of the simulation domain.
-	if (gx > ${lat_nx-1}) {
-		return;
-	}
+	%if no_outside:
+		// Nothing to do if we're outside of the simulation domain.
+		if (gx > ${lat_nx-1}) {
+			return;
+		}
+	%endif
 </%def>
 
 ## Defines local indices for kernels that can be split into bulk and boundary.
 ## Automatically handles the case when the split is disabled.
-<%def name="local_indices_split()">
+<%def name="local_indices_split(no_outside=True)">
 	%if boundary_size > 0:
 		int gx, gy, lx, gi;
 		%if dim == 3:
@@ -94,12 +96,12 @@
 		%endif
 
 		if (options & OPTION_BULK) {
-			${local_indices_bulk()}
+			${local_indices_bulk(no_outside=no_outside)}
 		} else {
-			${local_indices_boundary()}
+			${local_indices_boundary(no_outside=no_outside)}
 		}
 	%else:
-		${local_indices()}
+		${local_indices(no_outside=no_outside)}
 	%endif
 
 </%def>
@@ -156,7 +158,7 @@
 ## Defines local indices for bulk kernels.
 ## This is the same as local_indices(), but with proper offsets to skip
 ## the boundary.
-<%def name="local_indices_bulk()">
+<%def name="local_indices_bulk(no_outside=True)">
 	lx = get_local_id(0);	// ID inside the current block
 	<%
 		if block.has_face_conn(block.X_LOW) or block.periodic_x:
@@ -195,14 +197,16 @@
 
 	gi = ${get_global_idx()};
 
-	// Nothing to do if we're outside of the simulation domain.
-	if (gx > ${lat_nx-1}) {
-		return;
-	}
+	%if no_outside:
+		// Nothing to do if we're outside of the simulation domain.
+		if (gx > ${lat_nx-1}) {
+			return;
+		}
+	%endif
 </%def>
 
 ## Defines local indices for boundary kernels.
-<%def name="local_indices_boundary()">
+<%def name="local_indices_boundary(no_outside=True)">
 	lx = get_local_id(0);	// ID inside the current block
 	int gid = get_group_id(0) + get_group_id(1) * get_global_size(0) / get_local_size(0);
 
@@ -360,10 +364,12 @@
 
 	gi = ${get_global_idx()};
 
-	// Nothing to do if we're outside of the simulation domain.
-	if (gx > ${lat_nx-1}) {
-		return;
-	}
+	%if no_outside:
+		// Nothing to do if we're outside of the simulation domain.
+		if (gx > ${lat_nx-1}) {
+			return;
+		}
+	%endif
 </%def>
 
 <%def name="get_dist(array, i, idx, offset=0)" filter="trim">
