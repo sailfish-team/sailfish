@@ -1,3 +1,80 @@
+<%namespace file="propagation.mako" import="rel_offset"/>
+<%namespace file="kernel_common.mako" import="kernel_args_1st_moment,local_indices" />
+
+%if dim == 3:
+${kernel} void ComputeSquareVelocityAndVorticity(
+	${global_ptr} ${const_ptr} int *__restrict__ map,
+	${kernel_args_1st_moment('v')}
+	${global_ptr} float *usq,
+	${global_ptr} float *vort_sq) {
+
+	// We will decide ourselves whether a ghost can be skipped. In order for GPUArray
+	// reductions to work, the ghost nodes have to be filled with 0s.
+	${local_indices(no_outside=False)}
+	int ncode = map[gi];
+	int type = decodeNodeType(ncode);
+
+	if (isExcludedNode(type) || gx >= ${lat_nx-1}) {
+		usq[gi] = 0.0f;
+		vort_sq[gi] = 0.0f;
+		return;
+	}
+	float lvx = vx[gi];
+	float lvy = vy[gi];
+	float lvz = vz[gi];
+	usq[gi] = lvx * lvx + lvy * lvy + lvz * lvz;
+
+	float duz_dy, dux_dy;
+	// TODO(mjanusz): Modify this for variable-size neighborhood.
+	if (gy > 1 && gy < ${lat_ny-2}) {
+		duz_dy = (vz[gi + ${rel_offset(0, 1, 0)}] -
+				  vz[gi + ${rel_offset(0, -1, 0)}]) * 0.5f;
+		dux_dy = (vx[gi + ${rel_offset(0, 1, 0)}] -
+				  vx[gi + ${rel_offset(0, -1, 0)}]) * 0.5f;
+	} else if (gy == ${lat_ny-2}) {
+		duz_dy = lvz - vz[gi + ${rel_offset(0, -1, 0)}];
+		dux_dy = lvx - vx[gi + ${rel_offset(0, -1, 0)}];
+	} else if (gy == 1) {
+		duz_dy = vz[gi + ${rel_offset(0, 1, 0)}] - lvz;
+		dux_dy = vx[gi + ${rel_offset(0, 1, 0)}] - lvx;
+	}
+
+	float duy_dz, dux_dz;
+	if (gz > 1 && gz < ${lat_nz-2}) {
+		duy_dz = (vy[gi + ${rel_offset(0, 0, 1)}] -
+				  vy[gi + ${rel_offset(0, 0, -1)}]) * 0.5f;
+		dux_dz = (vx[gi + ${rel_offset(0, 0, 1)}] -
+				  vx[gi + ${rel_offset(0, 0, -1)}]) * 0.5f;
+	} else if (gz == ${lat_nz-2}) {
+		duy_dz = lvy - vy[gi + ${rel_offset(0, 0, -1)}];
+		dux_dz = lvx - vx[gi + ${rel_offset(0, 0, -1)}];
+	} else if (gz == 1) {
+		duy_dz = vy[gi + ${rel_offset(0, 0, 1)}] - lvy;
+		dux_dz = vx[gi + ${rel_offset(0, 0, 1)}] - lvx;
+	}
+
+	float duz_dx, duy_dx;
+	if (gx >= 2 && gx < ${lat_nx-2}) {
+		duz_dx = (vz[gi + ${rel_offset(1, 0, 0)}] -
+				  vz[gi + ${rel_offset(-1, 0, 0)}]) * 0.5f;
+		duy_dx = (vy[gi + ${rel_offset(1, 0, 0)}] -
+				  vy[gi + ${rel_offset(-1, 0, 0)}]) * 0.5f;
+	} else if (gx == ${lat_nx-2}) {
+		duz_dx = lvz - vz[gi + ${rel_offset(-1, 0, 0)}];
+		duy_dx = lvy - vy[gi + ${rel_offset(-1, 0, 0)}];
+	} else if (gx == 1) {
+		duz_dx = vz[gi + ${rel_offset(1, 0, 0)}] - lvz;
+		duy_dx = vy[gi + ${rel_offset(1, 0, 0)}] - lvy;
+	}
+
+	float vort_x = duz_dy - duy_dz;
+	float vort_y = dux_dz - duz_dx;
+	float vort_z = duy_dx - dux_dy;
+
+	vort_sq[gi] = vort_x * vort_x + vort_y * vort_y + vort_z * vort_z;
+}
+%endif
+
 <%def name="_compute_stats(num_inputs, stats, out_type)">
 	// Cache variables from global memory.
 	%for i in range(num_inputs):

@@ -115,7 +115,6 @@ class TestSim(LBSim):
 settings = {
     'debug_single_process': True,
     'quiet': True,
-    'save_src': '/tmp/foo.cu',
     'check_invalid_results_gpu': False,
     'check_invalid_results_host': False,
     'max_iters': 1}
