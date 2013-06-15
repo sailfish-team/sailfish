@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+"""Computes kinetic energy and enstrophy on the GPU and compares them with
+values computed on the host using operations on numpy arrays."""
 
 import unittest
 import numpy as np
@@ -46,6 +48,7 @@ class TestSubdomainRunner3D(SubdomainRunner):
 
         div = 2.0 * self._spec.num_nodes
 
+        # Compute the sum in double precision.
         self._sim.kinetic_energy = b.array.sum(arr_usq, dtype=np.float64).get() / div
         self._sim.enstrophy = b.array.sum(arr_vortsq, dtype=np.float64).get() / div
 
@@ -79,6 +82,7 @@ class TestKineticEnergyEnstrophy(unittest.TestCase):
         vort = util.vorticity(sim.v)
         vort_sq = vort[0]**2 + vort[1]**2 + vort[2]**2
 
+        # Convert the velocity field to double precision.
         dbl_v = [x.astype(np.float64) for x in sim.v]
 
         self.assertAlmostEqual(util.kinetic_energy(dbl_v), sim.kinetic_energy)
