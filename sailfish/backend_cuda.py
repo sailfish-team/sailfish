@@ -41,7 +41,8 @@ def _set_txt_format(dsc, strides):
         dsc.num_channels = 2
 
 class CUDABackend(object):
-    name='cuda'
+    name = 'cuda'
+    array = cudaarray
     FatalError = pycuda.driver.LaunchError
 
     @classmethod
@@ -262,9 +263,9 @@ class CUDABackend(object):
                 stream, *kernel.args, shared_size=kernel.shared_size)
 
     def get_reduction_kernel(self, reduce_expr, map_expr, neutral, *args):
-        """Generate and return reduction kernel; see PyCUDA documentation
-        of pycuda.reduction.ReductionKernel for detailed description.
-        Function expects buffers that are in device address space,
+        """Generate and return a reduction kernel; see PyCUDA documentation
+        of pycuda.reduction.ReductionKernel for a detailed description.
+        The eunction expects buffers that are in the device address space,
         stored in gpu_* variables.
 
         :param reduce_expr: expression used to reduce two values into one,
@@ -284,6 +285,9 @@ class CUDABackend(object):
                 reduce_expr=reduce_expr, map_expr=map_expr,
                 arguments=', '.join(arguments))
         return lambda : kernel(*arrays).get()
+
+    def get_array(self, arg):
+        return self.arrays[arg]
 
     def sync(self):
         self._ctx.synchronize()

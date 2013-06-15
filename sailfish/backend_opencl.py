@@ -13,7 +13,8 @@ import pyopencl.tools
 import numpy as np
 
 class OpenCLBackend(object):
-    name='opencl'
+    name ='opencl'
+    array = clarray
     FatalError = pyopencl.RuntimeError
 
     @classmethod
