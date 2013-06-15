@@ -111,11 +111,13 @@ class LBSim(object):
         self._fields = {}
         for field in self.fields():
             if type(field) is ScalarField:
-                f = runner.make_scalar_field(name=field.name, async=True)
+                f = runner.make_scalar_field(name=field.name, async=True,
+                                             gpu_array=field.gpu_array)
                 f[:] = field.init
                 self._scalar_fields.append(FieldPair(field, f))
             elif type(field) is VectorField:
-                f = runner.make_vector_field(name=field.name, async=True)
+                f = runner.make_vector_field(name=field.name, async=True,
+                                             gpu_array=field.gpu_array)
                 self._vector_fields.append(FieldPair(field, f))
                 for i in range(0, self.grid.dim):
                     setattr(self, field.name + suffixes[i], f[i])
@@ -316,16 +318,19 @@ class LBForcedSim(LBSim):
 
 
 class Field(object):
-    def __init__(self, name, expr=None, need_nn=False, init=0.0):
+    def __init__(self, name, expr=None, need_nn=False, init=0.0, gpu_array=False):
         """
         :param need_nn: if True, the model needs access to this field
             on the neighboring nodes.
         :param init: Initial value. Only used for scalar fields.
+        :param gpu_array: if True, a GPUArray wrapper will be automatically
+            created
         """
         self.name = name
         self.expr = expr
         self.init = init
         self.need_nn = need_nn
+        self.gpu_array = gpu_array
 
 class ScalarField(Field):
     pass

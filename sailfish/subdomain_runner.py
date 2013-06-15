@@ -88,6 +88,7 @@ class SubdomainRunner(object):
         self._field_base = {}
         self._scalar_fields = []
         self._vector_fields = []
+        self._array_fields = set()
         self._gpu_field_map = {}
         self._gpu_grids_primary = []
         self._gpu_grids_secondary = []  # only used for the AB access pattern
@@ -210,7 +211,8 @@ class SubdomainRunner(object):
     def add_visualization_field(self, field_cb, name):
         self._output.register_field(field_cb, name, visualization=True)
 
-    def make_scalar_field(self, dtype=None, name=None, register=True, async=False):
+    def make_scalar_field(self, dtype=None, name=None, register=True,
+                          async=False, gpu_array=False):
         """Allocates a scalar NumPy array.
 
         The array includes padding adjusted for the compute device (hidden from
@@ -245,6 +247,9 @@ class SubdomainRunner(object):
         fview = field[self._spec._nonghost_slice]
         self._field_base[id(fview.base)] = field
 
+        if gpu_array:
+            self._array_fields.add(id(fview.base))
+
         # Prior to numpy 1.7.0, the base was field (first element up the chain).
         assert fview.base is buf or fview.base is field
 
@@ -261,12 +266,14 @@ class SubdomainRunner(object):
     def field_base(self, field):
         return self._field_base[id(field.base)]
 
-    def make_vector_field(self, name=None, output=False, async=False):
+    def make_vector_field(self, name=None, output=False, async=False,
+                          gpu_array=False):
         """Allocates several scalar arrays representing a vector field."""
         components = []
 
         for x in range(0, self._spec.dim):
-            field = self.make_scalar_field(self.float, register=False, async=async)
+            field = self.make_scalar_field(self.float, register=False,
+                                           async=async, gpu_array=gpu_array)
             components.append(field)
 
         if name is not None:
@@ -700,12 +707,16 @@ class SubdomainRunner(object):
         self.config.logger.debug("Initializing compute unit data.")
 
         for field in self._scalar_fields:
-            self._gpu_field_map[id(field)] = self.backend.alloc_buf(like=self._field_base[id(field.base)])
+            self._gpu_field_map[id(field)] = self.backend.alloc_buf(
+                like=self._field_base[id(field.base)],
+                wrap_in_array=(id(field.base) in self._array_fields))
 
         for field in self._vector_fields:
             gpu_vector = []
             for component in field:
-                gpu_vector.append(self.backend.alloc_buf(like=self._field_base[id(component.base)]))
+                gpu_vector.append(self.backend.alloc_buf(
+                    like=self._field_base[id(component.base)],
+                    wrap_in_array=(id(component.base) in self._array_fields)))
             self._gpu_field_map[id(field)] = gpu_vector
 
         for grid in self._sim.grids:
