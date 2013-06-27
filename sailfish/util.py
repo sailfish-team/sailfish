@@ -108,7 +108,7 @@ def gpufile_to_clusterspec(gpufile, iface=''):
     f = open(gpufile, 'r')
     for line in f:
         line = line.strip()
-        host, _, gpu = line.partition('-gpu')
+        host, _, gpu = line.rpartition('-gpu')
         try:
             gpu = int(gpu)
         except ValueError:
