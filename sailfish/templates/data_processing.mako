@@ -11,10 +11,14 @@ ${kernel} void ComputeSquareVelocityAndVorticity(
 	// We will decide ourselves whether a ghost can be skipped. In order for GPUArray
 	// reductions to work, the ghost nodes have to be filled with 0s.
 	${local_indices(no_outside=False)}
+	if (gi >= ${dist_size}) {
+		return;
+	}
+
 	int ncode = map[gi];
 	int type = decodeNodeType(ncode);
 
-	if (isExcludedNode(type) || gx >= ${lat_nx-1}) {
+	if (isExcludedNode(type) || gx >= ${lat_nx-1} || gy >= ${lat_ny-1} || gz >= ${lat_nz-1}) {
 		usq[gi] = 0.0f;
 		vort_sq[gi] = 0.0f;
 		return;

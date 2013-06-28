@@ -44,8 +44,8 @@ class KineticEnergyEnstrophyMixIn(FlowStatsMixIn):
 
         # Compute the sum in double precision.
         kinetic_energy = b.array.sum(self._arr_vsq,
-                                     dtype=np.float64).get() / div
+                                     dtype=np.dtype(np.float64)).get() / div
         enstrophy = b.array.sum(self._arr_vortsq,
-                                dtype=np.float64).get() / div
+                                dtype=np.dtype(np.float64)).get() / div
 
         return kinetic_energy, enstrophy
