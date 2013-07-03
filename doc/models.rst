@@ -58,6 +58,14 @@ Supported features and models
 |                           +----------------------------------------+
 |                           | OpenCL                                 |
 +---------------------------+----------------------------------------+
+| on-GPU statistics         | 1D profiles of the first 4 moments of  |
+|                           | velocity and density                   |
+|                           +----------------------------------------+
+|                           | 1D profiles of correlations of         |
+|                           | velocity components and density        |
+|                           +----------------------------------------+
+|                           | total kientic energy and enstrophy     |
++---------------------------+----------------------------------------+
 
 .. [PRE78] Contact line dynamics in binary lattice Boltzmann simulations, Phys. Rev. E 78, 056709 (2008). DOI: 10.1103/PhysRevE.78.056709
 
