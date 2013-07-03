@@ -55,6 +55,7 @@ class TimeProfile(object):
         if not self._is_benchmark:
             return
         mi = self._runner.config.max_iters - self._runner.config.benchmark_sample_from
+        assert mi > 0
 
         # Final minibatch might be incomplete, but we still need to take it into
         # account.

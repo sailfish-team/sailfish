@@ -14,31 +14,55 @@
 %endif
 </%def>
 
-<%def name="iteration_number_if_required()">
+<%def name="iteration_number_if_required()" filter="trim">
 	%if needs_iteration_num:
 		, unsigned int iteration_number
 	%endif
 </%def>
 
-<%def name="iteration_number_arg_if_required()">
+<%def name="nodes_array_if_required()" filter="trim">
+	%if node_addressing == 'indirect':
+		${global_ptr} ${const_ptr} int *__restrict__ nodes,
+	%endif
+</%def>
+
+<%def name="nodes_array_arg_if_required()" filter="trim">
+	%if node_addressing == 'indirect':
+		nodes,
+	%endif
+</%def>
+
+<%def name="dense_gi_if_required()" filter="trim">
+	%if node_addressing == 'indirect':
+		, int dense_gi
+	%endif
+</%def>
+
+<%def name="dense_gi_arg_if_required()" filter="trim">
+	%if node_addressing == 'indirect':
+		, dense_gi
+	%endif
+</%def>
+
+<%def name="iteration_number_arg_if_required()" filter="trim">
 	%if needs_iteration_num:
 		, iteration_number
 	%endif
 </%def>
 
-<%def name="scratch_space_if_required()">
+<%def name="scratch_space_if_required()" filter="trim">
 	%if scratch_space:
 		, ${global_ptr} float *__restrict__ node_scratch_space
 	%endif
 </%def>
 
-<%def name="scratch_space_arg_if_required()">
+<%def name="scratch_space_arg_if_required()" filter="trim">
 	%if scratch_space:
 		, node_scratch_space
 	%endif
 </%def>
 
-<%def name="scalar_field_if_required(name, required)">
+<%def name="scalar_field_if_required(name, required)" filter="trim">
 	%if required:
 		, ${global_ptr} float *__restrict__ ${name}
 	%endif
@@ -88,6 +112,10 @@
 
 ## Defines local indices for kernels that can be split into bulk and boundary.
 ## Automatically handles the case when the split is disabled.
+##
+## Args:
+##  no_outside: if True, will call 'return' in case the indices end up pointing
+##              outside of the simulation domain
 <%def name="local_indices_split(no_outside=True)">
 	%if boundary_size > 0:
 		int gx, gy, lx, gi;
@@ -103,11 +131,26 @@
 	%else:
 		${local_indices(no_outside=no_outside)}
 	%endif
+</%def>
 
+<%def name="indirect_index()">
+	%if node_addressing == 'indirect':
+		// In the indirect access mode, the original global index is used for
+		// the 'nodes' table, while the index from that table is used for all
+		// fields and distributions.
+		int dense_gi = gi;
+		gi = nodes[dense_gi];
+		if (gi == INVALID_NODE) {
+			return;
+		}
+		if (gi >= DIST_SIZE) {
+			printf("invalid index %d @ %d %d %d\n", gi, gx, gy, gz);
+		}
+	%endif
 </%def>
 
 <%def name="shared_mem_propagation_vars()">
-	%if not propagate_on_read and propagation_enabled:
+	%if not propagate_on_read and propagation_enabled and node_addressing != 'indirect':
 		%if supports_shuffle and propagate_with_shuffle:
 			// Shared variables for cross-warp propagation.
 			%for i in sym.get_prop_dists(grid, 1):
@@ -426,6 +469,9 @@
 #define DIST_SIZE ${dist_size}
 #define OPTION_SAVE_MACRO_FIELDS 1
 #define OPTION_BULK 2
+
+## Indicates an unallocated node when using indirect node addressing.
+#define INVALID_NODE 0xffffffff
 
 #define DT 1.0f
 

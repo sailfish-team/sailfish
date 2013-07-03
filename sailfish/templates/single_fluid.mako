@@ -100,6 +100,7 @@ ${kernel_common.body(bgk_args_decl)}
 // A kernel to set the node distributions using the equilibrium distributions
 // and the macroscopic fields.
 ${kernel} void SetInitialConditions(
+	${nodes_array_if_required()}
 	${global_ptr} float *dist1_in,
 	${kernel_args_1st_moment('iv')}
 	${global_ptr} ${const_ptr} float *__restrict__ irho,
@@ -107,6 +108,7 @@ ${kernel} void SetInitialConditions(
 	${scratch_space_if_required()})
 {
 	${local_indices()}
+	${indirect_index()}
 
 	// Cache macroscopic fields in local variables.
 	float rho = irho[gi] ${' -1.0f' if config.minimize_roundoff else ''};
@@ -126,14 +128,16 @@ ${kernel} void SetInitialConditions(
 }
 
 ${kernel} void PrepareMacroFields(
+	${nodes_array_if_required()}
 	${global_ptr} ${const_ptr} int *__restrict__ map,
-	${global_ptr} ${const_ptr} float *__restrict__ dist1_in,
+	${global_ptr} ${const_ptr} float *__restrict__ dist_in,
 	${global_ptr} float *orho,
 	int options
 	${scratch_space_if_required()}
 	${iteration_number_if_required()})
 {
 	${local_indices_split()}
+	${indirect_index()}
 
 	int ncode = map[gi];
 	int type = decodeNodeType(ncode);
@@ -146,13 +150,17 @@ ${kernel} void PrepareMacroFields(
 
 	Dist fi;
 	float out;
-
-	getDist(&fi, dist1_in, gi ${iteration_number_arg_if_required()});
+	getDist(
+		${nodes_array_arg_if_required()}
+		&fi, dist_in, gi
+		${dense_gi_arg_if_required()}
+		${iteration_number_arg_if_required()});
 	get0thMoment(&fi, type, orientation, &out);
 	orho[gi] = out;
 }
 
 ${kernel} void CollideAndPropagate(
+	${nodes_array_if_required()}
 	${global_ptr} ${const_ptr} int *__restrict__ map,
 	${global_ptr} float *__restrict__ dist_in,
 	${global_ptr} float *__restrict__ dist_out,
@@ -165,6 +173,7 @@ ${kernel} void CollideAndPropagate(
 	)
 {
 	${local_indices_split()}
+	${indirect_index()}
 	${shared_mem_propagation_vars()}
 	${load_node_type()}
 	${declare_misc_bc_vars()}
@@ -172,7 +181,11 @@ ${kernel} void CollideAndPropagate(
 	// Cache the distributions in local variables
 	Dist d0;
 	if (!isPropagationOnly(type)) {
-		getDist(&d0, dist_in, gi ${iteration_number_arg_if_required()});
+		getDist(
+			${nodes_array_arg_if_required()}
+			&d0, dist_in, gi
+			${dense_gi_arg_if_required()}
+			${iteration_number_arg_if_required()});
 		fixMissingDistributions(&d0, dist_in, ncode, type, orientation, gi,
 								ovx, ovy ${', ovz' if dim == 3 else ''}, gg0m0
 								${misc_bc_args()}
@@ -186,8 +199,9 @@ ${kernel} void CollideAndPropagate(
 			${sc_calculate_force()}
 		%endif
 
+
 		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v
-									   ${', dist_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+									   ${', dist_out, gi' + (', nodes, dense_gi' if node_addressing == 'indirect' else '') if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
 									   ${iteration_number_arg_if_required()});
 
 		%if initialization:

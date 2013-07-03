@@ -22,6 +22,7 @@ class TestNodeTypeSetting2D(TestCase2D):
                                       backend=self.backend, quit_event=None)
         spec.runner._init_shape()
         sub = SubdomainTest2D(list(reversed(self.lattice_size)), spec, D2Q9)
+        sub.allocate()
         sub.reset()
 
         center = 64 / 2
@@ -49,6 +50,7 @@ class TestNodeTypeSetting3D(TestCase3D):
                                       backend=self.backend, quit_event=None)
         spec.runner._init_shape()
         sub = SubdomainTest3D(list(reversed(self.lattice_size)), spec, D3Q19)
+        sub.allocate()
         sub.reset()
 
         center_y = 32 / 2

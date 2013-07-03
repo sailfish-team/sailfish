@@ -15,6 +15,7 @@ class TestCase2D(unittest.TestCase):
         config.precision = 'single'
         config.block_size = 8
         config.mem_alignment = 8
+        config.node_addressing = 'direct'
         config.lat_nx, config.lat_ny = self.lattice_size
         config.logger = DummyLogger()
         config.grid = 'D2Q9'
@@ -34,6 +35,7 @@ class TestCase3D(unittest.TestCase):
         config.precision = 'single'
         config.block_size = 8
         config.mem_alignment = 8
+        config.node_addressing = 'direct'
         config.lat_nx, config.lat_ny, config.lat_nz = self.lattice_size
         config.logger = DummyLogger()
         config.grid = 'D3Q19'

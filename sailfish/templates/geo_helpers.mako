@@ -223,46 +223,55 @@ ${device_func} void checkInvalidValues(Dist* d, ${position_decl()}) {
 %>
 
 // Load the distributions from din to dout, for the node with the index 'idx'.
-${device_func} inline void getDistLocal(Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, int idx)
-{
+<%def name="get_dist_local()">
 	%for i, dname in enumerate(grid.idx_name):
-		dout->${dname} = ${get_dist('din', i, 'idx')};
+		dout->${dname} = ${get_dist('din', i, 'gi')};
 	%endfor
-}
+</%def>
 
 // Performs propagation when reading distributions from global memory.
 // This implements the propagate-on-read scheme.
-${device_func} inline void getUnpropagatedDist(Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, int idx) {
+<%def name="get_unpropagated_dist()">
 	%for i, (dname, ei) in enumerate(zip(grid.idx_name, grid.basis)):
-		dout->${dname} = ${get_dist('din', i, 'idx', offset=rel_offset(*(-ei)))};
+		%if node_addressing == 'indirect':
+			dout->${dname} = ${get_dist('din', i, 'nodes[dense_gi + %d]' % rel_offset(*(-ei)))}
+		%else:
+			dout->${dname} = ${get_dist('din', i, 'gi', offset=rel_offset(*(-ei)))};
+		%endif
 	%endfor
-}
+</%def>
 
 // Implements the propagate-on-read scheme for the AA access pattern, where the
 // distributions are not located in their natural slots, but the opposite ones
 // (e.g. fNE is located where fSW normally is). This ensures that within a single
 // timestep, the distributions are read from and written to the exact same places
 // in global memory.
-${device_func} inline void getUnpropagatedDistFromOppositeSlots(
-		Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, int idx) {
+<%def name="get_unpropagated_dist_from_opposite_slots()">
 	%for i, (dname, ei) in enumerate(zip(grid.idx_name, grid.basis)):
-		dout->${dname} = ${get_dist('din', grid.idx_opposite[i], 'idx', offset=rel_offset(*(-ei)))};
+		%if node_addressing == 'indirect':
+			dout->${dname} = ${get_dist('din', grid.idx_opposite[i], 'nodes[dense_gi + %d]' % rel_offset(*(-ei)))};
+		%else:
+			dout->${dname} = ${get_dist('din', grid.idx_opposite[i], 'gi', offset=rel_offset(*(-ei)))};
+		%endif
 	%endfor
-}
+</%def>
 
-${device_func} inline void getDist(Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, int gi
-								   ${iteration_number_if_required()}) {
+${device_func} inline void getDist(
+		${nodes_array_if_required()}
+		Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, int gi
+		${dense_gi_if_required()}
+		${iteration_number_if_required()}) {
 	%if access_pattern == 'AB':
 		%if propagate_on_read:
-			getUnpropagatedDist(dout, din, gi);
+			${get_unpropagated_dist()}
 		%else:
-			getDistLocal(dout, din, gi);
+			${get_dist_local()}
 		%endif
 	%else:
 		if ((iteration_number & 1) == 0) {
-			getDistLocal(dout, din, gi);
+			${get_dist_local()}
 		} else {
-			getUnpropagatedDistFromOppositeSlots(dout, din, gi);
+			${get_unpropagated_dist_from_opposite_slots()}
 		}
 	%endif
 }

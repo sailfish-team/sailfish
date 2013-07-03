@@ -17,7 +17,8 @@
 ##
 ## Args:
 ##   xoff: X propagation direction (1 for East, -1 for West, 0 for orthogonal to X axis)
-##   offset: target offset in the distribution array
+##   effective_dir: X propagation direction (1 for East, -1 for West)
+##   offset: target offset in the distribution array (used for PBC)
 ##   i: index of the base vector along which to propagate
 ##   di: dimension index
 
@@ -72,6 +73,7 @@
 	%for i in sym.get_prop_dists(grid, xoff):
 		%if dist_source == 'prop_local':
 			${prop_bnd(dist_out, dist_in, 0, i, True, offset)}
+		## prop_global
 		%else:
 			${cond(sentinel, 'if (%s.%s != -1.0f)' % (dist_in, grid.idx_name[i]))} {
 				${prop_bnd(dist_out, dist_in, xoff, i, False, offset)}
@@ -89,20 +91,56 @@
 </%def>
 
 <%def name="get_odist(dist_out, idir, xoff=0, yoff=0, zoff=0, offset=0)" filter="trim">
-	${dist_out}[gi + ${dist_size*idir + offset} + ${rel_offset(xoff, yoff, zoff)}]
+	${dist_out}[gi + ${dist_size * idir + offset} + ${rel_offset(xoff, yoff, zoff)}]
 </%def>
 
-<%def name="set_odist(dist_out, dist_in, idir, xoff, yoff, zoff, offset, shared)">
-	%if shared:
-		${get_odist(dist_out, idir, xoff, yoff, zoff, offset)} = prop_${grid.idx_name[idir]}[lx];
+<%def name="set_odist(dist_out, dist_in, idir, xoff, yoff, zoff, offset, shared, local=False, rhs=None)">
+	<%
+		if rhs is None:
+			if local:
+				rhs = 'prop_%s[lx]' % grid.idx_name[idir]
+			else:
+				rhs = '%s.%s' % (dist_in, grid.idx_name[idir])
+	%>
+
+	%if node_addressing == 'indirect':
+		{
+			int target_gi = nodes[dense_gi + ${rel_offset(xoff, yoff, zoff)} + ${offset}];
+			if (target_gi != INVALID_NODE) {
+				${dist_out}[target_gi + ${dist_size * idir}] = ${rhs};
+			}
+		}
 	%else:
-		${get_odist(dist_out, idir, xoff, yoff, zoff, offset)} = ${dist_in}.${grid.idx_name[idir]};
+		%if shared:
+			${get_odist(dist_out, idir, xoff, yoff, zoff, offset)} = prop_${grid.idx_name[idir]}[lx];
+		%else:
+			${get_odist(dist_out, idir, xoff, yoff, zoff, offset)} = ${rhs};
+		%endif
 	%endif
 </%def>
 
-## Propagate distributions using global memory only.
-## TODO: This function is DEPRECATED and should be removed.
-<%def name="propagate2(dist_out, dist_in='fi')">
+## Save mass fractions directly to global memory without perfoming
+## propagation.  This is used to implement the propagate-on-read
+## scheme, which is 10-15% faster on pre-Fermi devices.
+<%def name="propagate_inplace(dist_out, dist_in='fi')">
+	%for i, dname in enumerate(grid.idx_name):
+		${get_dist(dist_out, i, 'gi')} = ${dist_in}.${dname};
+	%endfor
+</%def>
+
+## Save mass fractions to the local node in global memory, but store
+## them in the opposite slot to their normal one. This implements the
+## propagate-on-read scheme for the AA access pattern.
+<%def name="propagate_inplace_opposite_slot(dist_out, dist_in='fi')">
+	%for i, dname in enumerate(grid.idx_name):
+		${get_dist(dist_out, grid.idx_opposite[i], 'gi')} = ${dist_in}.${dname};
+	%endfor
+</%def>
+
+
+## Like propagate_shared() below, but does not use shared memory.
+## Mainly useful with indirect node access.
+<%def name="propagate_global(dist_out, dist_in='fi')">
 	// update the 0-th direction distribution
 	${dist_out}[gi] = ${dist_in}.fC;
 
@@ -367,18 +405,26 @@
 		%if propagate_on_read:
 			${propagate_inplace(dist_out, dist_in)}
 		%else:
-			%if supports_shuffle and propagate_with_shuffle:
-				${propagate_shuffle(dist_out, dist_in)}
+			%if node_addressing == 'indirect':
+				${propagate_global(dist_out, dist_in)}
 			%else:
-				${propagate_shared(dist_out, dist_in)}
+				%if supports_shuffle and propagate_with_shuffle:
+					${propagate_shuffle(dist_out, dist_in)}
+				%else:
+					${propagate_shared(dist_out, dist_in)}
+				%endif
 			%endif
 		%endif
 	%elif access_pattern == 'AA':
 		if (iteration_number & 1) {
-			%if supports_shuffle and propagate_with_shuffle:
-				${propagate_shuffle(dist_out, dist_in)}
+			%if node_addressing == 'indirect':
+				${propagate_global(dist_out, dist_in)}
 			%else:
-				${propagate_shared(dist_out, dist_in)}
+				%if supports_shuffle and propagate_with_shuffle:
+					${propagate_shuffle(dist_out, dist_in)}
+				%else:
+					${propagate_shared(dist_out, dist_in)}
+				%endif
 			%endif
 		// inplace propagation does not require propagation-only nodes.
 		} else if (!propagation_only) {

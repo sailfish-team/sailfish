@@ -29,6 +29,7 @@ class BasicFunctionalityTest(unittest.TestCase):
         config.init_iters = 0
         config.seed = 0
         config.access_pattern = 'AA'
+        config.node_addressing = 'direct'
         config.precision = 'single'
         config.block_size = 8
         config.mem_alignment = 8
@@ -61,7 +62,7 @@ class BasicFunctionalityTest(unittest.TestCase):
 
         strides = runner._get_strides(np.float32)
         self.assertEqual(strides, [4 * 16, 4])
-        nodes = runner._get_nodes()
+        nodes = runner.num_phys_nodes
         self.assertEqual(nodes, reduce(operator.mul, real_size))
 
     def test_strides_and_size_3d(self):
@@ -75,7 +76,7 @@ class BasicFunctionalityTest(unittest.TestCase):
         self.assertEqual(runner._physical_size, real_size)
         strides = runner._get_strides(np.float64)
         self.assertEqual(strides, [8*8*5, 8*8, 8])
-        nodes = runner._get_nodes()
+        nodes = runner.num_phys_nodes
         self.assertEqual(nodes, reduce(operator.mul, real_size))
 
 
@@ -86,6 +87,7 @@ class NNSubdomainRunnerTest(unittest.TestCase):
         config.seed = 0
         config.init_iters = 0
         config.access_pattern = 'AA'
+        config.node_addressing = 'direct'
         config.precision = 'single'
         config.block_size = 8
         config.mem_alignment = 8

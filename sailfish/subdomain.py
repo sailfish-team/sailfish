@@ -89,6 +89,10 @@ class SubdomainSpec(object):
         return reduce(operator.mul, self.size)
 
     @property
+    def num_actual_nodes(self):
+        return reduce(operator.mul, self.actual_size)
+
+    @property
     def periodic_x(self):
         """X-axis periodicity within this subdomain."""
         return self._periodicity[0]
@@ -97,6 +101,10 @@ class SubdomainSpec(object):
     def periodic_y(self):
         """Y-axis periodicity within this subdomain."""
         return self._periodicity[1]
+
+    @property
+    def periodic(self):
+        return any(self._periodicity)
 
     def update_context(self, ctx):
         ctx['dim'] = self.dim
@@ -338,7 +346,9 @@ class SubdomainSpec3D(SubdomainSpec):
 
 class Subdomain(object):
     """Holds all field and geometry information specific to the subdomain
-    described by the corresponding SubdomainSpec."""
+    described by the corresponding SubdomainSpec. Objects of this class do
+    not directly know about the details of memory management on the compute
+    device."""
 
     NODE_MISC_MASK = 0
     NODE_MISC_SHIFT = 1
@@ -362,26 +372,39 @@ class Subdomain(object):
         # ghost nodes, and is formatted in a way that makes it suitable
         # for copying to the compute device. The entries in this array are
         # node type IDs.
-        self._type_map = spec.runner.make_scalar_field(np.uint32, register=False)
-        self._type_map_base = spec.runner.field_base(self._type_map)
-        self._type_vis_map = np.zeros(list(reversed(spec.size)),
-                dtype=np.uint8)
+        self._type_vis_map = np.zeros(self.lat_shape, dtype=np.uint8)
         self._type_map_encoded = False
-        self._param_map = spec.runner.make_scalar_field(dtype=np.int_,
-                register=False)
-        self._param_map_base = spec.runner.field_base(self._param_map)
         self._params = {}
         self._encoder = None
         self._seen_types = set([0])
-        self._type_map_base = spec.runner.field_base(self._type_map)
         self._needs_orientation = False
-        self._orientation = spec.runner.make_scalar_field(np.uint32,
-                register=False)
-        self._orientation_base = spec.runner.field_base(self._orientation)
+        self.active_node_mask = None
+
+    def allocate(self):
+        runner = self.spec.runner
+        if self.spec.runner.config.node_addressing == 'indirect':
+            self.load_active_node_map()
+            self.spec.runner.config.logger.info('Fill ratio is: %0.2f%%' %
+                    (self.active_nodes / float(self.spec.num_actual_nodes) * 100))
+        self._type_map_ghost, self._sparse_type_map = runner.make_scalar_field(np.uint32, register=False, nonghost_view=False)
+        self._type_map = self._type_map_ghost[self.spec._nonghost_slice]
+        self._type_map_base = runner.field_base(self._type_map_ghost)
+        self._param_map, self._sparse_param_map = runner.make_scalar_field(dtype=np.int_, register=False)
+        self._param_map_base = runner.field_base(self._param_map)
+        self._orientation, self._sparse_orientation_map = runner.make_scalar_field(np.uint32, register=False)
+        self._orientation_base = runner.field_base(self._orientation)
 
     @property
     def config(self):
         return self.spec.runner.config
+
+    @property
+    def lat_shape(self):
+        return list(reversed(self.spec.size))
+
+    @property
+    def full_lat_shape(self):
+        return list(reversed(self.spec.actual_size))
 
     def boundary_conditions(self, *args):
         raise NotImplementedError('boundary_conditions() not defined in a child'
@@ -390,6 +413,20 @@ class Subdomain(object):
     def initial_conditions(self, sim, *args):
         raise NotImplementedError('initial_conditions() not defined in a child '
                 'class')
+
+    def load_active_node_map(self):
+        """Populates active_node_mask with a dense boolean array filling the area
+        described by the corresponding SubdomainSpec. Nodes marked True indicate
+        active nodes participating in the simulation."""
+        # By default, consider all nodes to be active.
+        self.active_node_mask = np.ones(self.full_lat_shape, dtype=np.bool)
+        self.spec.runner.config.logger.warning(
+            'Using indirect addressing with all nodes active. Consider '
+            '--node_addressing=direct for better performance.')
+
+    @property
+    def active_nodes(self):
+        return long(np.sum(self.active_node_mask))
 
     def _verify_params(self, where, node_type):
         """Verifies that the node parameters are set correctly."""
@@ -565,10 +602,15 @@ class Subdomain(object):
             if hasattr(node_type, 'update_context'):
                 node_type.update_context(ctx)
 
-    def encoded_map(self):
+    def encoded_map(self, indirect_address=None):
         if not self._type_map_encoded:
             self._encoder.encode(self._orientation_base)
             self._type_map_encoded = True
+
+        if indirect_address is not None:
+            self._sparse_type_map[indirect_address[
+                self.active_node_mask]] = self._type_map_ghost[self.active_node_mask]
+            return self._sparse_type_map
 
         return self._type_map_base
 
@@ -578,6 +620,8 @@ class Subdomain(object):
         return self._type_vis_map
 
     def fluid_map(self):
+        """Returns a boolean array indicating which nodes are "wet" (
+        represent fluid and have valid macroscopic fields)."""
         fm = self.visualization_map()
         uniq_types = set(np.unique(fm))
         wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)

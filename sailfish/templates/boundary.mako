@@ -4,7 +4,7 @@
 %>
 
 <%namespace file="code_common.mako" import="*"/>
-<%namespace file="propagation.mako" import="rel_offset,get_odist"/>
+<%namespace file="propagation.mako" import="rel_offset,get_odist,set_odist"/>
 <%namespace file="utils.mako" import="*"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
 
@@ -570,7 +570,7 @@ ${device_func} inline void postcollisionBoundaryConditions(
 
 ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode,
 		int node_type, int orientation, float *rho, float *v0
-		${', ' + global_ptr + 'float *dist_out, int gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+		${', ' + global_ptr + 'float *dist_out, int gi' + (', %s const int *nodes, int dense_gi' % global_ptr if node_addressing == 'indirect'  else '') if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
 		${iteration_number_if_required()})
 {
 	if (0) {}

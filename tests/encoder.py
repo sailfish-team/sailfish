@@ -18,6 +18,7 @@ class TestOrientationDetection2D(TestCase2D):
                                       backend=self.backend, quit_event=None)
         spec.runner._init_shape()
         sub = TestSubdomain2D(list(reversed(self.lattice_size)), spec, D2Q9)
+        sub.allocate()
         sub.reset()
         sub._encoder.detect_orientation(sub._orientation_base)
 
@@ -56,6 +57,7 @@ class TestOrientationDetection3D(TestCase3D):
                                       backend=self.backend, quit_event=None)
         spec.runner._init_shape()
         sub = TestSubdomain3D(list(reversed(self.lattice_size)), spec, D3Q19)
+        sub.allocate()
         sub.reset()
         sub._encoder.detect_orientation(sub._orientation_base)
 

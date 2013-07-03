@@ -82,6 +82,12 @@ class LBFluidSim(LBSim):
 
         args1 = [gpu_dist1a] + gpu_v + [gpu_rho, gpu_map]
         args2 = [gpu_dist1b] + gpu_v + [gpu_rho, gpu_map]
+
+        if self.config.node_addressing == 'indirect':
+            gpu_nodes = runner.gpu_indirect_address()
+            args1 = [gpu_nodes] + args1
+            args2 = [gpu_nodes] + args2
+
         if runner.gpu_scratch_space is not None:
             args1.append(runner.gpu_scratch_space)
             args2.append(runner.gpu_scratch_space)
@@ -110,6 +116,11 @@ class LBFluidSim(LBSim):
         args1.append(np.uint32(options))
         args2.append(np.uint32(options))
 
+        if self.config.node_addressing == 'indirect':
+            gpu_nodes = runner.gpu_indirect_address()
+            args1 = [gpu_nodes] + args1
+            args2 = [gpu_nodes] + args2
+
         signature = 'P' * (len(args1) - 1) + 'i'
 
         if runner.gpu_scratch_space is not None:
@@ -128,7 +139,7 @@ class LBFluidSim(LBSim):
             needs_iteration=self.config.needs_iteration_num)
 
         if self.config.access_pattern == 'AB':
-            secondary_args = args2 if self.config.access_pattern == 'AB' else args1
+            secondary_args = args2
             cnp_secondary = runner.get_kernel(
                 'CollideAndPropagate', secondary_args, signature,
                 needs_iteration=self.config.needs_iteration_num)
@@ -150,6 +161,10 @@ class LBFluidSim(LBSim):
             kernels[0][i] = [runner.get_kernel(
                 'ApplyPeriodicBoundaryConditions', [gpu_dist1a, np.uint32(i)],
                 'Pi')]
+
+        if self.config.node_addressing == 'indirect':
+            raise NotImplementedError('PBC with indirect addressing is not '
+                                      'supported')
 
         if self.config.access_pattern == 'AB':
             gpu_dist = gpu_dist1b

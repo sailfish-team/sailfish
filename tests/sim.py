@@ -14,7 +14,7 @@ class DummyRunner(object):
         if dtype is None:
             dtype = np.float
         buf = np.zeros([64, 64], dtype=dtype)
-        return np.ndarray([64, 64], buffer=buf, dtype=dtype)
+        return np.ndarray([64, 64], buffer=buf, dtype=dtype), None
 
 
 class TestLBBase(unittest.TestCase):

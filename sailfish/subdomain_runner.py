@@ -81,6 +81,9 @@ class SubdomainRunner(object):
         self._bcg = codegen.BlockCodeGenerator(simulation)
         self._sim = simulation
 
+        # Subdomain object handled by this runner.
+        self._subdomain = None
+
         if self._bcg.is_double_precision():
             self.float = np.float64
         else:
@@ -90,11 +93,25 @@ class SubdomainRunner(object):
         self._field_base = {}
         self._scalar_fields = []
         self._vector_fields = []
+
+        # Sparse fields used for indirect node addressing.
+        self._sparse_scalar_fields = []
+        self._sparse_vector_fields = []
+
+        # Set of fields that are also wrapped in a GPUArray.
         self._array_fields = set()
         self._gpu_field_map = {}
         self._gpu_grids_primary = []
         self._gpu_grids_secondary = []  # only used for the AB access pattern
+        self._gpu_indirect_address = None  # only used for indirect node addressing
+        self._host_indirect_address = None
         self._quit_event = quit_event
+
+        self._pbc_kernels = []
+
+        # Dictionary of variables to be exported to the code templates
+        # in update_context().
+        self._code_context = {}
 
         self._profile = TimeProfile(self)
         # This only happens in unit tests.
@@ -151,6 +168,7 @@ class SubdomainRunner(object):
         self._spec.update_context(ctx)
         self._subdomain.update_context(ctx)
         ctx.update(self.backend.get_defines())
+        ctx.update(self._code_context)
 
         # Size of the lattice, including ghost nodes (without padding).
         ctx['lat_ny'] = self._lat_size[-2]
@@ -160,7 +178,6 @@ class SubdomainRunner(object):
         arr_nx = self._physical_size[-1]
         arr_ny = self._physical_size[-2]
         ctx['arr_nx'] = arr_nx
-        ctx['grid_nx'] = self._grid_nx
         ctx['arr_ny'] = arr_ny
 
         bnd_limits = list(self._spec.actual_size[:])
@@ -174,17 +191,19 @@ class SubdomainRunner(object):
             ctx['lat_nz'] = 1
             ctx['arr_nz'] = 1
             bnd_limits.append(1)
-            ctx['block_periodicity'] = [self._spec.periodic_x,
-                    self._spec.periodic_y, False]
+            ctx['block_periodicity'] = [self._spec.periodic_x, self._spec.periodic_y, False]
 
-        ctx['boundary_size'] = self._boundary_size
         ctx['lat_linear'] = self.lat_linear
         ctx['lat_linear_with_swap'] = self.lat_linear_with_swap
         ctx['lat_linear_dist'] = self.lat_linear_dist
         ctx['lat_linear_macro'] = self.lat_linear_macro
 
         ctx['bnd_limits'] = bnd_limits
-        ctx['dist_size'] = self._get_nodes()
+
+        if self.config.node_addressing == 'indirect':
+            ctx['dist_size'] = self._subdomain.active_nodes
+        else:
+            ctx['dist_size'] = self.num_phys_nodes
         ctx['sim'] = self._sim
         ctx['block'] = self._spec
         ctx['time_dependence'] = self.config.time_dependence
@@ -214,7 +233,8 @@ class SubdomainRunner(object):
         self._output.register_field(field_cb, name, visualization=True)
 
     def make_scalar_field(self, dtype=None, name=None, register=True,
-                          async=False, gpu_array=False):
+                          async=False, gpu_array=False, need_indirect=True,
+                          nonghost_view=True):
         """Allocates a scalar NumPy array.
 
         The array includes padding adjusted for the compute device (hidden from
@@ -229,14 +249,12 @@ class SubdomainRunner(object):
         if dtype is None:
             dtype = self.float
 
-        size = self._get_nodes()
-        strides = self._get_strides(dtype)
-
         if async:
-            buf = self.backend.alloc_async_host_buf(size, dtype=dtype)
+            buf = self.backend.alloc_async_host_buf(self.num_phys_nodes, dtype=dtype)
         else:
-            buf = np.zeros(size, dtype=dtype)
+            buf = np.zeros(self.num_phys_nodes, dtype=dtype)
 
+        strides = self._get_strides(dtype)
         field = np.ndarray(self._physical_size, buffer=buf,
                            dtype=dtype, strides=strides)
 
@@ -246,7 +264,10 @@ class SubdomainRunner(object):
             field[:] = np.inf
 
         assert field.base is buf
-        fview = field[self._spec._nonghost_slice]
+        if nonghost_view:
+            fview = field[self._spec._nonghost_slice]
+        else:
+            fview = field
         self._field_base[id(fview.base)] = field
 
         if gpu_array:
@@ -263,7 +284,23 @@ class SubdomainRunner(object):
 
         if register:
             self._scalar_fields.append(fview)
-        return fview
+
+        # Create sparse fields if necessary. With indirect node addressing,
+        # both distributions and macroscopic fields are stored in 'sparse'
+        # arrays that only store data for active nodes. The dense fields
+        # allocated above are only used for compatibility with the host
+        # initialization code.
+        sparse_field = None
+        if self.config.node_addressing == 'indirect' and need_indirect:
+            if async:
+                sparse_field = self.backend.alloc_async_host_buf(
+                    self._subdomain.active_nodes, dtype=dtype)
+            else:
+                sparse_field = np.zeros(self._subdomain.active_nodes, dtype=dtype)
+            if register:
+                self._sparse_scalar_fields.append(sparse_field)
+
+        return fview, sparse_field
 
     def field_base(self, field):
         return self._field_base[id(field.base)]
@@ -272,16 +309,19 @@ class SubdomainRunner(object):
                           gpu_array=False):
         """Allocates several scalar arrays representing a vector field."""
         components = []
+        sparse_components = []
 
         for x in range(0, self._spec.dim):
-            field = self.make_scalar_field(self.float, register=False,
-                                           async=async, gpu_array=gpu_array)
+            field, sparse_field = self.make_scalar_field(
+                self.float, register=False, async=async, gpu_array=gpu_array)
             components.append(field)
+            sparse_components.append(sparse_field)
 
         if name is not None:
             self._output.register_field(components, name)
 
         self._vector_fields.append(components)
+        self._sparse_vector_fields.append(sparse_components)
         return components
 
     def visualization_map(self):
@@ -291,8 +331,8 @@ class SubdomainRunner(object):
     def _init_geometry(self):
         self.config.logger.debug("Initializing geometry.")
         self._init_shape()
-        self._subdomain = self._sim.subdomain(self._global_size, self._spec,
-                self._sim.grid)
+        self._subdomain = self._sim.subdomain(self._global_size, self._spec, self._sim.grid)
+        self._subdomain.allocate()
         self._subdomain.reset()
         self._output.set_fluid_map(self._subdomain.fluid_map())
         if self.config.debug_dump_node_type_map:
@@ -304,28 +344,34 @@ class SubdomainRunner(object):
         self._lat_size = list(reversed(self._spec.actual_size))
 
         # Physical in-memory size of the lattice, adjusted for optimal memory
-        # access from the compute unit.  Size of the X dimension is rounded up
-        # to a multiple of block_size.  Order is [nz], ny, nx
+        # access from the compute unit. Size of the X dimension is rounded up
+        # to a multiple of block_size. Order is [nz], ny, nx
         self._physical_size = list(reversed(self._spec.actual_size))
-        bs = self.config.block_size
-        alignment = self.config.mem_alignment
-        self._physical_size[-1] = int(math.ceil(float(self._physical_size[-1]) / alignment)) * alignment
+
+        # Optimizing memory alignment only makes sense when using direct node
+        # addressing.
+        if self.config.node_addressing == 'direct':
+            alignment = self.config.mem_alignment
+            self._physical_size[-1] = int(math.ceil(float(self._physical_size[-1]) / alignment)) * alignment
+        else:
+            alignment = 1
 
         # Size of the lattice as necessary for the kernel grid to fully cover
-        # all available space.  This has to be larger or equal than the real
+        # all available space. This has to be larger or equal than the real
         # in-memory lattice.
+        bs = self.config.block_size
         assert bs >= alignment, ('The block size (--block_size) has to be at '
                 'least as large as --memory_alignment')
-        self._grid_nx = int(math.ceil(float(self._spec.actual_size[0]) / bs)) * bs
-        grid_nx = self._grid_nx
+        grid_nx = int(math.ceil(float(self._spec.actual_size[0]) / bs)) * bs
+        self._code_context['grid_nx'] = grid_nx
 
         self.config.logger.debug('Effective lattice size is: {0}'.format(
             list(reversed(self._physical_size))))
 
         # CUDA block/grid size for standard kernel call.
         self._kernel_block_size = (bs, 1)
-        self._boundary_size = self._spec.envelope_size * 2
-        bns = self._boundary_size
+        bns = self._spec.envelope_size * 2
+        self._code_context['boundary_size'] = bns
         assert bns < bs
 
         if self._spec.dim == 2:
@@ -402,7 +448,7 @@ class SubdomainRunner(object):
             # Disable the boundary kernels and ensure that the bulk kernel will
             # cover the whole domain.
             self._boundary_blocks = None
-            self._boundary_size = 0
+            self._code_context['boundary_size'] = 0
             self._kernel_grid_bulk = self._kernel_grid_full
 
         self.config.logger.debug('Bulk grid: %s' % repr(self._kernel_grid_bulk))
@@ -446,18 +492,24 @@ class SubdomainRunner(object):
         return list(reversed(reduce(lambda x, y: x + [x[-1] * y],
                 self._physical_size[-1:0:-1], [t])))
 
-    def _get_nodes(self):
-        """Returns the total amount of actual nodes in the lattice."""
+    @property
+    def num_phys_nodes(self):
+        """Returns the total number of actual nodes (including padding) in the lattice."""
         return reduce(operator.mul, self._physical_size)
 
     @property
     def num_nodes(self):
+        """Returns the total number of lattice nodes (including ghosts,
+        excluding padding."""
         return reduce(operator.mul, self._lat_size)
 
     def _get_dist_bytes(self, grid):
         """Returns the number of bytes required to store a single set of
            distributions for the whole simulation domain."""
-        return self._get_nodes() * grid.Q * self.float().nbytes
+        if self.config.node_addressing == 'indirect':
+            return self._subdomain.active_nodes * grid.Q * self.float().nbytes
+        else:
+            return self.num_phys_nodes * grid.Q * self.float().nbytes
 
     def _get_global_idx(self, location, dist_num=0):
         """Returns a global index (in the distributions array).
@@ -468,13 +520,13 @@ class SubdomainRunner(object):
         if self.dim == 2:
             gx, gy = location
             arr_nx = self._physical_size[1]
-            return gx + arr_nx * gy + (self._get_nodes() * dist_num)
+            return gx + arr_nx * gy + (self.num_phys_nodes * dist_num)
         else:
             gx, gy, gz = location
             arr_nx = self._physical_size[2]
             arr_ny = self._physical_size[1]
             return ((gx + arr_nx * gy + arr_nx * arr_ny * gz) +
-                    (self._get_nodes() * dist_num))
+                    (self.num_phys_nodes * dist_num))
 
     def _idx_helper(self, gx, buf_slice, dists):
         """Returns a numpy array of global indices (in the subdomain coordinate
@@ -705,9 +757,58 @@ class SubdomainRunner(object):
         self._data_stream = self.backend.make_stream()
         self._calc_stream = self.backend.make_stream()
 
-    def _init_gpu_data(self):
-        self.config.logger.debug("Initializing compute unit data.")
+    def _build_indirect_address_map(self):
+        """Builds a node addressing map."""
+        addr, _ = self.make_scalar_field(dtype=np.uint32, register=False, need_indirect=False,
+                                         nonghost_view=False)
+        addr[:] = 0xffffffff
+        print addr.shape
+        self._host_indirect_address = addr
+        addr[self._subdomain.active_node_mask] = np.arange(self._subdomain.active_nodes)
+        self._gpu_indirect_address = self.backend.alloc_buf(like=self._field_base[id(addr.base)])
 
+    def _init_gpu_data_indirect(self):
+        self._build_indirect_address_map()
+        addr = self._host_indirect_address
+        mask = self._subdomain.active_node_mask
+
+        for field, sparse_field in zip(self._scalar_fields,
+                                       self._sparse_scalar_fields):
+            # Copy field to the sparse array.
+            sparse_field[addr[mask]] = self._field_base[id(field.base)][mask]
+            self._gpu_field_map[id(field)] = self.backend.alloc_buf(
+                like=sparse_field,
+                wrap_in_array=(id(field.base) in self._array_fields))
+
+        for field, sparse_field in zip(self._vector_fields,
+                                       self._sparse_vector_fields):
+            gpu_vector = []
+            for component, sparse_component in zip(field, sparse_field):
+                # Copy field to the sparse array.
+                sparse_component[addr[mask]] = self._field_base[id(component.base)][mask]
+                gpu_vector.append(self.backend.alloc_buf(
+                    like=sparse_component,
+                    wrap_in_array=(id(component.base) in self._array_fields)))
+            self._gpu_field_map[id(field)] = gpu_vector
+
+        self._gpu_geo_map = self.backend.alloc_buf(
+                like=self._subdomain.encoded_map(addr))
+
+    def _unravel_fields(self):
+        """Copies data from sparse arrays back into the dense arrays used for
+        operations on the host."""
+        addr = self._host_indirect_address
+        mask = self._subdomain.active_node_mask
+        for field, sparse_field in zip(self._scalar_fields,
+                                       self._sparse_scalar_fields):
+             self._field_base[id(field.base)][mask] = sparse_field[addr[mask]]
+
+        for field, sparse_field in zip(self._vector_fields,
+                                       self._sparse_vector_fields):
+            for component, sparse_component in zip(field, sparse_field):
+                self._field_base[id(component.base)][mask] = sparse_component[addr[mask]]
+
+    def _init_gpu_data_direct(self):
         for field in self._scalar_fields:
             self._gpu_field_map[id(field)] = self.backend.alloc_buf(
                 like=self._field_base[id(field.base)],
@@ -721,15 +822,23 @@ class SubdomainRunner(object):
                     wrap_in_array=(id(component.base) in self._array_fields)))
             self._gpu_field_map[id(field)] = gpu_vector
 
+        self._gpu_geo_map = self.backend.alloc_buf(
+                like=self._subdomain.encoded_map())
+
+    def _init_gpu_data(self):
+        self.config.logger.debug("Initializing compute unit data.")
+
+        if self.config.node_addressing == 'indirect':
+            self._init_gpu_data_indirect()
+        else:
+            self._init_gpu_data_direct()
+
         for grid in self._sim.grids:
             size = self._get_dist_bytes(grid)
             self.config.logger.debug("Using {0} bytes for buffer".format(size))
             self._gpu_grids_primary.append(self.backend.alloc_buf(size=size))
             if self.config.access_pattern == 'AB':
                 self._gpu_grids_secondary.append(self.backend.alloc_buf(size=size))
-
-        self._gpu_geo_map = self.backend.alloc_buf(
-                like=self._subdomain.encoded_map())
 
         if self._subdomain.scratch_space_size > 0:
             self.config.logger.debug("Using {0} scratch space slots".format(
@@ -757,6 +866,9 @@ class SubdomainRunner(object):
 
     def gpu_geo_map(self):
         return self._gpu_geo_map
+
+    def gpu_indirect_address(self):
+        return self._gpu_indirect_address
 
     def get_kernel(self, name, args, args_format, block_size=None,
             needs_iteration=False, shared=0, more_shared=False):
@@ -1210,8 +1322,8 @@ class SubdomainRunner(object):
         self.backend.to_buf(self.gpu_dist(grid_num, iter_idx), dbuf)
 
     def _debug_global_idx_to_tuple(self, gi):
-        dist_num = gi / self._get_nodes()
-        rest = gi % self._get_nodes()
+        dist_num = gi / self.num_phys_nodes
+        rest = gi % self.num_phys_nodes
         arr_nx = self._physical_size[-1]
         gx = rest % arr_nx
         gy = rest / arr_nx
@@ -1224,9 +1336,10 @@ class SubdomainRunner(object):
             self.config.logger.debug('Sending timing information to controller.')
             assert self._summary_sender.recv() == 'ack'
 
-    def _initial_conditions(self):
-        self._sim.initial_conditions(self)
+    def _gpu_initial_conditions(self):
         self._sim.verify_fields()
+        # Applies initial conditions on the GPU.
+        self._sim.initial_conditions(self)
 
     def save_checkpoint(self):
         if self.config.single_checkpoint:
@@ -1350,6 +1463,9 @@ class SubdomainRunner(object):
         self.config.logger.debug(self.backend.info)
 
         self._init_geometry()
+
+        # Creates scalar fields on the host. They are used for gpu-host
+        # communication and for specifing initial conditions.
         self._sim.init_fields(self)
         self._init_buffers()
         self._init_compute()
@@ -1357,16 +1473,19 @@ class SubdomainRunner(object):
         self._subdomain.init_fields(self._sim)
         self._init_gpu_data()
         self._init_force_objects()
-        self.config.logger.debug("Applying initial conditions.")
+        self.config.logger.debug("Initializing GPU kernels.")
 
         self._init_interblock_kernels()
         self._prepare_compute_kernels()
-        self._pbc_kernels = self._sim.get_pbc_kernels(self)
+        if self._spec.periodic:
+            self._pbc_kernels = self._sim.get_pbc_kernels(self)
         self._aux_kernels = self._sim.get_aux_kernels(self)
 
-        self._initial_conditions()
+        self.config.logger.debug("Applying initial conditions.")
+        self._gpu_initial_conditions()
 
-        if self.config.output:
+        # Save initial state of the simulation.
+        if self.config.output and self.config.from_ == 0:
             self._output.save(self._sim.iteration)
 
         if not self.config.max_iters:
@@ -1502,6 +1621,9 @@ class SubdomainRunner(object):
                 # impact.
                 self.backend.sync_stream(self._data_stream, self._calc_stream)
 
+                if sync_req and self._host_indirect_address is not None:
+                    self._unravel_fields()
+
                 if output_req:
                     if (self.config.check_invalid_results_host and
                         not self._output.verify()):
@@ -1525,6 +1647,8 @@ class SubdomainRunner(object):
             self._data_stream.synchronize()
             self._calc_stream.synchronize()
             if output_req:
+                if self._host_indirect_address is not None:
+                    self._unravel_fields()
                 self._output.save(self._sim.iteration)
 
             self._profile.record_end()
@@ -1765,7 +1889,7 @@ class NNSubdomainRunner(SubdomainRunner):
                         self._init_macro_distrib_kernels(cbuf, _grid_dim1,
                             collect_block))
 
-    def _initial_conditions(self):
+    def _gpu_initial_conditions(self):
         """Prepares non-local fields prior to simulation start-up.
 
         This is necessary for models that use non-local field values to set
@@ -1786,7 +1910,7 @@ class NNSubdomainRunner(SubdomainRunner):
             self.backend.run_kernel(kernel, grid, self._data_stream)
 
         self._data_stream.synchronize()
-        super(NNSubdomainRunner, self)._initial_conditions()
+        super(NNSubdomainRunner, self)._gpu_initial_conditions()
 
     def step(self, sync_req):
         """Runs one simulation step."""

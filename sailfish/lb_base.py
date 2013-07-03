@@ -59,9 +59,16 @@ class LBSim(object):
         group.add_argument('--grid', help='LB grid', type=str,
                 choices=grids, default=grids[0])
         group.add_argument('--access_pattern', type=str, default='AB',
-                choices=['AB', 'AA'], help='Lattice access pattern. Valid '
-                'values are: AB (two copies of the whole domain in memory,'
-                ' faster), AA (single copy of the domain in memory)')
+                           choices=('AB', 'AA'),
+                           help='Lattice access pattern. Valid values are: '
+                           'AB (two copies of the whole domain in memory,'
+                           ' faster), AA (single domain copy in memory).')
+        group.add_argument('--node_addressing', type=str, default='direct',
+                           choices=('direct', 'indirect'),
+                           help='Node addressing mode. Valid values are: '
+                           'direct (dense matrix of nodes), indirect ('
+                           '(only active nodes have distributions; '
+                           'slower, but saves memory for sparse domains)')
         group.add_argument('--minimize_roundoff', action='store_true',
                            default=False, help='Tries to minimize round-off '
                            'errors by using a model that avoids adding O(1) '
@@ -121,6 +128,7 @@ class LBSim(object):
         ctx['propagation_enabled'] = self.config.propagation_enabled
         ctx['dt_per_lattice_time_unit'] = self.config.dt_per_lattice_time_unit
         ctx['access_pattern'] = self.config.access_pattern
+        ctx['node_addressing'] = self.config.node_addressing
         ctx['propagate_on_read'] = self.config.propagate_on_read
         ctx['propagate_with_shuffle'] = self.config.propagate_with_shuffle
         ctx['needs_iteration_num'] = self.config.needs_iteration_num
@@ -142,8 +150,8 @@ class LBSim(object):
         for src in sources:
             for field in src.fields():
                 if type(field) is ScalarField:
-                    f = runner.make_scalar_field(name=field.name, async=True,
-                                                 gpu_array=field.gpu_array)
+                    f, _ = runner.make_scalar_field(name=field.name, async=True,
+                                                    gpu_array=field.gpu_array)
                     f[:] = field.init
                     self._scalar_fields.append(FieldPair(field, f))
                 elif type(field) is VectorField:
