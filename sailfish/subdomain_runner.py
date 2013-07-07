@@ -1332,7 +1332,7 @@ class SubdomainRunner(object):
     def send_summary_info(self, timing_info, min_timings, max_timings):
         if self._summary_sender is not None:
             self._summary_sender.send_pyobj((timing_info, min_timings,
-                    max_timings))
+                    max_timings, self._subdomain.active_nodes))
             self.config.logger.debug('Sending timing information to controller.')
             assert self._summary_sender.recv() == 'ack'
 
@@ -1603,7 +1603,7 @@ class SubdomainRunner(object):
                     t_now = time.time()
                     if self.t_prev_checkpoint > 0.0:
                         dt = t_now - self.t_prev_checkpoint
-                        mlups = self._spec.num_nodes * pse / dt * 1e-6
+                        mlups = self._subdomain.active_nodes * pse / dt * 1e-6
                         self.config.logger.info(
                             "iteration:{0}  speed:{1:.2f} MLUPS".format(
                                 self._sim.iteration, mlups))

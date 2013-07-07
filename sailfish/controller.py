@@ -665,15 +665,17 @@ class LBSimulationController(object):
         timing_infos = []
         min_timings = []
         max_timings = []
+        num_nodes = []
 
         if self.config.cluster_spec or self._is_pbs_cluster() or self._is_lsf_cluster():
             if self.config.mode == 'benchmark':
                 for ch, node_subdomains in zip(self._cluster_channels, self._node_subdomains):
                     for sub in node_subdomains:
-                        ti, min_ti, max_ti = ch.receive()
+                        ti, min_ti, max_ti, nodes = ch.receive()
                         timing_infos.append(util.TimingInfo(*ti))
                         min_timings.append(util.TimingInfo(*min_ti))
                         max_timings.append(util.TimingInfo(*max_ti))
+                        num_nodes.append(nodes)
 
             self._wait_for_masters()
 
@@ -687,11 +689,12 @@ class LBSimulationController(object):
             if self.config.mode == 'benchmark':
                 # Collect timing information from all subdomains.
                 for i in range(len(subdomains)):
-                    ti, min_ti, max_ti = summary_receiver.recv_pyobj()
+                    ti, min_ti, max_ti, nodes = summary_receiver.recv_pyobj()
                     summary_receiver.send('ack')
                     timing_infos.append(ti)
                     min_timings.append(min_ti)
                     max_timings.append(max_ti)
+                    num_nodes.append(nodes)
 
             if not self.config.debug_single_process:
                 self._simulation_process.join()
@@ -700,10 +703,9 @@ class LBSimulationController(object):
             mlups_total = 0.0
             mlups_comp = 0.0
 
-            for ti in timing_infos:
-                subdomain = subdomains[ti.subdomain_id]
-                total = subdomain.num_nodes / ti.total * 1e-6
-                comp = subdomain.num_nodes / ti.comp * 1e-6
+            for ti, nodes in zip(timing_infos, num_nodes):
+                total = nodes / ti.total * 1e-6
+                comp = nodes / ti.comp * 1e-6
                 mlups_total += total
                 mlups_comp += comp
 
@@ -711,8 +713,8 @@ class LBSimulationController(object):
                 low = ti.total - stdev
                 high = ti.total + stdev
 
-                low = subdomain.num_nodes / low * 1e-6 - total
-                high = subdomain.num_nodes / high * 1e-6 - total
+                low = nodes / low * 1e-6 - total
+                high = nodes / high * 1e-6 - total
 
                 if not self.config.quiet:
                     print ('Subdomain {0}: MLUPS eff:{1:.2f} +{2:.2f} -{3:.2f}  '

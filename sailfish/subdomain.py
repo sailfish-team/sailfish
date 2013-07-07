@@ -426,7 +426,10 @@ class Subdomain(object):
 
     @property
     def active_nodes(self):
-        return long(np.sum(self.active_node_mask))
+        if self.active_node_mask is not None:
+            return long(np.sum(self.active_node_mask))
+        else:
+            return reduce(operator.mul, self.lat_shape)
 
     def _verify_params(self, where, node_type):
         """Verifies that the node parameters are set correctly."""
