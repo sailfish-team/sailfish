@@ -55,6 +55,9 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
 					%endif
 				%endfor
 				default:
+					%if gpu_check_invalid_values:
+						printf("Invalid vector value (idx=%d${', %d' * dim})\n", idx, ${position()});
+					%endif
 					die();
 			}
 		}
@@ -81,6 +84,9 @@ ${device_func} inline float node_param_get_scalar(const int idx ${dynamic_val_ar
 					%endif
 				%endfor
 				default:
+					%if gpu_check_invalid_values:
+						printf("Invalid scalar value (idx=%d${', %d' * dim})\n", idx, ${position()});
+					%endif
 					die();
 			}
 		}
