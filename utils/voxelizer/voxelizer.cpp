@@ -62,6 +62,11 @@ int main(int argc, char **argv)
 
 	readSTL(geometry, argv[1]);
 
+	std::cout << "Original bounding box: "
+	       << geometry.min(0) << ":" << geometry.max(0) << " "
+	       << geometry.min(1) << ":" << geometry.max(1) << " "
+	       << geometry.min(2) << ":" << geometry.max(2) << std::endl;
+
 	geometry.scaleTo(1.0);
 	std::cout << "Bounding box: "
 	       << geometry.max(0) - geometry.min(0) << " "
