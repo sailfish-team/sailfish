@@ -68,6 +68,10 @@ class Fluid3DVisCutplane(vis_2d.Fluid2DVis):
                                               self._slice_position[self._slice_axis]))
         return ret
 
+    # Drawing new nodes is not supported in 3D.
+    def _draw_wall(self, unused):
+        pass
+
     def _process_misc_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_x:
