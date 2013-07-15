@@ -313,5 +313,35 @@ ${kernel} void FinalizeReduce${name}(
 	}
 }
 %endif
-
 </%def>
+
+
+${kernel} void ExtractSlice(int axis, int position,
+	${kernel_args_1st_moment('iv')}
+	${global_ptr} float *out) {
+	int c0 = get_global_id(0) + 1;
+	int c1 = get_global_id(1) + 1;
+	int gi;
+
+	if (axis == 0) {
+		if (c0 >= ${lat_ny-1} || c1 >= ${lat_nz-1}) {
+			return;
+		}
+		gi = getGlobalIdx(1 + position, c0, c1);
+	} else if (axis == 1) {
+		if (c0 >= ${lat_nx-1} || c1 >= ${lat_nz-1}) {
+			return;
+		}
+		gi = getGlobalIdx(c0, 1 + position, c1);
+	} else {
+		if (c0 >= ${lat_nx-1} || c1 >= ${lat_ny-1}) {
+			return;
+		}
+		gi = getGlobalIdx(c0, c1, 1 + position);
+	}
+
+	float vx = ivx[gi];
+	float vy = ivy[gi];
+	float vz = ivz[gi];
+	out[(c1 - 1) * ${lat_nx-2} + (c0 - 1)] = sqrtf(vx * vx + vy * vy + vz * vz);
+}

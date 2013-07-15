@@ -30,6 +30,7 @@ class KidaSubdomain(Subdomain3D):
 
 class KidaSim(LBFluidSim):
     subdomain = KidaSubdomain
+    aux_code = ['data_processing.mako']
 
     @classmethod
     def update_defaults(cls, defaults):
@@ -43,7 +44,8 @@ class KidaSim(LBFluidSim):
             'grid': 'D3Q15',
             'visc': 0.001375,
             'access_pattern': 'AA',
-            'minimize_roundoff': True
+            'minimize_roundoff': True,
+            'perf_stats_every': 200,
             })
 
     @classmethod
@@ -60,6 +62,27 @@ class KidaSim(LBFluidSim):
         print 'Re = {0}'.format(config.lat_nx *
                 cls.subdomain.max_v / config.visc)
 
+    axis = 0
+    axis_pos = 0
+    def before_main_loop(self, runner):
+        runner._subdomain._buf = np.zeros((self.config.lat_nx, self.config.lat_nx), dtype=np.float32)
+        self._gpu_buf = runner.backend.alloc_buf(like=runner._subdomain._buf)
+
+        gpu_v = runner.gpu_field(self.v)
+        self.extract_k = runner.get_kernel('ExtractSlice',
+                                           [self.axis, self.axis_pos] + gpu_v +
+                                           [self._gpu_buf],
+                                           'iiPPPP', block_size=(128,))
+
+    def after_step(self, runner):
+        every = 5
+        mod = self.iteration % every
+
+        if mod == every - 1:
+            self.need_fields_flag = True
+        elif mod == 0:
+            runner.backend.run_kernel(self.extract_k, ((self.config.lat_nx + 127)
+                                                        / 128, self.config.lat_ny))
 
 if __name__ == '__main__':
     ctrl = LBSimulationController(KidaSim, EqualSubdomainsGeometry3D)
