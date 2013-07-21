@@ -66,12 +66,17 @@ int main(int argc, char **argv)
 	       << geometry.min(0) << ":" << geometry.max(0) << " "
 	       << geometry.min(1) << ":" << geometry.max(1) << " "
 	       << geometry.min(2) << ":" << geometry.max(2) << std::endl;
+	// Start saving a config file in JSON. This config file can later be used
+	// to generate VTK data in the original coordinate system.
+	std::ofstream config("output.config");
+	config << "{\"bounding_box\": ["
+		<< "[" << geometry.min(0) << ", " << geometry.max(0) << "], "
+		<< "[" << geometry.min(1) << ", " << geometry.max(1) << "], "
+		<< "[" << geometry.min(2) << ", " << geometry.max(2) << "]],";
 
+	// Scale so that the voxel_size parameter can have a geometry-independent
+	// meaning.
 	geometry.scaleTo(1.0);
-	std::cout << "Bounding box: "
-	       << geometry.max(0) - geometry.min(0) << " "
-	       << geometry.max(1) - geometry.min(1) << " "
-	       << geometry.max(2) - geometry.min(2) << std::endl;
 
 	voxelize(geometry, voxels, voxel_size, 1 /* pad */, (char)0 /* inside */, (char)1 /*outside */);
 
@@ -80,8 +85,9 @@ int main(int argc, char **argv)
 		<< round(fluid / (double)voxels.size() * 10000) / 100.0 << "%" << std::endl;
 
 	const std::size_t *ext = voxels.extents();
-	std::cout << "Lattice size: " << ext[0] << " " << ext[1]
-		<< " " << ext[2] << std::endl;
+	std::cout << "Lattice size: " << ext[0] << " " << ext[1] << " " << ext[2] << std::endl;
+	config << "\"size\": [" << ext[0] << ", " << ext[1] << ", " << ext[2] << "]}";
+	config.close();
 
 	std::ofstream out("output.npy");
 	out << "\x93NUMPY\x01";
