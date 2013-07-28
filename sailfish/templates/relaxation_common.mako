@@ -147,18 +147,11 @@
 		// Relaxation time using the standard viscosity-relaxation time relation.
 		float tau0 = 0.5f + 3.0f * visc;
 
-		// Form of the relaxation time correction as in comp-gas/9401004v1.
-		// Note that the Smagorinsky constant in Sailfish (C_s) is defined as:
-		//   C_s^2 = \Delta^2 C
-		// where the quantities on the RHS correspond to those used in the paper.
+		// Formulation of: Huidan Yu, Sharath S. Girimaji, Li-Shi Luo
+		// Journal of Computational Physics 209 (2005) 599–616.
 
-		// The correction to viscosity due to eddies is:
-		//   eddy_visc = C \Delta^2 |\bar{S}|
-		// with:
-		//   |\bar{S}| = (\sqrt(\nu_0^2 + 18 C \Delta^2 Q^{1/2}) - \nu_0) / (6 C \Delta^2)
-		// where
-		//   Q = T_ab T_ab
-		// and the nonequilibrium stress tensor: T = e_ia e_ib (f_i - f_i^eq)
+		// Q = T_ab T_ab
+		// nonequilibrium stress tensor: T = e_ia e_ib (f_i - f_i^eq)
 
 		// The 2nd order tensor formed from the equilibrium distributions is:
 		//   rho / 3 * \delta_{ab} + rho u_a u_b
@@ -186,9 +179,7 @@
 				strain += tmp * tmp;
 			%endfor
 
-			// This is 3.0 * eddy_visc.
-			tau0 += (sqrtf(visc*visc + 18.0f * ${cex(smagorinsky_const**2)} *
-					 sqrtf(strain)) - visc) / 2.0f;
+			tau0 += 0.5f * (sqrtf(tau0 * tau0 + 36.0f * ${cex(smagorinsky_const**2)} * sqrtf(strain)) - tau0);
 		}
 	%endif
 </%def>

@@ -44,7 +44,7 @@ class LBFluidSim(LBSim):
                 choices=['none', 'les-smagorinsky'],
                 help='subgrid model to use')
         group.add_argument('--smagorinsky_const',
-                help='Smagorinsky constant', type=float, default=0.03)
+                help='Smagorinsky constant', type=float, default=0.1)
 
     def update_context(self, ctx):
         super(LBFluidSim, self).update_context(ctx)
