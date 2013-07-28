@@ -148,7 +148,7 @@
 		float tau0 = 0.5f + 3.0f * visc;
 
 		// Formulation of: Huidan Yu, Sharath S. Girimaji, Li-Shi Luo
-		// Journal of Computational Physics 209 (2005) 599–616.
+		// Journal of Computational Physics 209 (2005) 599-616.
 
 		// Q = T_ab T_ab
 		// nonequilibrium stress tensor: T = e_ia e_ib (f_i - f_i^eq)

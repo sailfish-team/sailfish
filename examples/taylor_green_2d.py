@@ -131,7 +131,7 @@ class TaylorGreenSim(LBFluidSim):
             dy = ref_uy - vy
             err = (np.linalg.norm(np.dstack([dx, dy])) /
                    np.linalg.norm(np.dstack([ref_ux, ref_uy])))
-            rho_err = np.linalg.norm(ref_rho - rho)
+            rho_err = np.linalg.norm(ref_rho - rho) / np.linalg.norm(ref_rho)
             print self.iteration, err, top_v, top_ref_v, np.max(rho), np.max(ref_rho), rho_err
 
 
