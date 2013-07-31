@@ -35,7 +35,7 @@ class KidaSubdomain(Subdomain3D):
         sim.vz[:] = self.max_v * sin(z) * (cos(3 * x) * cos(y) - cos(x) * cos(3 * y))
 
 
-class KidaSim(LBFluidSim):
+class KidaSim(LBFluidSim, KineticEnergyEnstrophyMixIn):
     subdomain = KidaSubdomain
     aux_code = ['data_processing.mako']
 
@@ -80,16 +80,24 @@ class KidaSim(LBFluidSim):
                                            [self.axis, self.axis_pos] + gpu_v +
                                            [self._gpu_buf],
                                            'iiPPPP', block_size=(128,))
-
+    stats = []
     def after_step(self, runner):
-        every = 5
+        every = 20
         mod = self.iteration % every
 
         if mod == every - 1:
             self.need_fields_flag = True
         elif mod == 0:
+            ke, ens = self.compute_ke_enstropy(runner)
+            self.stats.append((self.iteration, ke, ens))
+
             runner.backend.run_kernel(self.extract_k, ((self.config.lat_nx + 127)
                                                         / 128, self.config.lat_ny))
+
+
+        if self.iteration == self.config.max_iters - 1:
+            np.savetxt('%s_ke_ens_%s.dat' % (self.config.output, runner._spec.id),
+                       np.array(self.stats))
 
 if __name__ == '__main__':
     ctrl = LBSimulationController(KidaSim, EqualSubdomainsGeometry3D)
