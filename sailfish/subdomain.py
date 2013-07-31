@@ -607,20 +607,14 @@ class Subdomain2D(Subdomain):
         self._type_map_base[:, es + self.spec.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
-        uniq_types = set(np.unique(self._type_map_base))
-        dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
-        dry_types = self._type_map.dtype.type(dry_types)
-
-        # Find nodes which are walls themselves and are completely surrounded by
-        # walls.  These nodes are marked as unused, as they do not contribute to
-        # the dynamics of the fluid in any way.
-        cnt = np.zeros_like(self._type_map_base).astype(np.uint32)
+        # Any node not connected to at least one fluid node is marked unused.
+        mask = np.zeros_like(self._type_map_base).astype(np.bool)
         for i, vec in enumerate(self.grid.basis):
             a = np.roll(self._type_map_base, int(-vec[0]), axis=1)
             a = np.roll(a, int(-vec[1]), axis=0)
-            cnt[util.in_anyd_fast(a, dry_types)] += 1
+            mask[a == 0] = True
 
-        self._type_map_base[(cnt == self.grid.Q)] = nt._NTUnused.id
+        self._type_map_base[np.logical_not(mask)] = nt._NTUnused.id
 
 class Subdomain3D(Subdomain):
     dim = 3
@@ -647,19 +641,12 @@ class Subdomain3D(Subdomain):
         self._type_map_base[:, :, es + self.spec.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
-        uniq_types = set(np.unique(self._type_map_base))
-        dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
-        dry_types = self._type_map.dtype.type(dry_types)
-
-        # Find nodes which are walls themselves and are completely surrounded by
-        # walls. These nodes are marked as unused, as they do not contribute to
-        # the dynamics of the fluid in any way.
-        dry_map = util.in_anyd_fast(self._type_map_base,
-                                    dry_types).astype(np.uint8)
+        fluid_map = (self._type_map_map == 0).astype(np.uint8)
         neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
         neighbors[1,1,1] = 1
         for ei in self.grid.basis:
             neighbors[1 + ei[2], 1 + ei[1], 1 + ei[0]] = 1
 
-        where = (filters.convolve(dry_map, neighbors, mode='wrap') == self.grid.Q)
+        # Any node not connected to at least one fluid node is marked unused.
+        where = (filters.convolve(fluid_map, neighbors, mode='wrap') == 0)
         self._type_map_base[where] = nt._NTUnused.id
