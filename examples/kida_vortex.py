@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+"""Kida vortex flow.
+
+For more details, see:
+
+S. Kida and Y. Murakami, Kolmogorov similarity in freely decaying turbulence
+Phys. Fluids 30, 2030 (1987); doi: 10.1063/1.866137
+"""
 
 import numpy as np
 
