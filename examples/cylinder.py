@@ -2,7 +2,7 @@
 
 import numpy as np
 from sailfish.geo import EqualSubdomainsGeometry2D
-from sailfish.subdomain import SubdomainSpec2D, Subdomain2D
+from sailfish.subdomain import Subdomain2D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
