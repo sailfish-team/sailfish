@@ -492,25 +492,44 @@ ${device_func} inline void postcollisionBoundaryConditions(
 
 	%if nt.NTHalfBBWall in node_types:
 		else if (isNTHalfBBWall(node_type)) {
-			switch (orientation) {
-			%for i in range(1, grid.dim * 2 + 1):
-				case ${i}: {
-					%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
+			%for i, (name, opp_idx) in enumerate(zip(grid.idx_name[1:], grid.idx_opposite[1:])):
+				## Don't generate code for cases that never happen.
+				%if unused_tag_bits & (1 << i) == 0:
+					// ${name} points to a missing node
+					if (orientation & ${1 << i} == 0) {
 						%if access_pattern == 'AB':
-							${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
+							${get_odist('dist_out', opp_idx)} = fi->${name};
 						%else:
 							if (iteration_number & 1) {
-								${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
+								${get_odist('dist_out', opp_idx)} = fi->${name};
 							} else {
-								${get_odist('dist_out', grid.idx_opposite[lvalue.idx],
-											*grid.basis[grid.idx_opposite[lvalue.idx]])} = ${rvalue};  // ${lvalue.var}
+								${get_odist('dist_out', i + 1,
+											*grid.basis[i + 1])} = fi->${name};
 							}
 						%endif
-					%endfor
-					break;
-				}
+					}
+				%endif
 			%endfor
-			}
+
+##			switch (orientation) {
+##			%for i in range(1, grid.dim * 2 + 1):
+##				case ${i}: {
+##					%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
+##						%if access_pattern == 'AB':
+##							${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
+##						%else:
+##							if (iteration_number & 1) {
+##								${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
+##							} else {
+##								${get_odist('dist_out', grid.idx_opposite[lvalue.idx],
+##											*grid.basis[grid.idx_opposite[lvalue.idx]])} = ${rvalue};  // ${lvalue.var}
+##							}
+##						%endif
+##					%endfor
+##					break;
+##				}
+##			%endfor
+##			}
 		}
 	%endif
 

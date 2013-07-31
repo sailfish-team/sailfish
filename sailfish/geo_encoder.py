@@ -48,6 +48,13 @@ class GeoEncoder(object):
             return 0xfffffffe
 
     def tag_directions(self, tags):
+        # For directions which are not periodic, keep the ghost nodes to avoid
+        # detecting some missing directions.
+        ngs = list(self.subdomain.spec._nonghost_slice)
+        for i, periodic in enumerate(reversed(self.subdomain.spec._periodicity)):
+            if not periodic:
+                ngs[i] = slice(None)
+
         # Limit dry and wet types to these that are actually used in the simulation.
         uniq_types = set(np.unique(self._type_map.base))
         dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
@@ -58,11 +65,11 @@ class GeoEncoder(object):
         dry_types = self._type_map.dtype.type(dry_types)
         wet_types = self._type_map.dtype.type(wet_types)
         orient_types = self._type_map.dtype.type(orient_types)
-        orient_map = util.in_anyd_fast(self._type_map, orient_types)
+        orient_map = util.in_anyd_fast(self._type_map[ngs], orient_types)
         l = self.subdomain.grid.dim - 1
         # Skip the stationary vector.
         for i, vec in enumerate(self.subdomain.grid.basis[1:]):
-            shifted_map = self._type_map
+            shifted_map = self._type_map[ngs]
             for j, shift in enumerate(vec):
                 if shift == 0:
                     continue
@@ -71,7 +78,7 @@ class GeoEncoder(object):
             # If the given distribution points to a fluid node, tag it as
             # active.
             idx = orient_map & util.in_anyd_fast(shifted_map, wet_types)
-            tags[idx] |= (1 << i)
+            tags[ngs][idx] |= (1 << i)
 
     def detect_orientation(self, orientation):
         # Limit dry and wet types to these that are actually used in the simulation.
@@ -120,11 +127,16 @@ class GeoEncoderConst(GeoEncoder):
         self.scratch_space_size = 0
 
     # TODO(michalj): Consider merging this funtionality into encode().
-    def prepare_encode(self, type_map, param_map, param_dict):
+    def prepare_encode(self, type_map, param_map, param_dict, orientation,
+                       detect_orientation):
         """
         :param type_map: uint32 array of NodeType.ids
         :param param_map: array whose entries are keys in param_dict
         :param param_dict: maps entries from param_map to LBNodeType objects
+        :param detect_orientation: if True, will try to auto-detect the
+            orientation of boundary nodes. This is used as an optimization to
+            skip the relatively costly orientation detection in case there are
+            no nodes requiring it.
         """
         uniq_types = list(np.unique(type_map))
         for nt_id in uniq_types:
@@ -246,6 +258,19 @@ class GeoEncoderConst(GeoEncoder):
         else:
             self._bits_scratch = 0
 
+        if detect_orientation:
+            orientation[:] = 0
+            self.tag_directions(orientation)
+
+            # TODO: Actually drop these bits to save space in the node code.
+            # It would be nice to use reduce here instead, but
+            # bitwise_and.identity = 1...
+            self._unused_tag_bits = int(np.bitwise_and.accumulate(
+                orientation[orientation > 0])[-1])
+
+            # self.detect_orientation(orientation)
+            self.config.logger.debug('... orientation done.')
+
     def _subdomain_encode_node(self, orientation, node_type, param):
         """Helper method for use from Subdomain only.
 
@@ -255,24 +280,14 @@ class GeoEncoderConst(GeoEncoder):
                                  np.choose(np.int32(node_type),
                                            self._type_choice_map))
 
-    def encode(self, orientation, detect_orientation):
+    def encode(self, orientation):
         """
         :param orientation: numpy array with the same layout as _type_map,
             indicating the orientation of different nodes; this array will be
             modified if detect_orientation is True.
-        :param detect_orientation: if True, will try to auto-detect the
-            orientation of boundary nodes. This is used as an optimization to
-            skip the relatively costly orientation detection in case there are
-            no nodes requiring it.
         """
         assert self._type_map is not None
         self.config.logger.debug('Node type encoding...')
-
-        if detect_orientation:
-            orientation[:] = 0
-            self.tag_directions(orientation)
-            # self.detect_orientation(orientation)
-            self.config.logger.debug('... orientation done.')
 
         # Remap type IDs.
         max_type_code = max(self._type_id_remap.keys())
@@ -317,6 +332,7 @@ class GeoEncoderConst(GeoEncoder):
             'non_symbolic_idxs': self._non_symbolic_idxs,
             'scratch_space': self.scratch_space_size > 0,
             'scratch_space_base': self._scratch_space_base,
+            'unused_tag_bits': self._unused_tag_bits
         })
 
     def _encode_node(self, orientation, param, node_type, scratch_id=0):

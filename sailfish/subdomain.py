@@ -501,7 +501,8 @@ class Subdomain(object):
         from sailfish import geo_encoder
         self._encoder = geo_encoder.GeoEncoderConst(self)
         self._encoder.prepare_encode(self._type_map_base, self._param_map_base,
-                                     self._params)
+                                     self._params, self._orientation_base,
+                                     self._needs_orientation)
 
         self.config.logger.debug('... encoder done.')
 
@@ -568,7 +569,7 @@ class Subdomain(object):
 
     def encoded_map(self):
         if not self._type_map_encoded:
-            self._encoder.encode(self._orientation_base, self._needs_orientation)
+            self._encoder.encode(self._orientation_base)
             self._type_map_encoded = True
 
         return self._type_map_base

@@ -11,7 +11,7 @@ from sailfish.lb_base import LBForcedSim
 
 class CylinderBlock(Subdomain2D):
     def boundary_conditions(self, hx, hy):
-        wall_bc = NTFullBBWall
+        wall_bc = NTHalfBBWall
         if self.config.vertical:
             diam = self.gx / 3
             x0 = self.gx / 2
@@ -27,7 +27,7 @@ class CylinderBlock(Subdomain2D):
             self.set_node(hy == 0, wall_bc)
             self.set_node(hy == self.gy - 1, wall_bc)
 
-        cylinder_map = np.square(hx - x0) + np.square(hy - y0) < diam**2 / 4.0
+        cylinder_map = (np.abs(hx - x0) < diam / 2) & (np.abs(hy - y0) < diam / 2)
         self.set_node(cylinder_map, wall_bc)
 
     def initial_conditions(self, sim, hx, hy):
