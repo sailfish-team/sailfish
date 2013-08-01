@@ -227,7 +227,7 @@ ${kernel} void ComputeSquareVelocityAndVorticity(
 ##		- [(0, 1)] indicates f_0
 ##		- [(0, 2)] indicates f_0^2
 ##		- [(0, 1), (1, 1)] indicates f_0 f_1
-##		- [(0, 2), (1, 1)] indciates f_0^2 f_1
+##		- [(0, 2), (1, 1)] indicates f_0^2 f_1
 ##  out_type: 'float' or 'double', identifies the precision of the reduction
 ##            operation and the final value
 ##  block_size: CUDA block size for the reduction kernel
