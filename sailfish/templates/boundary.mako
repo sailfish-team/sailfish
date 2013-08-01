@@ -495,8 +495,8 @@ ${device_func} inline void postcollisionBoundaryConditions(
 			%for i, (name, opp_idx) in enumerate(zip(grid.idx_name[1:], grid.idx_opposite[1:])):
 				## Don't generate code for cases that never happen.
 				%if unused_tag_bits & (1 << i) == 0:
-					// ${name} points to a missing node
-					if (orientation & ${1 << i} == 0) {
+					// ${name} points to a missing node, ${grid.idx_name[opp_idx]} is undefined
+					if ((orientation & ${1 << i}) == 0) {
 						%if access_pattern == 'AB':
 							${get_odist('dist_out', opp_idx)} = fi->${name};
 						%else:
