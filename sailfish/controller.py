@@ -239,7 +239,7 @@ class LBGeometryProcessor(object):
 
         # Ensure every subdomain is connected to at least one other subdomain.
         if len(self.subdomains) > 1 and len(connected) != len(self.subdomains):
-            raise GeometryError()
+            raise GeometryError('Not all subdomains are connected.')
 
     def transform(self, config):
         self._annotate()
