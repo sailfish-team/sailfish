@@ -37,7 +37,7 @@ class LBGeometry2D(LBGeometry):
         """Returns a 1-element list containing a single 2D block
         covering the whole domain."""
         return [SubdomainSpec2D((0, 0), (self.config.lat_nx,
-                                   self.config.lat_ny))]
+                                         self.config.lat_ny))]
 
 class LBGeometry3D(LBGeometry):
     """Describes the high-level 3D geometry of a LB simulation."""
@@ -59,9 +59,9 @@ class LBGeometry3D(LBGeometry):
     def subdomains(self):
         """Returns a 1-element list containing a single 3D block
         covering the whole domain."""
-        return [SubdomainSpec3D((0, 0, 0),
-                          (self.config.lat_nx, self.config.lat_ny,
-                           self.config.lat_nz))]
+        return [SubdomainSpec3D((0, 0, 0), (self.config.lat_nx,
+                                            self.config.lat_ny,
+                                            self.config.lat_nz))]
 
 
 class EqualSubdomainsGeometry2D(LBGeometry2D):

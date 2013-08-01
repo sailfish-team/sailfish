@@ -33,7 +33,6 @@ class SubdomainSpec(object):
     This class does not contain any references to the actual GPU or host data
     structures necessary to run the simulation for this subdomain.
     """
-
     dim = None
 
     # Face IDs.
@@ -107,7 +106,6 @@ class SubdomainSpec(object):
         # TODO(michalj): Fix this.
         # This requires support for ghost nodes in the periodicity code
         # on the GPU.
-        # ctx['periodicity'] = self._periodicity
         ctx['periodicity'] = [False, False, False]
         ctx['periodic_x'] = 0 #int(self._block.periodic_x)
         ctx['periodic_y'] = 0 #int(self._block.periodic_y)
@@ -642,7 +640,7 @@ class Subdomain3D(Subdomain):
         self._type_map_base[:, :, es + self.spec.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
-        fluid_map = (self._type_map_map == 0).astype(np.uint8)
+        fluid_map = (self._type_map_base == 0).astype(np.uint8)
         neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
         neighbors[1,1,1] = 1
         for ei in self.grid.basis:
