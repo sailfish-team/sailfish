@@ -125,6 +125,7 @@ class GeoEncoderConst(GeoEncoder):
         self._geo_params = []
         self.config = subdomain.spec.runner.config
         self.scratch_space_size = 0
+        self._unused_tag_bits = 0
 
     # TODO(michalj): Consider merging this funtionality into encode().
     def prepare_encode(self, type_map, param_map, param_dict, orientation,
@@ -264,7 +265,7 @@ class GeoEncoderConst(GeoEncoder):
 
             # TODO: Actually drop these bits to save space in the node code.
             # It would be nice to use reduce here instead, but
-            # bitwise_and.identity = 1...
+            # bitwise_and.identity = 1 makes it impossible to use it.
             self._unused_tag_bits = int(np.bitwise_and.accumulate(
                 orientation[orientation > 0])[-1])
 
