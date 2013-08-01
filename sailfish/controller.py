@@ -135,7 +135,7 @@ class LBGeometryProcessor(object):
         # items are maps from lower coordinate along the specific axis to
         # a list of SubdomainPairs
         self._coord_map_list = [defaultdict(list), defaultdict(list),
-                defaultdict(list)]
+                                defaultdict(list)]
         for subdomain in self.subdomains:
             self._add_pair(SubdomainPair(subdomain, subdomain))
 
@@ -144,6 +144,8 @@ class LBGeometryProcessor(object):
             periodicity.append(config.periodic_z)
 
         def _pbc_helper(loc, subdomain, axes):
+            """Returns a list of locations of virtual subdomains due to
+            periodic boundary conditions."""
             if not axes:
                 return [tuple(loc)]
 
@@ -156,12 +158,13 @@ class LBGeometryProcessor(object):
 
                 if subdomain.location[ax] == 0:
                     ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
+                    # Subdomain at the end of the global domain.
                     loc[ax] = self.geo.gsize[ax]
                     ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
-                    loc[ax] = 0
                     axis_done = True
                 if subdomain.end_location[ax] == self.geo.gsize[ax]:
                     ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
+                    # Subdomain before the beginning of the global domain.
                     loc[ax] = -subdomain.size[ax]
                     ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
                     axis_done = True
@@ -169,7 +172,7 @@ class LBGeometryProcessor(object):
             return ret
 
         # Handle PBCs by creating virtual copies of subdomains touching the
-        # lower boundary of the global domain.
+        # lower and upper boundaries of the global domain.
         done = set()
         for axis in range(self.dim):
             if not periodicity[axis]:
@@ -178,12 +181,9 @@ class LBGeometryProcessor(object):
             for subdomain, _ in self._coord_map_list[axis][0]:
                 if subdomain.id in done:
                     continue
-                loc = list(subdomain.location)
-                loc[axis] = self.geo.gsize[axis]
-
-                locs = set(_pbc_helper(list(subdomain.location), subdomain,
-                    range(axis, self.dim)))
                 b = subdomain
+                locs = set(_pbc_helper(list(b.location), b,
+                                       range(axis, self.dim)))
                 locs.remove(b.location)
 
                 for loc in locs:
@@ -201,6 +201,7 @@ class LBGeometryProcessor(object):
         grid = util.get_grid_from_config(config)
 
         def try_connect(subdomain, pair):
+            # Cannot connect the domain to itself.
             if subdomain.id == pair.real.id:
                 return False
 
@@ -211,6 +212,8 @@ class LBGeometryProcessor(object):
 
             return False
 
+        # Special processing for local periodicity (PBC within a single
+        # subdomain).
         periodicity = [config.periodic_x, config.periodic_y]
         if self.dim == 3:
             periodicity.append(config.periodic_z)
