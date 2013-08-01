@@ -606,14 +606,16 @@ class Subdomain2D(Subdomain):
         self._type_map_base[:, es + self.spec.nx:] = nt._NTGhost.id
 
     def _postprocess_nodes(self):
-        # Any node not connected to at least one fluid node is marked unused.
-        mask = np.zeros_like(self._type_map_base).astype(np.bool)
-        for i, vec in enumerate(self.grid.basis):
-            a = np.roll(self._type_map_base, int(-vec[0]), axis=1)
-            a = np.roll(a, int(-vec[1]), axis=0)
-            mask[a == 0] = True
+        fluid_map = (self._type_map_base == 0).astype(np.uint8)
+        neighbors = np.zeros((3, 3), dtype=np.uint8)
+        neighbors[1,1] = 1
+        for ei in self.grid.basis:
+            neighbors[1 + ei[1], 1 + ei[0]] = 1
 
-        self._type_map_base[np.logical_not(mask)] = nt._NTUnused.id
+        # Any node not connected to at least one fluid node is marked unused.
+        where = (filters.convolve(fluid_map, neighbors, mode='wrap') == 0)
+        self._type_map_base[where] = nt._NTUnused.id
+
 
 class Subdomain3D(Subdomain):
     dim = 3
