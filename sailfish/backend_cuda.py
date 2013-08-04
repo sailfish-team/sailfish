@@ -117,6 +117,12 @@ class CUDABackend(object):
     def total_memory(self):
         return self._device.total_memory()
 
+    def ipc_handle(self, addr):
+        return cuda.mem_get_ipc_handle(addr)
+
+    def ipc_handle_wrap(self, handle):
+        return cuda.IPCMemoryHandle(handle)
+
     def set_iteration(self, it):
         for kernel in self._iteration_kernels:
             kernel.args[-1] = it
