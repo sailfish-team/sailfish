@@ -242,12 +242,6 @@
 		first_prop_dist = grid.idx_name[sym.get_prop_dists(grid, 1)[0]]
 	%>
 
-	// Update the 0-th direction distribution
-	${dist_out}[gi] = ${dist_in}.fC;
-
-	// Propagation in directions orthogonal to the X axis (global memory)
-	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
-
 	%if propagation_sentinels:
 		// Initialize the shared array with invalid sentinel values.  If the sentinel
 		// value is not subsequently overridden, it will not be propagated.
@@ -255,25 +249,33 @@
 		${barrier()}
 	%endif
 
-	// E propagation in shared memory
-	if (gx < ${lat_nx-1}) {
-		// Note: propagation to ghost nodes is done directly in global memory as there
-		// are no threads running for the ghost nodes.
-		if (lx < ${block_size-1} && gx != ${lat_nx-1-envelope_size}) {
-			%for i in sym.get_prop_dists(grid, 1):
-				prop_${grid.idx_name[i]}[lx+1] = ${dist_in}.${grid.idx_name[i]};
-			%endfor
-		// E propagation in global memory (at right block boundary)
-		} else {
-			${prop_block_bnd(dist_out, dist_in, 1, 'prop_global')}
+	if (!propagation_only) {
+		// Update the 0-th direction distribution
+		${dist_out}[gi] = ${dist_in}.fC;
+
+		// Propagation in directions orthogonal to the X axis (global memory)
+		${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
+
+		// E propagation in shared memory
+		if (gx < ${lat_nx-1}) {
+			// Note: propagation to ghost nodes is done directly in global memory as there
+			// are no threads running for the ghost nodes.
+			if (lx < ${block_size-1} && gx != ${lat_nx-1-envelope_size}) {
+				%for i in sym.get_prop_dists(grid, 1):
+					prop_${grid.idx_name[i]}[lx+1] = ${dist_in}.${grid.idx_name[i]};
+				%endfor
+			// E propagation in global memory (at right block boundary)
+			} else {
+				${prop_block_bnd(dist_out, dist_in, 1, 'prop_global')}
+			}
 		}
+		%if periodic_x:
+		// periodic boundary conditions in the X direction
+		else {
+			${prop_block_bnd(dist_out, dist_in, 1, 'prop_global', pbc_offsets[0][1])}
+		}
+		%endif
 	}
-	%if periodic_x:
-	// periodic boundary conditions in the X direction
-	else {
-		${prop_block_bnd(dist_out, dist_in, 1, 'prop_global', pbc_offsets[0][1])}
-	}
-	%endif
 
 	${barrier()}
 
@@ -295,23 +297,25 @@
 
 	${barrier()}
 
-	// W propagation in shared memory
-	// Note: propagation to ghost nodes is done directly in global memory as there
-	// are no threads running for the ghost nodes.
-	if (lx > ${envelope_size} || (lx > 0 && gx >= ${block_size})) {
-		%for i in sym.get_prop_dists(grid, -1):
-			prop_${grid.idx_name[i]}[lx-1] = ${dist_in}.${grid.idx_name[i]};
-		%endfor
-	// W propagation in global memory (at left block boundary)
-	} else if (gx > 0) {
-		${prop_block_bnd(dist_out, dist_in, -1, 'prop_global')}
+	if (!propagation_only) {
+		// W propagation in shared memory
+		// Note: propagation to ghost nodes is done directly in global memory as there
+		// are no threads running for the ghost nodes.
+		if ((lx > ${envelope_size} || (lx > 0 && gx >= ${block_size})) && !propagation_only) {
+			%for i in sym.get_prop_dists(grid, -1):
+				prop_${grid.idx_name[i]}[lx-1] = ${dist_in}.${grid.idx_name[i]};
+			%endfor
+		// W propagation in global memory (at left block boundary)
+		} else if (gx > 0) {
+			${prop_block_bnd(dist_out, dist_in, -1, 'prop_global')}
+		}
+		%if periodic_x:
+		// periodic boundary conditions in the X direction
+		else {
+			${prop_block_bnd(dist_out, dist_in, -1, 'prop_global', pbc_offsets[0][-1])}
+		}
+		%endif
 	}
-	%if periodic_x:
-	// periodic boundary conditions in the X direction
-	else {
-		${prop_block_bnd(dist_out, dist_in, -1, 'prop_global', pbc_offsets[0][-1])}
-	}
-	%endif
 
 	${barrier()}
 
@@ -326,6 +330,8 @@
 </%def>
 
 <%def name="propagate(dist_out, dist_in='fi')">
+	const bool propagation_only = isPropagationOnly(type);
+
 	%if not propagation_enabled:
 		${propagate_inplace(dist_out, dist_in)}
 	%elif access_pattern == 'AB':
@@ -345,7 +351,8 @@
 			%else:
 				${propagate_shared(dist_out, dist_in)}
 			%endif
-		} else {
+		// inplace propagation does not require propagation-only nodes.
+		} else if (!propagation_only) {
 			${propagate_inplace_opposite_slot(dist_out, dist_in)}
 		}
 	%else:

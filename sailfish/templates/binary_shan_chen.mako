@@ -92,33 +92,35 @@ ${kernel} void ShanChenCollideAndPropagate${grid_idx}(
 	${local_indices_split()}
 	${shared_mem_propagation_vars()}
 	${load_node_type()}
-	${guo_density_node_index_shift_intro()}
-	float g${grid_idx}m0 = gg${grid_idx}m0[gi];
-	${sc_calculate_force(grid_idx=grid_idx)}
-
-	// Cache the distributions in local variables.
 	Dist d0;
-	getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
+	if (!isPropagationOnly(type)) {
+		${guo_density_node_index_shift_intro()}
+		float g${grid_idx}m0 = gg${grid_idx}m0[gi];
+		${sc_calculate_force(grid_idx=grid_idx)}
 
-	// Macroscopic quantities for the current cell.
-	float v[${dim}];
-	v[0] = ovx[gi];
-	v[1] = ovy[gi];
-	${'v[2] = ovz[gi]' if dim == 3 else ''};
+		// Cache the distributions in local variables.
+		getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
 
-	${guo_density_restore_index()}
+		// Macroscopic quantities for the current cell.
+		float v[${dim}];
+		v[0] = ovx[gi];
+		v[1] = ovy[gi];
+		${'v[2] = ovz[gi]' if dim == 3 else ''};
 
-	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g${grid_idx}m0, v
-								   ${', dist1_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
-								   ${iteration_number_arg_if_required()});
-	${relaxate(bgk_args_sc, grid_idx)}
+		${guo_density_restore_index()}
 
-	// FIXME: In order for the half-way bounce back boundary condition to work, a layer of unused
-	// nodes currently has to be placed behind the wall layer.
-	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g${grid_idx}m0, v, gi, dist1_out
-									${iteration_number_arg_if_required()});
-	${guo_density_node_index_shift_final()}
-	${check_invalid_values()}
+		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g${grid_idx}m0, v
+									   ${', dist1_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+									   ${iteration_number_arg_if_required()});
+		${relaxate(bgk_args_sc, grid_idx)}
+
+		// FIXME: In order for the half-way bounce back boundary condition to work, a layer of unused
+		// nodes currently has to be placed behind the wall layer.
+		postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g${grid_idx}m0, v, gi, dist1_out
+										${iteration_number_arg_if_required()});
+		${guo_density_node_index_shift_final()}
+		${check_invalid_values()}
+	}  // propagation only
 	${propagate('dist1_out', 'd0')}
 }
 %endfor

@@ -616,6 +616,10 @@ class Subdomain2D(Subdomain):
         where = (filters.convolve(fluid_map, neighbors, mode='wrap') == 0)
         self._type_map_base[where] = nt._NTUnused.id
 
+        # If an unused node touches a wet node, mark it as propagation only.
+        used_map = (self._type_map_base != nt._NTUnused.id).astype(np.uint8)
+        where = (filters.convolve(used_map, neighbors, mode='wrap') > 0)
+        self._type_map_base[where & (self._type_map_base == nt._NTUnused.id)] = nt._NTPropagationOnly.id
 
 class Subdomain3D(Subdomain):
     dim = 3
@@ -651,3 +655,8 @@ class Subdomain3D(Subdomain):
         # Any node not connected to at least one fluid node is marked unused.
         where = (filters.convolve(fluid_map, neighbors, mode='wrap') == 0)
         self._type_map_base[where] = nt._NTUnused.id
+
+        # If an unused node touches a wet node, mark it as propagation only.
+        used_map = (self._type_map_base != nt._NTUnused.id).astype(np.uint8)
+        where = (filters.convolve(used_map, neighbors, mode='wrap') > 0)
+        self._type_map_base[where & (self._type_map_base == nt._NTUnused.id)] = nt._NTPropagationOnly.id

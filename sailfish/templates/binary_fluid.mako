@@ -120,6 +120,10 @@ ${kernel} void FreeEnergyPrepareMacroFields(
 	${local_indices_split()}
 	${load_node_type()}
 
+	if (isPropagationOnly(type)) {
+		return;
+	}
+
 	// Do not not update the fields for pressure nodes, where by definition
 	// they are constant.
 	%for node_type in (nt.NTGuoDensity, nt.NTEquilibriumDensity, nt.NTZouHeDensity):
@@ -218,45 +222,48 @@ ${kernel} void FreeEnergyCollideAndPropagateFluid(
 	${local_indices_split()}
 	${shared_mem_propagation_vars()}
 	${load_node_type()}
-	${guo_density_node_index_shift_intro()}
 
-	float lap1, grad1[${dim}];
-	if (isWetNode(type)) {
-		laplacian_and_grad(gg1m0, 1, gi, &lap1, grad1, gx, gy ${', gz' if dim == 3 else ''});
-	}
-
-	// Macroscopic quantities for the current cell.
-	float g0m0, v[${dim}], g1m0;
-
-	// Cache the distributions in local variables.
 	Dist d0;
-	getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
-	g1m0 = gg1m0[gi];
-	${guo_density_restore_index()}
+	if (!isPropagationOnly(type)) {
+		${guo_density_node_index_shift_intro()}
 
-	getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
+		float lap1, grad1[${dim}];
+		if (isWetNode(type)) {
+			laplacian_and_grad(gg1m0, 1, gi, &lap1, grad1, gx, gy ${', gz' if dim == 3 else ''});
+		}
 
-	// Save laplacian and velocity to global memory so that they can be reused
-	// in the relaxation of the order parameter field.
-	ovx[gi] = v[0];
-	ovy[gi] = v[1];
-	${'ovz[gi] = v[2]' if dim == 3 else ''};
-	gg1laplacian[gi] = lap1;
+		// Macroscopic quantities for the current cell.
+		float g0m0, v[${dim}], g1m0;
 
-	%if phi_needs_rho:
-		gg0m0[gi] = g0m0;
-	%endif
+		// Cache the distributions in local variables.
+		getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
+		g1m0 = gg1m0[gi];
+		${guo_density_restore_index()}
 
-	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v
-								   ${', dist_out1, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
-								   ${iteration_number_arg_if_required()});
+		getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
 
-	${relaxate(bgk_args_fe, 0)}
-	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist1_out
-									${iteration_number_arg_if_required()});
-	${guo_density_node_index_shift_final()}
-	${check_invalid_values()}
-	${save_macro_fields(velocity=False)}
+		// Save laplacian and velocity to global memory so that they can be reused
+		// in the relaxation of the order parameter field.
+		ovx[gi] = v[0];
+		ovy[gi] = v[1];
+		${'ovz[gi] = v[2]' if dim == 3 else ''};
+		gg1laplacian[gi] = lap1;
+
+		%if phi_needs_rho:
+			gg0m0[gi] = g0m0;
+		%endif
+
+		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v
+									   ${', dist_out1, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+									   ${iteration_number_arg_if_required()});
+
+		${relaxate(bgk_args_fe, 0)}
+		postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist1_out
+										${iteration_number_arg_if_required()});
+		${guo_density_node_index_shift_final()}
+		${check_invalid_values()}
+		${save_macro_fields(velocity=False)}
+	}  // propagation only
 	${propagate('dist1_out', 'd0')}
 }
 
@@ -275,28 +282,31 @@ ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
 	${local_indices_split()}
 	${shared_mem_propagation_vars()}
 	${load_node_type()}
-	${guo_density_node_index_shift_intro()}
-	// Cache the distributions in local variables.
+
 	Dist d0;
-	getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
-	${guo_density_restore_index()}
-	float lap1 = gg1laplacian[gi];
-	float g1m0, v[${dim}];
-	${'float g0m0 = gg0m0[gi];' if phi_needs_rho else ''}
+	if (!isPropagationOnly(type)) {
+		${guo_density_node_index_shift_intro()}
+		// Cache the distributions in local variables.
+		getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
+		${guo_density_restore_index()}
+		float lap1 = gg1laplacian[gi];
+		float g1m0, v[${dim}];
+		${'float g0m0 = gg0m0[gi];' if phi_needs_rho else ''}
 
-	v[0] = ovx[gi];
-	v[1] = ovy[gi];
-	${'v[2] = ovz[gi]' if dim == 3 else ''};
-	g1m0 = gg1m0[gi];
+		v[0] = ovx[gi];
+		v[1] = ovy[gi];
+		${'v[2] = ovz[gi]' if dim == 3 else ''};
+		g1m0 = gg1m0[gi];
 
-	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v
-								   ${', dist1_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
-								   ${iteration_number_arg_if_required()});
-	${relaxate(bgk_args_fe, 1)}
-	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v, gi, dist1_out
-									${iteration_number_arg_if_required()});
-	${guo_density_node_index_shift_final()}
-	${check_invalid_values()}
+		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v
+									   ${', dist1_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+									   ${iteration_number_arg_if_required()});
+		${relaxate(bgk_args_fe, 1)}
+		postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v, gi, dist1_out
+										${iteration_number_arg_if_required()});
+		${guo_density_node_index_shift_final()}
+		${check_invalid_values()}
+	}  // propagation only
 	${propagate('dist1_out', 'd0')}
 }
 

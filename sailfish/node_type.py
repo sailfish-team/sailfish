@@ -24,6 +24,10 @@ class LBNodeType(object):
     #: If True, the node does not participate in the simulation.
     excluded = False
 
+    #: If True, the node participates in the propagation step only. This is
+    #: necessary for some schemes that use propagation in shared memory.
+    propagation_only = False
+
     #: If True, the node does not require any special processing to calculate
     #: macroscopic fluid quantities.  Typical examples of nodes requiring
     #: special treatment are edge and corner nodes where not all mass fractions
@@ -84,6 +88,15 @@ class _NTGhost(LBNodeType):
 class _NTUnused(LBNodeType):
     """Unused node."""
     excluded = True
+
+
+class _NTPropagationOnly(LBNodeType):
+    """Unused node participating in the propagation step.
+
+    These lie beyond the active fluid nodes, and are used to provide sentinel
+    values for the propagation step.
+    """
+    propagation_only = True
 
 ############################################################################
 # Wall (no-slip) nodes.

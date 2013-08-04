@@ -139,7 +139,7 @@ ${kernel} void PrepareMacroFields(
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isExcludedNode(type))
+	if (isExcludedNode(type) || isPropagationOnly(type))
 		return;
 
 	int orientation = decodeNodeOrientation(ncode);
@@ -171,37 +171,40 @@ ${kernel} void CollideAndPropagate(
 
 	// Cache the distributions in local variables
 	Dist d0;
-	getDist(&d0, dist_in, gi ${iteration_number_arg_if_required()});
-	fixMissingDistributions(&d0, dist_in, ncode, type, orientation, gi,
-							ovx, ovy ${', ovz' if dim == 3 else ''}, gg0m0
-							${misc_bc_args()}
-							${scratch_space_arg_if_required()});
+	if (!isPropagationOnly(type)) {
+		getDist(&d0, dist_in, gi ${iteration_number_arg_if_required()});
+		fixMissingDistributions(&d0, dist_in, ncode, type, orientation, gi,
+								ovx, ovy ${', ovz' if dim == 3 else ''}, gg0m0
+								${misc_bc_args()}
+								${scratch_space_arg_if_required()});
 
-	// Macroscopic quantities for the current cell
-	float g0m0, v[${dim}];
-	getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
+		// Macroscopic quantities for the current cell
+		float g0m0, v[${dim}];
+		getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
 
-	%if simtype == 'shan-chen':
-		${sc_calculate_force()}
-	%endif
+		%if simtype == 'shan-chen':
+			${sc_calculate_force()}
+		%endif
 
-	precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v
-								   ${', dist_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
-								   ${iteration_number_arg_if_required()});
+		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v
+									   ${', dist_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+									   ${iteration_number_arg_if_required()});
 
-	%if initialization:
-		v[0] = ovx[gi];
-		v[1] = ovy[gi];
-		${'v[2] = ovz[gi];' if dim == 3 else ''}
-	%endif
+		%if initialization:
+			v[0] = ovx[gi];
+			v[1] = ovy[gi];
+			${'v[2] = ovz[gi];' if dim == 3 else ''}
+		%endif
 
-	${relaxate(bgk_args)}
-	postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out
-									${iteration_number_arg_if_required()}
-									${misc_bc_args()}
-									${scratch_space_arg_if_required()});
-	${check_invalid_values()}
-	${save_macro_fields()}
+		${relaxate(bgk_args)}
+
+		postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out
+										${iteration_number_arg_if_required()}
+										${misc_bc_args()}
+										${scratch_space_arg_if_required()});
+		${check_invalid_values()}
+		${save_macro_fields()}
+	}  // propagation only
 	${propagate('dist_out', 'd0')}
 }
 

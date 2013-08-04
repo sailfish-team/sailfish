@@ -73,6 +73,16 @@ ${device_func} inline bool isExcludedNode(unsigned int type) {
 	);
 }
 
+${device_func} inline bool isPropagationOnly(unsigned int type) {
+	return (false
+		%for nt_class in node_types:
+			%if nt_class.propagation_only:
+				|| is${nt_class.__name__}(type)
+			%endif
+		%endfor
+	);
+}
+
 // Internal helper, do not use directly.
 ${device_func} inline void _storeNodeScratchSpace(unsigned int scratch_id,
 	unsigned int num_values, float *buffer, ${global_ptr} float *g_buffer) {
