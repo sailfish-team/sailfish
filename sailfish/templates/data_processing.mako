@@ -215,6 +215,60 @@ ${kernel} void ComputeSquareVelocityAndVorticity(
 	%endfor
 </%def>
 
+<%def name="aggregate_slice(name, axis, num_inputs=1, stats=[[(0,1)]], out_type='float', block_size=1024)">
+${kernel} void AggregateSlice${name}(
+	%for i in range(num_inputs):
+		${global_ptr} float *f${i},
+	%endfor
+	%for i in range(len(stats)):
+		${global_ptr} ${out_type} *out${i} ${',' if i < len(stats) - 1 else ''}
+	%endfor
+	, int position,
+	, int restart)
+{
+	%for i in range(len(stats)):
+		${out_type} acc${i} = 0.0f;
+	%endfor
+
+	int ga = get_global_id(0);
+	int gb = get_global_id(1);
+
+	// Skip ghost nodes
+	%if axis == 0:
+		if (ga >= ${lat_ny - 1} || ga == 0 || gb == 0 || gb >= ${lat_nz - 1}) {
+			return;
+		}
+		int gi = getGlobalIdx(position, ga, gb);
+		<% width = lat_ny %>
+	%elif axis == 1:
+		if (ga >= ${lat_nx - 1} || ga == 0 || gb == 0 || gb >= ${lat_nz - 1}) {
+			return;
+		}
+		int gi = getGlobalIdx(ga, position, gb);
+		<% width = lat_nx %>
+	%else:
+		if (ga >= ${lat_nx - 1} || ga == 0 || gb == 0 || gb >= ${lat_ny - 1}) {
+			return;
+		}
+		int gi = getGlobalIdx(ga, gb, position);
+		<% width = lat_nx %>
+	%endif
+	${_compute_stats(num_inputs, stats, out_type)}
+
+	<%
+		if restart:
+			op = '='
+		else:
+			op = '+='
+	%>
+
+	// Skip ghost nodes.
+	%for i in range(len(stats)):
+		out${i}[(ga - 1) + (gb - 1) * ${width - 2}] ${op} acc${i};
+	%endfor
+}
+</%def>
+
 ## Builds a custom reduction kernel.
 ##
 ## Args:
