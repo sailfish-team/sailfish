@@ -80,8 +80,8 @@ ${kernel} void ShanChenPrepareMacroFields(
 %for grid_idx in range(0, 2):
 ${kernel} void ShanChenCollideAndPropagate${grid_idx}(
 	${global_ptr} ${const_ptr} int *__restrict__ map,
-	${global_ptr} float *dist1_in,
-	${global_ptr} float *dist1_out,
+	${global_ptr} ${const_ptr} float *__restrict__ dist1_in,
+	${global_ptr} float *__restrict__ dist1_out,
 	${global_ptr} ${const_ptr} float *__restrict__ gg0m0,
 	${global_ptr} ${const_ptr} float *__restrict__ gg1m0,
 	${kernel_args_1st_moment('ov', const=True)}

@@ -154,9 +154,9 @@ ${kernel} void PrepareMacroFields(
 
 ${kernel} void CollideAndPropagate(
 	${global_ptr} ${const_ptr} int *__restrict__ map,
-	${global_ptr} float *dist_in,
-	${global_ptr} float *dist_out,
-	${global_ptr} float *gg0m0,
+	${global_ptr} float *__restrict__ dist_in,
+	${global_ptr} float *__restrict__ dist_out,
+	${global_ptr} float *__restrict__ gg0m0,
 	${kernel_args_1st_moment('ov')}
 	int options
 	${scratch_space_if_required()}
