@@ -140,7 +140,6 @@
 	%endfor
 </%def>
 
-
 ## Propagate distributions using a 1D shared memory array to make the propagation
 ## in the X direction more efficient.
 <%def name="propagate_shared(dist_out, dist_in='fi')">
@@ -150,6 +149,9 @@
 
 	// Update the 0-th direction distribution
 	${dist_out}[gi] = ${dist_in}.fC;
+
+	// Propagation in directions orthogonal to the X axis (global memory)
+	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
 
 	%if propagation_sentinels:
 		// Initialize the shared array with invalid sentinel values.  If the sentinel
@@ -189,9 +191,6 @@
 	{
 		${prop_block_bnd(dist_out, dist_in, 1, 'prop_local')}
 	}
-
-	// Propagation in directions orthogonal to the X axis (global memory)
-	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
 
 	%if propagation_sentinels:
 		${barrier()}
