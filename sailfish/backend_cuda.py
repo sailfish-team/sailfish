@@ -102,6 +102,10 @@ class CUDABackend(object):
             flags=cuda.ctx_flags.SCHED_AUTO if not options.cuda_sched_yield else
             cuda.ctx_flags.SCHED_YIELD)
 
+        if (options.precision == 'double' and
+            self._device.compute_capability()[0] >= 3):
+            self._ctx.set_shared_config(cuda.shared_config.EIGHT_BYTE_BANK_SIZE)
+
         # To keep track of allocated memory.
         self._total_memory_bytes = 0
 
