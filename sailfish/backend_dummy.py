@@ -51,6 +51,8 @@ class DummyBackend(object):
 
     def get_defines(self):
         return {
+            'warp_size': 32,
+            'supports_shuffle': False,
             'shared_var': '__shared__',
             'kernel': '__global__',
             'global_ptr': '',

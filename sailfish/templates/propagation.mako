@@ -5,14 +5,14 @@
 <%namespace file="kernel_common.mako" import="*"/>
 <%namespace file="opencl_compat.mako" import="*"/>
 
-<%def name="prop_bnd(dist_out, dist_in, effective_dir, i, di, local, offset)">
+<%def name="prop_bnd(dist_out, dist_in, xoff, i, shared, offset=0, di=1)">
 ## Generate the propagation code for a specific base direction.
 ##
 ## This is a generic function which should work for any dimensionality and grid
 ## type.
 ##
 ## Args:
-##   effective_dir: X propagation direction (1 for East, -1 for West)
+##   xoff: X propagation direction (1 for East, -1 for West, 0 for orthogonal to X axis)
 ##   offset: target offset in the distribution array
 ##   i: index of the base vector along which to propagate
 ##   di: dimension index
@@ -20,9 +20,9 @@
 	## This is the final dimension, generate the actual propagation code.
 	%if di == dim:
 		%if dim == 2:
-			${set_odist(dist_out, dist_in, i, effective_dir, grid.basis[i][1], 0, offset, local)}
+			${set_odist(dist_out, dist_in, i, xoff, grid.basis[i][1], 0, offset, shared)}
 		%else:
-			${set_odist(dist_out, dist_in, i, effective_dir, grid.basis[i][1], grid.basis[i][2], offset, local)}
+			${set_odist(dist_out, dist_in, i, xoff, grid.basis[i][1], grid.basis[i][2], offset, shared)}
 		%endif
 	## Make a recursive call to prop_bnd to process the remaining dimensions.
 	## The recursive calls are done to generate checks for out-of-domain
@@ -35,7 +35,7 @@
 			if (${loc_names[di]} > 0) { \
 		%endif
 			## Recursive call for the next dimension.
-			${prop_bnd(dist_out, dist_in, effective_dir, i, di+1, local, offset)}
+			${prop_bnd(dist_out, dist_in, xoff, i, shared, offset, di+1)}
 		%if grid.basis[i][di] != 0:
 			} \
 		%endif
@@ -46,7 +46,7 @@
 		## pbc_offsets and proceed to the following dimension.
 		%if periodicity[di] and grid.basis[i][di] != 0:
 			else {
-				${prop_bnd(dist_out, dist_in, effective_dir, i, di+1, local, offset+pbc_offsets[di][int(grid.basis[i][di])])}
+				${prop_bnd(dist_out, dist_in, xoff, i, shared, offset+pbc_offsets[di][int(grid.basis[i][di])], di+1)}
 			}
 		%endif
 	%endif
@@ -54,18 +54,20 @@
 
 ## Propagate eastwards or westwards knowing that there is an east/westward
 ## node layer to propagate to.
-<%def name="prop_block_bnd(dist_out, dist_in, dir, dist_source, offset=0)">
+<%def name="prop_block_bnd(dist_out, dist_in, xoff, dist_source, offset=0)">
 ## Generate the propagation code for all directions with a X component.  The X component
 ## is special as shared-memory propogation is done in the X direction.
 ##
 ## Args:
-##   dir: X propagation direction (1 for East, -1 for West, 0 for orthogonal to X axis)
+##   xoff: X propagation direction (1 for East, -1 for West, 0 for orthogonal to X axis)
+##   dist_source: prop_local (data from shared memory),
+##				  prop_global (data directly from the distribution structure)
 ##
-	%for i in sym.get_prop_dists(grid, dir):
+	%for i in sym.get_prop_dists(grid, xoff):
 		%if dist_source == 'prop_local':
-			${prop_bnd(dist_out, dist_in, 0, i, 1, True, offset)}
+			${prop_bnd(dist_out, dist_in, 0, i, True, offset)}
 		%else:
-			${prop_bnd(dist_out, dist_in, dir, i, 1, False, offset)}
+			${prop_bnd(dist_out, dist_in, xoff, i, False, offset)}
 		%endif
 	%endfor
 </%def>
@@ -82,8 +84,8 @@
 	${dist_out}[gi + ${dist_size*idir + offset} + ${rel_offset(xoff, yoff, zoff)}]
 </%def>
 
-<%def name="set_odist(dist_out, dist_in, idir, xoff, yoff, zoff, offset, local)">
-	%if local:
+<%def name="set_odist(dist_out, dist_in, idir, xoff, yoff, zoff, offset, shared)">
+	%if shared:
 		${get_odist(dist_out, idir, xoff, yoff, zoff, offset)} = prop_${grid.idx_name[idir]}[lx];
 	%else:
 		${get_odist(dist_out, idir, xoff, yoff, zoff, offset)} = ${dist_in}.${grid.idx_name[idir]};
@@ -137,6 +139,96 @@
 <%def name="propagate_inplace_opposite_slot(dist_out, dist_in='fi')">
 	%for i, dname in enumerate(grid.idx_name):
 		${get_dist(dist_out, grid.idx_opposite[i], 'gi')} = ${dist_in}.${dname};
+	%endfor
+</%def>
+
+
+<%def name="propagate_shuffle(dist_out, dist_in='fi')">
+	<%
+		first_prop_dist = grid.idx_name[sym.get_prop_dists(grid, 1)[0]]
+		warp_mask = warp_size - 1
+		import math
+		warp_bits = int(math.log(warp_size, 2))
+	%>
+
+	// Update the 0-th direction distribution
+	${dist_out}[gi] = ${dist_in}.fC;
+
+	// Propagation in directions orthogonal to the X axis (global memory)
+	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
+
+	const int warp_num = (lx >> ${warp_bits});
+	const int warp_x = (lx & ${warp_mask});
+
+	%if periodic_x:
+		// Periodic boundary conditions in the X direction.
+		if (gx == ${envelope_size}) {
+			// W-propagation.
+			${prop_block_bnd(dist_out, dist_in, -1, 'prop_global', pbc_offsets[0][-1])}
+		}
+		if (gx == ${lat_nx - envelope_size}) {
+			// E-propagation
+			${prop_block_bnd(dist_out, dist_in, 1, 'prop_global', pbc_offsets[0][1])}
+		}
+	%endif
+
+	// W-propagation via global memory, at beginning of blocks or when propagating
+	// to ghost nodes.
+	if ((gx > 0 && lx == 0) || gx <= ${envelope_size}) {
+		// Cross-block propagation via global memory.
+		${prop_block_bnd(dist_out, dist_in, -1, 'prop_global')}
+	}
+
+	// E propagation (+1 on X axis)
+	if (gx < ${lat_nx}) {
+		// Note: propagation to ghost nodes is done directly in global memory as there
+		// are no threads running for the ghost nodes.
+		if (lx == ${block_size - 1} || gx >= ${lat_nx - 1 - envelope_size}) {
+			// Cross-block propagation in global memory.
+			${prop_block_bnd(dist_out, dist_in, 1, 'prop_global')}
+		}
+		%for i in sym.get_prop_dists(grid, 1):
+			// Cross-warp propagation via shared memory.
+			if (warp_x == ${warp_mask}) {
+				prop_${grid.idx_name[i]}[warp_num + 1] = ${dist_in}.${grid.idx_name[i]};
+			}
+			${dist_in}.${grid.idx_name[i]} = __shfl_up(${dist_in}.${grid.idx_name[i]}, 1);
+		%endfor
+
+		${barrier()}
+
+		if (lx > 0) {
+			%for i in sym.get_prop_dists(grid, 1):
+				if (warp_x == 0) {
+					${dist_in}.${grid.idx_name[i]} = prop_${grid.idx_name[i]}[warp_num];
+				}
+
+				// No propagation from ghost nodes.
+				if (gx > 1) {
+					${prop_bnd(dist_out, dist_in, 0, i, False)}
+				}
+			%endfor
+		}
+	}
+	// W propagation (-1 on X axis)
+	%for i in sym.get_prop_dists(grid, -1):
+		// Cross-warp propagation via shared memory.
+		if (warp_x == 0 && lx > 0) {
+			prop_${grid.idx_name[i]}[warp_num - 1] = ${dist_in}.${grid.idx_name[i]};
+		}
+		${dist_in}.${grid.idx_name[i]} = __shfl_down(${dist_in}.${grid.idx_name[i]}, 1);
+	%endfor
+
+	${barrier()}
+
+	%for i in sym.get_prop_dists(grid, -1):
+		if (warp_x == ${warp_mask}) {
+			${dist_in}.${grid.idx_name[i]} = prop_${grid.idx_name[i]}[warp_num];
+		}
+		// No propagation at the end of the block and end of the domain.
+		if (lx < ${block_size - 1} && gx < ${lat_nx - 1 - envelope_size}) {
+			${prop_bnd(dist_out, dist_in, 0, i, False)}
+		}
 	%endfor
 </%def>
 
@@ -237,11 +329,19 @@
 		%if propagate_on_read:
 			${propagate_inplace(dist_out, dist_in)}
 		%else:
-			${propagate_shared(dist_out, dist_in)}
+			%if supports_shuffle:
+				${propagate_shuffle(dist_out, dist_in)}
+			%else:
+				${propagate_shared(dist_out, dist_in)}
+			%endif
 		%endif
 	%elif access_pattern == 'AA':
 		if (iteration_number & 1) {
-			${propagate_shared(dist_out, dist_in)}
+			%if supports_shuffle:
+				${propagate_shuffle(dist_out, dist_in)}
+			%else:
+				${propagate_shared(dist_out, dist_in)}
+			%endif
 		} else {
 			${propagate_inplace_opposite_slot(dist_out, dist_in)}
 		}

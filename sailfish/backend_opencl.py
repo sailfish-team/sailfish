@@ -197,6 +197,9 @@ class OpenCLBackend(object):
 
     def get_defines(self):
         return {
+            # FIXME
+            'warp_size': 32,
+            'supports_shuffle': False,
             'shared_var': '__local',
             'kernel': '__kernel',
             'global_ptr': '__global',

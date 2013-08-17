@@ -108,13 +108,23 @@
 
 <%def name="shared_mem_propagation_vars()">
 	%if not propagate_on_read and propagation_enabled:
-		// Shared variables for in-block propagation
-		%for i in sym.get_prop_dists(grid, 1):
-			${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
-		%endfor
-		%for i in sym.get_prop_dists(grid, 1):
-			#define prop_${grid.idx_name[grid.idx_opposite[i]]} prop_${grid.idx_name[i]}
-		%endfor
+		%if supports_shuffle:
+			// Shared variables for cross-warp propagation.
+			%for i in sym.get_prop_dists(grid, 1):
+				${shared_var} float prop_${grid.idx_name[i]}[${(block_size + warp_size - 1) / warp_size}];
+			%endfor
+			%for i in sym.get_prop_dists(grid, -1):
+				${shared_var} float prop_${grid.idx_name[i]}[${(block_size + warp_size - 1) / warp_size}];
+			%endfor
+		%else:
+			// Shared variables for in-block propagation
+			%for i in sym.get_prop_dists(grid, 1):
+				${shared_var} float prop_${grid.idx_name[i]}[BLOCK_SIZE];
+			%endfor
+			%for i in sym.get_prop_dists(grid, 1):
+				#define prop_${grid.idx_name[grid.idx_opposite[i]]} prop_${grid.idx_name[i]}
+			%endfor
+		%endif
 	%endif
 </%def>
 

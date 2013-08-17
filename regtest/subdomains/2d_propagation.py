@@ -175,6 +175,45 @@ class AASimulationTest(SimulationTest):
             'access_pattern': 'AA',
             })
 
+class ABPropagationTest(unittest.TestCase):
+    def test_horiz_spread(self):
+        def ic(self, runner):
+            dbuf = runner._debug_get_dist()
+            dbuf[:] = 0.0
+
+            # In-warp location x = 20.
+            dbuf[vi(1, 0), 30, 20] = 0.11
+            dbuf[vi(1, 1), 30, 20] = 0.12
+            dbuf[vi(1, -1), 30, 20] = 0.13
+
+            # End of warp location x = 31.
+            dbuf[vi(1, 0), 30, 31] = 0.14
+
+            # Beginning of warp location x = 32.
+            dbuf[vi(1, 0), 30, 32] = 0.16
+
+            # End of block location x = 64.
+            dbuf[vi(1, 0), 30, 63] = 0.15
+
+            runner._debug_set_dist(dbuf)
+            runner._debug_set_dist(dbuf, False)
+
+        HorizTest = type('HorizTest', (SimulationTest,),
+                {'initial_conditions': ic})
+        ctrl = LBSimulationController(HorizTest, LBGeometry2D, {'block_size': 64})
+        ctrl.run(ignore_cmdline=True)
+
+        output = os.path.join(tmpdir, 'test_out')
+        b0 = np.load(io.dists_filename(output, 1, 0, 1))['arr_0']
+        ae = np.testing.assert_equal
+
+        ae(b0[vi(1, 0), 30, 21], np.float32(0.11))
+        ae(b0[vi(1, 1), 31, 21], np.float32(0.12))
+        ae(b0[vi(1, -1), 29, 21], np.float32(0.13))
+        ae(b0[vi(1, 0), 30, 32], np.float32(0.14))
+        ae(b0[vi(1, 0), 30, 64], np.float32(0.15))
+        ae(b0[vi(1, 0), 30, 33], np.float32(0.16))
+
 class AAPropagationTest(unittest.TestCase):
     def test_horiz_spread(self):
         def ic(self, runner):
@@ -495,6 +534,7 @@ class PeriodicPropagationTest(unittest.TestCase):
 
 
 class TestCornerPropagation(unittest.TestCase):
+    """Tests mass fraction movements between the corners of 4 subdomains."""
     def setUp(self):
         global periodic_x, periodic_y
         periodic_x = False
