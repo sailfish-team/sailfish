@@ -108,7 +108,7 @@
 
 <%def name="shared_mem_propagation_vars()">
 	%if not propagate_on_read and propagation_enabled:
-		%if supports_shuffle:
+		%if supports_shuffle and propagate_with_shuffle:
 			// Shared variables for cross-warp propagation.
 			%for i in sym.get_prop_dists(grid, 1):
 				${shared_var} float prop_${grid.idx_name[i]}[${(block_size + warp_size - 1) / warp_size}];

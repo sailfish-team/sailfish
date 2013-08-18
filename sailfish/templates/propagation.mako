@@ -142,7 +142,10 @@
 	%endfor
 </%def>
 
-
+## Propagate using the shuffle operation to move data within warps and
+## a (small) shared memory buffer to move data between warps (within a
+## single block). Data is moved between blocks by direct global memory
+## writes.
 <%def name="propagate_shuffle(dist_out, dist_in='fi')">
 	<%
 		first_prop_dist = grid.idx_name[sym.get_prop_dists(grid, 1)[0]]
@@ -329,7 +332,7 @@
 		%if propagate_on_read:
 			${propagate_inplace(dist_out, dist_in)}
 		%else:
-			%if supports_shuffle:
+			%if supports_shuffle and propagate_with_shuffle:
 				${propagate_shuffle(dist_out, dist_in)}
 			%else:
 				${propagate_shared(dist_out, dist_in)}
@@ -337,7 +340,7 @@
 		%endif
 	%elif access_pattern == 'AA':
 		if (iteration_number & 1) {
-			%if supports_shuffle:
+			%if supports_shuffle and propagate_with_shuffle:
 				${propagate_shuffle(dist_out, dist_in)}
 			%else:
 				${propagate_shared(dist_out, dist_in)}

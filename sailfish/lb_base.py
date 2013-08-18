@@ -72,6 +72,10 @@ class LBSim(object):
                            'scheme in which distributions are saved to the '
                            'local node only, and streaming happens implicitly '
                            'by reading data from neighboring nodes.')
+        group.add_argument('--nopropagate_with_shuffle', action='store_false',
+                           dest='propagate_with_shuffle',
+                           default=True, help='Uses the shuffle operation to '
+                           'move data within warps if the device supports it.')
 
     @classmethod
     def modify_config(cls, config):
@@ -112,6 +116,7 @@ class LBSim(object):
         ctx['dt_per_lattice_time_unit'] = self.config.dt_per_lattice_time_unit
         ctx['access_pattern'] = self.config.access_pattern
         ctx['propagate_on_read'] = self.config.propagate_on_read
+        ctx['propagate_with_shuffle'] = self.config.propagate_with_shuffle
         ctx['needs_iteration_num'] = self.config.needs_iteration_num
         ctx['equilibria'] = self.equilibria
         ctx['config'] = self.config
