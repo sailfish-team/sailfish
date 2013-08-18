@@ -1,3 +1,5 @@
+"""Util functions for plots using internal Sailfish data structures."""
+
 from mpl_toolkits.mplot3d import Axes3D, proj3d
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch, Circle
@@ -7,6 +9,8 @@ from itertools import combinations, product
 import numpy as np
 
 class Arrow3D(FancyArrowPatch):
+    """Simple 2D arrow plotted in 3D space."""
+
     def __init__(self, xs, ys, zs, *args, **kwargs):
         FancyArrowPatch.__init__(self, (0,0), (0,0), *args, **kwargs)
         self._verts3d = xs, ys, zs
@@ -17,7 +21,16 @@ class Arrow3D(FancyArrowPatch):
         self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
         FancyArrowPatch.draw(self, renderer)
 
+
 def _plot_grid3d(ax, grid, bbox, planes):
+    """Plots a 3D LB lattice.
+
+    :param ax: matplotlib Axes object to use for plotting
+    :param grid: Sailfish grid object to illustrate
+    :param bbox: if True, draw a blue 3D bounding box around the plot
+    :param planes: if True, draws planes passing through the origin
+    """
+    assert grid.dim == 3
     bb = 0
     for ei in grid.basis[1:]:
         a = Arrow3D(*zip((0, 0, 0), [float(x) * 1.05 for x in ei]), color='k', arrowstyle='-|>',
@@ -50,6 +63,12 @@ def _plot_grid3d(ax, grid, bbox, planes):
 
 
 def _plot_grid2d(ax, grid):
+    """Plots a 2D LB lattice.
+
+    :param ax: matplotlib Axes object to use for plotting
+    :param grid: Sailfish grid object to illustrate
+    """
+    assert grid.dim == 2
     bb = 0
     for ei in grid.basis[1:]:
         a = FancyArrowPatch((0, 0), [float(x) * 1.025 for x in ei], color='k',
@@ -65,6 +84,13 @@ def _plot_grid2d(ax, grid):
     ax.set_ylim(-bb, bb)
 
 def plot_grid(ax, grid, bbox=False, planes=False):
+    """Plots a LB lattice.
+
+    :param ax: matplotlib Axes object to use for plotting
+    :param grid: Sailfish grid object to illustrate
+    :param bbox: if True, draw a blue 3D bounding box around the plot
+    :param planes: if True, draws planes passing through the origin
+    """
     if grid.dim == 3:
         return _plot_grid3d(ax, grid, bbox, planes)
     else:
