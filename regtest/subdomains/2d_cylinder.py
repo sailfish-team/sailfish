@@ -1,4 +1,7 @@
 #!/usr/bin/python
+"""Runs the cylinder test case with 2 or 3 subdomains vertically/horizontally
+and compares the results against a reference solution with a single subdomain.
+"""
 
 import os
 import shutil
@@ -7,7 +10,8 @@ import unittest
 
 import numpy as np
 
-from examples.cylinder import CylinderSimulation, CylinderGeometry
+from sailfish.geo import EqualSubdomainsGeometry2D
+from examples.cylinder import CylinderSimulation
 from sailfish import io
 from sailfish.controller import LBSimulationController
 from regtest.subdomains import util
@@ -30,6 +34,7 @@ class SimulationTest(CylinderSimulation):
             'block_size': block_size,
             'mem_alignment': mem_align,
             'subdomains': blocks,
+            'conn_axis': 'y' if vertical else 'x',
             'vertical': vertical,
             'max_iters': MAX_ITERS,
             'quiet': True,
@@ -43,7 +48,7 @@ class TestInterblockPropagation(unittest.TestCase):
         global blocks, vertical, output
         output = os.path.join(tmpdir, 'href')
         blocks = 1
-        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
+        LBSimulationController(SimulationTest, EqualSubdomainsGeometry2D).run(ignore_cmdline=True)
         cls.digits = io.filename_iter_digits(MAX_ITERS)
         cls.href = np.load(io.filename(output, cls.digits, 0, MAX_ITERS))
         cls.hrho = cls.href['rho']
@@ -52,7 +57,7 @@ class TestInterblockPropagation(unittest.TestCase):
 
         output = os.path.join(tmpdir, 'vref')
         vertical = True
-        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
+        LBSimulationController(SimulationTest, EqualSubdomainsGeometry2D).run(ignore_cmdline=True)
         cls.vref = np.load(io.filename(output, cls.digits, 0, MAX_ITERS))
         cls.vrho = cls.vref['rho']
         cls.vvx  = cls.vref['v'][0]
@@ -63,7 +68,7 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'horiz_2block')
         blocks = 2
         vertical = False
-        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
+        LBSimulationController(SimulationTest, EqualSubdomainsGeometry2D).run(ignore_cmdline=True)
 
         merged = merge_subdomains(output, self.digits, MAX_ITERS, save=False)
         rho = merged['rho']
@@ -79,7 +84,7 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'horiz_3block')
         blocks = 3
         vertical = False
-        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
+        LBSimulationController(SimulationTest, EqualSubdomainsGeometry2D).run(ignore_cmdline=True)
 
         merged = merge_subdomains(output, self.digits, MAX_ITERS, save=False)
         rho = merged['rho']
@@ -95,7 +100,7 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'vert_2block')
         blocks = 2
         vertical = True
-        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
+        LBSimulationController(SimulationTest, EqualSubdomainsGeometry2D).run(ignore_cmdline=True)
 
         merged = merge_subdomains(output, self.digits, MAX_ITERS, save=False)
         rho = merged['rho']
@@ -111,7 +116,7 @@ class TestInterblockPropagation(unittest.TestCase):
         output = os.path.join(tmpdir, 'vert_3block')
         blocks = 3
         vertical = True
-        LBSimulationController(SimulationTest, CylinderGeometry).run(ignore_cmdline=True)
+        LBSimulationController(SimulationTest, EqualSubdomainsGeometry2D).run(ignore_cmdline=True)
 
         merged = merge_subdomains(output, self.digits, MAX_ITERS, save=False)
         rho = merged['rho']

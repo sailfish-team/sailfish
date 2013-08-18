@@ -1,33 +1,12 @@
 #!/usr/bin/env python -u
 
 import numpy as np
-from sailfish.geo import LBGeometry2D
+from sailfish.geo import EqualSubdomainsGeometry2D
 from sailfish.subdomain import SubdomainSpec2D, Subdomain2D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
 from sailfish.lb_base import LBForcedSim
-
-class CylinderGeometry(LBGeometry2D):
-    def subdomains(self, n=None):
-        subdomains = []
-        if self.config.vertical:
-            q = self.gy / self.config.subdomains
-            diff = self.gy % self.config.subdomains
-        else:
-            q = self.gx / self.config.subdomains
-            diff = self.gx % self.config.subdomains
-
-        for i in range(0, self.config.subdomains):
-            size = q
-            if i == self.config.subdomains-1:
-                size += diff
-
-            if self.config.vertical:
-                subdomains.append(SubdomainSpec2D((0, i * q), (self.gx, size)))
-            else:
-                subdomains.append(SubdomainSpec2D((i * q, 0), (size, self.gy)))
-        return subdomains
 
 
 class CylinderBlock(Subdomain2D):
@@ -72,7 +51,6 @@ class CylinderSimulation(LBFluidSim, LBForcedSim):
         LBFluidSim.add_options(group, dim)
         LBForcedSim.add_options(group, dim)
 
-        group.add_argument('--subdomains', type=int, default=1, help='number of blocks to use')
         group.add_argument('--vertical', action='store_true')
 
     @classmethod
@@ -92,5 +70,5 @@ class CylinderSimulation(LBFluidSim, LBForcedSim):
 
 
 if __name__ == '__main__':
-    ctrl = LBSimulationController(CylinderSimulation, CylinderGeometry)
+    ctrl = LBSimulationController(CylinderSimulation, EqualSubdomainsGeometry2D)
     ctrl.run()
