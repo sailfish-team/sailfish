@@ -176,6 +176,12 @@ class AASimulationTest(SimulationTest):
             })
 
 class ABPropagationTest(unittest.TestCase):
+    """Verifies propagation in the AB-memory model, within a single
+    subdomain.
+
+    This is useful for testing shuffle-based propagation and cross-wrap
+    and cross-block distribution movement.
+    """
     def test_horiz_spread(self):
         def ic(self, runner):
             dbuf = runner._debug_get_dist()
@@ -192,7 +198,7 @@ class ABPropagationTest(unittest.TestCase):
             # Beginning of warp location x = 32.
             dbuf[vi(1, 0), 30, 32] = 0.16
 
-            # End of block location x = 64.
+            # End of block location x = 63.
             dbuf[vi(1, 0), 30, 63] = 0.15
 
             runner._debug_set_dist(dbuf)
@@ -213,6 +219,7 @@ class ABPropagationTest(unittest.TestCase):
         ae(b0[vi(1, 0), 30, 32], np.float32(0.14))
         ae(b0[vi(1, 0), 30, 64], np.float32(0.15))
         ae(b0[vi(1, 0), 30, 33], np.float32(0.16))
+
 
 class AAPropagationTest(unittest.TestCase):
     def test_horiz_spread(self):
