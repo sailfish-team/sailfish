@@ -5,6 +5,9 @@
 <%namespace file="kernel_common.mako" import="*"/>
 <%namespace file="opencl_compat.mako" import="*"/>
 
+## Note: all code protected by periodic_[xyz] or periodicity is never
+## actually used and PBC are applied using special kernels.
+
 <%def name="prop_bnd(dist_out, dist_in, xoff, i, shared, offset=0, di=1)">
 ## Generate the propagation code for a specific base direction.
 ##
@@ -40,12 +43,14 @@
 			} \
 		%endif
 
+		## XXX: This code is currently never used.
 		## In case we are about to propagate outside of the simulation domain,
 		## check for periodic boundary conditions for the current dimension.
 		## If they are enabled, update the offset by a value precomputed in
 		## pbc_offsets and proceed to the following dimension.
 		%if periodicity[di] and grid.basis[i][di] != 0:
 			else {
+				// Periodic boundary conditions for dimension ${di}.
 				${prop_bnd(dist_out, dist_in, xoff, i, shared, offset+pbc_offsets[di][int(grid.basis[i][di])], di+1)}
 			}
 		%endif
