@@ -479,6 +479,25 @@ def slip_bb_swap_pairs(grid, normal_dir):
                     break
     return ret
 
+def missing_dirs_from_tag(grid, tag_code):
+    """Generates a list of missing mass fractions given an orientation tag code.
+
+    Useful to debugging.
+
+    :param grid: grid object
+    :param tag_code: encoded map of missing mass fractions; bits set to 1
+        indicate directions pointing to fluid nodes
+    """
+
+    ret = []
+
+    for i, name in enumerate(grid.idx_name[1:]):
+        if (tag_code & 1) == 0:
+            ret.append(grid.idx_name[grid.idx_opposite[i + 1]])
+        tag_code >>= 1
+
+    return ret
+
 def get_missing_dists(grid, orientation):
     """Returns an iterable of missing distribution indices.
 
