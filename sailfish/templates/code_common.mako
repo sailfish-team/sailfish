@@ -22,7 +22,7 @@ ${sym_codegen.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors,
 	printf("${format_str}\n", ${values});
 </%def>
 
-<%def name="cond(cond, text)">
+<%def name="cond(cond, text)" filter="trim">
 	%if cond:
 		${text}
 	%endif

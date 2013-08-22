@@ -3,6 +3,7 @@
 %>
 
 <%namespace file="kernel_common.mako" import="*"/>
+<%namespace file="code_common.mako" import="*"/>
 <%namespace file="opencl_compat.mako" import="*"/>
 
 ## Note: all code protected by periodic_[xyz] or periodicity is never
@@ -59,7 +60,7 @@
 
 ## Propagate eastwards or westwards knowing that there is an east/westward
 ## node layer to propagate to.
-<%def name="prop_block_bnd(dist_out, dist_in, xoff, dist_source, offset=0)">
+<%def name="prop_block_bnd(dist_out, dist_in, xoff, dist_source, offset=0, sentinel=False)">
 ## Generate the propagation code for all directions with a X component.  The X component
 ## is special as shared-memory propogation is done in the X direction.
 ##
@@ -72,7 +73,9 @@
 		%if dist_source == 'prop_local':
 			${prop_bnd(dist_out, dist_in, 0, i, True, offset)}
 		%else:
-			${prop_bnd(dist_out, dist_in, xoff, i, False, offset)}
+			${cond(sentinel, 'if (%s.%s != -1.0f)' % (dist_in, grid.idx_name[i]))} {
+				${prop_bnd(dist_out, dist_in, xoff, i, False, offset)}
+			}
 		%endif
 	%endfor
 </%def>
@@ -159,11 +162,31 @@
 		warp_bits = int(math.log(warp_size, 2))
 	%>
 
-	// Update the 0-th direction distribution
-	${dist_out}[gi] = ${dist_in}.fC;
+	// Initialize shared memory with sentinel values.
+	if (lx < ${(block_size + warp_size - 1) / warp_size}) {
+		%for i in sym.get_prop_dists(grid, 1):
+			prop_${grid.idx_name[i]}[lx] = -1.0f;
+		%endfor
+		%for i in sym.get_prop_dists(grid, -1):
+			prop_${grid.idx_name[i]}[lx] = -1.0f;
+		%endfor
+	}
 
-	// Propagation in directions orthogonal to the X axis (global memory)
-	${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
+	// Initialize propagation only nodes with sentinel values.
+	if (propagation_only) {
+		%for i in sym.get_prop_dists(grid, 1):
+			${dist_in}.${grid.idx_name[i]} = -1.0f;
+		%endfor
+		%for i in sym.get_prop_dists(grid, -1):
+			${dist_in}.${grid.idx_name[i]} = -1.0f;
+		%endfor
+	} else {
+		// Update the 0-th direction distribution
+		${dist_out}[gi] = ${dist_in}.fC;
+
+		// Propagation in directions orthogonal to the X axis (global memory)
+		${prop_block_bnd(dist_out, dist_in, 0, 'prop_global')}
+	}
 
 	const int warp_num = (lx >> ${warp_bits});
 	const int warp_x = (lx & ${warp_mask});
@@ -172,11 +195,11 @@
 		// Periodic boundary conditions in the X direction.
 		if (gx == ${envelope_size}) {
 			// W-propagation.
-			${prop_block_bnd(dist_out, dist_in, -1, 'prop_global', pbc_offsets[0][-1])}
+			${prop_block_bnd(dist_out, dist_in, -1, 'prop_global', pbc_offsets[0][-1], sentinel=True)}
 		}
 		if (gx == ${lat_nx - envelope_size}) {
 			// E-propagation
-			${prop_block_bnd(dist_out, dist_in, 1, 'prop_global', pbc_offsets[0][1])}
+			${prop_block_bnd(dist_out, dist_in, 1, 'prop_global', pbc_offsets[0][1], sentinel=True)}
 		}
 	%endif
 
@@ -184,7 +207,7 @@
 	// to ghost nodes.
 	if ((gx > 0 && lx == 0) || gx <= ${envelope_size}) {
 		// Cross-block propagation via global memory.
-		${prop_block_bnd(dist_out, dist_in, -1, 'prop_global')}
+		${prop_block_bnd(dist_out, dist_in, -1, 'prop_global', sentinel=True)}
 	}
 
 	// E propagation (+1 on X axis)
@@ -193,7 +216,7 @@
 		// are no threads running for the ghost nodes.
 		if (lx == ${block_size - 1} || gx >= ${lat_nx - 1 - envelope_size}) {
 			// Cross-block propagation in global memory.
-			${prop_block_bnd(dist_out, dist_in, 1, 'prop_global')}
+			${prop_block_bnd(dist_out, dist_in, 1, 'prop_global', sentinel=True)}
 		}
 		%for i in sym.get_prop_dists(grid, 1):
 			// Cross-warp propagation via shared memory.
@@ -212,7 +235,7 @@
 				}
 
 				// No propagation from ghost nodes.
-				if (gx > 1) {
+				if (gx > 1 && ${dist_in}.${grid.idx_name[i]} != -1.0f) {
 					${prop_bnd(dist_out, dist_in, 0, i, False)}
 				}
 			%endfor
@@ -234,7 +257,7 @@
 			${dist_in}.${grid.idx_name[i]} = prop_${grid.idx_name[i]}[warp_num];
 		}
 		// No propagation at the end of the block and end of the domain.
-		if (lx < ${block_size - 1} && gx < ${lat_nx - 1 - envelope_size}) {
+		if (lx < ${block_size - 1} && gx < ${lat_nx - 1 - envelope_size} && ${dist_in}.${grid.idx_name[i]} != -1.0f) {
 			${prop_bnd(dist_out, dist_in, 0, i, False)}
 		}
 	%endfor
