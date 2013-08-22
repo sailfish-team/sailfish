@@ -386,6 +386,30 @@ ${device_func} inline void getMacro(
 	%endif
 }
 
+<%def name="for_orientation_dist()">
+	%for i, (name, opp_idx) in enumerate(zip(grid.idx_name[1:], grid.idx_opposite[1:])):
+		## Don't generate code for cases that never happen.
+		%if unused_tag_bits & (1 << i) == 0:
+			// ${name} points to a missing node, ${grid.idx_name[opp_idx]} is undefined
+			if ((orientation & ${1 << i}) == 0) {
+				${caller.body(idx=opp_idx, opp_name=name)}
+			}
+		%endif
+	%endfor
+</%def>
+
+<%def name="for_orientation_dist_old()">
+	switch (orientation) {
+		%for i in range(1, grid.dim*2+1):
+			case ${i}: {
+				%for dist_idx in sym.get_missing_dists(grid, o):
+					${caller.body(idx=dist_idx, opp_name=grid.idx_name[grid.idx_opposite[dist_idx]])}
+				%endfor
+				break;
+			}
+		%endfor
+	}
+</%def>
 
 // Uses extrapolation/other schemes to compute missing distributions for some implementations
 // of boundary condtitions.
@@ -465,16 +489,9 @@ ${device_func} inline void fixMissingDistributions(
 			%endfor
 			// Replace missing distributions with equilibrium ones
 			// calculated for the target macroscopic variables.
-			switch (orientation) {
-				%for i in range(1, grid.dim*2+1):
-					case ${i}: {
-						%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
-							${lvalue.var} = ${cex(eq.expression[lvalue.idx], rho='*tg_rho', vel='tg_v')};
-						%endfor
-						break;
-					}
-				%endfor
-			}
+			<%self:for_orientation_dist args="idx,opp_name">
+				fi->${grid.idx_name[idx]} = ${cex(eq.expression[idx], rho='*tg_rho', vel='tg_v')};
+			</%self:for_orientation_dist>
 		}
 	%endif
 }
@@ -492,44 +509,18 @@ ${device_func} inline void postcollisionBoundaryConditions(
 
 	%if nt.NTHalfBBWall in node_types:
 		else if (isNTHalfBBWall(node_type)) {
-			%for i, (name, opp_idx) in enumerate(zip(grid.idx_name[1:], grid.idx_opposite[1:])):
-				## Don't generate code for cases that never happen.
-				%if unused_tag_bits & (1 << i) == 0:
-					// ${name} points to a missing node, ${grid.idx_name[opp_idx]} is undefined
-					if ((orientation & ${1 << i}) == 0) {
-						%if access_pattern == 'AB':
-							${get_odist('dist_out', opp_idx)} = fi->${name};
-						%else:
-							if (iteration_number & 1) {
-								${get_odist('dist_out', opp_idx)} = fi->${name};
-							} else {
-								${get_odist('dist_out', i + 1,
-											*grid.basis[i + 1])} = fi->${name};
-							}
-						%endif
+			<%self:for_orientation_dist args="idx,opp_name">
+				%if access_pattern == 'AB':
+					${get_odist('dist_out', idx)} = fi->${opp_name};
+				%else:
+					if (iteration_number & 1) {
+						${get_odist('dist_out', idx)} = fi->${opp_name};
+					} else {
+						${get_odist('dist_out', grid.idx_opposite[idx],
+									*grid.basis[grid.idx_opposite[idx]])} = fi->${opp_name};
 					}
 				%endif
-			%endfor
-
-##			switch (orientation) {
-##			%for i in range(1, grid.dim * 2 + 1):
-##				case ${i}: {
-##					%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
-##						%if access_pattern == 'AB':
-##							${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
-##						%else:
-##							if (iteration_number & 1) {
-##								${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
-##							} else {
-##								${get_odist('dist_out', grid.idx_opposite[lvalue.idx],
-##											*grid.basis[grid.idx_opposite[lvalue.idx]])} = ${rvalue};  // ${lvalue.var}
-##							}
-##						%endif
-##					%endfor
-##					break;
-##				}
-##			%endfor
-##			}
+			</%self:for_orientation_dist>
 		}
 	%endif
 
@@ -570,25 +561,18 @@ ${device_func} inline void postcollisionBoundaryConditions(
 			}
 
 			// Write new values back to memory like for the half-way bounce-back.
-			switch (orientation) {
-			%for i in range(1, grid.dim * 2 + 1):
-				case ${i}: {
-					%for lvalue, rvalue in sym.fill_missing_dists(grid, 'fi', missing_dir=i):
-						%if access_pattern == 'AB':
-							${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
-						%else:
-							if (iteration_number & 1) {
-								${get_odist('dist_out', lvalue.idx)} = ${rvalue};  // ${lvalue.var}
-							} else {
-								${get_odist('dist_out', grid.idx_opposite[lvalue.idx],
-											*grid.basis[grid.idx_opposite[lvalue.idx]])} = ${rvalue};  // ${lvalue.var}
-							}
-						%endif
-					%endfor
-					break;
-				}
-			%endfor
-			}
+			<%self:for_orientation_dist args="idx,opp_name">
+				%if access_pattern == 'AB':
+					${get_odist('dist_out', idx)} = fi->${opp_name};
+				%else:
+					if (iteration_number & 1) {
+						${get_odist('dist_out', idx)} = fi->${opp_name};
+					} else {
+						${get_odist('dist_out', grid.idx_opposite[idx],
+									*grid.basis[grid.idx_opposite[idx]])} = fi->${opp_name};
+					}
+				%endif
+			</%self:for_orientation_dist>
 		}
 	%endif
 }
@@ -674,21 +658,14 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode,
 		// adjacent to the do-nothing node in such a way that in the next iteration
 		// they will be retrieved using the standard procedure.
 		else if (isNTDoNothing(node_type)) {
-			switch (orientation) {
-				%for o in range(1, grid.dim*2+1):
-					case ${o}: {
-						%for dist_idx in sym.get_missing_dists(grid, o):
-							if (iteration_number & 1) {
-								${get_odist('dist_out', dist_idx)} = fi->${grid.idx_name[dist_idx]};
-							} else {
-								${get_odist('dist_out', grid.idx_opposite[dist_idx],
-											*grid.basis[grid.idx_opposite[dist_idx]])} = fi->${grid.idx_name[dist_idx]};
-							}
-						%endfor
-						break;
-					}
-				%endfor
-			}
+			<%self:for_orientation_dist args="idx,opp_name">
+				if (iteration_number & 1) {
+					${get_odist('dist_out', idx)} = fi->${grid.idx_name[idx]};
+				} else {
+					${get_odist('dist_out', grid.idx_opposite[idx],
+								*grid.basis[grid.idx_opposite[idx]])} = fi->${grid.idx_name[idx]};
+				}
+			</%self:for_orientation_dist>
 		}
 	%endif
 }
