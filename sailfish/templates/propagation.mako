@@ -171,6 +171,7 @@
 			prop_${grid.idx_name[i]}[lx] = -1.0f;
 		%endfor
 	}
+	${barrier()}
 
 	// Initialize propagation only nodes with sentinel values.
 	if (propagation_only) {
