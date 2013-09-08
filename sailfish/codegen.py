@@ -35,13 +35,13 @@ def _remove_math_function_suffix(t):
     t = t.replace('tanhf(', 'tan(')
     return t
 
-def _use_instrinsics(t):
+def _use_intrinsics(t):
     t = t.replace('logf(', '__logf(')
     t = t.replace('expf(', '__expf(')
     t = t.replace('powf(', '__powf(')
     t = t.replace('sinf(', '__sinf(')
     t = t.replace('cosf(', '__cosf(')
-    #t = t.replace('sqrtf(', '__fsqrt_('
+    z = t.replace('sqrtf(', '__fsqrt_rz(')
     return t
 
 class BlockCodeGenerator(object):
@@ -85,6 +85,9 @@ class BlockCodeGenerator(object):
                 help='path to the GNU indent program')
         group.add_argument('--sed', type=str, default='sed',
                            help='path to the GNU sed program')
+        group.add_argument('--use_intrinsics', action='store_true',
+                           default=False, help='whether to use intrinsic '
+                           'implementation of transcendental functions')
 
     def __init__(self, simulation):
         self._sim = simulation
@@ -153,6 +156,9 @@ class BlockCodeGenerator(object):
 
         if self.is_double_precision():
             src = _convert_to_double(src)
+
+        if self.config.use_intrinsics:
+            src = _use_intrinsics(src)
 
         # TODO(michalj): Consider using native_ or half_ functions here.
         if target_type == 'opencl':
