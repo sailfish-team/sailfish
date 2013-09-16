@@ -41,7 +41,7 @@ def _use_intrinsics(t):
     t = t.replace('powf(', '__powf(')
     t = t.replace('sinf(', '__sinf(')
     t = t.replace('cosf(', '__cosf(')
-    z = t.replace('sqrtf(', '__fsqrt_rz(')
+    t = t.replace('sqrtf(', '__fsqrt_rz(')
     return t
 
 class BlockCodeGenerator(object):
