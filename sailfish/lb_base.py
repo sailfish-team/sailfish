@@ -54,7 +54,7 @@ class LBSim(object):
     def add_options(cls, group, dim):
         group.add_argument('--dt_per_lattice_time_unit',
                 help='physical time delta corresponding to one iteration '
-                'of the simulation', type=float, default=0.0)
+                'of the simulation', type=float, default=1.0)
         grids = [x.__name__ for x in sym.KNOWN_GRIDS if x.dim == dim]
         group.add_argument('--grid', help='LB grid', type=str,
                 choices=grids, default=grids[0])
