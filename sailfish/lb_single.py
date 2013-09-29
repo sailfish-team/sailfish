@@ -45,6 +45,14 @@ class LBFluidSim(LBSim):
                 help='subgrid model to use')
         group.add_argument('--smagorinsky_const',
                 help='Smagorinsky constant', type=float, default=0.1)
+        group.add_argument('--entropy_tolerance',
+                help='Entropy changes below this level will be trated as '
+                'constant. If 0.0, a default value will be applied used '
+                'depending on the precision of the simulation.',
+                type=float, default=0.0)
+        group.add_argument('--alpha_tolerance',
+                help='Alpha value tolerance used to end Newton-Rhapson '
+                'iterations.', type=float, default=1e-10)
 
     def update_context(self, ctx):
         super(LBFluidSim, self).update_context(ctx)
@@ -57,7 +65,11 @@ class LBFluidSim(LBSim):
         ctx['simtype'] = 'lbm'
         ctx['subgrid'] = self.config.subgrid
         ctx['smagorinsky_const'] = self.config.smagorinsky_const
-        ctx['entropy_tolerance'] = 1e-6 if self.config.precision == 'single' else 1e-10
+        if self.config.entropy_tolerance > 0.0:
+            ctx['entropy_tolerance'] = self.config.entropy_tolerance
+        else:
+            ctx['entropy_tolerance'] = 1e-6 if self.config.precision == 'single' else 1e-10
+        ctx['alpha_tolerance'] = self.config.alpha_tolerance
         ctx['alpha_output'] = self.alpha_output
         ctx['regularized'] = self.config.regularized
 

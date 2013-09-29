@@ -113,7 +113,7 @@ ${device_func} inline float EstimateAlphaFromEntropy(Dist* fi, Dist* fneq, float
 			new_alpha = 0.5f * (alpha + max_alpha);
 		}
 
-		if (fabsf(new_alpha - alpha) < 1e-10f) {
+		if (fabsf(new_alpha - alpha) < ${cex(alpha_tolerance)}) {
 			break;
 		}
 
