@@ -41,7 +41,7 @@ class LBNodeType(object):
 
     #: Indicates the effective location of the boundary condition along the
     #: direction of the normal vector. Positive values indicate offset towards
-    #: the fluid domain, negative values insidate offset away from the fluid
+    #: the fluid domain, negative values indicate offset away from the fluid
     #: domain.
     location = 0.0
 
