@@ -85,7 +85,6 @@ class CUDABackend(object):
         self.buffers = {}
         self.arrays = {}
         self._kern_stats = set()
-        self._tex_to_memcpy = {}
         self.options = options
         self._device = cuda.Device(gpu_id)
         self._ctx = self._device.make_context(
