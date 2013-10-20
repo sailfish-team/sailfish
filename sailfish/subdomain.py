@@ -505,6 +505,43 @@ class Subdomain(object):
 
         self.config.logger.debug('... encoder done.')
 
+    def get_fo_distributions(self, fo):
+        """Computes an array indicating which distributions correspond to
+        momentum trasferred from the object to the fluid.
+
+        :param fo: ForceObject description the object to analyze
+        :rvalue: dict: distribution index -> N-tuple of arrays indicating
+            coordinates of solid object nodes transferring momentum to
+            the fluid in the direction corresponding to the distribution
+        """
+        # Find all non-fluid nodes within the specified bounding box.
+        mgrid = self._get_mgrid()
+        cond = (self._type_vis_map != nt._NTFluid.id)
+        for mx, x0, x1 in zip(mgrid, fo.start, fo.end):
+            cond &= (mx >= x0) & (mx <= x1)
+
+        self.config.logger.debug('%s: num solid nodes: %d' %
+                                 (fo, np.sum(cond)))
+
+        ret = {}
+        l = self.grid.dim - 1
+        # Skip the stationary vector.
+        for i, vec in enumerate(self.grid.basis[1:]):
+            shifted_map = self._type_vis_map.copy()
+
+            for j, shift in enumerate(vec):
+                if shift == 0:
+                    continue
+                shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
+
+            t = np.where(cond & (shifted_map == nt._NTFluid.id))
+            # Only add entries for distributions that actually contribute
+            # momentum.
+            if t[0].size > 0:
+                ret[i + 1] = t
+
+        return ret
+
     @property
     def scratch_space_size(self):
         """Node scratch space size expressed in number of floating point values."""

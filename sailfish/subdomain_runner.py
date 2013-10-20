@@ -1271,8 +1271,23 @@ class SubdomainRunner(object):
         """Prepares GPU data structures for tracking momentum exchange
         between fluid and solid objects."""
 
+        self.config.logger.debug('Processing force objects.')
+
         for fo in self._sim.force_objects:
-            pass
+            dists = self._subdomain.get_fo_distributions(fo)
+            if not dists:
+                self.config.logger.warning(
+                    'No momentum-transferring distributions found for %s' % fo)
+                continue
+
+            idxs = np.array([], dtype=np.int32)
+            for dist_num, locs in dists.iteritems():
+                idxs = np.concatenate((idxs, self._get_global_idx(
+                    tuple(reversed(locs)), dist_num)))
+
+            self.config.logger.debug('%s: total momentum links: %d' % (
+                fo, len(idxs)))
+
 
     def run(self):
         self.config.logger.info("Initializing subdomain.")

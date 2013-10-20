@@ -248,7 +248,8 @@ class LBSim(object):
     def initial_conditions(self, runner):
         pass
 
-    def add_force_oject(self, runner, obj):
+    def add_force_oject(self, obj):
+        obj.id = len(self.force_objects)
         self.force_objects.append(obj)
 
     # TODO(michalj): Restore support for defining visualization fields.
@@ -372,7 +373,15 @@ class ForceObject(object):
     """Used to track momentum exchange between the fluid and a solid object."""
 
     def __init__(self, start, end):
-        self._start = start
-        self._end = end
+        """
+        :param start: N-tuple indicating lowest coordinates of the bounding box
+            of the object
+        :param end: N-tuple indicating highest coordinates of the bounding box
+            of the object
+        """
+        self.start = start
+        self.end = end
+        self.id = None
 
-
+    def __str__(self):
+        return 'ForceObject(id=%s)' % self.id
