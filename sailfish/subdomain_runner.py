@@ -1267,6 +1267,13 @@ class SubdomainRunner(object):
         self._kernels_bnd_full = gck(self, True, False)
         self._kernels_bnd_none = gck(self, False, False)
 
+    def _init_force_objects(self):
+        """Prepares GPU data structures for tracking momentum exchange
+        between fluid and solid objects."""
+
+        for fo in self._sim.force_objects:
+            pass
+
     def run(self):
         self.config.logger.info("Initializing subdomain.")
         self.config.logger.debug(self.backend.info)
@@ -1278,6 +1285,7 @@ class SubdomainRunner(object):
         self.config.logger.debug("Initializing macroscopic fields.")
         self._subdomain.init_fields(self._sim)
         self._init_gpu_data()
+        self._init_force_objects()
         self.config.logger.debug("Applying initial conditions.")
 
         self._init_interblock_kernels()

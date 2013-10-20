@@ -163,6 +163,8 @@ class LBSim(object):
         self.need_sync_flag = False
         self.need_fields_flag = False
 
+        self.force_objects = []
+
         # For use in unit tests only.
         if config is not None:
             grid = util.get_grid_from_config(config)
@@ -245,6 +247,9 @@ class LBSim(object):
 
     def initial_conditions(self, runner):
         pass
+
+    def add_force_oject(self, runner, obj):
+        self.force_objects.append(obj)
 
     # TODO(michalj): Restore support for defining visualization fields.
     # TODO(michalj): Restore support for tracer particles.
@@ -362,3 +367,12 @@ class ScalarField(Field):
 
 class VectorField(Field):
     pass
+
+class ForceObject(object):
+    """Used to track momentum exchange between the fluid and a solid object."""
+
+    def __init__(self, start, end):
+        self._start = start
+        self._end = end
+
+

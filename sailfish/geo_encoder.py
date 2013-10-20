@@ -173,6 +173,8 @@ class GeoEncoderConst(GeoEncoder):
 
         self._non_symbolic_idxs = param_items
 
+        # TODO(michalj): Verify that the type of the symbolic expression matches
+        # that of the boundary condition (vector vs scalar, etc).
         # Second pass: only process symbolic expressions here.
         for node_key, node_type in param_dict.iteritems():
             for param in node_type.params.itervalues():
