@@ -30,16 +30,6 @@ def _expand_grid(grid):
     else:
         return tuple(grid)
 
-def _set_txt_format(dsc, strides):
-    # float
-    if strides[-1] == 4:
-        dsc.format = cuda.array_format.FLOAT
-        dsc.num_channels = 1
-    # double encoded as int2
-    else:
-        dsc.format = cuda.array_format.UNSIGNED_INT32
-        dsc.num_channels = 2
-
 class CUDABackend(object):
     name = 'cuda'
     array = cudaarray
