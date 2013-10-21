@@ -38,6 +38,12 @@ def _start_subdomain_runner(subdomain, config, sim, num_subdomains,
     if num_subdomains > 1:
         tempfile.tempdir = tempfile.mkdtemp()
 
+    try:
+        import setproctitle
+        setproctitle.setproctitle('Sailfish %s subd:%d GPU:%d' % (str(sim.__class__.__name__), subdomain.id, gpu_id))
+    except ImportError:
+        pass
+
     # We instantiate the backend class here (instead of in the machine
     # master), so that the backend object is created within the
     # context of the new process.
