@@ -22,11 +22,11 @@ from sailfish.lb_single import LBFluidSim
 from sailfish.sym import S
 
 # Geometry set to match [1].
-H = 80
+H = 160
 L = int(6.25 * H)
 D = int(0.02 * L)
-max_v = 0.01
-visc = 0.01
+max_v = 0.05
+visc = 0.016666666666666666
 
 # St = f D / u_max
 
@@ -43,8 +43,6 @@ class BoxSubdomain(Subdomain2D):
         self.set_node((hx == self.gx - 1) & np.logical_not(walls),
                       NTEquilibriumDensity(1))
         l = L / 4
-
-        print  l - D/2, (H - D) / 2
 
         box = ((hx > l - D/2) & (hx <= l + D/2) &
                (hy > (H - D) / 2) & (hy <= (H + D) / 2))
