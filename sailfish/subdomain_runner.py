@@ -9,6 +9,7 @@ import cPickle as pickle
 import math
 import operator
 import os
+import signal
 import time
 import numpy as np
 import zmq
@@ -1337,6 +1338,13 @@ class SubdomainRunner(object):
                              block_size=128,
                              grid=[(fo.force_buf.size + 127) / 128])
 
+    def sighup_handler(self, signum, frame):
+        self.config.logger.info('Received HUP signal, will save checkpoint (it=%d).' % self._sim.iteration)
+        self._checkpoint_req = 2
+
+    def _install_signal_handlers(self):
+        signal.signal(signal.SIGHUP, self.sighup_handler)
+
     def run(self):
         self.config.logger.info("Initializing subdomain.")
         self.config.logger.debug(self.backend.info)
@@ -1376,6 +1384,8 @@ class SubdomainRunner(object):
         for c in self._sim.__class__.mro()[1:]:
             if issubclass(c, LBMixIn) and hasattr(c, 'before_main_loop'):
                 c.before_main_loop(self._sim, self)
+
+        self._install_signal_handlers()
 
         self.config.logger.info("Starting simulation.")
         self.main()
@@ -1441,7 +1451,7 @@ class SubdomainRunner(object):
                                         if node_type else nt._NTFluid)
         self.backend.to_buf(self._gpu_geo_map)
 
-
+    _checkpoint_req = 0
     t_prev_checkpoint = 0.0
     def main(self):
         is_quit = False
@@ -1503,7 +1513,9 @@ class SubdomainRunner(object):
                     self._output.save(self._sim.iteration)
                 self._profile.end_step()
 
-                if self.config.checkpoint_file and self._sim.need_checkpoint():
+                if self.config.checkpoint_file and (
+                        self._sim.need_checkpoint() or self._checkpoint_req > 0):
+                    self._checkpoint_req -= 1
                     self.save_checkpoint()
 
                 self._sim.after_step(self)
