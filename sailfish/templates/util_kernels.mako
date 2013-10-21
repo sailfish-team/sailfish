@@ -7,6 +7,8 @@
     from sailfish import sym
 %>
 
+<%include file="kernel_force_objects.mako"/>
+
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
 
 ##

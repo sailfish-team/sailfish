@@ -122,6 +122,7 @@ class CUDABackend(object):
             kernel.args[-1] = it
 
     def alloc_buf(self, size=None, like=None, wrap_in_array=False):
+        """Allocates a buffer on the device."""
         if like is not None:
             # When calculating the total array size, take into account
             # any striding.

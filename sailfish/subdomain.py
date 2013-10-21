@@ -534,11 +534,12 @@ class Subdomain(object):
                     continue
                 shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
 
+            # The current distribution is pointing to a fluid node.
             t = np.where(cond & (shifted_map == nt._NTFluid.id))
             # Only add entries for distributions that actually contribute
             # momentum.
             if t[0].size > 0:
-                ret[i + 1] = t
+                ret[i + 1] = tuple([x + self.spec.envelope_size for x in t])
 
         return ret
 

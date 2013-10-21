@@ -72,9 +72,9 @@ class LBSim(object):
                            'scheme in which distributions are saved to the '
                            'local node only, and streaming happens implicitly '
                            'by reading data from neighboring nodes.')
-        group.add_argument('--nopropagate_with_shuffle', action='store_false',
+        group.add_argument('--propagate_with_shuffle', action='store_true',
                            dest='propagate_with_shuffle',
-                           default=True, help='Uses the shuffle operation to '
+                           default=False, help='Uses the shuffle operation to '
                            'move data within warps if the device supports it.')
 
     @classmethod
@@ -370,7 +370,13 @@ class VectorField(Field):
     pass
 
 class ForceObject(object):
-    """Used to track momentum exchange between the fluid and a solid object."""
+    """Used to track momentum exchange between the fluid and a solid object.
+
+    The exchanged momentum can be used to compute the value of the force
+    acting on the solid object. See Ladd A. Effects of container walls on the
+    velocity fluctuations of sedimenting spheres. Phys Rev Lett 2002; 88:048301
+    for more info about this procedure.
+    """
 
     def __init__(self, start, end):
         """
@@ -382,6 +388,23 @@ class ForceObject(object):
         self.start = start
         self.end = end
         self.id = None
+        self._components_map = None
+        self.gpu_idx_buf = None
+        self.gpu_force_buf = None
+        self.force_buf = None
+
+    @property
+    def initialized(self):
+        return self._components_map is not None
 
     def __str__(self):
         return 'ForceObject(id=%s)' % self.id
+
+    def force(self):
+        """
+        :rvalue: N-tuple of force components
+        """
+        ret = []
+        for i in range(self._components_map.shape[0]):
+            ret.append(np.sum(self._components_map[i,:] * self.force_buf))
+        return ret

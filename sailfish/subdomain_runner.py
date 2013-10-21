@@ -768,10 +768,12 @@ class SubdomainRunner(object):
                 needs_iteration=needs_iteration, shared=shared,
                 more_shared=more_shared)
 
-    def exec_kernel(self, name, args, args_format, needs_iteration=False):
+    def exec_kernel(self, name, args, args_format, needs_iteration=False,
+                    grid=None, block_size=None):
         kernel = self.get_kernel(name, args, args_format,
-                needs_iteration=needs_iteration)
-        self.backend.run_kernel(kernel, self._kernel_grid_full)
+                needs_iteration=needs_iteration, block_size=block_size)
+        self.backend.run_kernel(kernel, self._kernel_grid_full if grid is None
+                                else grid)
 
     def step(self, sync_req):
         self._step_boundary(sync_req)
@@ -1271,7 +1273,8 @@ class SubdomainRunner(object):
         """Prepares GPU data structures for tracking momentum exchange
         between fluid and solid objects."""
 
-        self.config.logger.debug('Processing force objects.')
+        if self._sim.force_objects:
+            self.config.logger.info('Processing force objects.')
 
         for fo in self._sim.force_objects:
             dists = self._subdomain.get_fo_distributions(fo)
@@ -1281,13 +1284,58 @@ class SubdomainRunner(object):
                 continue
 
             idxs = np.array([], dtype=np.int32)
-            for dist_num, locs in dists.iteritems():
+            idxs_opp = np.array([], dtype=np.int32)
+            for dist_num, locs in sorted(dists.iteritems()):
+                opp_idx = self._subdomain.grid.idx_opposite[dist_num]
+
+                # Momentum transferred to the solid node.
                 idxs = np.concatenate((idxs, self._get_global_idx(
-                    tuple(reversed(locs)), dist_num)))
+                    tuple(reversed(locs)), opp_idx).astype(np.int32)))
+
+                dist = self._subdomain.grid.basis[dist_num]
+
+                shifted_locs = []
+                for i, loc in enumerate(reversed(locs)):
+                    shifted_locs.append(loc + int(dist[i]))
+
+                # Momentum transferred from the solid node.
+                idxs_opp = np.concatenate((idxs_opp, self._get_global_idx(
+                    shifted_locs, dist_num).astype(np.int32)))
+
+            components = np.zeros((self.dim, idxs.size), dtype=np.int32)
+            h = 0
+            for dist_num, locs in sorted(dists.iteritems()):
+                opp_idx = self._subdomain.grid.idx_opposite[dist_num]
+                ei = self._subdomain.grid.basis[opp_idx]
+                for i, ei_comp in enumerate(ei):
+                    components[i, h:h + locs[0].size] = int(ei_comp)
+                h += locs[0].size
 
             self.config.logger.debug('%s: total momentum links: %d' % (
                 fo, len(idxs)))
+            fo._components_map = components
+            h = np.zeros_like(idxs, dtype=self.float)
+            fo.gpu_force_buf = self.backend.alloc_buf(like=h)
+            fo.force_buf = h
+            fo.gpu_idx_buf = self.backend.alloc_buf(like=idxs)
+            fo.gpu_opp_idx_buf = self.backend.alloc_buf(like=idxs_opp)
 
+    # TODO(michalj): Make sure the kernels are cached.
+    def update_force_objects(self):
+        """
+        The kernels called in this function read data *after* propagation.
+        """
+        for fo in self._sim.force_objects:
+            if not fo.initialized:
+                continue
+
+            self.exec_kernel('ComputeForceObjects',
+                             [fo.gpu_idx_buf, fo.gpu_opp_idx_buf,
+                              self.gpu_dist(0, self._sim.iteration & 1),
+                              fo.gpu_force_buf, fo.force_buf.size],
+                             'PPPPi',
+                             block_size=128,
+                             grid=[(fo.force_buf.size + 127) / 128])
 
     def run(self):
         self.config.logger.info("Initializing subdomain.")
