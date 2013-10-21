@@ -27,7 +27,7 @@ class CylinderBlock(Subdomain2D):
             self.set_node(hy == 0, wall_bc)
             self.set_node(hy == self.gy - 1, wall_bc)
 
-        cylinder_map = (np.abs(hx - x0) < diam / 2) & (np.abs(hy - y0) < diam / 2)
+        cylinder_map = np.square(hx - x0) + np.square(hy - y0) < diam**2 / 4.0
         self.set_node(cylinder_map, wall_bc)
 
     def initial_conditions(self, sim, hx, hy):

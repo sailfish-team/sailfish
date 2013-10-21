@@ -18,8 +18,6 @@ from sympy import Matrix, Rational, Symbol, Eq
 
 from sailfish import sym_codegen
 
-TargetDist = namedtuple('TargetDist', 'var idx')
-
 #
 # Classes for different grid types.
 #
@@ -509,20 +507,6 @@ def get_missing_dists(grid, orientation):
     _, unknown = _get_known_dists(grid, normal)
     return unknown
 
-
-def fill_missing_dists(grid, distp, missing_dir):
-    """
-    :param grid: grid object
-    :param distp: name of the pointer to the Dist structure
-    :param missing_dir: orientation code
-    """
-    syms = [Symbol('%s->%s' % (distp, x)) for x in grid.idx_name]
-    ret = []
-
-    for idx in get_missing_dists(grid, missing_dir):
-        ret.append((TargetDist(syms[idx], idx), syms[grid.idx_opposite[idx]]))
-
-    return ret
 
 def ex_rho(grid, distp, incompressible, missing_dir=None):
     """Express density as a function of the distributions.

@@ -261,13 +261,16 @@ class GeoEncoderConst(GeoEncoder):
 
         if detect_orientation:
             orientation[:] = 0
-            self.tag_directions(orientation)
+            if self.config.use_orientation:
+                self.detect_orientation(orientation)
+            else:
+                self.tag_directions(orientation)
 
-            # TODO: Actually drop these bits to save space in the node code.
-            # It would be nice to use reduce here instead, but
-            # bitwise_and.identity = 1 makes it impossible to use it.
-            self._unused_tag_bits = int(np.bitwise_and.accumulate(
-                orientation[orientation > 0])[-1])
+                # TODO: Actually drop these bits to save space in the node code.
+                # It would be nice to use reduce here instead, but
+                # bitwise_and.identity = 1 makes it impossible to use it.
+                self._unused_tag_bits = int(np.bitwise_and.accumulate(
+                    orientation[orientation > 0])[-1])
 
             # self.detect_orientation(orientation)
             self.config.logger.debug('... orientation done.')
@@ -319,6 +322,7 @@ class GeoEncoderConst(GeoEncoder):
 
     def update_context(self, ctx):
         ctx.update({
+            'use_orientation': self.config.use_orientation,
             'node_types': self._node_types,
             'type_id_remap': self._type_id_remap,
             'nt_id_fluid': self._type_id(0),
