@@ -38,6 +38,10 @@ class LBNodeType(object):
     #: directions are currently supported).
     needs_orientation = False
 
+    #: If True, the node supports tagging of active directions (i.e. of links
+    #: that connect it to a fluid node.
+    link_tags = False
+
     #: Number of floating point values that the node needs to keep as additional
     #: information in global memory. This can be an int or an instance of
     #: ScratchSize.
@@ -126,6 +130,7 @@ class NTHalfBBWall(LBNodeType):
     wet_node = True
     standard_macro = True
     needs_orientation = True
+    link_tags = True
     location = -0.5
 
 
@@ -167,6 +172,7 @@ class NTWallTMS(LBNodeType):
     """
     wet_node = True
     needs_orientation = True
+    link_tags = True
     location = -0.5
 
     # This will cause the standard procedure to compute the instantaneous u and
@@ -382,6 +388,9 @@ def get_dry_node_type_ids():
 
 def get_orientation_node_type_ids():
     return [id for id, nt in _NODE_TYPES.iteritems() if nt.needs_orientation]
+
+def get_link_tag_node_type_ids():
+    return [id for id, nt in _NODE_TYPES.iteritems() if nt.link_tags]
 
 def multifield(values, where=None):
     """Collapses a list of numpy arrays into a structured field that can be

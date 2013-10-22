@@ -48,6 +48,9 @@ class GeoEncoder(object):
             return 0xfffffffe
 
     def tag_directions(self, tags):
+        """
+        :rvalue: True is there are any nodes supporting tagging, False otherwise
+        """
         # For directions which are not periodic, keep the ghost nodes to avoid
         # detecting some missing directions.
         ngs = list(self.subdomain.spec._nonghost_slice)
@@ -59,7 +62,10 @@ class GeoEncoder(object):
         uniq_types = set(np.unique(self._type_map.base))
         dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
         wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
-        orient_types = list(set(nt.get_orientation_node_type_ids()) & uniq_types)
+        orient_types = list(set(nt.get_link_tag_node_type_ids()) & uniq_types)
+
+        if not orient_types:
+            return False
 
         # Convert to a numpy array.
         dry_types = self._type_map.dtype.type(dry_types)
@@ -80,11 +86,17 @@ class GeoEncoder(object):
             idx = orient_map & util.in_anyd_fast(shifted_map, wet_types)
             tags[ngs][idx] |= (1 << i)
 
+        return True
+
     def detect_orientation(self, orientation):
         # Limit dry and wet types to these that are actually used in the simulation.
         uniq_types = set(np.unique(self._type_map.base))
         dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
-        orient_types = list(set(nt.get_orientation_node_type_ids()) & uniq_types)
+        orient_types = list((set(nt.get_orientation_node_type_ids()) -
+                            set(nt.get_link_tag_node_type_ids())) & uniq_types)
+
+        if not orient_types:
+            return
 
         # Convert to a numpy array.
         dry_types = self._type_map.dtype.type(dry_types)
@@ -259,20 +271,19 @@ class GeoEncoderConst(GeoEncoder):
         else:
             self._bits_scratch = 0
 
+        self._have_link_tags = False
+
         if detect_orientation:
             orientation[:] = 0
-            if self.config.use_orientation:
-                self.detect_orientation(orientation)
-            else:
-                self.tag_directions(orientation)
+            self._have_link_tags = self.tag_directions(orientation)
+            self.detect_orientation(orientation)
 
-                # TODO: Actually drop these bits to save space in the node code.
-                # It would be nice to use reduce here instead, but
-                # bitwise_and.identity = 1 makes it impossible to use it.
-                self._unused_tag_bits = int(np.bitwise_and.accumulate(
-                    orientation[orientation > 0])[-1])
+            # TODO: Actually drop these bits to save space in the node code.
+            # It would be nice to use reduce here instead, but
+            # bitwise_and.identity = 1 makes it impossible to use it.
+            self._unused_tag_bits = int(np.bitwise_and.accumulate(
+                orientation[orientation > 0])[-1])
 
-            # self.detect_orientation(orientation)
             self.config.logger.debug('... orientation done.')
 
     def _subdomain_encode_node(self, orientation, node_type, param):
@@ -322,7 +333,7 @@ class GeoEncoderConst(GeoEncoder):
 
     def update_context(self, ctx):
         ctx.update({
-            'use_orientation': self.config.use_orientation,
+            'use_link_tags': self.config.use_link_tags,
             'node_types': self._node_types,
             'type_id_remap': self._type_id_remap,
             'nt_id_fluid': self._type_id(0),
@@ -351,8 +362,8 @@ class GeoEncoderConst(GeoEncoder):
                       ^_ nt_scratch_shift + nt_param_shift + nt_misc_shift
 
         """
-
-        if 32 - self._bits_scratch < self.subdomain.grid.Q - 1:
+        if (32 - self._bits_scratch < self.subdomain.grid.Q - 1 and
+            self.config.use_link_tags and self._have_link_tags):
             raise ValueError('Not enough bits available to tag neighbor nodes.')
 
         misc_data = (orientation << self._bits_scratch) | scratch_id

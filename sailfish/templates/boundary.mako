@@ -93,10 +93,6 @@ ${device_func} inline float node_param_get_scalar(const int idx ${dynamic_val_ar
 	%if nt.NTGuoDensity in node_types:
 		int orig_gi = gi;
 		if (isNTGuoDensity(type)) {
-			%if not use_orientation:
-				#error Guo BC is only supported with orientation tagging.
-			%endif
-
 			switch (orientation) {
 				%for dir_ in grid.dir2vecidx.keys():
 					case (${dir_}): {
@@ -130,9 +126,6 @@ ${device_func} inline float node_param_get_scalar(const int idx ${dynamic_val_ar
 <%def name="guo_density_node_index_shift_final()">
 	%if nt.NTGuoDensity in node_types:
 		if (isNTGuoDensity(type)) {
-			%if not use_orientation:
-				#error Guo BC is only supported with orientation tagging.
-			%endif
 			switch (orientation) {
 				%for dir_ in grid.dir2vecidx.keys():
 					case (${dir_}): {
@@ -235,9 +228,6 @@ ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 </%def>
 
 <%def name="noneq_bb()">
-	%if not use_orientation:
-		#error Non-equilibrium bounce-back is only supported with orientation tagging.
-	%endif
 	// Bounce-back of the non-equilibrium parts.
 	switch (orientation) {
 		%for i in range(1, grid.dim * 2 + 1):
@@ -282,10 +272,6 @@ ${device_func} void zouhe_bb(Dist *fi, int orientation, float *rho, float *v0)
 		nvz = *rho * v0[2] - nvz;
 	%endif
 
-	%if not use_orientation:
-		#error Zou-He boundary conditions are only supported with orientation tagging.
-	%endif
-
 	// Redistribute excess momentum.
 	switch (orientation) {
 		%for i in range(1, grid.dim * 2 + 1):
@@ -302,8 +288,19 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 	compute_0th_moment(fi, out);
 }
 
-<%def name="for_orientation_dist()">
-	%if use_orientation:
+<%def name="for_orientation_dist(link_tags=False)">
+	%if use_link_tags and link_tags:
+		## Use connectivity tags.
+		%for i, (name, opp_idx) in enumerate(zip(grid.idx_name[1:], grid.idx_opposite[1:])):
+			## Don't generate code for cases that never happen.
+			%if unused_tag_bits & (1 << i) == 0:
+				// ${name} points to a missing node, ${grid.idx_name[opp_idx]} is undefined
+				if ((orientation & ${1 << i}) == 0) {
+					${caller.body(missing_idx=opp_idx, opp_name=name)}
+				}
+			%endif
+		%endfor
+	%else:
 		switch (orientation) {
 			%for o in range(1, grid.dim*2+1):
 				case ${o}: {
@@ -315,17 +312,6 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 				}
 			%endfor
 		}
-	%else:
-		## Use connectivity tags.
-		%for i, (name, opp_idx) in enumerate(zip(grid.idx_name[1:], grid.idx_opposite[1:])):
-			## Don't generate code for cases that never happen.
-			%if unused_tag_bits & (1 << i) == 0:
-				// ${name} points to a missing node, ${grid.idx_name[opp_idx]} is undefined
-				if ((orientation & ${1 << i}) == 0) {
-					${caller.body(missing_idx=opp_idx, opp_name=name)}
-				}
-			%endif
-		%endfor
 	%endif
 </%def>
 
@@ -342,9 +328,6 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 	*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
 	float par_rho = node_param_get_scalar(node_param_idx ${dynamic_val_args()});
 
-	%if not use_orientation:
-		#error Common code for density boundary conditions only works with orientation tagging.
-	%endif
 	switch (orientation) {
 		%for i in range(1, grid.dim*2+1):
 			case ${i}: {
@@ -366,9 +349,6 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 	*rho = ${sym.ex_rho(grid, 'fi', incompressible)};
 	node_param_get_vector(node_param_idx, v0 ${dynamic_val_args()});
 
-	%if not use_orientation:
-		#error Common code for velocity boundary conditions only works with orientation tagging.
-	%endif
 	switch (orientation) {
 		%for i in range(1, grid.dim*2+1):
 			case ${i}:
@@ -440,9 +420,6 @@ ${device_func} inline void fixMissingDistributions(
 	## their implementation requires a separate kernel call.
 	%if access_pattern == 'AB':
 		%if nt.NTCopy in node_types:
-			%if not use_orientation:
-				#error NTCopy only works with orientation taggging.
-			%endif
 			else if (isNTCopy(node_type)) {
 				switch (orientation) {
 				%for o in range(1, grid.dim*2+1):
@@ -459,9 +436,6 @@ ${device_func} inline void fixMissingDistributions(
 
 		%if nt.NTYuOutflow in node_types:
 			else if (isNTYuOutflow(node_type)) {
-				%if not use_orientation:
-					#error NTYuOutflow only works with orientation taggging.
-				%endif
 				switch (orientation) {
 				%for o in range(1, grid.dim*2+1):
 					case ${o}: {
@@ -510,7 +484,7 @@ ${device_func} inline void fixMissingDistributions(
 			%endfor
 			// Replace missing distributions with equilibrium ones
 			// calculated for the target macroscopic variables.
-			<%self:for_orientation_dist args="missing_idx,opp_name">
+			<%self:for_orientation_dist link_tags="True" args="missing_idx,opp_name">
 				fi->${grid.idx_name[missing_idx]} = ${cex(eq.expression[missing_idx], rho='*tg_rho', vel='tg_v')};
 			</%self:for_orientation_dist>
 		}
@@ -520,7 +494,7 @@ ${device_func} inline void fixMissingDistributions(
 ## Replaces missing distributions with opposite values, directly in global memory.
 ## This effectively implements bounce-back on the link, as used NTHalfBBWall.
 <%def name="_global_mem_fill_missing_dists_with_opposites()">
-	<%self:for_orientation_dist args="missing_idx,opp_name">
+	<%self:for_orientation_dist link_tags="True" args="missing_idx,opp_name">
 		%if access_pattern == 'AB':
 			${get_odist('dist_out', missing_idx)} = fi->${opp_name};
 		%else:
@@ -653,9 +627,6 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode,
 		%endif
 		else if (isNTSlip(node_type)) {
 			float t;
-			%if not use_orientation:
-				#error Slip boundary condition only supports orientation tagging.
-			%endif
 			switch (orientation) {
 			%for i in range(1, grid.dim*2+1):
 				case ${i}: {

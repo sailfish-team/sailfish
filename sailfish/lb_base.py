@@ -76,14 +76,12 @@ class LBSim(object):
                            dest='propagate_with_shuffle',
                            default=False, help='Uses the shuffle operation to '
                            'move data within warps if the device supports it.')
-        group.add_argument('--nouse_orientation', action='store_false',
-                           dest='use_orientation',
-                           default=True, help='Switches from orientation ( '
-                           'supports primary Cartesian axes only) to node '
-                           'connectivity tagging (supports arbitrary node '
-                           'arrangements). NOTE: This feature is still under '
-                           'development and some boundary conditions may '
-                           'not be supported with it).')
+        group.add_argument('--nouse_link_tags', action='store_false',
+                           dest='use_link_tags',
+                           default=True, help='Disables the use of link '
+                           'tagging for node types that support it. This '
+                           'effectively falls back to the more crude '
+                           'orientation tagging.')
 
     @classmethod
     def modify_config(cls, config):
