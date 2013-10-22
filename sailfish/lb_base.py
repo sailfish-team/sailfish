@@ -235,6 +235,10 @@ class LBSim(object):
         """Called from the main loop after the completion of every step."""
         pass
 
+    def after_main_loop(self, runner):
+        """Called after the main loop."""
+        pass
+
     def get_compute_kernels(self, runner, full_output, bulk):
         """
         :param runner: SubdomainRunner object

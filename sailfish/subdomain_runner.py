@@ -1533,6 +1533,8 @@ class SubdomainRunner(object):
                     self.config.checkpoint_file and self.config.final_checkpoint):
                 self.save_checkpoint()
 
+            self._sim.after_main_loop(self)
+
         except self.backend.FatalError:
             is_quit = True
             self.config.logger.exception("Fatal on-device error at iteration "
