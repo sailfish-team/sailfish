@@ -22,20 +22,19 @@ from sailfish.lb_single import LBFluidSim
 from sailfish.sym import S
 
 # Geometry set to match [1].
-H = 160
+H = 80
 L = int(6.25 * H)
 D = int(0.02 * L)
-visc = 0.016666666666666666
 
 # St = f D / u_max
 
 class BoxSubdomain(Subdomain2D):
     bc = NTHalfBBWall
-    max_v = 0.05
+    max_v = 0.025
 
     def boundary_conditions(self, hx, hy):
         walls = (hy == 0) | (hy == self.gy - 1)
-        self.set_node(walls, NTHalfBBWall)
+        self.set_node(walls, self.bc)
 
         hhy = S.gy - self.bc.location
         self.set_node((hx == 0) & np.logical_not(walls),
@@ -45,9 +44,16 @@ class BoxSubdomain(Subdomain2D):
                       NTEquilibriumDensity(1))
         l = L / 4
 
-        box = ((hx > l - D/2) & (hx <= l + D/2) &
-               (hy > (H - D) / 2) & (hy <= (H + D) / 2))
-        self.set_node(box, NTFullBBWall)
+        # Full bounce-back. For N box nodes, effective size is N+1.
+        if self.bc.location == 0.5:
+            eff_D = D - 1
+        # Half-way bounce-back. For N box nodes, effective size is N-2.
+        else:
+            eff_D = D + 2
+
+        box = ((hx > l - eff_D / 2.0) & (hx <= l + eff_D / 2.0) &
+               (hy > (H - eff_D) / 2.0) & (hy <= (H + eff_D) / 2.0))
+        self.set_node(box, self.bc)
 
     def initial_conditions(self, sim, hx, hy):
         sim.rho[:] = 1.0
@@ -64,10 +70,10 @@ class BoxSimulation(LBFluidSim):
     def update_defaults(cls, defaults):
         defaults.update({
             'lat_nx': L,
-            'lat_ny': H,
+            'lat_ny': (H + 2 if BoxSubdomain.bc.location == 0.5 else H),
             'precision': 'double',
             'max_iters': 1000000,
-            'visc': visc})
+            'visc': 0.05})
 
     def __init__(self, *args, **kwargs):
         super(BoxSimulation, self).__init__(*args, **kwargs)
@@ -81,7 +87,7 @@ class BoxSimulation(LBFluidSim):
         print 'Re = %2.f' % (BoxSubdomain.max_v * D / self.config.visc)
 
     def record_value(self, iteration, force, C_D, C_L):
-        print runner._sim.iteration, force[0], force[1], C_D, C_L
+        print iteration, force[0], force[1], C_D, C_L
 
     prev_f = None
     every = 500
