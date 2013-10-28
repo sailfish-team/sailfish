@@ -274,7 +274,9 @@ class GeoEncoderConst(GeoEncoder):
         self._have_link_tags = False
 
         if detect_orientation:
-            orientation[:] = 0
+            # We do not reset the orientation array here as it is possible to
+            # have orientation defined for some nodes and use autodetection for
+            # others.
             self._have_link_tags = self.tag_directions(orientation)
             self.detect_orientation(orientation)
 
