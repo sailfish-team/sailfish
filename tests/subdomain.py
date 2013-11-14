@@ -1,6 +1,6 @@
 import numpy as np
 import unittest
-from sailfish.node_type import NTEquilibriumVelocity, multifield, NTFullBBWall, _NTUnused
+from sailfish.node_type import NTEquilibriumVelocity, multifield, NTFullBBWall, _NTUnused, _NTPropagationOnly
 from sailfish.subdomain import Subdomain2D, Subdomain3D, SubdomainSpec2D, SubdomainSpec3D
 from sailfish.subdomain_runner import SubdomainRunner
 from sailfish.sym import D2Q9, D3Q19
@@ -11,6 +11,7 @@ class SubdomainTest2D(Subdomain2D):
         where = (hx == hy)
         self.set_node(where, NTEquilibriumVelocity(
             multifield((0.01 * (hx - self.gy / 2)**2, 0.0), where)))
+
         self.set_node((hx > 10) & (hy < 5), NTFullBBWall)
 
 class TestNodeTypeSetting2D(TestCase2D):
@@ -31,7 +32,9 @@ class TestNodeTypeSetting2D(TestCase2D):
                     np.float64([0.01 * (y - center)**2, 0.0]),
                     np.float64(sub._encoder.get_param((y + envelope, y + envelope), 2)))
 
-        np.testing.assert_equal(sub._type_map[1:4, 12:-1], _NTUnused.id)
+        np.testing.assert_equal(sub._type_map[1:2, 13:-1], _NTUnused.id)
+        np.testing.assert_equal(sub._type_map[1:2, 12], _NTPropagationOnly.id)
+        np.testing.assert_equal(sub._type_map[3, 12:-1], _NTPropagationOnly.id)
 
 class SubdomainTest3D(Subdomain3D):
     def boundary_conditions(self, hx, hy, hz):
@@ -62,7 +65,8 @@ class TestNodeTypeSetting3D(TestCase3D):
                     np.float64(sub._encoder.get_param(
                         (y + envelope, y + envelope, y + envelope), 3)))
 
-        np.testing.assert_equal(sub._type_map[1:6, 1:4, 12:-1], _NTUnused.id)
+        np.testing.assert_equal(sub._type_map[1:5, 1:2, 13:-1], _NTUnused.id)
+        np.testing.assert_equal(sub._type_map[5, 3, 12:-1], _NTPropagationOnly.id)
 
 if __name__ == '__main__':
     unittest.main()

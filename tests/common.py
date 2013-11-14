@@ -20,6 +20,9 @@ class TestCase2D(unittest.TestCase):
         config.logger = DummyLogger()
         config.grid = 'D2Q9'
         config.mode = 'batch'
+        config.periodic_x = False
+        config.periodic_y = False
+        config.use_link_tags = False
         self.sim = LBSim(config)
         self.config = config
         self.backend = DummyBackend()
@@ -40,5 +43,9 @@ class TestCase3D(unittest.TestCase):
         config.logger = DummyLogger()
         config.grid = 'D3Q19'
         config.mode = 'batch'
+        config.periodic_x = False
+        config.periodic_y = False
+        config.periodic_z = False
+        config.use_link_tags = False
         self.sim = LBSim(config)
         self.backend = DummyBackend()
