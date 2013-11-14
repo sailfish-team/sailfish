@@ -23,7 +23,7 @@ import zmq
 from sailfish import subdomain_runner, util, io
 from sailfish.connector import ZMQSubdomainConnector, ZMQRemoteSubdomainConnector, CompressedZMQRemoteSubdomainConnector
 
-def _start_subdomain_runner(subdomain, config, sim, num_subdomains,
+def _start_subdomain_runner(subdomain_spec, config, sim, num_subdomains,
         backend_class, gpu_id, output,
         quit_event, master_addr, timing_info_to_master):
     """
@@ -40,7 +40,8 @@ def _start_subdomain_runner(subdomain, config, sim, num_subdomains,
 
     try:
         import setproctitle
-        setproctitle.setproctitle('Sailfish %s subd:%d GPU:%d' % (str(sim.__class__.__name__), subdomain.id, gpu_id))
+        setproctitle.setproctitle('Sailfish %s subd:%d GPU:%d' %
+                                  (str(sim.__class__.__name__), subdomain_spec.id, gpu_id))
     except ImportError:
         pass
 
@@ -61,7 +62,7 @@ def _start_subdomain_runner(subdomain, config, sim, num_subdomains,
     if sim.subdomain_runner is not None:
         runner_cls = sim.subdomain_runner
 
-    runner = runner_cls(sim, subdomain, output, backend, quit_event, summary_addr,
+    runner = runner_cls(sim, subdomain_spec, output, backend, quit_event, summary_addr,
             master_addr)
     runner.run()
     return runner
@@ -83,7 +84,7 @@ class LBMachineMaster(object):
                 other subdomains
         """
 
-        self.subdomains = subdomains
+        self.subdomain_specs = subdomains
         self.config = config
         self.lb_class = lb_class
         self._subdomain_addr_map = subdomain_addr_map
@@ -109,10 +110,10 @@ class LBMachineMaster(object):
 
         try:
             gpus = len(self.config.gpus)
-            for i, subdomain in enumerate(self.subdomains):
+            for i, subdomain in enumerate(self.subdomain_specs):
                 subdomain2gpu[subdomain.id] = self.config.gpus[i % gpus]
         except TypeError:
-            for subdomain in self.subdomains:
+            for subdomain in self.subdomain_specs:
                 subdomain2gpu[subdomain.id] = 0
 
         return subdomain2gpu
@@ -129,11 +130,11 @@ class LBMachineMaster(object):
         _subdomain_conns = set()
 
         # IDs of the subdomains that are local to this master.
-        local_subdomain_ids = set([b.id for b in self.subdomains])
-        local_subdomain_map = dict([(b.id, b) for b in self.subdomains])
+        local_subdomain_ids = set([b.id for b in self.subdomain_specs])
+        local_subdomain_map = dict([(b.id, b) for b in self.subdomain_specs])
         ipc_files = []
 
-        for subdomain in self.subdomains:
+        for subdomain in self.subdomain_specs:
             connecting_subdomains = subdomain.connecting_subdomains()
             for face, nbid in connecting_subdomains:
                 if (subdomain.id, nbid) in _subdomain_conns:
@@ -191,7 +192,7 @@ class LBMachineMaster(object):
 
         # XXX compute total storage requirements
         self._vis_geo_queues = []
-        for subdomain in self.subdomains:
+        for subdomain in self.subdomain_specs:
             self._vis_geo_queues.append(subdomain.init_visualization())
 
         vis_lock = mp.Lock()
@@ -223,7 +224,7 @@ class LBMachineMaster(object):
         self._vis_quit_event = Event()
         self._vis_process = Process(
                 target=lambda: vis_class(
-                    self.config, self.subdomains, self._vis_quit_event,
+                    self.config, self.subdomain_specs, self._vis_quit_event,
                     self._quit_event, vis_config, self._vis_geo_queues).run(),
                 name='VisEngine')
         self._vis_process.start()
@@ -244,7 +245,7 @@ class LBMachineMaster(object):
         ipc_files = []
 
         # Create subdomain runners for all subdomains.
-        for subdomain in self.subdomains:
+        for subdomain in self.subdomain_specs:
             output = output_initializer(subdomain)
             master_addr = 'ipc://{0}/sailfish-master-{1}_{2}'.format(
                     tempfile.gettempdir(), os.getpid(), subdomain.id)
@@ -254,7 +255,7 @@ class LBMachineMaster(object):
             sockets.append(sock)
             p = Process(target=_start_subdomain_runner,
                         name='Subdomain/{0}'.format(subdomain.id),
-                        args=(subdomain, self.config, self.sim, len(self.subdomains),
+                        args=(subdomain, self.config, self.sim, len(self.subdomain_specs),
                               backend_cls, subdomain2gpu[subdomain.id],
                               output, self._quit_event, master_addr,
                               self._channel is not None))
@@ -325,7 +326,7 @@ class LBMachineMaster(object):
             pass
 
         self.config.logger.info('Handling subdomains: {0}'.format([b.id for b in
-            self.subdomains]))
+            self.subdomain_specs]))
 
         self.sim = self.lb_class(self.config)
         subdomain2gpu = self._assign_subdomains_to_gpus()
@@ -341,13 +342,13 @@ class LBMachineMaster(object):
             return
 
         if self.config.debug_single_process:
-            assert len(self.subdomains) == 1, ('Only a single subdomain can be'
+            assert len(self.subdomain_specs) == 1, ('Only a single subdomain can be'
                     'simulated in the single process mode.')
 
-            subdomain = self.subdomains[0]
+            subdomain = self.subdomain_specs[0]
             output = output_initializer(subdomain)
             self.runner = _start_subdomain_runner(subdomain, self.config, self.sim,
-                    len(self.subdomains), backend_cls,
+                    len(self.subdomain_specs), backend_cls,
                     subdomain2gpu[subdomain.id], output, self._quit_event,
                     None, self._channel is not None)
             self.config.logger.debug('Finished single process subdomain runner.')

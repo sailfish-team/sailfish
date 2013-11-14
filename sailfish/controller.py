@@ -449,7 +449,7 @@ class LBSimulationController(object):
         """Dimensionality of the simulation: 2 or 3."""
         return self._lb_class.subdomain.dim
 
-    def _init_subdomain_envelope(self, sim_class, subdomains):
+    def _init_subdomain_envelope(self, sim_class, subdomain_specs):
         """Sets the size of the ghost node envelope for all subdomains."""
         envelope_size = sim_class.nonlocality
         grid = util.get_grid_from_config(self.config)
@@ -460,7 +460,7 @@ class LBSimulationController(object):
         # Get rid of any Sympy wrapper objects.
         envelope_size = int(envelope_size)
 
-        for subdomain in subdomains:
+        for subdomain in subdomain_specs:
             subdomain.set_actual_size(envelope_size)
 
     def _start_cluster_simulation(self, subdomains, cluster=None):
@@ -754,17 +754,17 @@ class LBSimulationController(object):
         port = summary_receiver.bind_to_random_port('tcp://127.0.0.1')
         self.config._zmq_port = port
 
-        subdomains = self.geo.subdomains()
-        assert subdomains is not None, \
+        subdomain_specs = self.geo.subdomains()
+        assert subdomain_specs is not None, \
                 "Make sure the subdomain list is returned in geo_class.subdomains()"
-        assert len(subdomains) > 0, \
+        assert len(subdomain_specs) > 0, \
                 "Make sure at least one subdomain is returned in geo_class.subdomains()"
 
-        self._init_subdomain_envelope(self._lb_class, subdomains)
+        self._init_subdomain_envelope(self._lb_class, subdomain_specs)
 
-        proc = LBGeometryProcessor(subdomains, self.dim, self.geo)
-        subdomains = proc.transform(self.config)
-        self.save_subdomain_config(subdomains)
+        proc = LBGeometryProcessor(subdomain_specs, self.dim, self.geo)
+        subdomain_specs = proc.transform(self.config)
+        self.save_subdomain_config(subdomain_specs)
 
-        self._start_simulation(subdomains)
-        return self._finish_simulation(subdomains, summary_receiver)
+        self._start_simulation(subdomain_specs)
+        return self._finish_simulation(subdomain_specs, summary_receiver)
