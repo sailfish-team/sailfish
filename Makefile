@@ -1,5 +1,5 @@
 
-.PHONY: clean regtest regtest_small_block presubmit test_examples test_gpu goldens test_goldens
+.PHONY: clean regtest regtest_small_block presubmit test_examples test_gpu goldens test_goldens test
 
 regtest_ldc:
 	python -u regtest/ldc_3d.py
@@ -12,7 +12,10 @@ perf_plots:
 perf_block_plots:
 	python perftest/make_block_plots.py perftest perftest/results/single/GeForce_GTX_285/blocksize
 
-test:
+test: test_short, test_med
+
+# Max 5 sec runtime.
+test_short:
 	python tests/controller.py
 	python tests/encoder.py
 	python tests/sim.py
@@ -20,8 +23,11 @@ test:
 	python tests/subdomain_connection.py
 	python tests/subdomain_runner.py
 	python tests/sym.py
-	python tests/sym_equilibrium.py
 	python tests/util.py
+
+# Max 1 min runtime.
+test_med:
+	python tests/sym_equilibrium.py
 
 test_examples:
 	@bash tests/run_examples.sh
