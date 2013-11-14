@@ -71,7 +71,11 @@ class GeoEncoder(object):
         dry_types = self._type_map.dtype.type(dry_types)
         wet_types = self._type_map.dtype.type(wet_types)
         orient_types = self._type_map.dtype.type(orient_types)
-        orient_map = util.in_anyd_fast(self._type_map[ngs], orient_types)
+        # Only do direction tagging for nodes that do not have
+        # orientation/direction already.
+        orient_map = (
+            util.in_anyd_fast(self._type_map[ngs], orient_types) &
+            (tags[ngs] == 0))
         l = self.subdomain.grid.dim - 1
         # Skip the stationary vector.
         for i, vec in enumerate(self.subdomain.grid.basis[1:]):
@@ -104,7 +108,8 @@ class GeoEncoder(object):
         orient_map = util.in_anyd_fast(self._type_map, orient_types)
         l = self.subdomain.grid.dim - 1
         for vec in self.subdomain.grid.basis:
-            # FIXME: we currently only process the primary directions
+            # Orientaion only handles the primary directions. More complex
+            # setups need link tagging.
             if vec.dot(vec) != 1:
                 continue
             shifted_map = self._type_map
@@ -277,7 +282,8 @@ class GeoEncoderConst(GeoEncoder):
             # We do not reset the orientation array here as it is possible to
             # have orientation defined for some nodes and use autodetection for
             # others.
-            self._have_link_tags = self.tag_directions(orientation)
+            if self.config.use_link_tags:
+                self._have_link_tags = self.tag_directions(orientation)
             self.detect_orientation(orientation)
 
             # TODO: Actually drop these bits to save space in the node code.
