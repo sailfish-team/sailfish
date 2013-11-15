@@ -17,7 +17,6 @@ test: test_short, test_med
 # Max 5 sec runtime.
 test_short:
 	python tests/controller.py
-	python tests/encoder.py
 	python tests/sim.py
 	python tests/subdomain.py
 	python tests/subdomain_connection.py

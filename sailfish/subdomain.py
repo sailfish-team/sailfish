@@ -360,8 +360,8 @@ class Subdomain(object):
 
     def __init__(self, grid_shape, spec, grid, *args, **kwargs):
         """
-        :param grid_shape: size of the lattice for the subdomain, including
-                ghost nodes; X dimension is the last element in the tuple
+        :param grid_shape: size of the lattice for the simulation;
+            X dimension is the last element in the tuple
         :param spec: SubdomainSpec for this subdomain
         :param grid: grid object specifying the connectivity of the lattice
         """
@@ -475,16 +475,16 @@ class Subdomain(object):
             assert isinstance(node_type, nt.LBNodeType)
 
         self._verify_params(where, node_type)
-        self._type_map[where] = node_type.id
+        self._type_map_base[where] = node_type.id
         key = hash((node_type.id, frozenset(node_type.params.items())))
-        assert np.all(self._param_map[where] == 0),\
+        assert np.all(self._param_map_base[where] == 0),\
                 "Overriding previously set nodes is not allowed."
-        self._param_map[where] = key
+        self._param_map_base[where] = key
         self._params[key] = node_type
         self._seen_types.add(node_type.id)
 
         if hasattr(node_type, 'orientation') and node_type.orientation is not None:
-            self._orientation[where] = node_type.orientation
+            self._orientation_base[where] = node_type.orientation
         elif node_type.needs_orientation:
             self._needs_orientation = True
 
@@ -520,13 +520,118 @@ class Subdomain(object):
             getattr(node_type, 'orientation', 0),
             node_type.id, key)
 
+    def tag_directions(self):
+        """Creates direction tags for nodes that support it.
+
+        Direction tags are a way of summarizing which distributions at a node
+        will be undefined after streaming.
+
+        :rvalue: True if there are any nodes supporting tagging, False otherwise
+        """
+        # For directions which are not periodic, keep the ghost nodes to avoid
+        # detecting some missing directions.
+        ngs = list(self.spec._nonghost_slice)
+        for i, periodic in enumerate(reversed(self.spec._periodicity)):
+            if not periodic:
+                ngs[i] = slice(None)
+
+        # Limit dry and wet types to these that are actually used in the simulation.
+        uniq_types = set(np.unique(self._type_map.base))
+        dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
+        wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
+        orient_types = list(set(nt.get_link_tag_node_type_ids()) & uniq_types)
+
+        if not orient_types:
+            return False
+
+        # Convert to a numpy array.
+        dry_types = self._type_map.dtype.type(dry_types)
+        wet_types = self._type_map.dtype.type(wet_types)
+        orient_types = self._type_map.dtype.type(orient_types)
+        # Only do direction tagging for nodes that do not have
+        # orientation/direction already.
+        orient_map = (
+            util.in_anyd_fast(self._type_map_base[ngs], orient_types) &
+            (self._orientation_base[ngs] == 0))
+        l = self.grid.dim - 1
+        # Skip the stationary vector.
+        for i, vec in enumerate(self.grid.basis[1:]):
+            shifted_map = self._type_map_base[ngs]
+            for j, shift in enumerate(vec):
+                if shift == 0:
+                    continue
+                shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
+
+            # If the given distribution points to a fluid node, tag it as
+            # active.
+            idx = orient_map & util.in_anyd_fast(shifted_map, wet_types)
+            self._orientation_base[ngs][idx] |= (1 << i)
+
+        return True
+
+    def detect_orientation(self):
+        # Limit dry and wet types to these that are actually used in the simulation.
+        uniq_types = set(np.unique(self._type_map.base))
+        dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
+        orient_types = list((set(nt.get_orientation_node_type_ids()) -
+                            set(nt.get_link_tag_node_type_ids())) & uniq_types)
+
+        if not orient_types:
+            return
+
+        # Convert to a numpy array.
+        dry_types = self._type_map.dtype.type(dry_types)
+        orient_types = self._type_map.dtype.type(orient_types)
+        orient_map = util.in_anyd_fast(self._type_map_base, orient_types)
+        l = self.grid.dim - 1
+        for vec in self.grid.basis:
+            # Orientaion only handles the primary directions. More complex
+            # setups need link tagging.
+            if vec.dot(vec) != 1:
+                continue
+            shifted_map = self._type_map_base
+            for j, shift in enumerate(vec):
+                if shift == 0:
+                    continue
+                shifted_map = np.roll(shifted_map, int(-shift), axis=l-j)
+
+            # Only set orientation where it's not already defined (=0).
+            idx = orient_map & (shifted_map == 0) & (self._orientation_base == 0)
+            self._orientation_base[idx] = self.grid.vec_to_dir(list(vec))
+
     def reset(self):
         self.config.logger.debug('Setting subdomain geometry...')
         self._type_map_encoded = False
-        mgrid = self._get_mgrid()
-        self.boundary_conditions(*mgrid)
+
+        # Use a coordinate map covering ghost nodes as well. This is
+        # necessary so that orientation detection works correctly
+        # in case the ghost nodes would correspond to wet nodes from
+        # another domain.
+        # TODO: When setting nodes on ghosts, do not actually save the
+        # node parameters as they will never be used.
+        self.boundary_conditions(*self._get_mgrid_base(self.config))
         self.config.logger.debug('... boundary conditions done.')
 
+        have_link_tags = False
+        # Defines ghost nodes only where no explicit boundary conditions
+        # have been set and where the node does belong to another subdomain.
+        # In the last case, the node represents fluid and needs to stay this
+        # way for link tagging to work correctly.
+        self._define_ghosts(unset_only=True)
+
+        if self._needs_orientation:
+            # We do not reset the orientation array here as it is possible to
+            # have orientation defined for some nodes and use autodetection for
+            # others.
+            if self.config.use_link_tags:
+                have_link_tags = self.tag_directions()
+            self.detect_orientation()
+            self.config.logger.debug('... orientation done.')
+
+        # Detects unused and propagation-only nodes. Note that this has to take
+        # place before ghost nodes are set, as otherwise wall nodes at subdomain
+        # boundaries could be marked as unused, i.e.:
+        #   G W W W -> G U U W instead of G W U W
         self._postprocess_nodes()
         self.config.logger.debug('... postprocessing done.')
         self._define_ghosts()
@@ -540,7 +645,7 @@ class Subdomain(object):
         self._encoder = geo_encoder.GeoEncoderConst(self)
         self._encoder.prepare_encode(self._type_map_base, self._param_map_base,
                                      self._params, self._orientation_base,
-                                     self._needs_orientation)
+                                     have_link_tags)
 
         self.config.logger.debug('... encoder done.')
 
@@ -639,18 +744,55 @@ class Subdomain2D(Subdomain):
         Subdomain.__init__(self, grid_shape, spec, *args, **kwargs)
 
     def _get_mgrid(self):
+        """Returns a sequence (in natural order) of indexing arrays for the
+        non-ghost slice."""
         return reversed(np.mgrid[self.spec.oy:self.spec.oy + self.spec.ny,
                                  self.spec.ox:self.spec.ox + self.spec.nx])
 
-    def _define_ghosts(self):
+    def _get_mgrid_base(self, config):
+        """Returns a sequence (in natural order) of indexing arrays for the
+        base field (including ghosts)."""
+        es = self.spec.envelope_size
+        ox = self.spec.ox - es
+        oy = self.spec.oy - es
+        hx, hy = reversed(np.mgrid[oy:oy + self.spec.ny + 2 * es,
+                                   ox:ox + self.spec.nx + 2 * es])
+        if config.periodic_x:
+            hx[hx < 0] += self.gx
+            hx[hx >= self.gx] -= self.gx
+        if config.periodic_y:
+            hy[hy < 0] += self.gy
+            hy[hy >= self.gy] -= self.gy
+        return hx, hy
+
+    def _define_ghosts(self, unset_only=False):
         assert not self._type_map_encoded
         es = self.spec.envelope_size
         if not es:
             return
-        self._type_map_base[0:es, :] = nt._NTGhost.id
-        self._type_map_base[:, 0:es] = nt._NTGhost.id
-        self._type_map_base[es + self.spec.ny:, :] = nt._NTGhost.id
-        self._type_map_base[:, es + self.spec.nx:] = nt._NTGhost.id
+
+        def _slice(slc, face):
+            if face in (self.spec.X_LOW, self.spec.X_HIGH):
+                return slc[0], slice(None)
+            else:
+                return slice(None), slc[0]
+
+        def _set(x, face):
+            if unset_only:
+                # Nodes are fluid.
+                tg_map = (x == 0)
+                # Nodes do not communicate data to neighboring subdomains.
+                for cpair in self.spec._connections.get(face, []):
+                    tg_map[_slice(cpair.src.src_slice, face)] = False
+
+                x[tg_map] = nt._NTGhost.id
+            else:
+                x[:] = nt._NTGhost.id
+
+        _set(self._type_map_base[0:es, :], self.spec.Y_LOW)
+        _set(self._type_map_base[:, 0:es], self.spec.X_LOW)
+        _set(self._type_map_base[es + self.spec.ny:, :], self.spec.Y_HIGH)
+        _set(self._type_map_base[:, es + self.spec.nx:], self.spec.X_HIGH)
 
     def _postprocess_nodes(self):
         fluid_map = (self._type_map_base == 0).astype(np.uint8)
@@ -680,17 +822,59 @@ class Subdomain3D(Subdomain):
                                  self.spec.oy:self.spec.oy + self.spec.ny,
                                  self.spec.ox:self.spec.ox + self.spec.nx])
 
-    def _define_ghosts(self):
+    def _get_mgrid_base(self, config):
+        """Returns a sequence (in natural order) of indexing arrays for the
+        base field (including ghosts)."""
+        es = self.spec.envelope_size
+        ox = self.spec.ox - es
+        oy = self.spec.oy - es
+        oz = self.spec.oz - es
+        hx, hy, hz = reversed(np.mgrid[oz:oz + self.spec.nz + 2 * es,
+                                       oy:oy + self.spec.ny + 2 * es,
+                                       ox:ox + self.spec.nx + 2 * es])
+        if config.periodic_x:
+            hx[hx < 0] += self.gx
+            hx[hx >= self.gx] -= self.gx
+        if config.periodic_y:
+            hy[hy < 0] += self.gy
+            hy[hy >= self.gy] -= self.gy
+        if config.periodic_z:
+            hz[hz < 0] += self.gz
+            hz[hz >= self.gz] -= self.gz
+        return hx, hy, hz
+
+    def _define_ghosts(self, unset_only=False):
         assert not self._type_map_encoded
         es = self.spec.envelope_size
         if not es:
             return
-        self._type_map_base[0:es, :, :] = nt._NTGhost.id
-        self._type_map_base[:, 0:es, :] = nt._NTGhost.id
-        self._type_map_base[:, :, 0:es] = nt._NTGhost.id
-        self._type_map_base[es + self.spec.nz:, :, :] = nt._NTGhost.id
-        self._type_map_base[:, es + self.spec.ny:, :] = nt._NTGhost.id
-        self._type_map_base[:, :, es + self.spec.nx:] = nt._NTGhost.id
+
+        def _slice(slc, face):
+            if face in (self.spec.X_LOW, self.spec.X_HIGH):
+                return slc[1], slc[0], slice(None)
+            elif face in (self.spec.Y_LOW, self.spec.Y_HIGH):
+                return slc[1], slice(None), slc[0]
+            else:
+                return slice(None), slc[1], slc[0]
+
+        def _set(x, face):
+            if unset_only:
+                # Nodes are fluid.
+                tg_map = (x == 0)
+                # Nodes do not communicate data to neighboring subdomains.
+                for cpair in self.spec._connections.get(face, []):
+                    tg_map[_slice(cpair.src.src_slice, face)] = False
+
+                x[tg_map] = nt._NTGhost.id
+            else:
+                x[:] = nt._NTGhost.id
+
+        _set(self._type_map_base[0:es, :, :], self.spec.Z_LOW)
+        _set(self._type_map_base[:, 0:es, :], self.spec.Y_LOW)
+        _set(self._type_map_base[:, :, 0:es], self.spec.X_LOW)
+        _set(self._type_map_base[es + self.spec.nz:, :, :], self.spec.Z_HIGH)
+        _set(self._type_map_base[:, es + self.spec.ny:, :], self.spec.Y_HIGH)
+        _set(self._type_map_base[:, :, es + self.spec.nx:], self.spec.X_HIGH)
 
     def _postprocess_nodes(self):
         fluid_map = (self._type_map_base == 0).astype(np.uint8)
