@@ -1667,6 +1667,10 @@ class SubdomainRunner(object):
                 self._profile.end_step()
 
                 self._sim.after_step(self)
+                # Allow mix-ins to have their own after_step functions.
+                for c in self._sim.__class__.mro()[1:]:
+                    if issubclass(c, LBMixIn) and hasattr(c, 'after_step'):
+                        c.after_step(self._sim, self)
 
                 if self.config.checkpoint_file and (
                         self._sim.need_checkpoint() or self._checkpoint_req > 0):
