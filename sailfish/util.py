@@ -24,6 +24,12 @@ class GridError(Exception):
     pass
 
 
+class ArrayPair(object):
+    def __init__(self, host, gpu):
+        self.host = host
+        self.gpu = gpu
+
+
 def get_grid_from_config(config):
     for x in sym.KNOWN_GRIDS:
         if x.__name__ == config.grid:

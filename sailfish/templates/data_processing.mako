@@ -369,33 +369,53 @@ ${kernel} void FinalizeReduce${name}(
 %endif
 </%def>
 
-
-${kernel} void ExtractSlice(int axis, int position,
-	${kernel_args_1st_moment('iv')}
-	${global_ptr} float *out) {
-	int c0 = get_global_id(0) + 1;
-	int c1 = get_global_id(1) + 1;
-	int gi;
+<%def name="_compute_gi_for_slice()">
+	<% es = envelope_size %>
+	const int c0 = get_global_id(0) + ${es};
+	const int c1 = get_global_id(1) + ${es};
+	int gi, go;
 
 	if (axis == 0) {
-		if (c0 >= ${lat_ny-1} || c1 >= ${lat_nz-1}) {
+		if (c0 >= ${lat_ny - es} || c1 >= ${lat_nz - es}) {
 			return;
 		}
-		gi = getGlobalIdx(1 + position, c0, c1);
+		gi = getGlobalIdx(${es} + position, c0, c1);
+		go = (c1 - ${es}) * ${lat_ny - 2 * es} + (c0 - ${es});
 	} else if (axis == 1) {
-		if (c0 >= ${lat_nx-1} || c1 >= ${lat_nz-1}) {
+		if (c0 >= ${lat_nx - es} || c1 >= ${lat_nz - es}) {
 			return;
 		}
-		gi = getGlobalIdx(c0, 1 + position, c1);
+		gi = getGlobalIdx(c0, ${es} + position, c1);
+		go = (c1 - ${es}) * ${lat_nx - 2 * es} + (c0 - ${es});
 	} else {
-		if (c0 >= ${lat_nx-1} || c1 >= ${lat_ny-1}) {
+		if (c0 >= ${lat_nx - es} || c1 >= ${lat_ny - es}) {
 			return;
 		}
-		gi = getGlobalIdx(c0, c1, 1 + position);
+		gi = getGlobalIdx(c0, c1, ${es} + position);
+		go = (c1 - ${es}) * ${lat_nx - 2 * es} + (c0 - ${es});
 	}
+</%def>
 
-	float vx = ivx[gi];
-	float vy = ivy[gi];
-	float vz = ivz[gi];
-	out[(c1 - 1) * ${lat_nx-2} + (c0 - 1)] = sqrtf(vx * vx + vy * vy + vz * vz);
+${kernel} void ExtractSliceField(int axis, int position,
+		${global_ptr} int *type_map,
+		${global_ptr} float *in,
+		${global_ptr} float *out) {
+	${_compute_gi_for_slice()}
+
+	if (isWetNode(type_map[gi])) {
+		out[go] = in[gi];
+	} else {
+		out[go] = NAN;
+	}
+}
+
+${kernel} void ExtractSliceUsq(int axis, int position,
+		${kernel_args_1st_moment('iv')}
+		${global_ptr} float *out) {
+	${_compute_gi_for_slice()}
+
+	const float vx = ivx[gi];
+	const float vy = ivy[gi];
+	const float vz = ivz[gi];
+	out[go] = sqrtf(vx * vx + vy * vy + vz * vz);
 }

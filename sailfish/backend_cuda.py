@@ -30,6 +30,7 @@ def _expand_grid(grid):
     else:
         return tuple(grid)
 
+
 class CUDABackend(object):
     name = 'cuda'
     array = cudaarray
