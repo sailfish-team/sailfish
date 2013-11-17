@@ -16,12 +16,13 @@ from sailfish.lb_single import LBFluidSim
 from sailfish.lb_base import LBForcedSim
 from sailfish.node_type import NTWallTMS, NTHalfBBWall, NTFullBBWall
 from sailfish.stats import ReynoldsStatsMixIn
+from sailfish.vis_mixin import Vis2DSliceMixIn
 
 import scipy.ndimage.filters
 
 # Channel half-height.
-H = 40
-Re_tau = 395
+H = 60
+Re_tau = 180
 
 # Max velocity.
 u0 = 0.05
@@ -108,7 +109,7 @@ class ChannelSubdomain(Subdomain3D):
         sim.vz[:] += dvz / scale * 0.05  # streamwise
 
 
-class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn):
+class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
     subdomain = ChannelSubdomain
 
     @classmethod
@@ -136,11 +137,11 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn):
             'perf_stats_every': 5000,
             'periodic_y': True,
             'periodic_z': True,
-            'output': 'bgk395_hbb_120z',
-            'final_checkpoint': True,
-            'checkpoint_file': 'bgk395_hbb_120z',
+            #'output': 'bgk395_hbb_120z',
+            #'final_checkpoint': True,
+            #'checkpoint_file': 'bgk395_hbb_120z',
             #'restore_from': 'bgk_hbb_moser_dbl.0200000',
-            'checkpoint_every': 200000,
+            #'checkpoint_every': 200000,
             'subdomains': 2,
             'cluster_interface': 'ib0'
             })
