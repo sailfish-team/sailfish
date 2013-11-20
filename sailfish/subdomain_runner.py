@@ -666,7 +666,7 @@ class SubdomainRunner(object):
         """Creates buffers for inter-block communication."""
         alloc = self.backend.alloc_async_host_buf
 
-        # Maps block ID to a list of ConnectionBuffer objects.  The list will
+        # Maps subdomain ID to a list of ConnectionBuffer objects.  The list will
         # typically contain just 1 element, unless periodic boundary conditions
         # are used.
         self._block_to_connbuf = defaultdict(list)
@@ -680,15 +680,11 @@ class SubdomainRunner(object):
                 dist_full_idx = GPUBuffer(dist_full_idx, self.backend)
 
                 if self.config.access_pattern == 'AA':
-                    coll_idx_opposite = self._get_src_slice_indices(face, cpair,
-                            True)
-                    coll_idx_opposite = GPUBuffer(coll_idx_opposite,
-                            self.backend)
+                    coll_idx_opposite = self._get_src_slice_indices(face, cpair, True)
+                    coll_idx_opposite = GPUBuffer(coll_idx_opposite, self.backend)
 
-                    dist_full_idx_opposite = self._get_dst_slice_indices(face,
-                            cpair, True)
-                    dist_full_idx_opposite = GPUBuffer(dist_full_idx_opposite,
-                            self.backend)
+                    dist_full_idx_opposite = self._get_dst_slice_indices(face, cpair, True)
+                    dist_full_idx_opposite = GPUBuffer(dist_full_idx_opposite, self.backend)
                 else:
                     dist_full_idx_opposite = None
                     coll_idx_opposite = None
@@ -700,10 +696,8 @@ class SubdomainRunner(object):
                     dist_full_buf = alloc(cpair.dst.full_shape, dtype=self.float)
 
                     if self.config.access_pattern == 'AA':
-                        local_coll_buf = GPUBuffer(alloc(cpair.src.local_transfer_shape, dtype=self.float),
-                                self.backend)
-                        local_recv_buf = GPUBuffer(alloc(cpair.dst.local_transfer_shape, dtype=self.float),
-                                self.backend)
+                        local_coll_buf = GPUBuffer(alloc(cpair.src.local_transfer_shape, dtype=self.float), self.backend)
+                        local_recv_buf = GPUBuffer(alloc(cpair.dst.local_transfer_shape, dtype=self.float), self.backend)
                     else:
                         local_coll_buf = None
                         local_recv_buf = None
@@ -727,7 +721,7 @@ class SubdomainRunner(object):
                             local_recv_buf)
 
                     self.config.logger.debug('adding buffer for conn: {0} -> {1} '
-                            '(face {2})'.format(self._spec.id, block_id, face))
+                                             '(face {2})'.format(self._spec.id, block_id, face))
                     self._block_to_connbuf[block_id].append(cbuf)
 
         # Explicitly sort connection buffers by their face ID.  Create a
@@ -738,7 +732,7 @@ class SubdomainRunner(object):
             cbufs.sort(key=lambda x: (x.face, x.grid_id))
             recv_bufs = list(cbufs)
             recv_bufs.sort(key=lambda x: (self._spec.opposite_face(x.face),
-                x.grid_id))
+                                          x.grid_id))
             self._recv_block_to_connbuf[subdomain_id] = recv_bufs
 
     def _update_compute_code(self):
@@ -1094,14 +1088,12 @@ class SubdomainRunner(object):
         """
         # Sparse data collection.
         if cbuf.coll_idx.host is not None:
-            def _get_sparse_coll_kernel(i, idx_buffer=cbuf.coll_idx.gpu,
-                    coll_buf=cbuf.coll_buf):
-                return KernelGrid(
-                    self.get_kernel('CollectSparseData',
-                    [idx_buffer, self.gpu_dist(cbuf.grid_id, i),
-                     coll_buf.gpu, coll_buf.host.size],
-                    'PPPi', (block_size,)),
-                    grid=(grid_dim1(coll_buf.host.size),))
+            def _get_sparse_coll_kernel(i, idx_buffer=cbuf.coll_idx.gpu, coll_buf=cbuf.coll_buf):
+                return KernelGrid(self.get_kernel('CollectSparseData',
+                                                  [idx_buffer, self.gpu_dist(cbuf.grid_id, i),
+                                                   coll_buf.gpu, coll_buf.host.size],
+                                                  'PPPi', (block_size,)),
+                                  grid=(grid_dim1(coll_buf.host.size),))
 
             if self.config.access_pattern == 'AA':
                 return (_get_sparse_coll_kernel(0, cbuf.coll_idx_opposite.gpu, cbuf.local_coll_buf),
@@ -1111,10 +1103,10 @@ class SubdomainRunner(object):
         # Continuous data collection.
         else:
             def _get_cont_coll_kernel(i, kernel='CollectContinuousData', coll_buf=cbuf.coll_buf,
-                    src_slice=cbuf.cpair.src.src_slice):
+                                      src_slice=cbuf.cpair.src.src_slice):
                 # [X, Z * dists] or [X, Y * dists]
                 min_max = ([x.start for x in src_slice] +
-                        list(reversed(coll_buf.host.shape[1:])))
+                           list(reversed(coll_buf.host.shape[1:])))
                 min_max[-1] = min_max[-1] * len(cbuf.cpair.src.dists)
                 if self.dim == 2:
                     signature = 'PiiiP'
@@ -1122,7 +1114,7 @@ class SubdomainRunner(object):
                 else:
                     signature = 'PiiiiiP'
                     grid_size = (grid_dim1(coll_buf.host.shape[-1]),
-                        coll_buf.host.shape[-2] * len(cbuf.cpair.src.dists))
+                                 coll_buf.host.shape[-2] * len(cbuf.cpair.src.dists))
 
                 return KernelGrid(
                     self.get_kernel(kernel,
@@ -1155,8 +1147,7 @@ class SubdomainRunner(object):
         primary = []
         secondary = []
 
-        primary, secondary = self._init_distrib_kernels_ab(cbuf, grid_dim1,
-                block_size)
+        primary, secondary = self._init_distrib_kernels_ab(cbuf, grid_dim1, block_size)
 
         if self.config.access_pattern == 'AB':
             return primary, secondary
@@ -1165,14 +1156,13 @@ class SubdomainRunner(object):
 
         if cbuf.dist_full_idx_opposite.host is not None:
             grid_size = (grid_dim1(cbuf.local_recv_buf.host.size),)
-            secondary.append(KernelGrid(
-                    self.get_kernel('DistributeSparseData',
-                        [cbuf.dist_full_idx_opposite.gpu,
-                         self.gpu_dist(cbuf.grid_id, 0),
-                         cbuf.local_recv_buf.gpu,
-                         cbuf.local_recv_buf.host.size],
-                    'PPPi', (block_size,)),
-                    grid_size))
+            secondary.append(KernelGrid(self.get_kernel('DistributeSparseData',
+                                                        [cbuf.dist_full_idx_opposite.gpu,
+                                                         self.gpu_dist(cbuf.grid_id, 0),
+                                                         cbuf.local_recv_buf.gpu,
+                                                         cbuf.local_recv_buf.host.size],
+                                                        'PPPi', (block_size,)),
+                                        grid_size))
         else:
             min_max = ([y.start for y in cbuf.cpair.src.dst_macro_slice] +
                 list(reversed(cbuf.local_recv_buf.host.shape[1:])))
@@ -1184,15 +1174,14 @@ class SubdomainRunner(object):
             else:
                 signature = 'PiiiiiP'
                 grid_size = (grid_dim1(cbuf.local_recv_buf.host.shape[-1]),
-                    cbuf.local_recv_buf.host.shape[-2] * len(cbuf.cpair.dst.dists))
+                             cbuf.local_recv_buf.host.shape[-2] * len(cbuf.cpair.dst.dists))
 
-            secondary.append(KernelGrid(
-                    self.get_kernel('DistributeContinuousDataWithSwap',
-                            [self.gpu_dist(cbuf.grid_id, 0),
-                             self._spec.opposite_face(cbuf.face)] +
-                            min_max + [cbuf.local_recv_buf.gpu],
-                            signature, (block_size,)),
-                            grid_size))
+            secondary.append(KernelGrid(self.get_kernel('DistributeContinuousDataWithSwap',
+                                                        [self.gpu_dist(cbuf.grid_id, 0),
+                                                         self._spec.opposite_face(cbuf.face)] +
+                                                        min_max + [cbuf.local_recv_buf.gpu],
+                                                        signature, (block_size,)),
+                                        grid_size))
 
         return primary, secondary
 
@@ -1267,8 +1256,7 @@ class SubdomainRunner(object):
         return primary, secondary
 
     def _init_interblock_kernels(self):
-        """Creates kernels for collection and distribution of distribution
-        data."""
+        """Creates kernels for collection and distribution of distribution data."""
 
         collect_primary = []
         collect_secondary = []
@@ -1283,14 +1271,13 @@ class SubdomainRunner(object):
 
         for b_id, conn_bufs in self._block_to_connbuf.iteritems():
             for cbuf in conn_bufs:
-                primary, secondary = self._init_collect_kernels(cbuf,
-                        _grid_dim1, collect_block)
-
+                primary, secondary = self._init_collect_kernels(cbuf, _grid_dim1,
+                                                                collect_block)
                 collect_primary.append(primary)
                 collect_secondary.append(secondary)
 
-                primary, secondary = self._init_distrib_kernels(cbuf,
-                        _grid_dim1, collect_block)
+                primary, secondary = self._init_distrib_kernels(cbuf, _grid_dim1,
+                                                                collect_block)
                 distrib_primary.extend(primary)
                 distrib_secondary.extend(secondary)
 
