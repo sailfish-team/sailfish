@@ -50,21 +50,29 @@ class LBBinaryFluidBase(LBSim):
         dist_kernels = defaultdict(lambda: defaultdict(list))
         macro_kernels = defaultdict(lambda: defaultdict(list))
 
+        if self.config.node_addressing == 'indirect':
+            args = [runner.gpu_indirect_address()]
+            signature = 'PPi'
+        else:
+            args = []
+            signature = 'Pi'
+
         for i in range(0, 3):
             dist_kernels[0][i] = [
                     runner.get_kernel(
-                        'ApplyPeriodicBoundaryConditions', [gpu_dist1a,
-                            np.uint32(i)], 'Pi'),
+                        'ApplyPeriodicBoundaryConditions',
+                        args + [gpu_dist1a, np.uint32(i)], signature),
                     runner.get_kernel(
-                        'ApplyPeriodicBoundaryConditions', [gpu_dist2a,
-                            np.uint32(i)], 'Pi')]
+                        'ApplyPeriodicBoundaryConditions',
+                        args + [gpu_dist2a, np.uint32(i)], signature)]
 
             for field_pair in self._scalar_fields:
                 if not field_pair.abstract.need_nn:
                     continue
                 macro_kernels[0][i].append(
                         runner.get_kernel('ApplyMacroPeriodicBoundaryConditions',
-                            [runner.gpu_field(field_pair.buffer), np.uint32(i)], 'Pi'))
+                                          args + [runner.gpu_field(field_pair.buffer), np.uint32(i)],
+                                          signature))
 
         if self.config.access_pattern == 'AB':
             gpu_dist1 = gpu_dist1b
@@ -87,7 +95,8 @@ class LBBinaryFluidBase(LBSim):
                     continue
                 macro_kernels[1][i].append(
                         runner.get_kernel('ApplyMacroPeriodicBoundaryConditions',
-                            [runner.gpu_field(field_pair.buffer), np.uint32(i)], 'Pi'))
+                                          args + [runner.gpu_field(field_pair.buffer), np.uint32(i)],
+                                          signature))
 
         ret = MacroKernels(macro=macro_kernels, distributions=dist_kernels)
         return ret

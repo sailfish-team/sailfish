@@ -154,13 +154,20 @@ class LBFluidSim(LBSim):
         # grid type (primary, secondary) -> axis -> kernels
         kernels = defaultdict(lambda: defaultdict(list))
 
+        if self.config.node_addressing == 'indirect':
+            signature = 'PPi'
+            args = [runner.gpu_indirect_address()]
+        else:
+            signature = 'Pi'
+            args = []
+
         # One kernel per axis, per grid.  Kernels for 3D are always prepared,
         # and in 2D simulations the kernel for the Z dimension is simply
         # ignored.
         for i in range(0, 3):
             kernels[0][i] = [runner.get_kernel(
-                'ApplyPeriodicBoundaryConditions', [gpu_dist1a, np.uint32(i)],
-                'Pi')]
+                'ApplyPeriodicBoundaryConditions', args + [gpu_dist1a, np.uint32(i)],
+                signature)]
 
         if self.config.node_addressing == 'indirect':
             raise NotImplementedError('PBC with indirect addressing is not '
@@ -175,8 +182,8 @@ class LBFluidSim(LBSim):
 
         for i in range(0, 3):
             kernels[1][i] = [runner.get_kernel(
-                kernel, [gpu_dist, np.uint32(i)],
-                'Pi')]
+                kernel, args + [gpu_dist, np.uint32(i)],
+                signature)]
 
         return kernels
 
@@ -274,13 +281,22 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
     def get_pbc_kernels(self, runner):
         dist_kernels = super(LBSingleFluidShanChen, self).get_pbc_kernels(runner)
         macro_kernels = defaultdict(lambda: defaultdict(list))
+
+        if self.config.node_addressing == 'indirect':
+            signature = 'PPi'
+            args = [runner.gpu_field()]
+        else:
+            signature = 'Pi'
+            args = []
+
         for i in range(0, 3):
             for field_pair in self._scalar_fields:
                 if not field_pair.abstract.need_nn:
                     continue
                 macro_kernels[0][i].append(
                         runner.get_kernel('ApplyMacroPeriodicBoundaryConditions',
-                            [runner.gpu_field(field_pair.buffer), np.uint32(i)], 'Pi'))
+                                          args + [runner.gpu_field(field_pair.buffer), np.uint32(i)],
+                                          signature))
 
         for i in range(0, 3):
             for field_pair in self._scalar_fields:
@@ -288,7 +304,8 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
                     continue
                 macro_kernels[1][i].append(
                         runner.get_kernel('ApplyMacroPeriodicBoundaryConditions',
-                            [runner.gpu_field(field_pair.buffer), np.uint32(i)], 'Pi'))
+                                          args + [runner.gpu_field(field_pair.buffer), np.uint32(i)],
+                                          signature))
 
         ret = MacroKernels(macro=macro_kernels, distributions=dist_kernels)
         return ret

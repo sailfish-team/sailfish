@@ -174,13 +174,20 @@
 			return ' && '.join(conds)
 	%>
 
+	%if node_addressing == 'indirect':
+		const int gi_low_dense = gi_low;
+		const int gi_high_dense = gi_high;
+		gi_low = nodes[gi_low];
+		gi_high = nodes[gi_high];
+	%endif
+
 	// TODO(michalj): Generalize this for grids with e_i > 1.
 	// From low idx to high idx.
 	%for i in sym.get_prop_dists(grid, -1, axis):
 		<%
 			j = grid.idx_opposite[i] if opposite else i
 		%>
-		float f${grid.idx_name[i]} = ${get_dist('dist', j, 'gi_low')};
+		const float f${grid.idx_name[i]} = ${get_dist('dist', j, 'gi_low')};
 	%endfor
 
 	%for i in sym.get_prop_dists(grid, -1, axis):
@@ -206,8 +213,8 @@
 						%for cond, targ in zip(corner_cond, target):
 							%if cond:
 								else if (${cond}) {
-									int gi_high2 = getGlobalIdx(${targ});
-									${get_dist('dist', j, 'gi_high2')} = f${grid.idx_name[i]};
+									const int gi_high2 = getGlobalIdx(${targ});
+									${get_dist('dist', j, 'nodes[gi_high2]' if node_addressing == 'indirect' else 'gi_high2')} = f${grid.idx_name[i]};
 								}
 							%endif
 						%endfor
@@ -226,7 +233,11 @@
 		<%
 			j = grid.idx_opposite[i] if opposite else i
 		%>
-		float f${grid.idx_name[i]} = ${get_dist('dist', j, 'gi_high', offset)};
+		%if node_addressing == 'indirect':
+			const float f${grid.idx_name[i]} = ${get_dist('dist', j, 'nodes[gi_high_dense + %d]' % offset)};
+		%else:
+			const float f${grid.idx_name[i]} = ${get_dist('dist', j, 'gi_high', offset)};
+		%endif
 	%endfor
 
 	%for i in sym.get_prop_dists(grid, 1, axis):
@@ -237,7 +248,11 @@
 			if (isfinite(f${grid.idx_name[i]})) {
 				// Skip distributions which are not populated or cross multiple boundaries.
 				if (${make_cond(i)}) {
-					${get_dist('dist', j, 'gi_low', offset)} = f${grid.idx_name[i]};
+					%if node_addressing == 'indirect':
+						${get_dist('dist', j, 'nodes[gi_low + %d]' % offset)} = f${grid.idx_name[i]};
+					%else:
+						${get_dist('dist', j, 'gi_low', offset)} = f${grid.idx_name[i]};
+					%endif
 				}
 				<%
 					axis_target = 1 if not opposite else 0
@@ -252,8 +267,8 @@
 						%for cond, targ in zip(corner_cond, target):
 							%if cond:
 								else if (${cond}) {
-									int gi_low2 = getGlobalIdx(${targ});
-									${get_dist('dist', j, 'gi_low2')} = f${grid.idx_name[i]};
+									const int gi_low2 = getGlobalIdx(${targ});
+									${get_dist('dist', j, 'nodes[gi_low2]' if node_addressing == 'indirect' else 'gi_low2')} = f${grid.idx_name[i]};
 								}
 							%endif
 						%endfor
@@ -262,7 +277,11 @@
 			}
 		%else:
 			if (isfinite(f${grid.idx_name[i]})) {
-				${get_dist('dist', j, 'gi_low', offset)} = f${grid.idx_name[i]};
+				%if node_addressing == 'indirect':
+					${get_dist('dist', j, 'nodes[gi_low + %d]' % offset)} = f${grid.idx_name[i]};
+				%else:
+					${get_dist('dist', j, 'gi_low', offset)} = f${grid.idx_name[i]};
+				%endif
 			}
 		%endif
 	%endfor
@@ -272,9 +291,10 @@
 //  dist: pointer to the distributions array
 //  axis: along which axis the PBCs are to be applied (0:x, 1:y, 2:z)
 ${kernel} void ApplyPeriodicBoundaryConditions(
-		${global_ptr} float *dist, int axis)
+	${nodes_array_if_required()}
+	${global_ptr} float *dist, int axis)
 {
-	int idx1 = get_global_id(0);
+	const int idx1 = get_global_id(0);
 	int gi_low, gi_high;
 
 	// For single block PBC, the envelope size (width of the ghost node
@@ -293,7 +313,7 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 			${pbc_helper(1, lat_nx-2)}
 		}
 	%else:
-		int idx2 = get_global_id(1);
+		const int idx2 = get_global_id(1);
 		if (axis == 0) {
 			if (idx1 >= ${lat_ny} || idx2 >= ${lat_nz}) { return; }
 			gi_low = getGlobalIdx(0, idx1, idx2);				// ghost node
@@ -318,9 +338,10 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 //  - distributions opposite to normal ones are copied
 //  - data is copied from real nodes to ghost nodes
 ${kernel} void ApplyPeriodicBoundaryConditionsWithSwap(
+		${nodes_array_if_required()}
 		${global_ptr} float *dist, int axis)
 {
-	int idx1 = get_global_id(0);
+	const int idx1 = get_global_id(0);
 	int gi_low, gi_high;
 
 	// For single block PBC, the envelope size (width of the ghost node
@@ -339,7 +360,7 @@ ${kernel} void ApplyPeriodicBoundaryConditionsWithSwap(
 			${pbc_helper(1, lat_nx-2, opposite=True)}
 		}
 	%else:
-		int idx2 = get_global_id(1);
+		const int idx2 = get_global_id(1);
 		if (axis == 0) {
 			if (idx1 >= ${lat_ny-1} || idx2 >= ${lat_nz-1} || idx1 < 1 || idx2 < 1) { return; }
 			gi_low = getGlobalIdx(1, idx1, idx2);				// real node
@@ -366,13 +387,21 @@ ${kernel} void ApplyPeriodicBoundaryConditionsWithSwap(
 	}
 </%def>
 
+<%def name="_indirect_index()">
+	%if node_addressing == 'indirect':
+		gi_low = nodes[gi_low];
+		gi_high = nodes[gi_high];
+	%endif
+</%def>
+
 // Applies periodic boundary conditions to a scalar field within a single subdomain.
 //  dist: pointer to the array with the field data
 //  axis: along which axis the PBCs are to be applied (0:x, 1:y, 2:z)
 ${kernel} void ApplyMacroPeriodicBoundaryConditions(
+		${nodes_array_if_required()}
 		${global_ptr} float *field, int axis)
 {
-	int idx1 = get_global_id(0);
+	const int idx1 = get_global_id(0);
 	int gi_low, gi_high;
 
 	// TODO(michalj): Generalize this for the case when envelope_size != 1.
@@ -381,44 +410,54 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 			if (idx1 >= ${lat_ny}) { return; }
 			gi_low = getGlobalIdx(0, idx1);					// ghost node
 			gi_high = getGlobalIdx(${lat_nx-2}, idx1);		// real node
+			${_indirect_index()}
 			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(1, idx1);					// real node
 			gi_high = getGlobalIdx(${lat_nx-1}, idx1);		// ghost node
+			${_indirect_index()}
 			${_copy_field_if_finite('gi_low', 'gi_high')}
 		} else if (axis == 1) {
 			if (idx1 >= ${lat_nx}) { return; }
 			gi_low = getGlobalIdx(idx1, 0);					// ghost node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-2});		// real node
+			${_indirect_index()}
 			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(idx1, 1);					// real node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-1});		// ghost node
+			${_indirect_index()}
 			${_copy_field_if_finite('gi_low', 'gi_high')}
 		}
 	%else:
-		int idx2 = get_global_id(1);
+		const int idx2 = get_global_id(1);
 		if (axis == 0) {
 			if (idx1 >= ${lat_ny} || idx2 >= ${lat_nz}) { return; }
 			gi_low = getGlobalIdx(0, idx1, idx2);				// ghost node
 			gi_high = getGlobalIdx(${lat_nx-2}, idx1, idx2);	// real node
+			${_indirect_index()}
 			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(1, idx1, idx2);				// real node
 			gi_high = getGlobalIdx(${lat_nx-1}, idx1, idx2);	// ghost node
+			${_indirect_index()}
 			${_copy_field_if_finite('gi_low', 'gi_high')}
 		} else if (axis == 1) {
 			if (idx1 >= ${lat_nx} || idx2 >= ${lat_nz}) { return; }
 			gi_low = getGlobalIdx(idx1, 0, idx2);				// ghost node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-2}, idx2);	// real node
+			${_indirect_index()}
 			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(idx1, 1, idx2);				// real node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-1}, idx2);	// ghost node
+			${_indirect_index()}
 			${_copy_field_if_finite('gi_low', 'gi_high')}
 		} else {
 			if (idx1 >= ${lat_nx} || idx2 >= ${lat_ny}) { return; }
 			gi_low = getGlobalIdx(idx1, idx2, 0);				// ghost node
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});	// real node
+			${_indirect_index()}
 			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(idx1, idx2, 1);				// real node
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-1});	// ghost node
+			${_indirect_index()}
 			${_copy_field_if_finite('gi_low', 'gi_high')}
 		}
 	%endif
