@@ -100,11 +100,17 @@ class SubdomainRunner(object):
 
         # Set of fields that are also wrapped in a GPUArray.
         self._array_fields = set()
+
         self._gpu_field_map = {}
         self._gpu_grids_primary = []
         self._gpu_grids_secondary = []  # only used for the AB access pattern
         self._gpu_indirect_address = None  # only used for indirect node addressing
+
+        # Numpy array where every entry contains a node address.
+        # The node address is the node's offset within the dense node array
+        # used for data storage in the indirect addressing scheme.
         self._host_indirect_address = None
+
         self._quit_event = quit_event
 
         self._pbc_kernels = []
@@ -546,6 +552,16 @@ class SubdomainRunner(object):
             return self._get_global_idx((gx, idx[2], idx[1]),
                     idx[0]).astype(np.uint32)
 
+    def _handle_idx_for_indirect(self, idxs):
+        if self.config.node_addressing == 'indirect':
+            # Get actual node addresses.
+            # TODO: Ideally, we would filter out unused nodes here. This
+            # requires careful handling between what the source domain and the
+            # destination domain see/expect.
+            return self._host_indirect_address.flatten()[idxs]
+        else:
+            return idxs
+
     def _get_src_slice_indices(self, face, cpair, opposite=False):
         """Returns a numpy array of indices of sparse nodes from which
         data is to be collected.
@@ -563,11 +579,12 @@ class SubdomainRunner(object):
         # as for the macroscopic fields.
         if opposite:
             gx = self.lat_linear_macro[face]
-            return self._idx_helper(gx, cpair.src.src_macro_slice,
-                    [self._sim.grid.idx_opposite[d] for d in cpair.src.dists])
+            ret = self._idx_helper(gx, cpair.src.src_macro_slice,
+                                   [self._sim.grid.idx_opposite[d] for d in cpair.src.dists])
         else:
             gx = self.lat_linear[face]
-            return self._idx_helper(gx, cpair.src.src_slice, cpair.src.dists)
+            ret = self._idx_helper(gx, cpair.src.src_slice, cpair.src.dists)
+        return self._handle_idx_for_indirect(ret)
 
     def _get_dst_slice_indices(self, face, cpair, opposite=False):
         """Returns a numpy array of indices of sparse nodes to which
@@ -581,21 +598,22 @@ class SubdomainRunner(object):
         """
         if face not in (self._spec.X_LOW, self._spec.X_HIGH):
             return None
-        es = self._spec.envelope_size
+
         if opposite:
             if not cpair.src.dst_macro_slice:
                 return None
             gx = self.lat_linear_with_swap[self._spec.opposite_face(face)]
-            return self._idx_helper(gx, cpair.src.dst_macro_slice,
-                    [self._sim.grid.idx_opposite[d] for d in cpair.dst.dists])
+            ret = self._idx_helper(gx, cpair.src.dst_macro_slice,
+                                   [self._sim.grid.idx_opposite[d] for d in cpair.dst.dists])
         else:
             if not cpair.dst.dst_slice:
                 return None
-            dst_slice = [
-                slice(x.start + es, x.stop + es) for x in
-                cpair.dst.dst_slice]
+            es = self._spec.envelope_size
+            dst_slice = [slice(x.start + es, x.stop + es) for x in cpair.dst.dst_slice]
             gx = self.lat_linear_dist[self._spec.opposite_face(face)]
-            return self._idx_helper(gx, dst_slice, cpair.dst.dists)
+            ret = self._idx_helper(gx, dst_slice, cpair.dst.dists)
+
+        return self._handle_idx_for_indirect(ret)
 
     def _dst_face_loc_to_full_loc(self, face, face_loc, opposite=False):
         """Expands a location tuple in the (full) face coordinate system into a
@@ -636,8 +654,9 @@ class SubdomainRunner(object):
         """
         if cpair.dst.partial_nodes == 0:
             return None, None, None
+
         buf = self.backend.alloc_async_host_buf(cpair.dst.partial_nodes,
-                dtype=self.float)
+                                                dtype=self.float)
         idx = np.zeros(cpair.dst.partial_nodes, dtype=np.uint32)
         dst_low = [x + self._spec.envelope_size for x in cpair.dst.dst_low]
         sel = []
@@ -755,8 +774,8 @@ class SubdomainRunner(object):
         """Builds a node addressing map."""
         addr, _ = self.make_scalar_field(dtype=np.uint32, register=False, need_indirect=False,
                                          nonghost_view=False)
+        # Mark all nodes as invalid.
         addr[:] = 0xffffffff
-        print addr.shape
         self._host_indirect_address = addr
         addr[self._subdomain.active_node_mask] = np.arange(self._subdomain.active_nodes)
         self._gpu_indirect_address = self.backend.alloc_buf(like=self._field_base[id(addr.base)])

@@ -463,10 +463,20 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 	%endif
 }
 
+## For use in the collect/distribute kernels below. Works with any kernel
+## where the threads corresponding to invalid nodes can be terminated.
+<%def name="_handle_indirect()">
+	%if node_addressing == 'indirect':
+		gi = nodes[gi];
+		if (gi == INVALID_NODE) {
+			return;
+		}
+	%endif
+</%def>
+
 %if dim == 2:
 <%def name="collect_continuous_data_body_2d(opposite=False)">
-	int idx = get_global_id(0);
-	int gi;
+	const int idx = get_global_id(0);
 	float tmp;
 
 	if (idx >= max_lx) {
@@ -484,14 +494,15 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 				else:
 					gy = lat_linear[axis]
 			%>
-			int dist_size = max_lx / ${len(dists)};
-			int dist_num = idx / dist_size;
-			int gx = idx % dist_size;
+			const int dist_size = max_lx / ${len(dists)};
+			const int dist_num = idx / dist_size;
+			const int gx = idx % dist_size;
+			const int gi = getGlobalIdx(base_gx + gx, ${gy});
+			${_handle_indirect()}
 
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
 				case ${i}: {
-					gi = getGlobalIdx(base_gx + gx, ${gy});
 					%if opposite:
 						tmp = ${get_dist('dist', grid.idx_opposite[prop_dist], 'gi')};
 					%else:
@@ -514,13 +525,16 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 // face: see LBBlock class constants
 // buffer: buffer where the data is to be saved
 ${kernel} void CollectContinuousData(
+		${nodes_array_if_required()}
 		${global_ptr} float *dist, int face, int base_gx,
 		int max_lx, ${global_ptr} float *buffer)
 {
 	${collect_continuous_data_body_2d(False)}
 }
 
+// As above, used for the AA access pattern.
 ${kernel} void CollectContinuousDataWithSwap(
+		${nodes_array_if_required()}
 		${global_ptr} float *dist, int face, int base_gx,
 		int max_lx, ${global_ptr} float *buffer)
 {
@@ -535,6 +549,7 @@ ${kernel} void CollectContinuousDataWithSwap(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear[axis]});
 	%endif
+	${_handle_indirect()}
 </%def>
 
 ## In the case of in-place propagation, the data is read from the same place as
@@ -547,11 +562,12 @@ ${kernel} void CollectContinuousDataWithSwap(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_macro[axis]});
 	%endif
+	${_handle_indirect()}
 </%def>
 
 <%def name="collect_continuous_data_body_3d(opposite=False)">
-	int gx = get_global_id(0);
-	int idx = get_global_id(1);
+	const int gx = get_global_id(0);
+	const int idx = get_global_id(1);
 	int gi;
 	float tmp;
 
@@ -609,15 +625,17 @@ ${kernel} void CollectContinuousDataWithSwap(
 // (x0, y0, d1), (x1, y0, d1), .. (xN, y0, d1),
 // ...
 ${kernel} void CollectContinuousData(
-	${global_ptr} float *dist, int face, int base_gx, int base_other,
-	int max_lx, int max_other, ${global_ptr} float *buffer)
+		${nodes_array_if_required()}
+		${global_ptr} float *dist, int face, int base_gx, int base_other,
+		int max_lx, int max_other, ${global_ptr} float *buffer)
 {
 	${collect_continuous_data_body_3d(False)};
 }
 
 ${kernel} void CollectContinuousDataWithSwap(
-	${global_ptr} float *dist, int face, int base_gx, int base_other,
-	int max_lx, int max_other, ${global_ptr} float *buffer)
+		${nodes_array_if_required()}
+		${global_ptr} float *dist, int face, int base_gx, int base_other,
+		int max_lx, int max_other, ${global_ptr} float *buffer)
 {
 	${collect_continuous_data_body_3d(True)};
 }
@@ -625,8 +643,7 @@ ${kernel} void CollectContinuousDataWithSwap(
 
 %if dim == 2:
 <%def name="distribute_continuous_data_body_2d(opposite)">
-	int idx = get_global_id(0);
-	int gi;
+	const int idx = get_global_id(0);
 
 	if (idx >= max_lx) {
 		return;
@@ -643,14 +660,15 @@ ${kernel} void CollectContinuousDataWithSwap(
 				else:
 					gy = lat_linear_dist[axis]
 			%>
-			int dist_size = max_lx / ${len(dists)};
-			int dist_num = idx / dist_size;
-			int gx = idx % dist_size;
-			float tmp = buffer[idx];
+			const int dist_size = max_lx / ${len(dists)};
+			const int dist_num = idx / dist_size;
+			const int gx = idx % dist_size;
+			const float tmp = buffer[idx];
+			const int gi = getGlobalIdx(base_gx + gx, ${gy});
+			${_handle_indirect()}
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
 				case ${i}: {
-					gi = getGlobalIdx(base_gx + gx, ${gy});
 					%if opposite:
 						${get_dist('dist', grid.idx_opposite[prop_dist], 'gi')} = tmp;
 					%else:
@@ -668,6 +686,7 @@ ${kernel} void CollectContinuousDataWithSwap(
 </%def>
 
 ${kernel} void DistributeContinuousData(
+		${nodes_array_if_required()}
 		${global_ptr} float *dist, int face, int base_gx,
 		int max_lx, ${global_ptr} float *buffer)
 {
@@ -675,6 +694,7 @@ ${kernel} void DistributeContinuousData(
 }
 
 ${kernel} void DistributeContinuousDataWithSwap(
+		${nodes_array_if_required()}
 		${global_ptr} float *dist, int face, int base_gx,
 		int max_lx, ${global_ptr} float *buffer)
 {
@@ -690,6 +710,7 @@ ${kernel} void DistributeContinuousDataWithSwap(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_dist[axis]});
 	%endif
+	${_handle_indirect()}
 </%def>
 
 <%def name="_get_global_dist_idx_opp(axis)">
@@ -700,10 +721,11 @@ ${kernel} void DistributeContinuousDataWithSwap(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_with_swap[axis]});
 	%endif
+	${_handle_indirect()}
 </%def>
 
 <%def name="distribute_continuous_data_body_3d(opposite)">
-	int gx = get_global_id(0);
+	const int gx = get_global_id(0);
 	int idx = get_global_id(1);
 	int gi;
 
@@ -718,11 +740,11 @@ ${kernel} void DistributeContinuousDataWithSwap(
 				normal = block.face_to_normal(axis)
 				dists = sym.get_interblock_dists(grid, normal)
 			%>
-			int dist_size = max_other / ${len(dists)};
-			int dist_num = idx / dist_size;
-			int other = idx % dist_size;
+			const int dist_size = max_other / ${len(dists)};
+			const int dist_num = idx / dist_size;
+			const int other = idx % dist_size;
 			idx = (dist_size * max_lx * dist_num) + (other * max_lx) + gx;
-			float tmp = buffer[idx];
+			const float tmp = buffer[idx];
 
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
@@ -747,6 +769,7 @@ ${kernel} void DistributeContinuousDataWithSwap(
 // Layout of the data in the buffer is the same as in the output buffer of
 // CollectContinuousData.
 ${kernel} void DistributeContinuousData(
+		${nodes_array_if_required()}
 		${global_ptr} float *dist, int face, int base_gx, int base_other,
 		int max_lx, int max_other, ${global_ptr} float *buffer)
 {
@@ -754,6 +777,7 @@ ${kernel} void DistributeContinuousData(
 }
 
 ${kernel} void DistributeContinuousDataWithSwap(
+		${nodes_array_if_required()}
 		${global_ptr} float *dist, int face, int base_gx, int base_other,
 		int max_lx, int max_other, ${global_ptr} float *buffer)
 {
@@ -794,17 +818,18 @@ ${kernel} void DistributeSparseData(
 
 %if dim == 2:
 ${kernel} void CollectContinuousMacroData(
+		${nodes_array_if_required()}
 		${global_ptr} float *field, int base_gx, int max_lx, int gy,
 		${global_ptr} float *buffer)
 {
-	int idx = get_global_id(0);
+	const int idx = get_global_id(0);
 	if (idx >= max_lx) {
 		return;
 	}
 
-	int gi = getGlobalIdx(base_gx + idx, gy);
-	float tmp = field[gi];
-	buffer[idx] = tmp;
+	const int gi = getGlobalIdx(base_gx + idx, gy);
+	${_handle_indirect()}
+	buffer[idx] = field[gi];
 }
 %else:
 <%def name="_get_global_macro_idx(face)">
@@ -815,6 +840,7 @@ ${kernel} void CollectContinuousMacroData(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_macro[face]});
 	%endif
+	${_handle_indirect()}
 </%def>
 
 // The data is collected from a rectangular area of the plane corresponding to 'face'.
@@ -824,26 +850,26 @@ ${kernel} void CollectContinuousMacroData(
 //  y: # nodes along the Y/Z direction
 //
 ${kernel} void CollectContinuousMacroData(
+		${nodes_array_if_required()}
 		${global_ptr} float *field, int face, int base_gx, int base_other,
 		int max_lx, int max_other, ${global_ptr} float *buffer)
 {
-	int gx = get_global_id(0);
-	int other = get_global_id(1);
+	const int gx = get_global_id(0);
+	const int other = get_global_id(1);
 
 	if (gx >= max_lx || other >= max_other) {
 		return;
 	}
 
 	// Index in the output buffer.
-	int idx = other * get_global_size(0) + gx;
+	const int idx = other * get_global_size(0) + gx;
 
 	switch (face) {
 	%for axis in range(2, 2 * dim):
 		case ${axis}: {
 			int gi;
 			${_get_global_macro_idx(axis)};
-			float tmp = field[gi];
-			buffer[idx] = tmp;
+			buffer[idx] = field[gi];
 			break;
 		}
 	%endfor
@@ -853,17 +879,18 @@ ${kernel} void CollectContinuousMacroData(
 
 %if dim == 2:
 ${kernel} void DistributeContinuousMacroData(
+		${nodes_array_if_required()}
 		${global_ptr} float *field, int base_gx, int max_lx, int gy,
 		${global_ptr} float *buffer)
 {
-	int idx = get_global_id(0);
+	const int idx = get_global_id(0);
 	if (idx >= max_lx) {
 		return;
 	}
 
-	float tmp = buffer[idx];
-	int gi = getGlobalIdx(base_gx + idx, gy);
-	field[gi] = tmp;
+	const int gi = getGlobalIdx(base_gx + idx, gy);
+	${_handle_indirect()}
+	field[gi] = buffer[idx];
 }
 %else:
 <%def name="_get_global_macro_dist_idx(face)">
@@ -874,22 +901,24 @@ ${kernel} void DistributeContinuousMacroData(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear[face]});
 	%endif
+	${_handle_indirect()}
 </%def>
 
 ${kernel} void DistributeContinuousMacroData(
+		${nodes_array_if_required()}
 		${global_ptr} float *field, int face, int base_gx, int base_other,
 		int max_lx, int max_other, ${global_ptr} float *buffer)
 {
-	int gx = get_global_id(0);
-	int other = get_global_id(1);
+	const int gx = get_global_id(0);
+	const int other = get_global_id(1);
 
 	if (gx >= max_lx || other >= max_other) {
 		return;
 	}
 
 	// Index in the input buffer.
-	int idx = other * get_global_size(0) + gx;
-	float tmp = buffer[idx];
+	const int idx = other * get_global_size(0) + gx;
+	const float tmp = buffer[idx];
 
 	switch (face) {
 	%for axis in range(2, 2 * dim):
