@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import math
 import os
 import shutil
 import tempfile
@@ -7,8 +8,10 @@ import unittest
 
 import numpy as np
 
-from examples.ldc_2d import LDCGeometry, LDCSim
+from examples.ldc_2d import LDCSim
 from sailfish import io
+from sailfish.geo import LBGeometry2D
+from sailfish.subdomain import SubdomainSpec2D
 from sailfish.controller import LBSimulationController
 from regtest.subdomains import util
 
@@ -19,13 +22,55 @@ blocks = 1
 output = ''
 MAX_ITERS = 100
 
+
+class LDCGeometry(LBGeometry2D):
+    def subdomains(self, n=None):
+        subdomains = []
+        bps = int(math.sqrt(blocks))
+
+        # Special case.
+        if blocks == 3:
+            w1 = self.gx / 2
+            w2 = self.gx - w1
+            h1 = self.gy / 2
+            h2 = self.gy - h1
+
+            subdomains.append(SubdomainSpec2D((0, 0), (w1, h1)))
+            subdomains.append(SubdomainSpec2D((0, h1), (w1, h2)))
+            subdomains.append(SubdomainSpec2D((w1, 0), (w2, self.gy)))
+            return subdomains
+
+        if bps**2 != blocks:
+            print ('Only configurations with '
+                    'square-of-interger numbers of subdomains are supported. '
+                    'Falling back to {0} x {0} subdomains.'.format(bps))
+
+        yq = self.gy / bps
+        ydiff = self.gy % bps
+        xq = self.gx / bps
+        xdiff = self.gx % bps
+
+        for i in range(0, bps):
+            xsize = xq
+            if i == bps - 1:
+                xsize += xdiff
+
+            for j in range(0, bps):
+                ysize = yq
+                if j == bps - 1:
+                    ysize += ydiff
+
+                subdomains.append(SubdomainSpec2D((i * xq, j * yq), (xsize, ysize)))
+
+        return subdomains
+
+
 class SimulationTest(LDCSim):
     @classmethod
     def update_defaults(cls, defaults):
         LDCSim.update_defaults(defaults)
         defaults['block_size'] = block_size
         defaults['mem_alignment'] = mem_align
-        defaults['ldc_subdomains'] = blocks
         defaults['max_iters'] = MAX_ITERS
         defaults['quiet'] = True
         defaults['output'] = output

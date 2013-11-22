@@ -567,7 +567,7 @@ ${kernel} void CollectContinuousDataWithSwap(
 
 <%def name="collect_continuous_data_body_3d(opposite=False)">
 	const int gx = get_global_id(0);
-	const int idx = get_global_id(1);
+	int idx = get_global_id(1);
 	int gi;
 	float tmp;
 

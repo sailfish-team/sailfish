@@ -11,9 +11,6 @@ from sailfish import subdomain_runner, sym, sym_equilibrium
 from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField, KernelPair
 
 
-MacroKernels = namedtuple('MacroKernels', 'distributions macro')
-
-
 class LBFluidSim(LBSim):
     """Simulates a single fluid."""
 
@@ -307,7 +304,7 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
                                           args + [runner.gpu_field(field_pair.buffer), np.uint32(i)],
                                           signature))
 
-        ret = MacroKernels(macro=macro_kernels, distributions=dist_kernels)
+        ret = subdomain_runner.MacroKernels(macro=macro_kernels, distributions=dist_kernels)
         return ret
 
     def get_compute_kernels(self, runner, full_output, bulk):

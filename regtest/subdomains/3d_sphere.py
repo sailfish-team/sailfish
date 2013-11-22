@@ -7,8 +7,9 @@ import unittest
 
 import numpy as np
 
-from examples.sphere_3d import SphereSimulation, SphereGeometry
+from examples.sphere_3d import SphereSimulation
 from sailfish import io
+from sailfish.geo import EqualSubdomainsGeometry3D
 from sailfish.controller import LBSimulationController
 from regtest.subdomains import util
 
@@ -38,7 +39,7 @@ class TestInterblockPropagation(unittest.TestCase):
         global blocks, output
         output = os.path.join(tmpdir, 'href')
         blocks = 1
-        ctrl = LBSimulationController(SimulationTest, SphereGeometry)
+        ctrl = LBSimulationController(SimulationTest, EqualSubdomainsGeometry3D)
         ctrl.run(ignore_cmdline=True)
         cls.digits = io.filename_iter_digits(MAX_ITERS)
         cls.ref = np.load(io.filename(output, cls.digits, 0, MAX_ITERS))
@@ -47,7 +48,7 @@ class TestInterblockPropagation(unittest.TestCase):
         global blocks, output
         output = os.path.join(tmpdir, 'horiz_2block')
         blocks = 2
-        ctrl = LBSimulationController(SimulationTest, SphereGeometry)
+        ctrl = LBSimulationController(SimulationTest, EqualSubdomainsGeometry3D)
         ctrl.run(ignore_cmdline=True)
         util.verify_fields(self.ref, output, self.digits, MAX_ITERS)
 

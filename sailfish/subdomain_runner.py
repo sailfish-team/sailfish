@@ -23,6 +23,8 @@ import sailfish.node_type as nt
 # to be executed.
 KernelGrid = namedtuple('KernelGrid', 'kernel grid')
 
+MacroKernels = namedtuple('MacroKernels', 'distributions macro')
+
 
 class GPUBuffer(object):
     """Numpy array and a corresponding GPU buffer."""
@@ -1707,6 +1709,9 @@ class NNSubdomainRunner(SubdomainRunner):
 
     An arrow above symbolizes a dependency between the two streams.
     """
+    def __init__(self, *args, **kwargs):
+        super(NNSubdomainRunner, self).__init__(*args, **kwargs)
+        self._pbc_kernels = MacroKernels(macro=[], distributions=[])
 
     @profile(TimeProfile.RECV_MACRO)
     def _recv_macro(self):

@@ -9,7 +9,6 @@ from functools import partial
 import numpy as np
 from sailfish import subdomain_runner, sym, sym_equilibrium
 from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField, KernelPair
-from sailfish.lb_single import MacroKernels
 
 
 class LBBinaryFluidBase(LBSim):
@@ -98,7 +97,7 @@ class LBBinaryFluidBase(LBSim):
                                           args + [runner.gpu_field(field_pair.buffer), np.uint32(i)],
                                           signature))
 
-        ret = MacroKernels(macro=macro_kernels, distributions=dist_kernels)
+        ret = subdomain_runner.MacroKernels(macro=macro_kernels, distributions=dist_kernels)
         return ret
 
     def initial_conditions(self, runner):
