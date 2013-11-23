@@ -13,11 +13,10 @@ How to help?
   other users.
 
 * Send us patches implementing new functionality, fixing bugs or adding new test cases.
-  Patches should be sent to the project mailing list.
+  Patches should be sent in the form of merge requests on `GitHub <https://raw.github.com/sailfish-team/sailfish>`_.
 
 * Don't know what to start with?  Not a problem!  Have a look at the tasks in our
   `TODO list`__.
-
 __ https://raw.github.com/sailfish-team/sailfish/master/TODO
 
 
