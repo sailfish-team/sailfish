@@ -736,6 +736,15 @@ class Subdomain(object):
         wet_types = self._type_map.dtype.type(wet_types)
         return util.in_anyd_fast(fm, wet_types)
 
+    def _fluid_map_base(self):
+        assert not self._type_map_encoded
+
+        uniq_types = set(np.unique(self._type_map_base))
+        wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
+        wet_types = self._type_map.dtype.type(wet_types)
+        return util.in_anyd_fast(self._type_map_base, wet_types)
+
+
 class Subdomain2D(Subdomain):
     dim = 2
 
@@ -795,13 +804,13 @@ class Subdomain2D(Subdomain):
         _set(self._type_map_base[:, es + self.spec.nx:], self.spec.X_HIGH)
 
     def _postprocess_nodes(self):
-        fluid_map = (self._type_map_base == 0).astype(np.uint8)
+        fluid_map = self._fluid_map_base().astype(np.uint8)
         neighbors = np.zeros((3, 3), dtype=np.uint8)
         neighbors[1,1] = 1
         for ei in self.grid.basis:
             neighbors[1 + ei[1], 1 + ei[0]] = 1
 
-        # Any node not connected to at least one fluid node is marked unused.
+        # Any node not connected to at least one wet node is marked unused.
         where = (filters.convolve(fluid_map, neighbors, mode='wrap') == 0)
         self._type_map_base[where] = nt._NTUnused.id
 
@@ -877,13 +886,13 @@ class Subdomain3D(Subdomain):
         _set(self._type_map_base[:, :, es + self.spec.nx:], self.spec.X_HIGH)
 
     def _postprocess_nodes(self):
-        fluid_map = (self._type_map_base == 0).astype(np.uint8)
+        fluid_map = self._fluid_map_base().astype(np.uint8)
         neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
         neighbors[1,1,1] = 1
         for ei in self.grid.basis:
             neighbors[1 + ei[2], 1 + ei[1], 1 + ei[0]] = 1
 
-        # Any node not connected to at least one fluid node is marked unused.
+        # Any node not connected to at least one wet node is marked unused.
         where = (filters.convolve(fluid_map, neighbors, mode='wrap') == 0)
         self._type_map_base[where] = nt._NTUnused.id
 

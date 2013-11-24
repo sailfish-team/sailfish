@@ -17,7 +17,7 @@ find examples -perm +0111 -name '*.py' | while read filename ; do
 			exit 1
 		fi
 	fi
-done
+done || exit 1
 
 rm ${tmpdir}/result*
 rmdir ${tmpdir}
