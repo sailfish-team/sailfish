@@ -1,6 +1,6 @@
 #!/bin/bash
 
-blacklist="examples/boolean_geometry.py examples/ldc_2d_unorm.py"
+blacklist="examples/boolean_geometry.py examples/ldc_2d_unorm.py examples/duct_flow.py examples/ldc_2d_entropic.py examples/binary_fluid/fe_poiseuille_2d.py examples/binary_fluid/fe_capillary_wave_2d.py examples/binary_fluid/sc_poiseuille_2d.py"
 tmpdir=$(mktemp -d)
 
 find examples -perm +0111 -name '*.py' | while read filename ; do
