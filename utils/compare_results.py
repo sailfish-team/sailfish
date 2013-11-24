@@ -11,10 +11,12 @@ if data_a.files != data_b.files:
             data_a.files, data_b.files)
     sys.exit(1)
 
+err = 0
+
 for f in data_a.files:
     if not np.all(np.nan_to_num(data_a[f]) == np.nan_to_num(data_b[f])):
         print >>sys.stderr, 'Difference in field "%s", max deviation is: %e.' % (
             f, np.nanmax(np.abs(data_a[f] - data_b[f])))
-        sys.exit(1)
+        err += 1
 
-sys.exit(0)
+sys.exit(err)
