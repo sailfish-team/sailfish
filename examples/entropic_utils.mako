@@ -3,7 +3,9 @@
 ${kernel} void ComputeEntropy(
 	${global_ptr} ${const_ptr} int *__restrict__ map,
 	${global_ptr} float *dist,
-	${global_ptr} float *entropy)
+	${global_ptr} float *entropy
+	${iteration_number_if_required()}
+)
 {
 	${local_indices()}
 	${load_node_type()}

@@ -32,10 +32,10 @@ class EnhancedEntropicFluidSim(LBEntropicFluidSim):
 
         ce1 = runner.get_kernel('ComputeEntropy',
                                 [gpu_map, gpu_dist1b, gpu_entropy],
-                                'PPP')
+                                'PPP', needs_iteration=True)
         ce2 = runner.get_kernel('ComputeEntropy',
                                 [gpu_map, gpu_dist1a, gpu_entropy],
-                                'PPP')
+                                'PPP', needs_iteration=True)
         return KernelPair([ce1], [ce2])
 
 

@@ -475,6 +475,11 @@ ${device_func} inline void fixMissingDistributions(
 				%endfor
 			}
 		%endif
+	## access_pattern == AA
+	%else:
+		%if nt.NTYuOutflow in node_types or nt.NTGradFreeflow in node_types or nt.NTCopy in node_types:
+			#error NTYuOutflow, NTGradFreeflow and NTCopy are not supported with the AA access_pattern.
+		%endif
 	%endif
 
 	%if nt.NTWallTMS in node_types:
