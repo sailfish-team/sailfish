@@ -21,8 +21,8 @@ class CapillaryDomain(Subdomain2D):
         rem_y = (self.gy - chan_diam) / 2
 
         geometry = np.zeros(hx.shape, dtype=np.bool)
-        geometry[0,:] = True
-        geometry[self.gy-1,:] = True
+        geometry[hy == 0] = True
+        geometry[hy == self.gy - 1] = True
         geometry[np.logical_and(
                     hy < rem_y,
                     hy < rem_y - (np.abs((hx - self.gx/2)) - chan_len/2)
