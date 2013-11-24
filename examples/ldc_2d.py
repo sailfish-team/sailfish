@@ -37,5 +37,5 @@ class LDCSim(LBFluidSim):
             'lat_ny': 256})
 
 if __name__ == '__main__':
-    ctrl = LBSimulationController(LDCSim, LDCGeometry)
+    ctrl = LBSimulationController(LDCSim)
     ctrl.run()

@@ -122,7 +122,6 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn):
             'force_implementation': 'guo',
             'model': 'bgk',
             'minimize_roundoff': True,
-            'verbose': True,
             'visc': visc,
             'seed': 11341351351,
             'block_size': 128,

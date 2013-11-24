@@ -13,6 +13,7 @@ from sailfish.geo import EqualSubdomainsGeometry3D
 from sailfish.subdomain import Subdomain3D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_single import LBFluidSim
+from sailfish.stats import KineticEnergyEnstrophyMixIn
 
 class KidaSubdomain(Subdomain3D):
     max_v = 0.05
@@ -76,7 +77,7 @@ class KidaSim(LBFluidSim, KineticEnergyEnstrophyMixIn):
         self._gpu_buf = runner.backend.alloc_buf(like=runner._subdomain._buf)
 
         gpu_v = runner.gpu_field(self.v)
-        self.extract_k = runner.get_kernel('ExtractSlice',
+        self.extract_k = runner.get_kernel('ExtractSliceUsq',
                                            [self.axis, self.axis_pos] + gpu_v +
                                            [self._gpu_buf],
                                            'iiPPPP', block_size=(128,))
