@@ -409,11 +409,11 @@ def _get_dst_partial_map(dists, grid, src_slice_global, b1, slice_axes,
 
 class LBConnection(object):
     """Container object for detailed data about a directed connection between two
-    blocks (at the level of the LB model)."""
+    subdomains (at the level of the LB model)."""
 
     @classmethod
     def make(cls, b1, b2, face, grid):
-        """Tries to create an LBCollection between two sudomains.
+        """Tries to create an LBCollection between two subdomains.
 
         If no connection exists, returns None.  Otherwise, returns
         a new instance of LBConnection describing the connection details.
@@ -441,7 +441,7 @@ class LBConnection(object):
                 b1, b2, src_slice_global, full_map, slice_axes)
 
         # No full or partial connection means that the topology of the grid
-        # is such that there are not distributions pointing to the 2nd block.
+        # is such that there are no distributions pointing to the 2nd subdomain.
         if not dst_slice and not dst_partial_map:
             return None
 
