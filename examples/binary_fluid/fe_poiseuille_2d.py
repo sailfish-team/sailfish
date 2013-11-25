@@ -52,6 +52,7 @@ class PoiseuilleSim(LBBinaryFluidFreeEnergy, LBForcedSim):
             'Gamma': 25.0,
             'periodic_y': True,
             'bc_wall_grad_order': 1,
+            'use_link_tags': False,
         })
 
     def __init__(self, config):

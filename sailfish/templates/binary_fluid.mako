@@ -182,13 +182,17 @@ ${kernel} void FreeEnergyPrepareMacroFields(
 	%endif  ## NTFullBBWall
 	%if nt.NTHalfBBWall in node_types:
 		%if bc_wall_grad_order != 1:
-			__ONLY_FIRST_ORDER_GRADIENTS_ARE_SUPPORTED_FOR_HALF_BB_WETTING_WALLS__
+			#error Only first order gradients are supported for half-way BB wetting walls.
 		%endif
 		int helper_idx = gi;
 
 		## Half-way  BB: F . W | U
-		##               x ----> y
+		##                   x -> y
 		if (isNTHalfBBWall(type)) {
+			%if use_link_tags:
+				#error Link tagging it not supported for binary fluid models. Use --nouse_link_tags.
+			%endif
+
 			switch (orientation) {
 				%for dir in grid.dir2vecidx.keys():
 					case ${dir}: {  // ${grid.dir_to_vec(dir)}
