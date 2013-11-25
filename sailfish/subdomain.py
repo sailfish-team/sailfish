@@ -569,12 +569,13 @@ class Subdomain(object):
 
         return True
 
-    def detect_orientation(self):
+    def detect_orientation(self, use_tags):
         # Limit dry and wet types to these that are actually used in the simulation.
         uniq_types = set(np.unique(self._type_map.base))
         dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
         orient_types = list((set(nt.get_orientation_node_type_ids()) -
-                            set(nt.get_link_tag_node_type_ids())) & uniq_types)
+                             set(nt.get_link_tag_node_type_ids() if use_tags
+                                 else [])) & uniq_types)
 
         if not orient_types:
             return
@@ -625,7 +626,7 @@ class Subdomain(object):
             # others.
             if self.config.use_link_tags:
                 have_link_tags = self.tag_directions()
-            self.detect_orientation()
+            self.detect_orientation(self.config.use_link_tags)
             self.config.logger.debug('... orientation done.')
 
         # Detects unused and propagation-only nodes. Note that this has to take
