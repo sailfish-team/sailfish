@@ -71,6 +71,7 @@ class PoiseuilleSim(LBBinaryFluidFreeEnergy):
             'Gamma': 0.8,
             'periodic_x': True,
             'bc_wall_grad_order': 1,
+            'use_link_tags': False,
         })
 
     phi_log = []
