@@ -908,11 +908,11 @@ class SubdomainRunner(object):
         self._step_bulk(sync_req)
         self._sim.iteration += 1
         self._send_dists()
-        if sync_req:
-            self._step_aux()
         # Run this at a point after the compute step is fully scheduled for execution
         # on the GPU and where it doesn't unnecessarily delay other operations.
         self.backend.set_iteration(self._sim.iteration)
+        if sync_req:
+            self._step_aux()
         self._recv_dists()
         self._profile.record_gpu_start(TimeProfile.DISTRIB, self._data_stream)
         for kernel, grid in self._distrib_kernels[self._sim.iteration & 1]:
