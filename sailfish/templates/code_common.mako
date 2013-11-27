@@ -6,15 +6,15 @@
 ${sym_codegen.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors, phi=phi, vel=vel)}
 </%def>
 
-<%def name="dump_dists(name, short=False)">
+<%def name="dump_dists(name, short=False, precision=5)">
 	<%
 		format_str = ""
 		values = []
 		for dname in grid.idx_name:
 			if short:
-				format_str += '%.5e '
+				format_str += '%.' + str(precision) + 'e '
 			else:
-				format_str += dname + ':%.5e '
+				format_str += dname + ':%.' + str(precision) + 'e '
 			values.append('%s.%s' % (name, dname))
 
 		values = ', '.join(values)
