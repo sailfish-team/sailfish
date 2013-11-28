@@ -179,21 +179,19 @@
 		const int gi_high_dense = gi_high;
 		gi_low = nodes[gi_low];
 		gi_high = nodes[gi_high];
+		if (gi_low != INVALID_NODE)
 	%endif
 
+	{
 	// TODO(michalj): Generalize this for grids with e_i > 1.
-	// From low idx to high idx.
+	// Load distributions to be propagated from low idx to high idx.
 	%for i in sym.get_prop_dists(grid, -1, axis):
-		<%
-			j = grid.idx_opposite[i] if opposite else i
-		%>
+		<% j = grid.idx_opposite[i] if opposite else i %>
 		const float f${grid.idx_name[i]} = ${get_dist('dist', j, 'gi_low')};
 	%endfor
 
 	%for i in sym.get_prop_dists(grid, -1, axis):
-		<%
-			j = grid.idx_opposite[i] if opposite else i
-		%>
+		<% j = grid.idx_opposite[i] if opposite else i %>
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
 			if (isfinite(f${grid.idx_name[i]})) {
 				// Skip distributions which are not populated or cross multiple boundaries.
@@ -213,8 +211,14 @@
 						%for cond, targ in zip(corner_cond, target):
 							%if cond:
 								else if (${cond}) {
-									const int gi_high2 = getGlobalIdx(${targ});
-									${get_dist('dist', j, 'nodes[gi_high2]' if node_addressing == 'indirect' else 'gi_high2')} = f${grid.idx_name[i]};
+									int gi_high2 = getGlobalIdx(${targ});
+									%if node_addressing == 'indirect':
+										gi_high2 = nodes[gi_high2];
+										if (gi_high2 != INVALID_NODE)
+									%endif
+									{
+										${get_dist('dist', j, 'gi_high2')} = f${grid.idx_name[i]};
+									}
 								}
 							%endif
 						%endfor
@@ -222,53 +226,54 @@
 				%endif
 			}
 		%else:
-			if (isfinite(f${grid.idx_name[i]})) {
+			if (gi_high != INVALID_NODE && isfinite(f${grid.idx_name[i]})) {
 				${get_dist('dist', j, 'gi_high')} = f${grid.idx_name[i]};
 			}
 		%endif
 	%endfor
+	}  // low to high
 
-	// From high idx to low idx.
+
+	%if node_addressing == 'indirect':
+		<% _offset = 0 %>
+		gi_high = nodes[gi_high_dense + ${offset}];
+		gi_low = nodes[gi_low_dense + ${offset}];
+		if (gi_high != INVALID_NODE)
+	%else:
+		<% _offset = offset %>
+	%endif
+	{
+	// Load distributrions to be propagated from high idx to low idx.
 	%for i in sym.get_prop_dists(grid, 1, axis):
-		<%
-			j = grid.idx_opposite[i] if opposite else i
-		%>
-		%if node_addressing == 'indirect':
-			const float f${grid.idx_name[i]} = ${get_dist('dist', j, 'nodes[gi_high_dense + %d]' % offset)};
-		%else:
-			const float f${grid.idx_name[i]} = ${get_dist('dist', j, 'gi_high', offset)};
-		%endif
+		<% j = grid.idx_opposite[i] if opposite else i %>
+		const float f${grid.idx_name[i]} = ${get_dist('dist', j, 'gi_high', _offset)};
 	%endfor
 
 	%for i in sym.get_prop_dists(grid, 1, axis):
-		<%
-			j = grid.idx_opposite[i] if opposite else i
-		%>
+		<% j = grid.idx_opposite[i] if opposite else i %>
 		%if grid.basis[i].dot(grid.basis[i]) > 1:
 			if (isfinite(f${grid.idx_name[i]})) {
 				// Skip distributions which are not populated or cross multiple boundaries.
-				if (${make_cond(i)}) {
-					%if node_addressing == 'indirect':
-						${get_dist('dist', j, 'nodes[gi_low + %d]' % offset)} = f${grid.idx_name[i]};
-					%else:
-						${get_dist('dist', j, 'gi_low', offset)} = f${grid.idx_name[i]};
-					%endif
+				if (${make_cond(i)} ${' && gi_low != INVALID_NODE' if node_addressing == 'indirect' else ''}) {
+					${get_dist('dist', j, 'gi_low', _offset)} = f${grid.idx_name[i]};
 				}
 				<%
 					axis_target = 1 if not opposite else 0
 					corner_cond, target = handle_corners(grid.basis[i], axis_target)
 				%>
 				%if corner_cond:
-					%if not opposite:
-						else
-					%endif
+					${'else' if not opposite else ''}
 					{
 						if (0) {}
 						%for cond, targ in zip(corner_cond, target):
 							%if cond:
 								else if (${cond}) {
-									const int gi_low2 = getGlobalIdx(${targ});
-									${get_dist('dist', j, 'nodes[gi_low2]' if node_addressing == 'indirect' else 'gi_low2')} = f${grid.idx_name[i]};
+									int gi_low2 = getGlobalIdx(${targ});
+									%if node_addressing == 'indirect':
+										gi_low2 = nodes[gi_low2];
+										if (gi_low2 != INVALID_NODE)
+									%endif
+									{ ${get_dist('dist', j, 'gi_low2')} = f${grid.idx_name[i]}; }
 								}
 							%endif
 						%endfor
@@ -276,15 +281,12 @@
 				%endif
 			}
 		%else:
-			if (isfinite(f${grid.idx_name[i]})) {
-				%if node_addressing == 'indirect':
-					${get_dist('dist', j, 'nodes[gi_low + %d]' % offset)} = f${grid.idx_name[i]};
-				%else:
-					${get_dist('dist', j, 'gi_low', offset)} = f${grid.idx_name[i]};
-				%endif
+			if (isfinite(f${grid.idx_name[i]}) && gi_low != INVALID_NODE) {
+				${get_dist('dist', j, 'gi_low', _offset)} = f${grid.idx_name[i]};
 			}
 		%endif
 	%endfor
+	}  // high to low
 </%def>
 
 // Applies periodic boundary conditions within a single subdomain.
@@ -382,12 +384,19 @@ ${kernel} void ApplyPeriodicBoundaryConditionsWithSwap(
 
 
 <%def name="_copy_field_if_finite(src, dest)">
-	if (isfinite(field[${src}])) {
+	%if node_addressing == 'indirect':
+		<% h = '%s != INVALID_NODE && %s != INVALID_NODE && ' % (src, dest) %>
+	%else:
+		<% h = '' %>
+	%endif
+
+
+	if (${h} isfinite(field[${src}])) {
 		field[${dest}] = field[${src}];
 	}
 </%def>
 
-<%def name="_indirect_index()">
+<%def name="_indirect_index_pbc()">
 	%if node_addressing == 'indirect':
 		gi_low = nodes[gi_low];
 		gi_high = nodes[gi_high];
@@ -410,21 +419,21 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 			if (idx1 >= ${lat_ny}) { return; }
 			gi_low = getGlobalIdx(0, idx1);					// ghost node
 			gi_high = getGlobalIdx(${lat_nx-2}, idx1);		// real node
-			${_indirect_index()}
+			${_indirect_index_pbc()}
 			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(1, idx1);					// real node
 			gi_high = getGlobalIdx(${lat_nx-1}, idx1);		// ghost node
-			${_indirect_index()}
+			${_indirect_index_pbc()}
 			${_copy_field_if_finite('gi_low', 'gi_high')}
 		} else if (axis == 1) {
 			if (idx1 >= ${lat_nx}) { return; }
 			gi_low = getGlobalIdx(idx1, 0);					// ghost node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-2});		// real node
-			${_indirect_index()}
+			${_indirect_index_pbc()}
 			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(idx1, 1);					// real node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-1});		// ghost node
-			${_indirect_index()}
+			${_indirect_index_pbc()}
 			${_copy_field_if_finite('gi_low', 'gi_high')}
 		}
 	%else:
@@ -433,31 +442,31 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 			if (idx1 >= ${lat_ny} || idx2 >= ${lat_nz}) { return; }
 			gi_low = getGlobalIdx(0, idx1, idx2);				// ghost node
 			gi_high = getGlobalIdx(${lat_nx-2}, idx1, idx2);	// real node
-			${_indirect_index()}
+			${_indirect_index_pbc()}
 			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(1, idx1, idx2);				// real node
 			gi_high = getGlobalIdx(${lat_nx-1}, idx1, idx2);	// ghost node
-			${_indirect_index()}
+			${_indirect_index_pbc()}
 			${_copy_field_if_finite('gi_low', 'gi_high')}
 		} else if (axis == 1) {
 			if (idx1 >= ${lat_nx} || idx2 >= ${lat_nz}) { return; }
 			gi_low = getGlobalIdx(idx1, 0, idx2);				// ghost node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-2}, idx2);	// real node
-			${_indirect_index()}
+			${_indirect_index_pbc()}
 			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(idx1, 1, idx2);				// real node
 			gi_high = getGlobalIdx(idx1, ${lat_ny-1}, idx2);	// ghost node
-			${_indirect_index()}
+			${_indirect_index_pbc()}
 			${_copy_field_if_finite('gi_low', 'gi_high')}
 		} else {
 			if (idx1 >= ${lat_nx} || idx2 >= ${lat_ny}) { return; }
 			gi_low = getGlobalIdx(idx1, idx2, 0);				// ghost node
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-2});	// real node
-			${_indirect_index()}
+			${_indirect_index_pbc()}
 			${_copy_field_if_finite('gi_high', 'gi_low')}
 			gi_low = getGlobalIdx(idx1, idx2, 1);				// real node
 			gi_high = getGlobalIdx(idx1, idx2, ${lat_nz-1});	// ghost node
-			${_indirect_index()}
+			${_indirect_index_pbc()}
 			${_copy_field_if_finite('gi_low', 'gi_high')}
 		}
 	%endif
@@ -468,9 +477,7 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 <%def name="_handle_indirect()">
 	%if node_addressing == 'indirect':
 		gi = nodes[gi];
-		if (gi == INVALID_NODE) {
-			return;
-		}
+		if (gi == INVALID_NODE) return;
 	%endif
 </%def>
 
@@ -497,7 +504,7 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 			const int dist_size = max_lx / ${len(dists)};
 			const int dist_num = idx / dist_size;
 			const int gx = idx % dist_size;
-			const int gi = getGlobalIdx(base_gx + gx, ${gy});
+			int gi = getGlobalIdx(base_gx + gx, ${gy});
 			${_handle_indirect()}
 
 			switch (dist_num) {
@@ -664,7 +671,7 @@ ${kernel} void CollectContinuousDataWithSwap(
 			const int dist_num = idx / dist_size;
 			const int gx = idx % dist_size;
 			const float tmp = buffer[idx];
-			const int gi = getGlobalIdx(base_gx + gx, ${gy});
+			int gi = getGlobalIdx(base_gx + gx, ${gy});
 			${_handle_indirect()}
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
@@ -798,6 +805,7 @@ ${kernel} void CollectSparseData(
 		return;
 	}
 	int gi = idx_array[idx];
+	if (gi == INVALID_NODE) return;
 	buffer[idx] = dist[gi];
 }
 
@@ -813,6 +821,7 @@ ${kernel} void DistributeSparseData(
 		return;
 	}
 	int gi = idx_array[idx];
+	if (gi == INVALID_NODE) return;
 	dist[gi] = buffer[idx];
 }
 
@@ -827,7 +836,7 @@ ${kernel} void CollectContinuousMacroData(
 		return;
 	}
 
-	const int gi = getGlobalIdx(base_gx + idx, gy);
+	int gi = getGlobalIdx(base_gx + idx, gy);
 	${_handle_indirect()}
 	buffer[idx] = field[gi];
 }
@@ -888,7 +897,7 @@ ${kernel} void DistributeContinuousMacroData(
 		return;
 	}
 
-	const int gi = getGlobalIdx(base_gx + idx, gy);
+	int gi = getGlobalIdx(base_gx + idx, gy);
 	${_handle_indirect()}
 	field[gi] = buffer[idx];
 }

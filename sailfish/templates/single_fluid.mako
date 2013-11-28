@@ -199,10 +199,9 @@ ${kernel} void CollideAndPropagate(
 			${sc_calculate_force()}
 		%endif
 
-
 		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v
-									   ${', dist_out, gi' + (', nodes, dense_gi' if node_addressing == 'indirect' else '') if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
-									   ${iteration_number_arg_if_required()});
+										${precollision_arguments()}
+										${iteration_number_arg_if_required()});
 
 		%if initialization:
 			v[0] = ovx[gi];

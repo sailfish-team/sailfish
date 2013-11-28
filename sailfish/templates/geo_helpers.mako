@@ -182,7 +182,6 @@ ${device_func} inline unsigned int decodeNodeParamIdx(unsigned int nodetype) {
 	}
 %endif
 
-
 ${device_func} void die(void) {
 	%if backend == 'cuda':
 		asm("trap;");

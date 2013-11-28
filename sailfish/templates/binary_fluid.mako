@@ -84,6 +84,7 @@ ${const_var} float tau1 = ${tau_phi}f;
 // A kernel to set the node distributions using the equilibrium distributions
 // and the macroscopic fields.
 ${kernel} void SetInitialConditions(
+	${nodes_array_if_required()}
 	${global_ptr} float *dist1_in,
 	${global_ptr} float *dist2_in,
 	${kernel_args_1st_moment('iv')}
@@ -91,6 +92,7 @@ ${kernel} void SetInitialConditions(
 	${global_ptr} ${const_ptr} float *__restrict__ iphi)
 {
 	${local_indices()}
+	${indirect_index()}
 
 	// Cache macroscopic fields in local variables.
 	float rho = irho[gi];
@@ -108,6 +110,7 @@ ${kernel} void SetInitialConditions(
 
 %if simtype == 'free-energy':
 ${kernel} void FreeEnergyPrepareMacroFields(
+	${nodes_array_if_required()}
 	${global_ptr} ${const_ptr} int *__restrict__ map,
 	${global_ptr} ${const_ptr} float *__restrict__ dist1_in,
 	${global_ptr} ${const_ptr} float *__restrict__ dist2_in,
@@ -118,6 +121,7 @@ ${kernel} void FreeEnergyPrepareMacroFields(
 	${iteration_number_if_required()})
 {
 	${local_indices_split()}
+	${indirect_index()}
 	${load_node_type()}
 
 	if (isPropagationOnly(type)) {
@@ -136,7 +140,11 @@ ${kernel} void FreeEnergyPrepareMacroFields(
 	float out;
 
 	if (isWetNode(type)) {
-		getDist(&fi, dist2_in, gi ${iteration_number_arg_if_required()});
+		getDist(
+			${nodes_array_arg_if_required()}
+			&fi, dist2_in, gi
+			${dense_gi_arg_if_required()}
+			${iteration_number_arg_if_required()});
 		get0thMoment(&fi, type, orientation, &out);
 		ophi[gi] = out;
 	}
@@ -158,7 +166,7 @@ ${kernel} void FreeEnergyPrepareMacroFields(
 	##
 	## The schematics assume a bc_wall_grad_order of 2.
 	%if nt.NTFullBBWall in node_types:
-		int helper_idx = gi;
+		int helper_idx = ${'dense_gi' if node_addressing == 'indirect' else 'gi'};
 		## Full BB: F . F | W
 		##          x ----> y
 		if (isNTFullBBWall(type)) {
@@ -175,7 +183,16 @@ ${kernel} void FreeEnergyPrepareMacroFields(
 					}
 				%endfor
 			}
-			getDist(&fi, dist2_in, helper_idx ${iteration_number_arg_if_required()});
+
+			%if node_addressing == 'indirect':
+				int dense_helper_idx = helper_idx;
+				helper_idx = nodes[helper_idx];
+			%endif
+			getDist(
+				${nodes_array_arg_if_required()}
+				&fi, dist2_in, helper_idx
+				${', dense_helper_idx' if node_addressing == 'indirect' else ''}
+				${iteration_number_arg_if_required()});
 			get0thMoment(&fi, type, orientation, &out);
 			ophi[gi] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
 		}
@@ -184,7 +201,7 @@ ${kernel} void FreeEnergyPrepareMacroFields(
 		%if bc_wall_grad_order != 1:
 			#error Only first order gradients are supported for half-way BB wetting walls.
 		%endif
-		int helper_idx = gi;
+		int helper_idx = ${'dense_gi' if node_addressing == 'indirect' else 'gi'};
 
 		## Half-way  BB: F . W | U
 		##                   x -> y
@@ -206,15 +223,23 @@ ${kernel} void FreeEnergyPrepareMacroFields(
 				%endfor
 			}
 
+			%if node_addressing == 'indirect':
+				helper_idx = nodes[helper_idx];
+				if (helper_idx == INVALID_NODE) {
+					printf("Invalid node detected at dense_gi = %d\n", dense_gi);
+					die();
+				}
+			%endif
 			ophi[helper_idx] = out - (${bc_wall_grad_order*bc_wall_grad_phase});
 		}
 	%endif
 }
 
 ${kernel} void FreeEnergyCollideAndPropagateFluid(
+	${nodes_array_if_required()}
 	${global_ptr} ${const_ptr} int *__restrict__ map,
 	${global_ptr} ${const_ptr} float *__restrict__ dist1_in,
-	${global_ptr} float *__restrict__ dist1_out,
+	${global_ptr} float *__restrict__ dist_out,
 	${global_ptr} float *__restrict__ gg0m0,
 	${global_ptr} float *__restrict__ gg1m0,
 	${kernel_args_1st_moment('ov')}
@@ -224,6 +249,7 @@ ${kernel} void FreeEnergyCollideAndPropagateFluid(
 	${iteration_number_if_required()})
 {
 	${local_indices_split()}
+	${indirect_index()}
 	${shared_mem_propagation_vars()}
 	${load_node_type()}
 
@@ -240,7 +266,11 @@ ${kernel} void FreeEnergyCollideAndPropagateFluid(
 		float g0m0, v[${dim}], g1m0;
 
 		// Cache the distributions in local variables.
-		getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
+		getDist(
+			${nodes_array_arg_if_required()}
+			&d0, dist1_in, gi
+			${dense_gi_arg_if_required()}
+			${iteration_number_arg_if_required()});
 		g1m0 = gg1m0[gi];
 		${guo_density_restore_index()}
 
@@ -258,23 +288,24 @@ ${kernel} void FreeEnergyCollideAndPropagateFluid(
 		%endif
 
 		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v
-									   ${', dist_out1, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+									   ${precollision_arguments()}
 									   ${iteration_number_arg_if_required()});
 
 		${relaxate(bgk_args_fe, 0)}
-		postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist1_out
+		postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g0m0, v, gi, dist_out
 										${iteration_number_arg_if_required()});
 		${guo_density_node_index_shift_final()}
 		${check_invalid_values()}
 		${save_macro_fields(velocity=False)}
 	}  // propagation only
-	${propagate('dist1_out', 'd0')}
+	${propagate('dist_out', 'd0')}
 }
 
 ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
+	${nodes_array_if_required()}
 	${global_ptr} ${const_ptr} int *__restrict__ map,
 	${global_ptr} ${const_ptr} float *__restrict__ dist1_in,
-	${global_ptr} float *__restrict__ dist1_out,
+	${global_ptr} float *__restrict__ dist_out,
 	${global_ptr + const_ptr + ' float *__restrict__ gg0m0,' if phi_needs_rho else ''}
 	${global_ptr} ${const_ptr} float *__restrict__ gg1m0,
 	${kernel_args_1st_moment('ov')}
@@ -284,6 +315,7 @@ ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
 	${iteration_number_if_required()})
 {
 	${local_indices_split()}
+	${indirect_index()}
 	${shared_mem_propagation_vars()}
 	${load_node_type()}
 
@@ -291,7 +323,11 @@ ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
 	if (!isPropagationOnly(type)) {
 		${guo_density_node_index_shift_intro()}
 		// Cache the distributions in local variables.
-		getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
+		getDist(
+			${nodes_array_arg_if_required()}
+			&d0, dist1_in, gi
+			${dense_gi_arg_if_required()}
+			${iteration_number_arg_if_required()});
 		${guo_density_restore_index()}
 		float lap1 = gg1laplacian[gi];
 		float g1m0, v[${dim}];
@@ -303,15 +339,15 @@ ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
 		g1m0 = gg1m0[gi];
 
 		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v
-									   ${', dist1_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+									   ${precollision_arguments()}
 									   ${iteration_number_arg_if_required()});
 		${relaxate(bgk_args_fe, 1)}
-		postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v, gi, dist1_out
+		postcollisionBoundaryConditions(&d0, ncode, type, orientation, &g1m0, v, gi, dist_out
 										${iteration_number_arg_if_required()});
 		${guo_density_node_index_shift_final()}
 		${check_invalid_values()}
 	}  // propagation only
-	${propagate('dist1_out', 'd0')}
+	${propagate('dist_out', 'd0')}
 }
 
 %endif  ## free-energy

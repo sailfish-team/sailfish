@@ -166,10 +166,6 @@ class LBFluidSim(LBSim):
                 'ApplyPeriodicBoundaryConditions', args + [gpu_dist1a, np.uint32(i)],
                 signature)]
 
-        if self.config.node_addressing == 'indirect':
-            raise NotImplementedError('PBC with indirect addressing is not '
-                                      'supported')
-
         if self.config.access_pattern == 'AB':
             gpu_dist = gpu_dist1b
             kernel = 'ApplyPeriodicBoundaryConditions'
@@ -178,9 +174,7 @@ class LBFluidSim(LBSim):
             kernel = 'ApplyPeriodicBoundaryConditionsWithSwap'
 
         for i in range(0, 3):
-            kernels[1][i] = [runner.get_kernel(
-                kernel, args + [gpu_dist, np.uint32(i)],
-                signature)]
+            kernels[1][i] = [runner.get_kernel(kernel, args + [gpu_dist, np.uint32(i)], signature)]
 
         return kernels
 

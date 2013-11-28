@@ -31,6 +31,7 @@ class SimulationTest(CylinderSimulation):
         CylinderSimulation.update_defaults(defaults)
         defaults.update({
             'access_pattern': access_pattern,
+            'node_addressing': node_addressing,
             'block_size': block_size,
             'mem_alignment': mem_align,
             'subdomains': blocks,
@@ -138,4 +139,5 @@ if __name__ == '__main__':
     if block_size < mem_align:
         mem_align = block_size
     access_pattern = args.access_pattern
+    node_addressing = args.node_addressing
     unittest.main()

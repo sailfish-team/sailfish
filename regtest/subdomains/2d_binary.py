@@ -48,11 +48,12 @@ class SCSimulationTest(SeparationSCSim):
             'block_size': block_size,
             'mem_alignment': mem_align,
             'every': 1,
+            'silent': True,
             'max_iters': MAX_ITERS,
-            'quiet': True,
             'cuda_cache': False,
             'output': output,
-            'access_pattern': access_pattern})
+            'access_pattern': access_pattern,
+            'node_addressing': node_addressing})
 
 
 class FETestDomain(SeparationDomain):
@@ -81,10 +82,11 @@ class FESimulationTest(SeparationFESim):
             'mem_alignment': mem_align,
             'every': 10,
             'max_iters': MAX_ITERS,
-            'quiet': True,
+            'silent': True,
             'cuda_cache': False,
             'output': output,
-            'access_pattern': access_pattern})
+            'access_pattern': access_pattern,
+            'node_addressing': node_addressing})
 
 
 class Geometry4Blocks(LBGeometry2D):
@@ -181,6 +183,7 @@ if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
     access_pattern = args.access_pattern
+    node_addressing = args.node_addressing
     if block_size < mem_align:
         mem_align = block_size
     unittest.main()

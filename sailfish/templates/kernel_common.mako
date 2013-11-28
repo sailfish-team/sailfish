@@ -144,7 +144,11 @@
 			return;
 		}
 		if (gi >= DIST_SIZE) {
-			printf("invalid index %d @ %d %d %d\n", gi, gx, gy, gz);
+			%if dim == 3:
+				printf("invalid index %d @ %d %d %d\n", gi, gx, gy, gz);
+			%else:
+				printf("invalid index %d @ %d %d\n", gi, gx, gy);
+			%endif
 		}
 	%endif
 </%def>
