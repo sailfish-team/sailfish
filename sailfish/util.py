@@ -205,6 +205,8 @@ def setup_logger(config):
         stream_handler.setLevel(logging.DEBUG)
     elif config.quiet:
         stream_handler.setLevel(logging.WARNING)
+    elif config.silent:
+        stream_handler.setLevel(logging.ERROR)
     else:
         stream_handler.setLevel(logging.INFO)
 

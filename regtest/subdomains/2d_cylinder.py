@@ -38,9 +38,9 @@ class SimulationTest(CylinderSimulation):
             'conn_axis': 'y' if vertical else 'x',
             'vertical': vertical,
             'max_iters': MAX_ITERS,
-            'quiet': True,
             'output': output,
-            'cuda_cache': False})
+            'cuda_cache': False,
+            'silent': True})
 
 # NOTE: This test class is not thread safe.
 class TestInterblockPropagation(unittest.TestCase):

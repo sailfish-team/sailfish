@@ -69,13 +69,15 @@ class SimulationTest(LDCSim):
     @classmethod
     def update_defaults(cls, defaults):
         LDCSim.update_defaults(defaults)
-        defaults['block_size'] = block_size
-        defaults['mem_alignment'] = mem_align
-        defaults['max_iters'] = MAX_ITERS
-        defaults['quiet'] = True
-        defaults['output'] = output
-        defaults['cuda_cache'] = False
-        defaults['access_pattern'] = access_pattern
+        defaults.update({
+            'block_size': block_size,
+            'mem_alignment': mem_align,
+            'max_iters': MAX_ITERS,
+            'silent': True,
+            'output': output,
+            'cuda_cache': False,
+            'access_pattern': access_pattern,
+            'node_addressing': node_addressing})
 
 # NOTE: This test class is not thread safe.
 class TestInterblockPropagation(unittest.TestCase):
@@ -111,6 +113,7 @@ if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
     access_pattern = args.access_pattern
+    node_addressing = args.node_addressing
     if block_size < mem_align:
         mem_align = block_size
     unittest.main()

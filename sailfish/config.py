@@ -37,6 +37,9 @@ class LBConfigParser(object):
         self._parser.add_argument('-v', '--verbose',
                 help='print additional info about the simulation',
                 action='store_true', default=False)
+        self._parser.add_argument('--silent',
+                help='reduce verbosity further', action='store_true',
+                                  default=False)
 
         self.config = LBConfig()
 
