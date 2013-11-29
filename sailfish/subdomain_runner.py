@@ -1105,7 +1105,7 @@ class SubdomainRunner(object):
 
     def _add_indirect_args(self, args, signature):
         if self.config.node_addressing == 'indirect':
-            return [self.gpu_indirect_address()] + args, 'P' + signature
+            return [self.gpu_indirect_address()] + list(args), 'P' + signature
         else:
             return args, signature
 
@@ -1183,7 +1183,6 @@ class SubdomainRunner(object):
         secondary = []
 
         primary, secondary = self._init_distrib_kernels_ab(cbuf, grid_dim1, block_size)
-
         if self.config.access_pattern == 'AB':
             return primary, secondary
 
@@ -1210,7 +1209,7 @@ class SubdomainRunner(object):
                              cbuf.local_recv_buf.host.shape[-2] * len(cbuf.cpair.dst.dists))
 
             args = [self.gpu_dist(cbuf.grid_id, 0),
-                    self._spec.opposite_face(cbuf.face)] + min_max + [cbuf.local_recv_buf.gpu],
+                    self._spec.opposite_face(cbuf.face)] + min_max + [cbuf.local_recv_buf.gpu]
             args, signature = self._add_indirect_args(args, signature)
             secondary.append(KernelGrid(self.get_kernel('DistributeContinuousDataWithSwap',
                                                         args, signature,

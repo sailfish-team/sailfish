@@ -62,7 +62,16 @@ regtest_aa:
 	$(PYTHON) regtest/subdomains/2d_binary.py --access_pattern=AA
 	$(PYTHON) regtest/subdomains/2d_ldc.py --access_pattern=AA
 	$(PYTHON) regtest/subdomains/3d_ldc.py --access_pattern=AA
+	$(PYTHON) regtest/subdomains/3d_sphere.py --access_pattern=AA
 	$(PYTHON) regtest/subdomains/binary_pbc.py --access_pattern=AA
+
+regtest_indirect:
+	$(PYTHON) regtest/subdomains/2d_cylinder.py --access_pattern=AA --node_addressing=indirect
+	#$(PYTHON) regtest/subdomains/2d_binary.py --access_pattern=AA --node_addressing=indirect
+	$(PYTHON) regtest/subdomains/2d_ldc.py --access_pattern=AA --node_addressing=indirect
+	$(PYTHON) regtest/subdomains/3d_ldc.py --access_pattern=AA --node_addressing=indirect
+	$(PYTHON) regtest/subdomains/3d_sphere.py --access_pattern=AA --node_addressing=indirect
+	#$(PYTHON) regtest/subdomains/binary_pbc.py --access_pattern=AA --node_addressing=indirect
 
 # Necessary to trigger bulk/boundary split code.
 regtest_small_block:
