@@ -255,6 +255,9 @@ class SubdomainRunner(object):
 
         :param register: if True, the field will be registered for output and
             for automated creation of equivalent field on the compute device.
+        :rvalue: tuple of: non-ghost view into the backing array,
+            sparse field (only when indirect addressing is enabled; None
+            otherwise)
         """
         if dtype is None:
             dtype = self.float

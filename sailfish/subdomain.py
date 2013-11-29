@@ -378,6 +378,10 @@ class Subdomain(object):
         self._encoder = None
         self._seen_types = set([0])
         self._needs_orientation = False
+
+        # A dense boolean array indicaing which nodes are active in the
+        # simulation (marked as True). This is only used in the indirect
+        # addressing node. This array covers all nodes, including ghosts.
         self.active_node_mask = None
 
     def allocate(self):
@@ -717,8 +721,9 @@ class Subdomain(object):
             self._type_map_encoded = True
 
         if indirect_address is not None:
-            self._sparse_type_map[indirect_address[
-                self.active_node_mask]] = self._type_map_ghost[self.active_node_mask]
+            anm = self.active_node_mask
+            h = indirect_address[anm]
+            self._sparse_type_map[h] = self._type_map_ghost[anm]
             return self._sparse_type_map
 
         return self._type_map_base
