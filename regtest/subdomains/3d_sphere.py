@@ -28,9 +28,13 @@ class SimulationTest(SphereSimulation):
         defaults['mem_alignment'] = mem_align
         defaults['subdomains'] = blocks
         defaults['max_iters'] = MAX_ITERS
-        defaults['quiet'] = True
         defaults['output'] = output
         defaults['cuda_cache'] = False
+        defaults.update({
+            'access_pattern': access_pattern,
+            'node_addressing': node_addressing,
+            'silent': True,
+            })
 
 # NOTE: This test class is not thread safe.
 class TestInterblockPropagation(unittest.TestCase):
@@ -65,6 +69,8 @@ def tearDownModule():
 if __name__ == '__main__':
     args = util.parse_cmd_line()
     block_size = args.block_size
+    access_pattern = args.access_pattern
+    node_addressing = args.node_addressing
     if block_size < mem_align:
         mem_align = block_size
     unittest.main()
