@@ -133,22 +133,29 @@
 	%endif
 </%def>
 
-<%def name="indirect_index()">
+<%def name="indirect_index(orig='dense_gi', position_warning=True)">
 	%if node_addressing == 'indirect':
 		// In the indirect access mode, the original global index is used for
 		// the 'nodes' table, while the index from that table is used for all
 		// fields and distributions.
-		int dense_gi = gi;
-		gi = nodes[dense_gi];
+		%if orig is not None:
+			int ${orig} = gi;
+		%endif
+		gi = nodes[gi];
 		if (gi == INVALID_NODE) {
 			return;
 		}
-		if (gi >= DIST_SIZE) {
-			%if dim == 3:
-				printf("invalid index %d @ %d %d %d\n", gi, gx, gy, gz);
+		if (gi >= DIST_SIZE || gi < 0) {
+			%if position_warning:
+				%if dim == 3:
+					printf("invalid index %d @ %d %d %d\n", gi, gx, gy, gz);
+				%else:
+					printf("invalid index %d @ %d %d\n", gi, gx, gy);
+				%endif
 			%else:
-				printf("invalid index %d @ %d %d\n", gi, gx, gy);
+				printf("invalid node index detected\n");
 			%endif
+			return;
 		}
 	%endif
 </%def>

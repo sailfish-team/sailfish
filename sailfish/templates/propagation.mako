@@ -91,7 +91,11 @@
 </%def>
 
 <%def name="get_odist(dist_out, idir, xoff=0, yoff=0, zoff=0, offset=0)" filter="trim">
-	${dist_out}[gi + ${dist_size * idir + offset} + ${rel_offset(xoff, yoff, zoff)}]
+	%if node_addressing == 'indirect' and (offset != 0 or xoff != 0 or yoff != 0 or zoff != 0):
+		${dist_out}[nodes[dense_gi + ${offset} + ${rel_offset(xoff, yoff, zoff)}] + ${dist_size * idir}]
+	%else:
+		${dist_out}[gi + ${dist_size * idir + offset} + ${rel_offset(xoff, yoff, zoff)}]
+	%endif
 </%def>
 
 <%def name="set_odist(dist_out, dist_in, idir, xoff, yoff, zoff, offset, shared, local=False, rhs=None)">

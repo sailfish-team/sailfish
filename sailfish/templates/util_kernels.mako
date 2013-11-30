@@ -472,15 +472,6 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 	%endif
 }
 
-## For use in the collect/distribute kernels below. Works with any kernel
-## where the threads corresponding to invalid nodes can be terminated.
-<%def name="_handle_indirect()">
-	%if node_addressing == 'indirect':
-		gi = nodes[gi];
-		if (gi == INVALID_NODE) return;
-	%endif
-</%def>
-
 %if dim == 2:
 <%def name="collect_continuous_data_body_2d(opposite=False)">
 	const int idx = get_global_id(0);
@@ -505,7 +496,7 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 			const int dist_num = idx / dist_size;
 			const int gx = idx % dist_size;
 			int gi = getGlobalIdx(base_gx + gx, ${gy});
-			${_handle_indirect()}
+			${indirect_index(orig=None, position_warning=False)}
 
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
@@ -556,7 +547,7 @@ ${kernel} void CollectContinuousDataWithSwap(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear[axis]});
 	%endif
-	${_handle_indirect()}
+	${indirect_index(orig=None, position_warning=False)}
 </%def>
 
 ## In the case of in-place propagation, the data is read from the same place as
@@ -569,7 +560,7 @@ ${kernel} void CollectContinuousDataWithSwap(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_macro[axis]});
 	%endif
-	${_handle_indirect()}
+	${indirect_index(orig=None, position_warning=False)}
 </%def>
 
 <%def name="collect_continuous_data_body_3d(opposite=False)">
@@ -672,7 +663,7 @@ ${kernel} void CollectContinuousDataWithSwap(
 			const int gx = idx % dist_size;
 			const float tmp = buffer[idx];
 			int gi = getGlobalIdx(base_gx + gx, ${gy});
-			${_handle_indirect()}
+			${indirect_index(orig=None, position_warning=False)}
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
 				case ${i}: {
@@ -717,7 +708,7 @@ ${kernel} void DistributeContinuousDataWithSwap(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_dist[axis]});
 	%endif
-	${_handle_indirect()}
+	${indirect_index(orig=None, position_warning=False)}
 </%def>
 
 <%def name="_get_global_dist_idx_opp(axis)">
@@ -728,7 +719,7 @@ ${kernel} void DistributeContinuousDataWithSwap(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_with_swap[axis]});
 	%endif
-	${_handle_indirect()}
+	${indirect_index(orig=None, position_warning=False)}
 </%def>
 
 <%def name="distribute_continuous_data_body_3d(opposite)">
@@ -806,6 +797,10 @@ ${kernel} void CollectSparseData(
 	}
 	int gi = idx_array[idx];
 	if (gi == INVALID_NODE) return;
+	if (gi >= DIST_SIZE * ${grid.Q} || gi < 0) {
+		printf("invalid node index detected in sparse coll %d (%d, %d)\n", gi, get_global_id(0), get_global_id(1));
+		return;
+	}
 	buffer[idx] = dist[gi];
 }
 
@@ -822,6 +817,11 @@ ${kernel} void DistributeSparseData(
 	}
 	int gi = idx_array[idx];
 	if (gi == INVALID_NODE) return;
+	if (gi >= DIST_SIZE * ${grid.Q} || gi < 0) {
+		printf("invalid node index detected in sparse dist %d (%d, %d)\n", gi, get_global_id(0), get_global_id(1));
+		return;
+	}
+
 	dist[gi] = buffer[idx];
 }
 
@@ -837,7 +837,7 @@ ${kernel} void CollectContinuousMacroData(
 	}
 
 	int gi = getGlobalIdx(base_gx + idx, gy);
-	${_handle_indirect()}
+	${indirect_index(orig=None, position_warning=False)}
 	buffer[idx] = field[gi];
 }
 %else:
@@ -849,7 +849,7 @@ ${kernel} void CollectContinuousMacroData(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear_macro[face]});
 	%endif
-	${_handle_indirect()}
+	${indirect_index(orig=None, position_warning=False)}
 </%def>
 
 // The data is collected from a rectangular area of the plane corresponding to 'face'.
@@ -898,7 +898,7 @@ ${kernel} void DistributeContinuousMacroData(
 	}
 
 	int gi = getGlobalIdx(base_gx + idx, gy);
-	${_handle_indirect()}
+	${indirect_index(orig=None, position_warning=False)}
 	field[gi] = buffer[idx];
 }
 %else:
@@ -910,7 +910,7 @@ ${kernel} void DistributeContinuousMacroData(
 	%else:
 		gi = getGlobalIdx(base_gx + gx, base_other + other, ${lat_linear[face]});
 	%endif
-	${_handle_indirect()}
+	${indirect_index(orig=None, position_warning=False)}
 </%def>
 
 ${kernel} void DistributeContinuousMacroData(
