@@ -387,7 +387,7 @@ class Subdomain(object):
     def allocate(self):
         runner = self.spec.runner
         if self.spec.runner.config.node_addressing == 'indirect':
-            self.load_active_node_map(*self._get_mgrid())
+            self.load_active_node_map(*self._get_mgrid_base(self.config))
             self.spec.runner.config.logger.info('Fill ratio is: %0.2f%%' %
                     (self.active_nodes / float(self.spec.num_actual_nodes) * 100))
         self._type_map_ghost, self._sparse_type_map = runner.make_scalar_field(np.uint32, register=False, nonghost_view=False)
@@ -721,6 +721,7 @@ class Subdomain(object):
             self._type_map_encoded = True
 
         if indirect_address is not None:
+            assert self.active_node_mask is not None
             anm = self.active_node_mask
             h = indirect_address[anm]
             self._sparse_type_map[h] = self._type_map_ghost[anm]
