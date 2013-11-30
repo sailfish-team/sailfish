@@ -516,13 +516,17 @@ class SubdomainRunner(object):
         excluding padding."""
         return reduce(operator.mul, self._lat_size)
 
+    @property
+    def num_active_nodes(self):
+        if self.config.node_addressing == 'indirect':
+            return self._subdomain.active_nodes
+        else:
+            return self.num_phys_nodes
+
     def _get_dist_bytes(self, grid):
         """Returns the number of bytes required to store a single set of
            distributions for the whole simulation domain."""
-        if self.config.node_addressing == 'indirect':
-            return self._subdomain.active_nodes * grid.Q * self.float().nbytes
-        else:
-            return self.num_phys_nodes * grid.Q * self.float().nbytes
+        return self.num_active_nodes * grid.Q * self.float().nbytes
 
     def _get_global_idx(self, location, dist_num=0):
         """Returns a global index (in the distributions array).
@@ -540,12 +544,12 @@ class SubdomainRunner(object):
                 mask = ret != self.INVALID_NODE
                 if ret.size == 1:
                     if ret != self.INVALID_NODE:
-                        ret += self.num_phys_nodes * dist_num
+                        ret += self.num_active_nodes * dist_num
                 else:
                     if np.array(dist_num).size == 1:
-                        ret[mask] += self.num_phys_nodes * dist_num
+                        ret[mask] += self.num_active_nodes * dist_num
                     else:
-                        ret[mask] += (self.num_phys_nodes * dist_num)[mask]
+                        ret[mask] += (self.num_active_nodes * dist_num)[mask]
                 return ret
             else:
                 return idxs + self.num_phys_nodes * dist_num
