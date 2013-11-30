@@ -387,7 +387,7 @@ class Subdomain(object):
     def allocate(self):
         runner = self.spec.runner
         if self.spec.runner.config.node_addressing == 'indirect':
-            self.load_active_node_map()
+            self.load_active_node_map(*self._get_mgrid())
             self.spec.runner.config.logger.info('Fill ratio is: %0.2f%%' %
                     (self.active_nodes / float(self.spec.num_actual_nodes) * 100))
         self._type_map_ghost, self._sparse_type_map = runner.make_scalar_field(np.uint32, register=False, nonghost_view=False)
@@ -418,7 +418,7 @@ class Subdomain(object):
         raise NotImplementedError('initial_conditions() not defined in a child '
                 'class')
 
-    def load_active_node_map(self):
+    def load_active_node_map(self, *args):
         """Populates active_node_mask with a dense boolean array filling the area
         described by the corresponding SubdomainSpec. Nodes marked True indicate
         active nodes participating in the simulation."""

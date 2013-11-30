@@ -536,7 +536,7 @@ class SubdomainRunner(object):
                 # TODO: Ideally, we would filter out unused nodes here. This
                 # requires careful handling between what the source domain and the
                 # destination domain see/expect.
-                ret = self._host_indirect_address.flatten()[idxs]
+                ret = self._host_indirect_address.flat[idxs]
                 mask = ret != self.INVALID_NODE
                 if ret.size == 1:
                     if ret != self.INVALID_NODE:
