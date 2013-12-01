@@ -14,6 +14,7 @@ The sample file pipe.npy was generated using:
     (19.3 * (0.8 + 0.2 * np.sin(2 * pi * hx / 128.0)))**2] = True
 """
 
+import os
 import numpy as np
 
 from sailfish.subdomain import Subdomain3D
@@ -60,6 +61,12 @@ class ExternalSimulation(LBFluidSim, LBForcedSim):
     def modify_config(cls, config):
         if not config.geometry:
             return
+
+        if config.geometry == 'pipe.npy':
+            # Look for the geometry file in the same directory where
+            # external_geometry.py is located.
+            config.geometry = os.path.join(os.path.dirname(
+                os.path.realpath(__file__)), config.geometry)
 
         # Override lattice size based on the geometry file.
         wall_map = np.load(config.geometry)
