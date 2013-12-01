@@ -3,7 +3,7 @@
 # ldc_2d_entropic: expected to generate differences in entropy estimate at
 #                  boundary nodes where not all distributions are defined
 
-blacklist="examples/boolean_geometry.py examples/ldc_2d_unorm.py examples/duct_flow.py examples/ldc_2d_entropic.py examples/binary_fluid/fe_poiseuille_2d.py examples/binary_fluid/fe_capillary_wave_2d.py examples/binary_fluid/sc_poiseuille_2d.py"
+blacklist="examples/ldc_2d_unorm.py examples/duct_flow.py examples/ldc_2d_entropic.py examples/binary_fluid/fe_poiseuille_2d.py examples/binary_fluid/fe_capillary_wave_2d.py examples/binary_fluid/sc_poiseuille_2d.py"
 tmpdir=$(mktemp -d -t sailfish_addr.XXXXXXXX)
 
 # Examples to run can be specified in a list on the command line as well.

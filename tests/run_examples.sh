@@ -1,6 +1,6 @@
 #!/bin/bash
 
-blacklist="examples/boolean_geometry.py examples/ldc_2d_unorm.py"
+blacklist="examples/ldc_2d_unorm.py"
 
 find examples -perm +0111 -name '*.py' | while read filename ; do
 	if [[ ${blacklist/${filename}/} == ${blacklist} ]]; then
