@@ -57,17 +57,17 @@ ${kernel} void ShanChenPrepareMacroFields(
 
 	getDist(&fi, dist1_in, gi ${iteration_number_arg_if_required()});
 	get0thMoment(&fi, type, orientation, &rho0);
-	compute_1st_moment(&fi, v, 0, 1.0f/tau0);
+	compute_1st_moment(&fi, v, 0, tau0_inv);
 	orho0[gi] = rho0;
 
 	// TODO: try moving this line earlier and see what the performance impact is.
 	getDist(&fi, dist2_in, gi ${iteration_number_arg_if_required()});
 	get0thMoment(&fi, type, orientation, &rho1);
-	compute_1st_moment(&fi, v, 1, 1.0f/tau1);
+	compute_1st_moment(&fi, v, 1, tau1_inv);
 	orho1[gi] = rho1;
 
 	// Velocity becomes a weighted average of the values for invidual components.
-	float total_rho = rho0 / tau0 + rho1 / tau1;
+	const float total_rho = tau0_inv * rho0 + tau1_inv * rho1;
 	%for i in range(0, dim):
 		v[${i}] /= total_rho;
 	%endfor

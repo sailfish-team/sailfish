@@ -35,11 +35,13 @@
 %if simtype == 'shan-chen':
 	## In the free-energy model, the relaxation time is a local quantity.
 	${const_var} float tau0 = ${tau}f;		// relaxation time
+	${const_var} float tau0_inv = 1.0f / ${tau}f;
 	// Relaxation time for the 2nd fluid component.
 %else:
 	// Relaxation time for the order parameter field.
 %endif
 ${const_var} float tau1 = ${tau_phi}f;
+${const_var} float tau1_inv = 1.0f / ${tau_phi}f;
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
