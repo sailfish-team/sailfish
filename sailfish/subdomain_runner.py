@@ -1334,7 +1334,10 @@ class SubdomainRunner(object):
         dbuf = np.zeros(self._get_dist_bytes(self._sim.grid) / self.float().nbytes,
             dtype=self.float)
         self.backend.from_buf(self.gpu_dist(grid_num, iter_idx), dbuf)
-        dbuf = dbuf.reshape([self._sim.grid.Q] + self._physical_size)
+        if self.config.node_addressing == 'indirect':
+            dbuf = dbuf.reshape([self._sim.grid.Q, self.num_active_nodes])
+        else:
+            dbuf = dbuf.reshape([self._sim.grid.Q] + self._physical_size)
         return dbuf
 
     def _debug_set_dist(self, dbuf, output=True, grid_num=0):
