@@ -104,14 +104,15 @@ class LBBinaryFluidBase(LBSim):
         gpu_rho = runner.gpu_field(self.rho)
         gpu_phi = runner.gpu_field(self.phi)
         gpu_v = runner.gpu_field(self.v)
+        gpu_map = runner.gpu_geo_map()
 
         gpu_dist1a = runner.gpu_dist(0, 0)
         gpu_dist1b = runner.gpu_dist(0, 1)
         gpu_dist2a = runner.gpu_dist(1, 0)
         gpu_dist2b = runner.gpu_dist(1, 1)
 
-        args1 = [gpu_dist1a, gpu_dist2a] + gpu_v + [gpu_rho, gpu_phi]
-        args2 = [gpu_dist1b, gpu_dist2b] + gpu_v + [gpu_rho, gpu_phi]
+        args1 = [gpu_map, gpu_dist1a, gpu_dist2a] + gpu_v + [gpu_rho, gpu_phi]
+        args2 = [gpu_map, gpu_dist1b, gpu_dist2b] + gpu_v + [gpu_rho, gpu_phi]
 
         runner.exec_kernel('SetInitialConditions', args1, 'P'*len(args1))
         if self.config.access_pattern == 'AB':
