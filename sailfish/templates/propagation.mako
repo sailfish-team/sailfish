@@ -69,7 +69,7 @@
 ##   xoff: X propagation direction (1 for East, -1 for West, 0 for orthogonal to X axis)
 ##   dist_source: prop_local (data from shared memory),
 ##				  prop_global (data directly from the distribution structure)
-##
+##   sentinel: if True, add a check for invalid values
 	%for i in sym.get_prop_dists(grid, xoff):
 		%if dist_source == 'prop_local':
 			${prop_bnd(dist_out, dist_in, 0, i, True, offset)}
@@ -352,7 +352,7 @@
 
 	// Save locally propagated distributions into global memory.
 	// The leftmost thread is not updated in this block.
-	if (lx > 0 && gx < ${lat_nx})
+	if (lx > 0 && gx < ${lat_nx} && !propagation_only)
 	%if propagation_sentinels:
 		if (prop_${first_prop_dist}[lx] != -1.0f)
 	%endif
@@ -391,7 +391,7 @@
 	${barrier()}
 
 	// The rightmost thread is not updated in this block.
-	if (lx < ${block_size-1} && gx < ${lat_nx-1})
+	if (lx < ${block_size-1} && gx < ${lat_nx-1} && !propagation_only)
 	%if propagation_sentinels:
 		if (prop_${first_prop_dist}[lx] != -1.0f)
 	%endif
