@@ -335,6 +335,7 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 	%endif
 }
 
+%if access_pattern == 'AA':
 // Like ApplyPeriodicBoundaryConditions above, but works after the fully local
 // step of the AA access pattern. The differences are:
 //  - distributions opposite to normal ones are copied
@@ -381,7 +382,7 @@ ${kernel} void ApplyPeriodicBoundaryConditionsWithSwap(
 		}
 	%endif
 }
-
+%endif  ## access_pattern == 'AA'
 
 <%def name="_copy_field_if_finite(src, dest)">
 	%if node_addressing == 'indirect':
@@ -530,6 +531,7 @@ ${kernel} void CollectContinuousData(
 	${collect_continuous_data_body_2d(False)}
 }
 
+%if access_pattern == 'AA':
 // As above, used for the AA access pattern.
 ${kernel} void CollectContinuousDataWithSwap(
 		${nodes_array_if_required()}
@@ -538,6 +540,8 @@ ${kernel} void CollectContinuousDataWithSwap(
 {
 	${collect_continuous_data_body_2d(True)}
 }
+%endif
+
 %else:
 <%def name="_get_global_idx(axis)">
 	## Y-axis
@@ -630,6 +634,7 @@ ${kernel} void CollectContinuousData(
 	${collect_continuous_data_body_3d(False)};
 }
 
+%if access_pattern == 'AA':
 ${kernel} void CollectContinuousDataWithSwap(
 		${nodes_array_if_required()}
 		${global_ptr} float *dist, int face, int base_gx, int base_other,
@@ -637,6 +642,7 @@ ${kernel} void CollectContinuousDataWithSwap(
 {
 	${collect_continuous_data_body_3d(True)};
 }
+%endif  ## access_pattern == 'AA'
 %endif
 
 %if dim == 2:
@@ -691,6 +697,7 @@ ${kernel} void DistributeContinuousData(
 	${distribute_continuous_data_body_2d(False)}
 }
 
+%if access_pattern == 'AA':
 ${kernel} void DistributeContinuousDataWithSwap(
 		${nodes_array_if_required()}
 		${global_ptr} float *dist, int face, int base_gx,
@@ -698,6 +705,7 @@ ${kernel} void DistributeContinuousDataWithSwap(
 {
 	${distribute_continuous_data_body_2d(True)}
 }
+%endif  ## access_pattern == 'AA'
 %else:
 ## 3D
 <%def name="_get_global_dist_idx(axis)">
@@ -774,6 +782,7 @@ ${kernel} void DistributeContinuousData(
 	${distribute_continuous_data_body_3d(False)}
 }
 
+%if access_pattern == 'AA':
 ${kernel} void DistributeContinuousDataWithSwap(
 		${nodes_array_if_required()}
 		${global_ptr} float *dist, int face, int base_gx, int base_other,
@@ -781,6 +790,7 @@ ${kernel} void DistributeContinuousDataWithSwap(
 {
 	${distribute_continuous_data_body_3d(True)}
 }
+%endif  ## access_pattern == 'AA'
 %endif
 
 ${kernel} void CollectSparseData(
