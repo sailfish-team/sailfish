@@ -419,14 +419,61 @@ class Subdomain(object):
                 'class')
 
     def load_active_node_map(self, *args):
-        """Populates active_node_mask with a dense boolean array filling the area
-        described by the corresponding SubdomainSpec. Nodes marked True indicate
-        active nodes participating in the simulation."""
+        """Populates active_node_mask with a dense Boolean array.
+
+        The array coreesponds to the volume described by SubdomainSpec,
+        including ghost nodes. Nodes marked True indicate active nodes
+        participating in the simulation."""
         # By default, consider all nodes to be active.
         self.active_node_mask = np.ones(self.full_lat_shape, dtype=np.bool)
         self.spec.runner.config.logger.warning(
             'Using indirect addressing with all nodes active. Consider '
             '--node_addressing=direct for better performance.')
+
+    def select_subdomain(self, array, hx, hy, *args):
+        """Returns part of array corresponding to the subdomain.
+
+        :param array: array to select from; the array should cover ghost nodes
+
+        Use this with arrays covering all nodes in the global simulation domain.
+        Args are the index arrays hx, hy, [hz].
+        """
+        if self.dim == 3:
+            hz = args[0]
+
+        es = self.spec.envelope_size
+        if self.dim == 2:
+            return array[hy + es, hx + es]
+        else:
+            return array[hz + es, hy + es, hx + es]
+
+    def set_active_node_map_from_wall_map(self, wall_map):
+        """Sets the active node map from a wall map.
+
+        Takes care of ensuring that only a single layer of wall nodes is
+        remains as active nodes. To be used in load_active_node_map().
+
+        :param wall_map: Boolean array covering all nodes, including ghosts.
+            True indicates a solid node not participating in the simulation.
+            These nodes would typically be set to NTFullBBWall or similar.
+        """
+        fluid_map = np.logical_not(wall_map)
+        # Build a convolution kernel to count active neighbor nodes.
+        if self.dim == 3:
+            neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
+            for x in self.grid.basis:
+                neighbors[x[0] + 1, x[1] + 1, x[2] + 1] = 1
+        else:
+            neighbors = np.zeros((3, 3), dtype=np.uint8)
+            for x in self.grid.basis:
+                neighbors[x[0] + 1, x[1] + 1] = 1
+
+        # Mark nodes connected to at least one active node as active.
+        # We need these nodes for walls and ghost nodes.
+        where = (filters.convolve(fluid_map.astype(np.uint8),
+                                  neighbors, mode='wrap') > 0)
+        fluid_map[where] = True
+        self.active_node_mask = fluid_map
 
     @property
     def active_nodes(self):

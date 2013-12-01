@@ -1510,6 +1510,7 @@ class SubdomainRunner(object):
 
         # Save initial state of the simulation.
         if self.config.output and self.config.from_ == 0:
+            self.config.logger.debug("Saving initial state.")
             self._output.save(self._sim.iteration)
 
         if not self.config.max_iters:
