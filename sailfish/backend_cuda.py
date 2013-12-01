@@ -93,7 +93,8 @@ class CUDABackend(object):
 
         if (options.precision == 'double' and
             self._device.compute_capability()[0] >= 3):
-            self._ctx.set_shared_config(cuda.shared_config.EIGHT_BYTE_BANK_SIZE)
+            if hasattr(self._ctx, 'set_shared_config'):
+                self._ctx.set_shared_config(cuda.shared_config.EIGHT_BYTE_BANK_SIZE)
 
         # To keep track of allocated memory.
         self._total_memory_bytes = 0
