@@ -503,7 +503,7 @@ class Subdomain(object):
                         "in the 'where' array.  Use node_util.multifield() to "
                         "generate the array in an easy way.")
             elif isinstance(param, nt.DynamicValue):
-                if param.has_symbols(sym.S.time):
+                if param.has_symbols(sym.S.time) or zip(param.get_timeseries()):
                     self.config.time_dependence = True
                 if param.has_symbols(sym.S.gx, sym.S.gy, sym.S.gz):
                     self.config.space_dependence = True
@@ -651,7 +651,7 @@ class Subdomain(object):
             idx = orient_map & (shifted_map == 0) & (self._orientation_base == 0)
             self._orientation_base[idx] = self.grid.vec_to_dir(list(vec))
 
-    def reset(self):
+    def reset(self, encode=True):
         self.config.logger.debug('Setting subdomain geometry...')
         self._type_map_encoded = False
 
@@ -699,6 +699,10 @@ class Subdomain(object):
                                      self._params, self._orientation_base,
                                      have_link_tags)
 
+        # Actually do the encoding... It's useful to have this as a separate
+        # step for testing.
+        if encode:
+            self.encoded_map()
         self.config.logger.debug('... encoder done.')
 
     def get_fo_distributions(self, fo):

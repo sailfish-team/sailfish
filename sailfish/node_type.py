@@ -5,8 +5,10 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+import hashlib
 from collections import namedtuple
 import numpy as np
+from sympy import Symbol
 from sympy.core import expr
 
 ScratchSize = namedtuple('ScratchSize', ('dim2', 'dim3'))
@@ -465,6 +467,71 @@ class DynamicValue(object):
                 if isinstance(param, expr.Expr) and symbol in param:
                     return True
         return False
+
+    def get_timeseries(self):
+        """Returns a generator iterating over all time series used in params."""
+        for param in self.params:
+            if isinstance(param, LinearlyInterpolatedTimeSeries):
+                yield param
+                continue
+            elif not isinstance(param, expr.Expr):
+                continue
+            for arg in param.args:
+                if isinstance(arg, LinearlyInterpolatedTimeSeries):
+                    yield arg
+
+
+class LinearlyInterpolatedTimeSeries(Symbol):
+    """A time-dependent scalar data source based on a discrete time series."""
+
+    def __new__(cls, data, step_size=1.0):
+        return Symbol.__new__(cls, 'lits%s_%s' % (hashlib.sha1(np.array(data)).hexdigest(),
+                                                  step_size))
+
+    def __init__(self, data, step_size=1.0):
+        """A continous scalar data source from a discrete time series.
+
+        Time series data points are linearly interpolated in order to generate
+        values for points not present in the time series. The time series is
+        wrapped in order to generate an infinite sequence.
+
+        :param data: iterable of scalar values
+        :param step_size: number of LB iterations corresponding to one unit in
+            the time series (i.e. time distance between two neighboring points).
+        """
+
+        Symbol.__init__('unused')
+        if type(data) is list or type(data) is tuple:
+            data = np.float64(data)
+
+        self._data = data
+        self._step_size = step_size
+
+        # To be set later by the geometry encoder class. This is necessary due
+        # to how the printing system in Sympy works (see _ccode below).
+        self._offset = None
+
+    def __hash__(self):
+        return (hash(hashlib.sha1(str(self._step_size)).digest()) ^
+                hash(hashlib.sha1(self._data).digest()))
+
+    def __str__(self):
+        return 'LinearlyInterpolatedTimeSeries([%d items], %f)' % (
+            self._data.size, self._step_size)
+
+    def __eq__(self, other):
+        if not isinstance(other, LinearlyInterpolatedTimeSeries):
+            return False
+        return np.all(other._data == self._data) and self._step_size == other._step_size
+
+    def _ccode(self, printer):
+        assert self._offset is not None
+        return 'timeseries_interpolate(%d, %d, %.18f, iteration_number)' % (
+            self._offset, self._data.size, self._step_size)
+
+    def data_hash(self):
+        """Returns a hash of the underying data series."""
+        return hashlib.sha1(self._data).digest()
 
 # Maps node type IDs to their classes.
 _NODE_TYPES = __init_node_type_list()

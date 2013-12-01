@@ -23,6 +23,8 @@ class TestCase2D(unittest.TestCase):
         config.periodic_x = False
         config.periodic_y = False
         config.use_link_tags = False
+        config.time_dependence = False
+        config.space_dependence = False
         self.sim = LBSim(config)
         self.config = config
         self.backend = DummyBackend()
@@ -47,5 +49,7 @@ class TestCase3D(unittest.TestCase):
         config.periodic_y = False
         config.periodic_z = False
         config.use_link_tags = False
+        config.time_dependence = False
+        config.space_dependence = False
         self.sim = LBSim(config)
         self.backend = DummyBackend()

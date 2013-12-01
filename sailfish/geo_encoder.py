@@ -65,6 +65,7 @@ class GeoEncoderConst(GeoEncoder):
         self._bits_scratch = 0
         self._type_map = None
         self._param_map = None
+        self._timeseries_data = []
         self._geo_params = []
         self.config = subdomain.spec.runner.config
         self.scratch_space_size = 0
@@ -96,7 +97,6 @@ class GeoEncoderConst(GeoEncoder):
         param_to_idx = dict()  # Maps entries in seen_params to ids.
         seen_params = set()
         param_items = 0
-        self._symbol_map = {}  # Maps param indices to sympy expressions.
 
         # Refer to subdomain.Subdomain._verify_params for a list of allowed
         # ways of encoding nodes.
@@ -142,7 +142,7 @@ class GeoEncoderConst(GeoEncoder):
                         idxs = nodes_idx[param == value]
                         if idxs.shape[1] == 3:
                             self._encoded_param_map[idxs[:,0], idxs[:,1],
-                                    idxs[:,2]] = idx
+                                                    idxs[:,2]] = idx
                         elif idxs.shape[1] == 2:
                             self._encoded_param_map[idxs[:,0], idxs[:,1]] = idx
                         else:
@@ -150,10 +150,16 @@ class GeoEncoderConst(GeoEncoder):
                                     idxs.shape[1])
 
         self._non_symbolic_idxs = param_items
+        self._symbol_map = {}  # Maps param indices to sympy expressions.
+
+        # Maps timeseries data ID to offset in self._timeseries_data.
+        timeseries_offset_map = {}
+        timeseries_offset = 0
 
         # TODO(michalj): Verify that the type of the symbolic expression matches
         # that of the boundary condition (vector vs scalar, etc).
         # Second pass: only process symbolic expressions here.
+
         for node_key, node_type in param_dict.iteritems():
             for param in node_type.params.itervalues():
                 if isinstance(param, nt.DynamicValue):
@@ -165,6 +171,17 @@ class GeoEncoderConst(GeoEncoder):
                         self._symbol_map[idx] = param
                         param_to_idx[param] = idx
                         param_items += 1
+
+                        for ts in param.get_timeseries():
+                            dh = ts.data_hash()
+                            if dh in timeseries_offset_map:
+                                ts._offset = timeseries_offset_map[dh]
+                            else:
+                                ts._offset = timeseries_offset
+                                timeseries_offset_map[dh] = ts._offset
+                                timeseries_offset += ts._data.size
+                                self._timeseries_data.extend(ts._data)
+
                     self._encoded_param_map[param_map == node_key] = idx
 
         self._bits_param = bit_len(param_items)
@@ -265,6 +282,7 @@ class GeoEncoderConst(GeoEncoder):
                                 # in orientation processing code
             'node_params': self._geo_params,
             'symbol_idx_map': self._symbol_map,
+            'timeseries_data': self._timeseries_data,
             'non_symbolic_idxs': self._non_symbolic_idxs,
             'scratch_space': self.scratch_space_size > 0,
             'scratch_space_base': self._scratch_space_base,

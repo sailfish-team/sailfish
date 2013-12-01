@@ -24,12 +24,43 @@
 	%endif
 </%def>
 
+#############################################################################
+## Code rendering.
+#############################################################################
+
 %if time_dependence:
 	${device_func} inline float get_time_from_iteration(unsigned int iteration) {
 		return iteration * ${cex(dt_per_lattice_time_unit)};
 	}
 %endif
 
+%if timeseries_data:
+	__device__ float bc_timeseries[] = {
+		${', '.join('%.16e' % x for x in timeseries_data)}
+	};
+
+	${device_func} inline float interpolate_linear(const float d0, const float d1, const float pos) {
+		return pos * d1 + d0 * (1.0f - pos);
+	}
+
+	${device_func} inline float timeseries_interpolate(
+			const unsigned int offset,
+			const unsigned int size,
+			const float step,
+			const unsigned int iteration) {
+		const float buf_position = fmodf(iteration, step * size);
+		float w = buf_position / step;
+		const unsigned int idx = floor(w);
+		w -= idx;
+		unsigned int idx2 = (idx + 1);
+		if (idx2 >= size) {
+			idx2 -= size;
+		}
+		return interpolate_linear(bc_timeseries[offset + idx], bc_timeseries[offset + idx2], w);
+	}
+%endif
+
+## Renders functions to compute dynamic values.
 %for i, expressions in symbol_idx_map.iteritems():
 	${device_func} inline void time_dep_param_${i}(float *out ${dynamic_val_args_decl()}) {
 		%if time_dependence:
@@ -56,7 +87,7 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
 				%endfor
 				default:
 					%if gpu_check_invalid_values:
-						printf("Invalid vector value (idx=%d${', %d' * dim})\n", idx, ${position()});
+						printf("Invalid vector value (idx=%d)\n", idx);
 					%endif
 					die();
 			}
@@ -85,7 +116,7 @@ ${device_func} inline float node_param_get_scalar(const int idx ${dynamic_val_ar
 				%endfor
 				default:
 					%if gpu_check_invalid_values:
-						printf("Invalid scalar value (idx=%d${', %d' * dim})\n", idx, ${position()});
+						printf("Invalid scalar value (idx=%d\n", idx);
 					%endif
 					die();
 			}

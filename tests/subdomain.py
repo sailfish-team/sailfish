@@ -1,10 +1,10 @@
 import numpy as np
 import operator
 import unittest
-from sailfish.node_type import NTEquilibriumDensity, NTEquilibriumVelocity, multifield, NTFullBBWall, _NTUnused, _NTPropagationOnly, NTHalfBBWall
+from sailfish.node_type import NTEquilibriumDensity, NTEquilibriumVelocity, multifield, NTFullBBWall, _NTUnused, _NTPropagationOnly, NTHalfBBWall, DynamicValue, LinearlyInterpolatedTimeSeries
 from sailfish.subdomain import Subdomain2D, Subdomain3D, SubdomainSpec2D, SubdomainSpec3D
 from sailfish.subdomain_runner import SubdomainRunner
-from sailfish.sym import D2Q9, D3Q19
+from sailfish.sym import D2Q9, D3Q19, S
 from common import TestCase2D, TestCase3D
 
 
@@ -16,6 +16,21 @@ class SubdomainTest2D(Subdomain2D):
         where = (hx == hy)
         self.set_node(where, NTEquilibriumVelocity(
             multifield((0.01 * (hx - self.gy / 2)**2, 0.0), where)))
+
+        where = ((hx == 5) & (hy == 7))
+        self.set_node(where, NTEquilibriumDensity(
+            DynamicValue(0.1 * S.gx)))
+
+        # Interpolated time series.
+        data = np.linspace(0, 50, 10)
+        where = ((hx == 5) & (hy == 8))
+        self.set_node(where, NTEquilibriumDensity(
+            DynamicValue(0.1 * S.gx * LinearlyInterpolatedTimeSeries(data, 40))))
+
+        # Same underlying data, but different time step.
+        where = ((hx == 5) & (hy == 9))
+        self.set_node(where, NTEquilibriumDensity(
+            DynamicValue(0.1 * S.gx * LinearlyInterpolatedTimeSeries(data, 30))))
 
         self.set_node((hx > 10) & (hy < 5), NTFullBBWall)
 
@@ -29,7 +44,7 @@ class TestNodeTypeSetting2D(TestCase2D):
         spec.runner._init_shape()
         sub = SubdomainTest2D(list(reversed(self.lattice_size)), spec, D2Q9)
         sub.allocate()
-        sub.reset()
+        sub.reset(encode=False)
 
         center = 64 / 2
         for y in range(0, 64):
@@ -40,6 +55,8 @@ class TestNodeTypeSetting2D(TestCase2D):
         np.testing.assert_equal(sub._type_map[1:2, 13:-1], _NTUnused.id)
         np.testing.assert_equal(sub._type_map[1:2, 12], _NTPropagationOnly.id)
         np.testing.assert_equal(sub._type_map[3, 12:-1], _NTPropagationOnly.id)
+        self.assertTrue(sub.config.time_dependence)
+        self.assertTrue(sub.config.space_dependence)
 
 class SubdomainTest3D(Subdomain3D):
     def boundary_conditions(self, hx, hy, hz):
@@ -59,7 +76,7 @@ class TestNodeTypeSetting3D(TestCase3D):
         spec.runner._init_shape()
         sub = SubdomainTest3D(list(reversed(self.lattice_size)), spec, D3Q19)
         sub.allocate()
-        sub.reset()
+        sub.reset(encode=False)
 
         center_y = 32 / 2
         center_z = 16 / 2

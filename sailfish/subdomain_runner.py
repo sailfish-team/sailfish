@@ -1101,7 +1101,7 @@ class SubdomainRunner(object):
                     recv_buf[:] = dest.reshape(recv_buf.shape)
                 distribute(cbuf)
 
-    def _fields_to_host(self):
+    def _fields_to_host(self, sync=False):
         """Copies data for all fields from the GPU to the host."""
         for field in self._scalar_fields:
             self.backend.from_buf_async(self.gpu_field(field), self._calc_stream)
@@ -1109,6 +1109,9 @@ class SubdomainRunner(object):
         for field in self._vector_fields:
             for component in self.gpu_field(field):
                 self.backend.from_buf_async(component, self._calc_stream)
+
+        if sync:
+            self.backend.sync_stream(self._calc_stream)
 
     def _add_indirect_args(self, args, signature):
         if self.config.node_addressing == 'indirect':
