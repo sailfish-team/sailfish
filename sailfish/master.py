@@ -312,7 +312,8 @@ class LBMachineMaster(object):
             os.unlink(ipcfile)
 
     def run(self):
-        self.config.logger.info('Machine master starting with PID {0}'.format(os.getpid()))
+        self.config.logger.info('Machine master starting with PID {0} at {1}'.format(
+            os.getpid(), time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())))
 
         # Log Sailfish version if running from a git repository.
         sailfish_root_dir = os.path.join(os.path.realpath(
