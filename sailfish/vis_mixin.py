@@ -4,6 +4,7 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+import hashlib
 import zlib
 from collections import namedtuple
 from sailfish.lb_base import ScalarField, LBMixIn
@@ -30,6 +31,10 @@ class Vis2DSliceMixIn(LBMixIn):
                            help='Base port to use for visualization. '
                            'The subdomain ID will be added to it to '
                            'generate the actual port number.')
+        group.add_argument('--visualizer_auth_token', type=str, default='',
+                           help='Authentication token for control of the '
+                           'visualizer. If empty, a token will be generated '
+                           'automatically.')
 
     def before_main_loop(self, runner):
         self._vis_every = 10
@@ -42,6 +47,11 @@ class Vis2DSliceMixIn(LBMixIn):
         self._ctrl_sock = self._ctx.socket(zmq.REP)
         self._port = self._sock.bind_to_random_port('tcp://*')
 
+        if runner.config.visualizer_auth_token:
+            self._authtoken = runner.config.visualizer_auth_token
+        else:
+            self._authtoken = hashlib.md5(np.random.rand(100)).hexdigest()
+
         if runner.config.visualizer_port > 0:
             self._ctrl_sock.bind('tcp://*:{0}'.format(runner.config.visualizer_port))
             self._ctrl_port = runner.config.visualizer_port
@@ -52,8 +62,8 @@ class Vis2DSliceMixIn(LBMixIn):
             addr = netifaces.ifaddresses(iface).get(
                 netifaces.AF_INET, [{}])[0].get('addr', '')
             if addr:
-                self.config.logger.info('Visualization server at tcp://%s:%d', addr,
-                                        self._ctrl_port)
+                self.config.logger.info('Visualization server at tcp://%s@%s:%d',
+                                        self._authtoken, addr, self._ctrl_port)
 
         gpu_map = runner.gpu_geo_map()
         gpu_v = runner.gpu_field(self.v)
@@ -102,15 +112,19 @@ class Vis2DSliceMixIn(LBMixIn):
         if self._ctrl_sock in socks:
             cmd = self._ctrl_sock.recv_json()
             ack = True
-            if cmd[0] == 'axis':
-                self._axis = cmd[1]
-            elif cmd[0] == 'position':
-                self._position = cmd[1]
-            elif cmd[0] == 'field':
-                self._field = cmd[1]
-            elif cmd[0] == 'every':
-                self._vis_every = cmd[1]
-            elif cmd[0] == 'port_info':
+            if cmd[0] != self._authtoken:
+                self._ctrl_sock.send('unauthorized')
+                return True
+
+            if cmd[1] == 'axis':
+                self._axis = cmd[2]
+            elif cmd[1] == 'position':
+                self._position = cmd[2]
+            elif cmd[1] == 'field':
+                self._field = cmd[2]
+            elif cmd[1] == 'every':
+                self._vis_every = cmd[2]
+            elif cmd[1] == 'port_info':
                 self._ctrl_sock.send_json(self._port)
                 ack = False
 

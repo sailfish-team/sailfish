@@ -1,6 +1,16 @@
 #!/usr/bin/env python
+"""
+WX-based visualizer for data generated from the VisMixIn class. Run with:
+
+    ./visualizer.py <remote_addr>
+
+where remote_addr is the host, port and authentication token printed by the
+simulation.
+"""
+
 
 import json
+import re
 import sys
 import threading
 import zlib
@@ -18,6 +28,12 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 from wx.lib.pubsub import Publisher
 
+def _extract_auth_token(addr):
+    return re.search(r'//([^/@]+)@', addr).groups()[0]
+
+def _remove_auth_token(addr):
+    token = _extract_auth_token(addr)
+    return addr.replace(token + '@', '')
 
 class DataThread(threading.Thread):
     def __init__(self, window, data_port):
@@ -48,7 +64,7 @@ class DataThread(threading.Thread):
 
     def run(self):
         ioloop.install()
-        addr = sys.argv[1]
+        addr = _remove_auth_token(sys.argv[1])
         addr = "%s:%s" % (addr.rsplit(':', 1)[0], self._data_port)
 
         self._ctx = zmq.Context()
@@ -70,10 +86,11 @@ class CanvasFrame(wx.Frame):
 
         self._ctx = zmq.Context()
         self._sock = self._ctx.socket(zmq.REQ)
-        addr = sys.argv[1]
+        self._auth_token = _extract_auth_token(sys.argv[1])
+        addr = _remove_auth_token(sys.argv[1])
         self._sock.connect(addr)
         self._cmd('every', 25)
-        self._sock.send_json(('port_info',))
+        self._sock.send_json((self._auth_token, 'port_info',))
         data_port = self._sock.recv_json()
 
         # UI setup.
@@ -136,7 +153,7 @@ class CanvasFrame(wx.Frame):
         self._cmax = -100000
 
     def _cmd(self, name, args):
-        self._sock.send_json((name, args))
+        self._sock.send_json((self._auth_token, name, args))
         assert self._sock.recv_string() == 'ack'
 
     def OnAxisSelect(self, event):
