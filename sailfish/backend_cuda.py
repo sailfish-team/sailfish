@@ -215,7 +215,7 @@ class CUDABackend(object):
 
         return pycuda.compiler.SourceModule(source, options=options,
                 nvcc=self.options.cuda_nvcc, keep=self.options.cuda_keep_temp,
-                cache_dir=cache) #options=['-Xopencc', '-O0']) #, options=['--use_fast_math'])
+                cache_dir=cache)
 
     def get_kernel(self, prog, name, block, args, args_format, shared=0,
             needs_iteration=False, more_shared=False):
