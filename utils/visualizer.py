@@ -108,9 +108,22 @@ class CanvasFrame(wx.Frame):
                                 style=wx.CB_DROPDOWN | wx.CB_READONLY)
         self.Bind(wx.EVT_COMBOBOX, self.OnAxisSelect)
 
+        # Refresh frequency control.
+        self.every = wx.SpinCtrl(self)
+        self.every.SetRange(1, 100000)
+        self.every.SetValue(25)
+        self.Bind(wx.EVT_SPINCTRL, self.OnEveryChange)
+
+        # Field selector.
+        self.field = wx.ComboBox(self, value='vx', choices=['vx'],
+                                 style=wx.CB_DROPDOWN | wx.CB_READONLY)
+        self.Bind(wx.EVT_COMBOBOX, self.OnFieldSelect)
+
         # Status information.
         pos_txt = wx.StaticText(self, -1, 'Position: ')
         axis_txt = wx.StaticText(self, -1, 'Axis: ')
+        every_txt = wx.StaticText(self, -1, 'Every: ')
+        field_txt = wx.StaticText(self, -1, 'Field: ')
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -121,8 +134,14 @@ class CanvasFrame(wx.Frame):
         self.SetSizer(self.sizer)
 
         self.info_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.info_iter = wx.StaticText(self, -1, 'Iteration: NA')
+        self.info_iter = wx.StaticText(self, -1, 'Iteration: NA',
+                                       style=wx.ST_NO_AUTORESIZE )
+        self.info_compression = wx.StaticText(self, -1, 'Compression: NA',
+                                              style=wx.ST_NO_AUTORESIZE )
         self.info_sizer.Add(self.info_iter, 0, wx.ALIGN_CENTER_VERTICAL)
+        self.info_sizer.AddSpacer(10)
+        self.info_sizer.Add(self.info_compression, 0, wx.ALIGN_CENTER_VERTICAL)
+        self.SetDoubleBuffered(True)
 
         self.sizer.Add(self.info_sizer)
         self.sizer.Add(self.canvas, 10, wx.TOP | wx.LEFT | wx.EXPAND)
@@ -133,6 +152,13 @@ class CanvasFrame(wx.Frame):
         self.stat_sizer.AddSpacer(10)
         self.stat_sizer.Add(axis_txt, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
         self.stat_sizer.Add(self.axis, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
+        self.stat_sizer.AddSpacer(10)
+        self.stat_sizer.Add(every_txt, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
+        self.stat_sizer.Add(self.every, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
+        self.stat_sizer.AddSpacer(10)
+        self.stat_sizer.Add(field_txt, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
+        self.stat_sizer.Add(self.field, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
+
         self.sizer.Add(self.stat_sizer, 0, wx.TOP | wx.LEFT | wx.ADJUST_MINSIZE)
 
         self.plot = None
@@ -141,6 +167,7 @@ class CanvasFrame(wx.Frame):
         Publisher().subscribe(self.OnData, "update")
         DataThread(self, data_port).start()
 
+        # Timer to force updates of the main figure.
         self._timer = wx.Timer(self, 42)
         self._timer.Start(30)
         wx.EVT_TIMER(self, 42, self.OnTimer)
@@ -166,6 +193,13 @@ class CanvasFrame(wx.Frame):
     def OnPositionChange(self, event):
         self._cmd('position', event.GetInt())
 
+    def OnEveryChange(self, event):
+        self._cmd('every', event.GetInt())
+
+    def OnFieldSelect(self, event):
+        self._cmd('field', event.GetSelection())
+        self._reset_colorscale()
+
     def OnPaint(self, event):
         self.canvas.draw()
         event.Skip()
@@ -177,6 +211,9 @@ class CanvasFrame(wx.Frame):
     def OnData(self, evt):
         data = evt.data
         f = data['fields'][0].transpose()
+
+        if self.field.GetItems() != data['names']:
+            self.field.Set(data['names'])
 
         # Update the color map. Keep max/min values to prevent "oscillating"
         # colors which make the features of the flow more difficult to see.
@@ -194,7 +231,8 @@ class CanvasFrame(wx.Frame):
             self.plot.set_clim(self._cmin, self._cmax)
 
         self.info_iter.SetLabel('Iteration: %d' % data['iteration'])
-
+        self.info_compression.SetLabel('Compression: %.2f' %
+                                       data['compression'])
 
 class App(wx.App):
     def OnInit(self):
