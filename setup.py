@@ -28,7 +28,6 @@ def do_setup():
               'scipy >= 0.13.0',
               'pycuda >= 2013.1.1',
               'pyopencl >= 2013.2',
-              'execnet >= 1.1',
               'netifaces >= 0.8',
               'pyzmq >= 14.0.0',
               'Mako >= 0.9.0',
@@ -38,6 +37,7 @@ def do_setup():
           extras_require = {
               'doc': ['Sphinx >= 1.1', 'matplotlib >= 1.3.1'],
               'visualization': ['Pygame >= 1.7.1', 'wxPython >= 2.9.1.1'],
+              'cluster': ['execnet >= 1.1'],
           },
           setup_requires = [ "setuptools_git >= 0.3", ],
           include_package_data = True,
