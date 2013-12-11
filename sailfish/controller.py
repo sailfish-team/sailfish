@@ -23,7 +23,6 @@ import time
 from collections import defaultdict
 from multiprocessing import Process
 
-import execnet
 import zmq
 from sailfish import codegen, config, io, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
@@ -476,6 +475,7 @@ class LBSimulationController(object):
         self._cluster_gateways = []
         self._node_subdomains = split_subdomains_between_nodes(cluster.nodes, subdomains)
 
+        import execnet
         for _, node in zip(self._node_subdomains, cluster.nodes):
             self._cluster_gateways.append(execnet.makegateway(node.host))
 
@@ -636,6 +636,7 @@ class LBSimulationController(object):
 
     def _wait_for_masters(self):
         done = set()
+        import execnet
         while len(done) != len(self._cluster_channels):
             for i, ch in enumerate(self._cluster_channels):
                 if i in done:
