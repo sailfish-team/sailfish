@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding=utf-8
 """Flow between two parallel plates driven by a body force.
 
 The simulation is optimized for distributed runs (flow along the Z
@@ -26,19 +27,20 @@ Re_tau = 180
 
 # Max velocity.
 u0 = 0.05
-u_tau = u0 / (2.5 * math.log(Re_tau) + 6)
+
+# Max velocity is attained at the center of the channel. The center of the
+# channel in wall units is at Re_tau.
+u_tau = u0 / (1.0/0.41 * math.log(Re_tau) + 5.5)
 visc = u_tau * H / Re_tau
 
+# (2, 4, 12) * H is approximately the reference geometry from Moser.
 NX = 2 * H  # wall normal
-NY = 2 * H  # spanwise (PBC)
-NZ = 6 * H  # streamwise
+NY = 4 * H  # spanwise (PBC)
+NZ = 12 * H  # streamwise (PBC)
 
-# Literature stability limits:
-# 2.3 max stability with bounce back
-# 3.0 shocks with ELBM
-print 'Delta = %e' % (u_tau / visc)
+print 'Delta_+ = %e' % (u_tau / visc)
 print 'visc = %e' % visc
-print 'u = %e' % u_tau
+print 'u_tau = %e' % u_tau
 print 'force = %e' % (Re_tau**2 * visc**2 / H**3)
 
 
@@ -104,8 +106,9 @@ class ChannelSubdomain(Subdomain3D):
         dvz = dvz[z0:z1+1, y0:y1+1, x0:x1+1]
 
         # Add random perturbation to the initial flow field. The numerical
-        # factor deterines the largest perturbation value. We also force
-        # the perturbations to be smaller close to the wall.
+        # factor determines the largest perturbation value. We also force
+        # the perturbations to be smaller close to the wall in the wall-normal
+        # direction.
         sim.vx[:] += dvx / scale * 0.05 * u / u0
         sim.vy[:] += dvy / scale * 0.05
         sim.vz[:] += dvz / scale * 0.05  # streamwise
@@ -130,22 +133,13 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
             'block_size': 128,
             'precision': 'single',
             'check_invalid_results_gpu': False,
-            #'cuda_minimize_cpu': True,
-            #'cuda_sched_yield': True,
-            'cuda_disable_l1': True,
             'conn_axis': 'z',
             'max_iters': 3500000,
             'every': 200000,
             'perf_stats_every': 5000,
             'periodic_y': True,
             'periodic_z': True,
-            #'output': 'bgk395_hbb_120z',
-            #'final_checkpoint': True,
-            #'checkpoint_file': 'bgk395_hbb_120z',
-            #'restore_from': 'bgk_hbb_moser_dbl.0200000',
-            #'checkpoint_every': 200000,
             'subdomains': 2,
-            'cluster_interface': 'ib0'
             })
 
     def __init__(self, config):
