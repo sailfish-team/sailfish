@@ -45,14 +45,23 @@ print 'force = %e' % (Re_tau**2 * visc**2 / H**3)
 
 
 class ChannelSubdomain(Subdomain3D):
+    wall_bc = NTHalfBBWall
+
     def boundary_conditions(self, hx, hy, hz):
         wall_map = ((hx == 0) | (hx == self.gx - 1))
-        self.set_node(wall_map, NTHalfBBWall)
+        self.set_node(wall_map, self.wall_bc)
 
     def initial_conditions(self, sim, hx, hy, hz):
         sim.rho[:] = 1.0
 
-        y_plus = (H - np.abs(hx + 0.5 - H)) * u_tau / visc
+        hhx = np.abs(hx - self.wall_bc.location - H)
+        # Sanity checks.
+        if self.wall_bc.location == -0.5:
+            assert (H - hhx)[hx == 0] == 0.5
+        elif self.wall_bc.location == 0.5:
+            assert (H - hhx)[hx == 0] == -0.5
+
+        y_plus = (H - hhx) * u_tau / visc
         # Log-law.
         u = (1/0.41 * np.log(y_plus) + 5.5) * u_tau
         # Linear scaling close to the wall. y0 is chosen to make
