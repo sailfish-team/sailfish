@@ -53,8 +53,10 @@ class ChannelSubdomain(Subdomain3D):
         y_plus = (H - np.abs(hx + 0.5 - H)) * u_tau / visc
         # Log-law.
         u = (1/0.41 * np.log(y_plus) + 5.5) * u_tau
-        # Linear scaling close to the wall.
-        u[y_plus < 11.6] = y_plus[y_plus < 11.6] * u_tau
+        # Linear scaling close to the wall. y0 is chosen to make
+        # the profile continuous.
+        y0 = 11.44532166
+        u[y_plus < y0] = y_plus[y_plus < y0] * u_tau
         sim.vz[:] = u
 
         # Determine subdomain span.
