@@ -7,21 +7,23 @@ installed on the host system.  These are as follows (minimal required versions a
 
 General requirements:
 
-* numpy-1.6.0
-* sympy-0.7.1
-* mako-0.2.5
+* numpy-1.7.0
+* scipy-0.13.0
+* sympy-0.7.3
+* mako-0.9.0
 * execnet-1.0.9
-* Python zeromq-2.1.10
-* netifaces-0.6 (for distributed simulations only)
+* pyzmq-14.0.0
+* netifaces-0.8 (for distributed simulations only)
 * a Python module for the computational backend (one or more of the following):
 
-  * pycuda-0.92 (with the NVIDIA drivers and NVIDIA CUDA Toolkit)
+  * pycuda-2013.1 (with the NVIDIA drivers and NVIDIA CUDA Toolkit)
   * pypencl (with any OpenCL implementation)
 
 Visualization (optional):
 
 * pygame
 * matplotlib
+* wxpython
 
 Data output (optional):
 
@@ -45,7 +47,7 @@ Sailfish milestones and releases are appropriately tagged in the repository.  We
 make sure the code is always in a working state, but if you find the most recent checkout
 to be somehow broken, you might want to rewind to one of the tagged releases, e.g.::
 
-  git checkout v0.2
+  git checkout 2012.1
 
 Gentoo installation instructions
 --------------------------------
@@ -69,27 +71,16 @@ on your system and use ``i686`` instead of ``x86_64`` if you are on a 32-bit mac
 Ubuntu installation instructions
 --------------------------------
 
-These instructions assume that you want to use the CUDA backend.  Before following them,
-please make sure the NVIDIA CUDA Toolkit is installed in ``/usr/local/cuda`` (default location) and
-that ``nvcc`` is in your ``$PATH``.  You can get the necessary files at http://nvidia.com/cuda.
+On Ubuntu 13.10 or later all required dependencies can be installed from the standard
+package repository::
 
-To install the required packages on an Ubuntu system::
+  apt-get install nvidia-current-dev nvidia-current-updates nvidia-current-updates-dev nvidia-cuda-dev
+  apt-get install python-pycuda python-numpy python-matplotlib python-scipy python-sympy
+  apt-get install python-zmq python-execnet git
 
-  apt-get install python-pygame mayavi2 python-matplotlib python-numpy python-scipy python-sympy python-zmq python-execnet
-  apt-get install python-mako python-decorator python-pytools build-essential python-dev python-setuptools libboost-dev libboost-python-dev libboost-thread-dev
-  apt-get install python-pip git-core
-  sudo PATH=$PATH LD_LIBRARY_PATH=$LD_LIBRARY_PATH pip install pycuda
-
-For 32-bit systems please change ``/usr/local/cuda/lib64`` to ``/usr/local/cuda/lib``.
-
-There are currently no packages for PyCUDA/PyOpenCL available for
-Ubuntu, so these have to be installed manually from a checked-out upstream code repository of
-these projects or a snapshot tarball (as illustrated above for PyCUDA).  If this method does not
-work for you, please refer to http://wiki.tiker.net/PyCuda/Installation/Linux/Ubuntu for further
-instructions about installing PyCUDA on Ubuntu.
-
-Please also note that the NumPy version provided in Ubuntu releases older than Karmic is not
-recent enough for Sailfish.
+These instructions assume that you want to use the CUDA backend.  On older Ubuntu versions
+some packages might require manual installation (we recommend the ``pip`` Python package
+installer).
 
 When running Sailfish simulations, you can use::
 
@@ -97,6 +88,17 @@ When running Sailfish simulations, you can use::
 
 to avoid compatibility problems with the CUDA compiler, which as of CUDA 4.0 only supports GCC 4.4 and older.
 
+Installation instructions for other Linux systems
+-------------------------------------------------
+
+Whenever possible, it is recommended to install all necessary dependencies through the
+native package manager for your distribution. If the package manager lacks a dependency
+or if you do not have admin privileges allowing a global installation, we recommend the
+``pip`` Python package installer, which can currently install most Sailfish dependencies.
+
+Please refer to the ``examples/cluster/setup.sh`` script in our code repository
+for sample invocations. Note that this script assumes a completely bare system without
+even a Python interpreter.
 
 Mac OS X installation instructions (Mac Ports)
 ----------------------------------------------
