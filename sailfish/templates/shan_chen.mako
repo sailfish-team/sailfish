@@ -8,17 +8,13 @@
 
 ## Declares and evaluate the Shan-Chen forces.
 <%def name="sc_calculate_force(grid_idx=0)">
-	float sca0[${dim}];
+	float sca0[${dim}]={};
 
 	if (isWetNode(type)) {
 		%for dists, coupling_const in force_couplings.iteritems():
-			%if dists[0] == grid_idx:
+			%if (dists[0] == grid_idx) and (constants[coupling_const] != 0.0):
 				shan_chen_force(gi, g${grid_idx}m0, gg${dists[1]}m0,
 								${coupling_const}, sca0, ${position()});
-			%elif dists[1] == grid_idx:
-				shan_chen_force(gi, g${grid_idx}m0, gg${dists[0]}m0,
-								${coupling_const}, sca0, ${position()});
-			%endif
 		%endfor
 
 		// Convert momentum and force into velocity and acceleration.
@@ -50,10 +46,6 @@ ${device_func} inline void shan_chen_force(int i, float rho, ${global_ptr} ${con
 float cc, float *force, ${position_decl(prefix='')})
 {
 	float psi;
-
-	%for i in range(0, dim):
-		force[${i}] = 0.0f;
-	%endfor
 
 	%if block.envelope_size != 0:
 		int off;
