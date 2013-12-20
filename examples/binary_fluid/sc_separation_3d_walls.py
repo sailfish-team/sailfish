@@ -27,7 +27,7 @@ class SeparationSCSim2(SeparationSCSim):
             'lat_ny': 192,
             'lat_nz': 192,
             'grid': 'D3Q19',
-            'G': 1.2,
+            'G12': 1.2,
             'visc': 1.0/6.0,
             'periodic_x': False,
             'periodic_y': False,

@@ -36,7 +36,7 @@ class RayleighTaylorSCSim(LBBinaryFluidShanChen, LBForcedSim):
             'lat_nx': 640,
             'lat_ny': 400,
             'grid': 'D2Q9',
-            'G': 1.2,
+            'G12': 1.2,
             'visc': 1.0 / 6.0,
             'periodic_x': True})
 
