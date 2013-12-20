@@ -356,11 +356,17 @@ class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
 
     def __init__(self, config):
         super(LBBinaryFluidShanChen, self).__init__(config)
-        self.add_force_coupling(0, 1, 'SCG')
+        self.add_force_coupling(0, 0, 'G11')
+        self.add_force_coupling(0, 1, 'G12')
+        self.add_force_coupling(1, 0, 'G21')
+        self.add_force_coupling(1, 1, 'G22')
 
     def constants(self):
         ret = super(LBBinaryFluidShanChen, self).constants()
-        ret['SCG'] = self.config.G
+        ret['G11'] = self.config.G11
+        ret['G12'] = self.config.G12
+        ret['G21'] = self.config.G12
+        ret['G22'] = self.config.G22
         return ret
 
     @classmethod
@@ -375,8 +381,12 @@ class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
         LBBinaryFluidBase.add_options(group, dim)
 
         group.add_argument('--visc', type=float, default=1.0, help='numerical viscosity')
-        group.add_argument('--G', type=float, default=1.0,
-                help='Shan-Chen interaction strength constant')
+        group.add_argument('--G11', type=float, default=0.0,
+                help='Shan-Chen component 1 self-interaction strength constant')
+        group.add_argument('--G12', type=float, default=0.0,
+                help='Shan-Chen component 1<->2 interaction strength constant')
+        group.add_argument('--G22', type=float, default=0.0,
+                help='Shan-Chen component 2 self-interaction strength constant')
         group.add_argument('--sc_potential', type=str,
                 choices=sym.SHAN_CHEN_POTENTIALS, default='linear',
                 help='Shan-Chen pseudopotential function to use')
