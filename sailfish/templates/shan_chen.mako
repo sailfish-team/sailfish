@@ -15,6 +15,7 @@
 			%if (dists[0] == grid_idx) and (constants[coupling_const] != 0.0):
 				shan_chen_force(gi, g${grid_idx}m0, gg${dists[1]}m0,
 								${coupling_const}, sca0, ${position()});
+			%endif
 		%endfor
 
 		// Convert momentum and force into velocity and acceleration.
