@@ -26,7 +26,7 @@ class SeparationSCSim(LBBinaryFluidShanChen):
             'lat_ny': 192,
             'lat_nz': 192,
             'grid': 'D3Q19',
-            'G': 1.2,
+            'G12': 1.2,
             'visc': 1.0/6.0,
             'periodic_x': True,
             'periodic_y': True,
