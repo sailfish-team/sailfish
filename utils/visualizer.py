@@ -35,6 +35,7 @@ def _remove_auth_token(addr):
     token = _extract_auth_token(addr)
     return addr.replace(token + '@', '')
 
+
 class DataThread(threading.Thread):
     def __init__(self, window, data_port):
         threading.Thread.__init__(self)
@@ -89,35 +90,36 @@ class CanvasFrame(wx.Frame):
         self._auth_token = _extract_auth_token(sys.argv[1])
         addr = _remove_auth_token(sys.argv[1])
         self._sock.connect(addr)
-        self._cmd('every', 25)
         self._sock.send_json((self._auth_token, 'port_info',))
-        data_port = self._sock.recv_json()
+        data_port, md = self._sock.recv_json()
 
         # UI setup.
         self.figure = Figure(figsize=(4,3), dpi=100)
         self.canvas = FigureCanvas(self, -1, self.figure)
 
         # Slice position control.
-        self.position = wx.SpinCtrl(self)
-        self.position.SetRange(0, 10)
-        self.position.SetValue(0)
-        self.Bind(wx.EVT_SPINCTRL, self.OnPositionChange)
+        self.position = wx.SpinCtrl(self, style=wx.TE_PROCESS_ENTER |
+                                    wx.SP_ARROW_KEYS)
+        self.position.Bind(wx.EVT_SPINCTRL, self.OnPositionChange)
+        self.position.Bind(wx.EVT_TEXT_ENTER, self.OnPositionChange)
+        self.position.SetValue(md['axis'])
 
         # Slice axis control.
         self.axis = wx.ComboBox(self, value='x', choices=['x', 'y', 'z'],
                                 style=wx.CB_DROPDOWN | wx.CB_READONLY)
-        self.Bind(wx.EVT_COMBOBOX, self.OnAxisSelect)
+        self.axis.Bind(wx.EVT_COMBOBOX, self.OnAxisSelect)
 
         # Refresh frequency control.
-        self.every = wx.SpinCtrl(self)
+        self.every = wx.SpinCtrl(self, style=wx.TE_PROCESS_ENTER |
+                                wx.SP_ARROW_KEYS)
         self.every.SetRange(1, 100000)
-        self.every.SetValue(25)
-        self.Bind(wx.EVT_SPINCTRL, self.OnEveryChange)
+        self.every.Bind(wx.EVT_SPINCTRL, self.OnEveryChange)
+        self.every.Bind(wx.EVT_TEXT_ENTER, self.OnEveryChange)
 
         # Field selector.
         self.field = wx.ComboBox(self, value='vx', choices=['vx'],
                                  style=wx.CB_DROPDOWN | wx.CB_READONLY)
-        self.Bind(wx.EVT_COMBOBOX, self.OnFieldSelect)
+        self.field.Bind(wx.EVT_COMBOBOX, self.OnFieldSelect)
 
         # Status information.
         pos_txt = wx.StaticText(self, -1, 'Position: ')
@@ -180,7 +182,7 @@ class CanvasFrame(wx.Frame):
         self._cmax = -100000
 
     def _cmd(self, name, args):
-        self._sock.send_json((self._auth_token, name, args))
+        self._sock.send_json((self._auth_token, name, args), zmq.NOBLOCK)
         assert self._sock.recv_string() == 'ack'
 
     def OnAxisSelect(self, event):
@@ -190,11 +192,21 @@ class CanvasFrame(wx.Frame):
         self.figure.clear()
         self.plot = None
 
+    def _get_int_from_event(self, event):
+        if event.GetString():
+            try:
+                val = int(event.GetString())
+            except ValueError:
+                val = 0
+        else:
+            val = event.GetInt()
+        return val
+
     def OnPositionChange(self, event):
-        self._cmd('position', event.GetInt())
+        self._cmd('position', self._get_int_from_event(event))
 
     def OnEveryChange(self, event):
-        self._cmd('every', event.GetInt())
+        self._cmd('every', self._get_int_from_event(event))
 
     def OnFieldSelect(self, event):
         self._cmd('field', event.GetSelection())
@@ -225,7 +237,7 @@ class CanvasFrame(wx.Frame):
             self.plot = self.axes.imshow(f, origin='lower',
                                          interpolation='nearest')
             self.cbar = self.figure.colorbar(self.plot)
-            self.position.SetRange(0, data['axis'] - 1)
+            self.position.SetRange(0, data['axis_range'] - 1)
         else:
             self.plot.set_data(f)
             self.plot.set_clim(self._cmin, self._cmax)

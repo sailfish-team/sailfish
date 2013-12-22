@@ -21,6 +21,15 @@ class Slice(object):
         self.kernel = kernel
 
 
+class VisConfig(object):
+    """Container class for settings related to visualization."""
+    def __init__(self):
+        self.every = 100
+        self.axis = 0
+        self.position = 0
+        self.field = 0
+
+
 class Vis2DSliceMixIn(LBMixIn):
     """Extracts 2D slices of 3D fields for on-line visualization."""
     aux_code = ['data_processing.mako']
@@ -37,11 +46,7 @@ class Vis2DSliceMixIn(LBMixIn):
                            'automatically.')
 
     def before_main_loop(self, runner):
-        self._vis_every = 10
-        self._axis = 0
-        self._position = 10
-        self._field = 2
-
+        self._vis_config = VisConfig()
         self._ctx = zmq.Context()
         self._sock = self._ctx.socket(zmq.XPUB)
         self._ctrl_sock = self._ctx.socket(zmq.REP)
@@ -117,15 +122,15 @@ class Vis2DSliceMixIn(LBMixIn):
                 return True
 
             if cmd[1] == 'axis':
-                self._axis = cmd[2]
+                self._vis_config.axis = cmd[2]
             elif cmd[1] == 'position':
-                self._position = cmd[2]
+                self._vis_config.position = cmd[2]
             elif cmd[1] == 'field':
-                self._field = cmd[2]
+                self._vis_config.field = cmd[2]
             elif cmd[1] == 'every':
-                self._vis_every = cmd[2]
+                self._vis_config.every = cmd[2]
             elif cmd[1] == 'port_info':
-                self._ctrl_sock.send_json(self._port)
+                self._ctrl_sock.send_json((self._port, self._vis_config.__dict__))
                 ack = False
 
             if ack:
@@ -141,19 +146,20 @@ class Vis2DSliceMixIn(LBMixIn):
         while self._handle_commands():
             pass
 
-        mod = self.iteration % self._vis_every
-        if mod == self._vis_every - 1:
+        mod = self.iteration % self._vis_config.every
+        if mod == self._vis_config.every - 1:
             self.need_fields_flag = True
         elif mod == 0:
             # Collect all data into a single dict.
             md = {
-                'axis': self._axis_len[self._axis],
-                'current': (self._axis, self._position),
-                'every': self._vis_every,
+                'axis_range': self._axis_len[self._vis_config.axis],
+                'axis': self._vis_config.axis,
+                'current': (self._vis_config.axis, self._vis_config.position),
+                'every': self._vis_config.every,
                 'iteration': self.iteration,
                 'names': self._names,
                 'dtype': str(runner.float().dtype),
-                'shape': self._buf_shapes[self._axis]
+                'shape': self._buf_shapes[self._vis_config.axis]
             }
 
             # Look for new subscribers.
@@ -179,21 +185,21 @@ class Vis2DSliceMixIn(LBMixIn):
                 # Bail out early to avoid running kernels to extract slice data.
                 return
 
-            shape = self._buf_shapes[self._axis]
+            shape = self._buf_shapes[self._vis_config.axis]
 
             grid = [(shape[1] + self.config.block_size - 1) /
                     self.config.block_size, shape[0]]
 
             # Run kernel to extract slice data.
             sl = self._slices[self._field]
-            sl.kernel.args[0] = self._axis
-            sl.kernel.args[1] = self._position
+            sl.kernel.args[0] = self._vis_config.axis
+            sl.kernel.args[1] = self._vis_config.position
             runner.backend.run_kernel(sl.kernel, grid)
 
             # Selector to extract part of slice buffer that actually holds
             # meaningful data. We need this since we use a single buffer
             # for slices of all three possible orientations.
-            selector = slice(0, self._buf_sizes[self._axis])
+            selector = slice(0, self._buf_sizes[self._vis_config.axis])
             runner.backend.from_buf(sl.pair.gpu)
             try:
                 self._sock.send(zlib.compress(sl.pair.host[selector]), zmq.NOBLOCK)
