@@ -108,7 +108,7 @@ ${kernel} void SetInitialConditions(
 	${scratch_space_if_required()})
 {
 	${local_indices()}
-	${indirect_index()}
+	${indirect_index(orig=None)}
 
 	// Cache macroscopic fields in local variables.
 	float rho = irho[gi] ${' -1.0f' if config.minimize_roundoff else ''};
