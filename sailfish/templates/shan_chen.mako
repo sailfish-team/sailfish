@@ -41,12 +41,13 @@ ${device_func} inline float sc_ppot(${global_ptr} ${const_ptr} float *__restrict
 // field: (density) fielf of the other fluid component
 // f1, f2: fields
 // cc: coupling constant
-// force: Shan-Chen force (output variable)
+// out: Shan-Chen force (output variable)
 // x, y, [z]: position of the node
 ${device_func} inline void shan_chen_force(int i, float rho, ${global_ptr} ${const_ptr} float *__restrict__ field,
-float cc, float *force, ${position_decl(prefix='')})
+float cc, float *out, ${position_decl(prefix='')})
 {
 	float psi;
+	float force[${dim}] = {};
 
 	%if block.envelope_size != 0:
 		int off;
@@ -79,5 +80,6 @@ float cc, float *force, ${position_decl(prefix='')})
 
 	%for i in range(0, dim):
 		force[${i}] *= - psi * cc;
+		out[${i}] += force[${i}];
 	%endfor
 }
