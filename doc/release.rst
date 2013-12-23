@@ -1,23 +1,29 @@
 Release notes
 =============
 
-2013.1 (in progress)
-""""""""""""""""""""
+2013.1
+""""""
  * 4 new outflow boundary conditions: Grad's approximation (NTGradFreeflow), Yu's method (NTYuOutflow), node copying method (NTCopy), Neumann's BC (NTNeumann).
  * New boundary conditions based on the regularized LB dynamics (NTRegularizedDensity, NTRegularizedVelocity).
  * New no-slip boundary condition based on the Tamm-Mott-Smith approximation (NTWallTMS).
  * NTHalfBBWall is now supported when the AA memory layout is used.
- * Added support for the exact difference method (EDM) of applying body forces.
- * Added support for a model minimizing round-off errors (--minimize_roundoff)
- * New examples: four rolls mill, 2D lid-driven cavity with the entropic model.
+ * Exact difference method (EDM) of applying body forces.
+ * Model minimizing round-off errors (--minimize_roundoff)
+ * New examples: four rolls mill, 2D lid-driven cavity with the entropic model, external geometry from a npy file, Taylor-Green flow, duct flow, channel flow, capillary wave, two-phase Poiseuille flow.
  * Restored the cutplane visualization engine for 3D simulations to a working state.
- * Added a mechanism of easy inclusion of additional code fragments (commit ae7bdff4)
- * Added support for regularized LB dynamics (--regularized).
- * Fixed the entropic LB model.
- * Compatiblity fixed for sympy-0.7.2 and numpy-1.7.0.
- * Added support for distributed simulations on LSF clusters.
- * Added the D3Q27 lattice.
- * Added support for drawing walls in the pygame visualization interface.
+ * Mechanism of easy inclusion of additional code fragments (commit ae7bdff4)
+ * Regularized LB dynamics (--regularized).
+ * Entropic LB model fixes.
+ * Compatiblity fixes for sympy-0.7.2 and numpy-1.7.0.
+ * Support for distributed simulations on LSF clusters.
+ * D3Q27 lattice.
+ * Support for drawing walls in the pygame visualization interface.
+ * New on-line, remote visualization tool (utils/visualizer.py).
+ * LinearlyInterpolatedTimeSeries data source for boundary conditions.
+ * Indirect node addressing mode for sparse geometries.
+ * Possibility to use neighbor link tagging instead of orientation (NTHalfBBWall in more complex geometries).
+ * Support for SIGHUP (creates a checkpoint dump).
+ * Support for shuffle propagation.
 
 2012.2
 """"""
