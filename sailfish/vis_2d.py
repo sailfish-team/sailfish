@@ -150,6 +150,7 @@ class Fluid2DVis(vis.FluidVis):
     def __init__(self, config, subdomains, quit_event, sim_quit_event,
                  vis_config, geo_queues=None):
         pygame.init()
+        pygame.font.init()
         pygame.surfarray.use_arraytype('numpy')
 
         super(Fluid2DVis, self).__init__()
@@ -182,7 +183,6 @@ class Fluid2DVis(vis.FluidVis):
 
         pygame.key.set_repeat(100,50)
         pygame.display.set_caption('Sailfish')
-        return
 
     def set_mode(self, width, height):
         if self.config.scr_depth != 0:
