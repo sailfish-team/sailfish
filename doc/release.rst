@@ -22,8 +22,10 @@ Release notes
  * LinearlyInterpolatedTimeSeries data source for boundary conditions.
  * Indirect node addressing mode for sparse geometries.
  * Possibility to use neighbor link tagging instead of orientation (NTHalfBBWall in more complex geometries).
- * Support for SIGHUP (creates a checkpoint dump).
- * Support for shuffle propagation.
+ * SIGHUP handling (creates a checkpoint dump).
+ * Shuffle propagation (speeds up execution on some lower-end GPUs).
+ * Force objects (on-GPU calculations of forces on solid objects).
+ * On-GPU flow statistics (kinetic energy, Reynolds stresses, etc).
 
 2012.2
 """"""
