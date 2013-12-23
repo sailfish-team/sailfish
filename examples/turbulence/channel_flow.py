@@ -56,10 +56,7 @@ class ChannelSubdomain(Subdomain3D):
 
         hhx = np.abs(hx - self.wall_bc.location - H)
         # Sanity checks.
-        if self.wall_bc.location == -0.5:
-            assert (H - hhx)[hx == 0] == 0.5
-        elif self.wall_bc.location == 0.5:
-            assert (H - hhx)[hx == 0] == -0.5
+        assert np.all((H - hhx)[hx == 0] == -self.wall_bc.location)
 
         y_plus = (H - hhx) * u_tau / visc
         # Log-law.

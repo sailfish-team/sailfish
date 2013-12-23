@@ -28,7 +28,7 @@ class VisConfig(object):
         self.axis = 0
         self.position = 0
         self.field = 0
-
+        self.levels = 256
 
 class Vis2DSliceMixIn(LBMixIn):
     """Extracts 2D slices of 3D fields for on-line visualization."""
@@ -103,7 +103,7 @@ class Vis2DSliceMixIn(LBMixIn):
             self._slices.append(
                 Slice(pair, runner.get_kernel(
                     'ExtractSliceField',
-                    [self._axis, self._position, gpu_map, gf,
+                    [self._vis_config.axis, self._vis_config.position, gpu_map, gf,
                      pair.gpu], 'iiPPP')))
 
         self._vis_targets = targets
@@ -117,6 +117,8 @@ class Vis2DSliceMixIn(LBMixIn):
         if self._ctrl_sock in socks:
             cmd = self._ctrl_sock.recv_json()
             ack = True
+            self.config.logger.debug('Visualizer command "%s" received.' %
+                                     cmd[1])
             if cmd[0] != self._authtoken:
                 self._ctrl_sock.send('unauthorized')
                 return True
@@ -129,9 +131,14 @@ class Vis2DSliceMixIn(LBMixIn):
                 self._vis_config.field = cmd[2]
             elif cmd[1] == 'every':
                 self._vis_config.every = cmd[2]
+            elif cmd[1] == 'levels':
+                self._vis_config.levels = cmd[2]
             elif cmd[1] == 'port_info':
                 self._ctrl_sock.send_json((self._port, self._vis_config.__dict__))
                 ack = False
+            else:
+                self.config.logger.info('Invalid visualizer command: %s' %
+                                        cmd[1])
 
             if ack:
                 self._ctrl_sock.send('ack')
@@ -156,6 +163,7 @@ class Vis2DSliceMixIn(LBMixIn):
                 'axis': self._vis_config.axis,
                 'current': (self._vis_config.axis, self._vis_config.position),
                 'every': self._vis_config.every,
+                'field': self._vis_config.field,
                 'iteration': self.iteration,
                 'names': self._names,
                 'dtype': str(runner.float().dtype),
@@ -167,8 +175,10 @@ class Vis2DSliceMixIn(LBMixIn):
                 rc = self._sock.recv(zmq.NOBLOCK)
                 if rc[0] == '\x01':
                     self._num_subs += 1
+                    self.config.logger.info('Visualizer connected.')
                 else:
                     self._num_subs -= 1
+                    self.config.logger.info('Visualizer disconnected.')
             except zmq.ZMQError:
                 pass
 
@@ -191,7 +201,7 @@ class Vis2DSliceMixIn(LBMixIn):
                     self.config.block_size, shape[0]]
 
             # Run kernel to extract slice data.
-            sl = self._slices[self._field]
+            sl = self._slices[self._vis_config.field]
             sl.kernel.args[0] = self._vis_config.axis
             sl.kernel.args[1] = self._vis_config.position
             runner.backend.run_kernel(sl.kernel, grid)
@@ -202,7 +212,13 @@ class Vis2DSliceMixIn(LBMixIn):
             selector = slice(0, self._buf_sizes[self._vis_config.axis])
             runner.backend.from_buf(sl.pair.gpu)
             try:
-                self._sock.send(zlib.compress(sl.pair.host[selector]), zmq.NOBLOCK)
+                data = sl.pair.host[selector]
+                # Bucketize the data to improve compression rates.
+                dv = ((np.nanmax(data) - np.nanmin(data)) /
+                      self._vis_config.levels)
+                data = np.round(data / dv)
+                data *= dv
+                self._sock.send(zlib.compress(data.astype(runner.float)), zmq.NOBLOCK)
             except zmq.ZMQError:
                 self.config.logger.error('Failed to send visualization data')
                 return
