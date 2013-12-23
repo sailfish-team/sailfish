@@ -3,7 +3,7 @@ PYTHON=python
 
 .PHONY: clean regtest regtest_small_block presubmit test_examples test_gpu goldens test_goldens test
 
-presubmit: test test_gpu test_examples regtest regtest_small_block regtest_aa test_access_pattern
+presubmit: test test_gpu test_examples regtest regtest_small_block regtest_aa test_access_pattern regtest_indirect
 test: test_short test_med
 
 # Host unit tests.
