@@ -15,7 +15,7 @@ class DropSubdomain(Subdomain2D):
         sim.phi[:] = 0.02
         sim.rho[drop_map] = 0.02
         sim.phi[drop_map] = 0.2
-        
+
 class SCSim(LBBinaryFluidShanChen):
     subdomain = DropSubdomain
 
