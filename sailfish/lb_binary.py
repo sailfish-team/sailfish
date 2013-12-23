@@ -48,7 +48,6 @@ class LBBinaryFluidBase(LBSim):
         # grid type (primary, secondary) -> axis -> kernels
         dist_kernels = defaultdict(lambda: defaultdict(list))
         macro_kernels = defaultdict(lambda: defaultdict(list))
-
         if self.config.node_addressing == 'indirect':
             args = [runner.gpu_indirect_address()]
             signature = 'PPi'
@@ -83,9 +82,15 @@ class LBBinaryFluidBase(LBSim):
             kernel = 'ApplyPeriodicBoundaryConditionsWithSwap'
 
         for i in range(0, 3):
+            if self.config.node_addressing == 'indirect':
+                args2 = [runner.gpu_indirect_address()]
+                sig2 = 'PPi'
+            else:
+                args2 = []
+                sig2 = 'Pi'
             dist_kernels[1][i] = [
-                    runner.get_kernel(kernel, [gpu_dist1, np.uint32(i)], 'Pi'),
-                    runner.get_kernel(kernel, [gpu_dist2, np.uint32(i)], 'Pi')]
+                    runner.get_kernel(kernel, args2 + [gpu_dist1, np.uint32(i)], sig2),
+                    runner.get_kernel(kernel, args2 + [gpu_dist2, np.uint32(i)], sig2)]
 
             # This is the same as above -- for macroscopic fields, there is no
             # distinction between primary and secondary buffers.
@@ -113,6 +118,11 @@ class LBBinaryFluidBase(LBSim):
 
         args1 = [gpu_map, gpu_dist1a, gpu_dist2a] + gpu_v + [gpu_rho, gpu_phi]
         args2 = [gpu_map, gpu_dist1b, gpu_dist2b] + gpu_v + [gpu_rho, gpu_phi]
+
+        if self.config.node_addressing == 'indirect':
+            gpu_nodes = runner.gpu_indirect_address()
+            args1 = [gpu_nodes] + args1
+            args2 = [gpu_nodes] + args2
 
         runner.exec_kernel('SetInitialConditions', args1, 'P'*len(args1))
         if self.config.access_pattern == 'AB':
@@ -300,6 +310,15 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
         macro_args2 = [gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi,
                        options]
 
+        if self.config.node_addressing == 'indirect':
+            gpu_nodes = runner.gpu_indirect_address()
+            args1a = [gpu_nodes] + args1a
+            args1b = [gpu_nodes] + args1b
+            args2a = [gpu_nodes] + args2a
+            args2b = [gpu_nodes] + args2b
+            macro_args1 = [gpu_nodes] + macro_args1
+            macro_args2 = [gpu_nodes] + macro_args2
+
         args_a_signature = 'P' * (len(args1a) - 1) + 'i'
         args_b_signature = 'P' * (len(args1b) - 1) + 'i'
         macro_signature = 'P' * (len(macro_args1) - 1) + 'i'
@@ -440,6 +459,15 @@ class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
                        gpu_v + [options])
         macro_args2 = ([gpu_map, gpu_dist1b, gpu_dist2b, gpu_rho, gpu_phi] +
                        gpu_v + [options])
+
+        if self.config.node_addressing == 'indirect':
+            gpu_nodes = runner.gpu_indirect_address()
+            args1a = [gpu_nodes] + args1a
+            args1b = [gpu_nodes] + args1b
+            args2a = [gpu_nodes] + args2a
+            args2b = [gpu_nodes] + args2b
+            macro_args1 = [gpu_nodes] + macro_args1
+            macro_args2 = [gpu_nodes] + macro_args2
 
         args_a_signature = 'P' * (len(args1a) - 1) + 'i'
         args_b_signature = 'P' * (len(args1b) - 1) + 'i'

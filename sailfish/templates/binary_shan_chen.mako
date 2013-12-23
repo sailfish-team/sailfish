@@ -18,6 +18,7 @@
 </%def>
 
 ${kernel} void ShanChenPrepareMacroFields(
+	${nodes_array_if_required()}
 	${global_ptr} ${const_ptr} int *__restrict__ map,
 	${global_ptr} ${const_ptr} float *__restrict__ dist1_in,
 	${global_ptr} ${const_ptr} float *__restrict__ dist2_in,
@@ -29,6 +30,7 @@ ${kernel} void ShanChenPrepareMacroFields(
 	${iteration_number_if_required()})
 {
 	${local_indices_split()}
+	${indirect_index()}
 	${load_node_type()}
 
 	// Do not update the macroscopic fields for nodes which do not
@@ -55,13 +57,21 @@ ${kernel} void ShanChenPrepareMacroFields(
 	v[1] = 0.0f;
 	${'v[2] = 0.0f;' if dim == 3 else ''}
 
-	getDist(&fi, dist1_in, gi ${iteration_number_arg_if_required()});
+	getDist(
+		${nodes_array_arg_if_required()}
+		&fi, dist1_in, gi
+		${dense_gi_arg_if_required()}
+		${iteration_number_arg_if_required()});
 	get0thMoment(&fi, type, orientation, &rho0);
 	compute_1st_moment(&fi, v, 0, tau0_inv);
 	orho0[gi] = rho0;
 
 	// TODO: try moving this line earlier and see what the performance impact is.
-	getDist(&fi, dist2_in, gi ${iteration_number_arg_if_required()});
+	getDist(
+		${nodes_array_arg_if_required()}
+		&fi, dist2_in, gi
+		${dense_gi_arg_if_required()}
+		${iteration_number_arg_if_required()});
 	get0thMoment(&fi, type, orientation, &rho1);
 	compute_1st_moment(&fi, v, 1, tau1_inv);
 	orho1[gi] = rho1;
@@ -79,6 +89,7 @@ ${kernel} void ShanChenPrepareMacroFields(
 
 %for grid_idx in range(0, 2):
 ${kernel} void ShanChenCollideAndPropagate${grid_idx}(
+	${nodes_array_if_required()}
 	${global_ptr} ${const_ptr} int *__restrict__ map,
 	${global_ptr} ${const_ptr} float *__restrict__ dist1_in,
 	${global_ptr} float *__restrict__ dist1_out,
@@ -90,6 +101,7 @@ ${kernel} void ShanChenCollideAndPropagate${grid_idx}(
 	${iteration_number_if_required()})
 {
 	${local_indices_split()}
+	${indirect_index()}
 	${shared_mem_propagation_vars()}
 	${load_node_type()}
 	Dist d0;
@@ -99,7 +111,11 @@ ${kernel} void ShanChenCollideAndPropagate${grid_idx}(
 		${sc_calculate_force(grid_idx=grid_idx)}
 
 		// Cache the distributions in local variables.
-		getDist(&d0, dist1_in, gi ${iteration_number_arg_if_required()});
+		getDist(
+			${nodes_array_arg_if_required()}
+			&d0, dist1_in, gi
+			${dense_gi_arg_if_required()}
+			${iteration_number_arg_if_required()});
 
 		// Macroscopic quantities for the current cell.
 		float v[${dim}];
@@ -110,7 +126,7 @@ ${kernel} void ShanChenCollideAndPropagate${grid_idx}(
 		${guo_density_restore_index()}
 
 		precollisionBoundaryConditions(&d0, ncode, type, orientation, &g${grid_idx}m0, v
-									   ${', dist1_out, gi' if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+									   ${precollision_arguments()}
 									   ${iteration_number_arg_if_required()});
 		${relaxate(bgk_args_sc, grid_idx)}
 
