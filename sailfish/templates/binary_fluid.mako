@@ -95,7 +95,7 @@ ${kernel} void SetInitialConditions(
 	${global_ptr} ${const_ptr} float *__restrict__ iphi)
 {
 	${local_indices()}
-	${indirect_index()}
+	${indirect_index(orig=None)}
 
 	int ncode = map[gi];
 	int type = decodeNodeType(ncode);
