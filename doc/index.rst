@@ -16,7 +16,7 @@ Sailfish is a free computational fluid dynamics solver based on the Lattice Bolt
 method and optimized for modern multi-core systems, especially GPUs (Graphics Processing Units).
 
 Want to see Sailfish in action?  Check out our `videos on YouTube <http://www.youtube.com/watch?v=kx4-VjaJ2eI&feature=PlayList&p=96C9241314F1A898&index=0&playnext=1>`_,
-or better yet, `get the code <http://github.com/sailfish-team>`_ and see for yourself by running the provided examples.
+or better yet, `get the code <http://github.com/sailfish-team/sailfish>`_ and see for yourself by running the provided examples.
 
 Contents
 ========

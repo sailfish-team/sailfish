@@ -15,10 +15,8 @@ How to help?
 * Send us patches implementing new functionality, fixing bugs or adding new test cases.
   Patches should be sent in the form of merge requests on `GitHub <https://raw.github.com/sailfish-team/sailfish>`_.
 
-* Don't know what to start with?  Not a problem!  Have a look at the tasks in our
-  `TODO list`__.
-__ https://raw.github.com/sailfish-team/sailfish/master/TODO
-
+* Don't know what to start with?  Not a problem!  Just ping us on the mailing list and
+  we would be happy to provide ideas.
 
 Note that you don't need to be a physicist or engineer to be able to provide useful help.
 We have a number of things that we would like to do within the project that only

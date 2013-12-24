@@ -9,3 +9,10 @@ Posters
 Presentations
 """""""""""""
  * GPU Technology Conference 2012: :download:`Sailfish: Lattice Boltzmann Fluid Simulations with GPUs and Python <media/2012_gtc.pdf>`
+
+Academic Papers
+"""""""""""""""
+Have you used Sailfish for a paper? Let us know and have it showcased here!
+
+ * M. Januszewski, M. Kostur, `Sailfish: a flexible multi-GPU implementation of the lattice Boltzmann method <http://arxiv.org/abs/1311.2404>`_ (under review)
+ * M. Matyka, Z. Koza, J. Gołembiewski, M. Kostur, M. Januszewski `Anisotropy of flow in stochastically generated porous media <http://arxiv.org/abs/1305.3426>`_ Physical Review E 08/2013; 88(2):023018
