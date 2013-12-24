@@ -1384,7 +1384,8 @@ class SubdomainRunner(object):
 
         for i in range(len(self._sim.grids)):
             data['dist{0}a'.format(i)] = self._debug_get_dist(True, i)
-            data['dist{0}b'.format(i)] = self._debug_get_dist(False, i)
+            if self.config.access_pattern == 'AB':
+                data['dist{0}b'.format(i)] = self._debug_get_dist(False, i)
 
         np.savez(fname, **data)
 
