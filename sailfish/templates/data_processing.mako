@@ -423,3 +423,65 @@ ${kernel} void ExtractSliceUsq(int axis, int position,
 	const float vz = ivz[gi];
 	out[go] = sqrtf(vx * vx + vy * vy + vz * vz);
 }
+
+<%def name="stats_slice(name, axis, num_inputs=1, stats=[[(0,1)]], out_type='float')">
+${kernel} void ${name}(int position,
+	%for i in range(num_inputs):
+		${global_ptr} float *f${i},
+	%endfor
+	%for i in range(len(stats)):
+		${global_ptr} ${out_type} *out${i} ${',' if i < len(stats) - 1 else ''}
+	%endfor
+){
+	const int c0 = get_global_id(0) + 1;
+	const int c1 = get_global_id(1) + 1;
+
+	%if axis == 0:
+		if (c0 >= ${lat_ny-1} || c1 >= ${lat_nz-1}) {
+			return;
+		}
+		const int gi = getGlobalIdx(1 + position, c0, c1);
+		const int stride = ${lat_ny - 2};
+	%elif axis == 1:
+		if (c0 >= ${lat_nx-1} || c1 >= ${lat_nz-1}) {
+			return;
+		}
+		const int gi = getGlobalIdx(c0, 1 + position, c1);
+		const int stride = ${lat_nx - 2};
+	%else:
+		if (c0 >= ${lat_nx-1} || c1 >= ${lat_ny-1}) {
+			return;
+		}
+		const int gi = getGlobalIdx(c0, c1, 1 + position);
+		const int stride = ${lat_nx - 2};
+	%endif
+	%for i in range(len(stats)):
+		${out_type} acc${i} = 0.0f;
+	%endfor
+	${_compute_stats(num_inputs, stats, out_type)}
+	const int gi_dst = (c1 - 1) * stride + (c0 - 1);
+	%for i in range(len(stats)):
+		out${i}[gi_dst] += acc${i};
+	%endfor
+}
+</%def>
+
+<%def name="stats_global(name, num_inputs=1, stats=[], out_type='float')">
+${kernel} void ${name}(
+	%for i in range(num_inputs):
+		${global_ptr} float *f${i},
+	%endfor
+	%for i in range(len(stats)):
+		${global_ptr} ${out_type} *out${i} ${',' if i < len(stats) - 1 else ''}
+	%endfor
+){
+	${local_indices()}
+	%for i in range(len(stats)):
+		${out_type} acc${i} = 0.0f;
+	%endfor
+	${_compute_stats(num_inputs, stats, out_type)}
+	%for i in range(len(stats)):
+		out${i}[gi] += acc${i};
+	%endfor
+}
+</%def>
