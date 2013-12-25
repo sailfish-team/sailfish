@@ -176,7 +176,7 @@ class Vis2DSliceMixIn(LBMixIn):
                 'field': self._vis_config.field,
                 'iteration': self.iteration,
                 'names': self._names,
-                'dtype': str(runner.float().dtype),
+                'dtype': str(np.float16().dtype),
                 'shape': _swap(self._buf_shapes[self._vis_config.axis])
             }
 
@@ -227,7 +227,7 @@ class Vis2DSliceMixIn(LBMixIn):
                       self._vis_config.levels)
                 data = np.round(data / dv)
                 data *= dv
-                self._sock.send(zlib.compress(data.astype(runner.float)), zmq.NOBLOCK)
+                self._sock.send(zlib.compress(data.astype(np.float16)), zmq.NOBLOCK)
             except zmq.ZMQError:
                 self.config.logger.error('Failed to send visualization data')
                 return
