@@ -271,7 +271,6 @@ class CanvasFrame(wx.Frame):
         self._reset_colorscale()
         self.figure.clear()
         self.plot = None
-        self.position.SetRange(0, data['axis_range'] - 1)
 
     def _get_int_from_event(self, event):
         if event.GetString():
@@ -309,6 +308,9 @@ class CanvasFrame(wx.Frame):
         if self.transpose.GetValue():
             f = f.transpose()
 
+        if np.all(np.isnan(f)):
+            return
+
         if self._last_transpose != self.transpose.GetValue():
             self._last_transpose = self.transpose.GetValue()
             self.figure.clear()
@@ -328,6 +330,7 @@ class CanvasFrame(wx.Frame):
             self.plot = self.axes.imshow(f, origin='lower',
                                          interpolation='nearest')
             self.cbar = self.figure.colorbar(self.plot)
+            self.position.SetRange(0, data['axis_range'] - 1)
         else:
             self.plot.set_data(f)
             self.plot.set_clim(self._cmin, self._cmax)
