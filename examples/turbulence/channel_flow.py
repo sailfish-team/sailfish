@@ -39,7 +39,7 @@ class ChannelSubdomain(Subdomain3D):
         wall_map = ((hx == 0) | (hx == self.gx - 1))
         self.set_node(wall_map, self.wall_bc)
 
-    def make_gradients(self, NX, NY, NZ):
+    def make_gradients(self, NX, NY, NZ, hx, hy, hz, u):
         # Buffer size (used to make the random perturbation continuous
         # along the streamwise direction.
         B = 40
@@ -54,8 +54,10 @@ class ChannelSubdomain(Subdomain3D):
         n1[:,:hB,:] = n1[:,-B:-hB,:]
 
         nn1 = scipy.ndimage.filters.gaussian_filter(n1, 5)
-        # Remove the buffer layer.
-        return [x[hB:-hB,hB:-hB,:] for x in np.gradient(nn1)]
+        # Remove the buffer layer. We also force the perturbations to be
+        # smaller close to the wall. Select the right part of the random
+        # field for this subdomain.
+        return [self.select_subdomain(x[hB:-hB,hB:-hB,:], hx, hy, hz) * u / self.u0 for x in np.gradient(nn1)]
 
     def select_subdomain(self, field, hx, hy, hz):
         # Determine subdomain span.
@@ -82,9 +84,9 @@ class ChannelSubdomain(Subdomain3D):
         sim.vz[:] = u
 
         np.random.seed(11341351351)
-        _, dy1, dz1 = self.make_gradients(NX, NY, NZ)
-        dx2, _, dz2 = self.make_gradients(NX, NY, NZ)
-        dx3, dy3, _ = self.make_gradients(NX, NY, NZ)
+        _, dy1, dz1 = self.make_gradients(NX, NY, NZ, hx, hy, hz, u)
+        dx2, _, dz2 = self.make_gradients(NX, NY, NZ, hx, hy, hz, u)
+        dx3, dy3, _ = self.make_gradients(NX, NY, NZ, hx, hy, hz, u)
 
         # Compute curl of the random field.
         dvx = dy3 - dz2
@@ -97,18 +99,11 @@ class ChannelSubdomain(Subdomain3D):
 
         scale = np.max([np.max(np.abs(dvx)), np.max(np.abs(dvy)), np.max(np.abs(dvz))])
 
-        # Select the right part of the random field for this subdomain.
-        dvx = self.select_subdomain(dvx, hx, hy, hz)
-        dvy = self.select_subdomain(dvy, hx, hy, hz)
-        dvz = self.select_subdomain(dvz, hx, hy, hz)
-
         # Add random perturbation to the initial flow field. The numerical
-        # factor determines the largest perturbation value. We also force
-        # the perturbations to be smaller close to the wall in the wall-normal
-        # direction.
-        sim.vx[:] += dvx / scale * pert * u / self.u0
-        sim.vy[:] += dvy / scale * pert * u / self.u0
-        sim.vz[:] += dvz / scale * pert * u / self.u0  # streamwise
+        # factor determines the largest perturbation value.
+        sim.vx[:] += dvx / scale * pert
+        sim.vy[:] += dvy / scale * pert
+        sim.vz[:] += dvz / scale * pert  # streamwise
 
 
 class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
