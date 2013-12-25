@@ -131,6 +131,8 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
             'max_iters': 3500000,
             'every': 200000,
             'perf_stats_every': 5000,
+            'final_checkpoint': True,
+            'checkpoint_every': 500000,
             })
 
     @classmethod
@@ -158,7 +160,12 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
 
         # Timescales: large eddies, flow-through time in the wall layer.
         print 't_eddy = %d' % (config.H * 2.0 / ChannelSubdomain.u0)
-        print 't_flow = %d' % (config.H / u_tau * az)
+        print 't_flow = %d' % cls.t_flow(config)
+
+    @classmethod
+    def t_flow(cls, config):
+        u_tau = ChannelSubdomain.u_tau(config.Re_tau)
+        return config.H / u_tau * (config.lat_nz / config.H)
 
     @classmethod
     def add_options(cls, group, dim):
@@ -177,7 +184,8 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
         self.prepare_reynolds_stats(runner, axis='x')
 
     def after_step(self, runner):
-        if self.iteration < 1500000:
+        # Ignore transients.
+        if self.iteration < 2 * self.t_flow(self.config):
            return
 
         every = 20
