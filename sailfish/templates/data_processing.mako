@@ -1,5 +1,5 @@
 <%namespace file="propagation.mako" import="rel_offset"/>
-<%namespace file="kernel_common.mako" import="kernel_args_1st_moment,local_indices" />
+<%namespace file="kernel_common.mako" import="kernel_args_1st_moment,local_indices,nodes_array_if_required,indirect_index" />
 
 %if dim == 3:
 ${kernel} void ComputeSquareVelocityAndVorticity(
@@ -371,8 +371,8 @@ ${kernel} void FinalizeReduce${name}(
 
 <%def name="_compute_gi_for_slice()">
 	<% es = envelope_size %>
-	const int c0 = get_global_id(0) + ${es};
-	const int c1 = get_global_id(1) + ${es};
+	const int c0 = get_global_id(0) + ${es};  // x or y
+	const int c1 = get_global_id(1) + ${es};  // y or z
 	int gi, go;
 
 	if (axis == 0) {
@@ -396,13 +396,17 @@ ${kernel} void FinalizeReduce${name}(
 	}
 </%def>
 
-${kernel} void ExtractSliceField(int axis, int position,
-		${global_ptr} int *type_map,
-		${global_ptr} float *in,
+${kernel} void ExtractSliceField(
+		int axis, int position,
+		${nodes_array_if_required()}
+		${global_ptr} ${const_ptr} int *__restrict__ type_map,
+		${global_ptr} ${const_ptr} float *__restrict__ in,
 		${global_ptr} float *out) {
 	${_compute_gi_for_slice()}
-
-	if (isWetNode(type_map[gi])) {
+	${indirect_index(orig=None, position_warning=False, check_invalid=False)}
+	const int ncode = type_map[gi];
+	const int type = decodeNodeType(ncode);
+	if (isWetNode(type)) {
 		out[go] = in[gi];
 	} else {
 		out[go] = NAN;

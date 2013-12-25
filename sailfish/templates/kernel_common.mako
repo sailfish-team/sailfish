@@ -133,7 +133,7 @@
 	%endif
 </%def>
 
-<%def name="indirect_index(orig='dense_gi', position_warning=True)">
+<%def name="indirect_index(orig='dense_gi', position_warning=True, check_invalid=True)">
 	%if node_addressing == 'indirect':
 		// In the indirect access mode, the original global index is used for
 		// the 'nodes' table, while the index from that table is used for all
@@ -142,9 +142,11 @@
 			int ${orig} = gi;
 		%endif
 		gi = nodes[gi];
-		if (gi == INVALID_NODE) {
-			return;
-		}
+		%if check_invalid:
+			if (gi == INVALID_NODE) {
+				return;
+			}
+		%endif
 		if (gi >= DIST_SIZE || gi < 0) {
 			%if position_warning:
 				%if dim == 3:

@@ -30,6 +30,7 @@ class VisConfig(object):
         self.field = 0
         self.levels = 256
 
+
 class Vis2DSliceMixIn(LBMixIn):
     """Extracts 2D slices of 3D fields for on-line visualization."""
     aux_code = ['data_processing.mako']
@@ -70,15 +71,12 @@ class Vis2DSliceMixIn(LBMixIn):
                 self.config.logger.info('Visualization server at tcp://%s@%s:%d',
                                         self._authtoken, addr, self._ctrl_port)
 
-        gpu_map = runner.gpu_geo_map()
-        gpu_v = runner.gpu_field(self.v)
-
         self._buf_sizes = (runner._spec.ny * runner._spec.nz,
                            runner._spec.nx * runner._spec.nz,
                            runner._spec.nx * runner._spec.ny)
-        self._buf_shapes = ((runner._spec.nz, runner._spec.ny),
-                            (runner._spec.nz, runner._spec.nx),
-                            (runner._spec.ny, runner._spec.ny))
+        self._buf_shapes = ((runner._spec.ny, runner._spec.nz),
+                            (runner._spec.nx, runner._spec.nz),
+                            (runner._spec.nx, runner._spec.ny))
         self._axis_len = (runner._spec.nx, runner._spec.ny, runner._spec.nz)
 
         # The buffer has to be large enough to hold any slice.
@@ -93,18 +91,27 @@ class Vis2DSliceMixIn(LBMixIn):
         targets.extend(self._scalar_fields)
         self._names = ['vx', 'vy', 'vz']
 
+        gpu_v = runner.gpu_field(self.v)
         gpu_targets = gpu_v
         for f in self._scalar_fields:
             gpu_targets.append(runner.gpu_field(f.buffer))
             self._names.append(f.abstract.name)
 
+        gpu_map = runner.gpu_geo_map()
         for gf in gpu_targets:
             pair = _make_buf(buffer_size)
-            self._slices.append(
-                Slice(pair, runner.get_kernel(
-                    'ExtractSliceField',
-                    [self._vis_config.axis, self._vis_config.position, gpu_map, gf,
-                     pair.gpu], 'iiPPP')))
+
+            sig = 'ii'
+            args = [self._vis_config.axis, self._vis_config.position]
+            if self.config.node_addressing == 'indirect':
+                args.append(runner.gpu_indirect_address())
+                sig += 'P'
+
+            args.extend([gpu_map, gf, pair.gpu])
+            sig += 'PPP'
+
+            self._slices.append(Slice(pair, runner.get_kernel(
+                'ExtractSliceField', args, sig)))
 
         self._vis_targets = targets
         self._num_subs = 0
@@ -157,6 +164,9 @@ class Vis2DSliceMixIn(LBMixIn):
         if mod == self._vis_config.every - 1:
             self.need_fields_flag = True
         elif mod == 0:
+            def _swap(shape):
+                return shape[1], shape[0]
+
             # Collect all data into a single dict.
             md = {
                 'axis_range': self._axis_len[self._vis_config.axis],
@@ -167,7 +177,7 @@ class Vis2DSliceMixIn(LBMixIn):
                 'iteration': self.iteration,
                 'names': self._names,
                 'dtype': str(runner.float().dtype),
-                'shape': self._buf_shapes[self._vis_config.axis]
+                'shape': _swap(self._buf_shapes[self._vis_config.axis])
             }
 
             # Look for new subscribers.
@@ -196,9 +206,8 @@ class Vis2DSliceMixIn(LBMixIn):
                 return
 
             shape = self._buf_shapes[self._vis_config.axis]
-
-            grid = [(shape[1] + self.config.block_size - 1) /
-                    self.config.block_size, shape[0]]
+            grid = [(shape[0] + self.config.block_size - 1) /
+                    self.config.block_size, shape[1]]
 
             # Run kernel to extract slice data.
             sl = self._slices[self._vis_config.field]
