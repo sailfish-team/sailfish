@@ -137,7 +137,7 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
 
     @classmethod
     def modify_config(cls, config):
-        h = 2 if ChannelSubdomain.wall_bc.location == 0.5 else 0
+        h = 2 if cls.subdomain.wall_bc.location == 0.5 else 0
 
         az = 6
         ay = 2
@@ -146,10 +146,14 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
         config.lat_nx = config.H * 2 + h  # wall normal
         config.lat_ny = config.H * ay  # spanwise (PBC)
         config.lat_nz = config.H * az  # streamwise (PBC)
-        config.visc = ChannelSubdomain.u_tau(config.Re_tau) * config.H / config.Re_tau
+        config.visc = cls.subdomain.u_tau(config.Re_tau) * config.H / config.Re_tau
 
-        u_tau = ChannelSubdomain.u_tau(config.Re_tau)
-        Re = ChannelSubdomain.u0 * 2.0 * config.H / config.visc
+        cls.show_info(config)
+
+    @classmethod
+    def show_info(cls, config):
+        u_tau = cls.subdomain.u_tau(config.Re_tau)
+        Re = cls.subdomain.u0 * 2.0 * config.H / config.visc
         print 'Delta_+ = %.2f' % (u_tau / config.visc)
         print 'Re_tau = %.2f' % (config.Re_tau)
         print 'Re = %.2f' % Re
@@ -159,12 +163,12 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
         print 'force = %e' % (config.Re_tau**2 * config.visc**2 / config.H**3)
 
         # Timescales: large eddies, flow-through time in the wall layer.
-        print 't_eddy = %d' % (config.H * 2.0 / ChannelSubdomain.u0)
+        print 't_eddy = %d' % (config.H * 2.0 / cls.subdomain.u0)
         print 't_flow = %d' % cls.t_flow(config)
 
     @classmethod
     def t_flow(cls, config):
-        u_tau = ChannelSubdomain.u_tau(config.Re_tau)
+        u_tau = cls.subdomain.u_tau(config.Re_tau)
         return config.H / u_tau * (config.lat_nz / config.H)
 
     @classmethod
