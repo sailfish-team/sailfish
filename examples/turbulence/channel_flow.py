@@ -202,7 +202,7 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
             if stats is not None:
                 np.savez('%s_reyn_stat_%s.%s' % (self.config.output, runner._spec.id,
                                                  self.iteration),
-                         stats)
+                         **stats)
 
 if __name__ == '__main__':
     ctrl = LBSimulationController(ChannelSim, EqualSubdomainsGeometry3D)
