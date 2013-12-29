@@ -1588,7 +1588,7 @@ class SubdomainRunner(object):
         self._initialization = False
         self._update_compute_code()
         self._prepare_compute_kernels()
-        self._initial_conditions()
+        self._gpu_initial_conditions()
 
     def _handle_geo_updates(self):
         q = self._spec.geo_queue
