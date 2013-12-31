@@ -181,6 +181,7 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
 
     def __init__(self, config):
         super(ChannelSim, self).__init__(config)
+        # force = u_tau^2 / H
         self.add_body_force((0.0, 0.0, config.Re_tau**2 * config.visc**2 /
                              config.H**3))
 
