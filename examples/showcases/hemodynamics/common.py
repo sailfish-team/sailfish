@@ -8,6 +8,46 @@ from sailfish.lb_single import LBFluidSim
 from sailfish.sym import S, D3Q19
 from sympy import sin
 
+
+class CoordinateConverter(object):
+    """Converts between physical coordinates and LB coordinates"""
+
+    def __init__(self, config):
+        """Initializes the converter.
+
+        :param config: dictionary of settings from the .config file
+        """
+        self.dx = []
+        ax = config['axes']
+        self.axes = [ax.index('x'), ax.index('y'), ax.index('z')]
+
+        self.padding = []
+        self.phys_min_x = []
+        self.actual_size = []
+        for i, size in enumerate(config['size']):
+            self.padding.append(config['padding'][2 * i])
+            size -= config['padding'][2 * i]
+            size -= config['padding'][2 * i + 1]
+            self.actual_size.append(size)
+            phys_size = config['bounding_box'][i]
+            self.dx.append((phys_size[1] - phys_size[0]) / size)
+            self.phys_min_x.append(phys_size[0])
+
+    def to_lb(self, phys_pos):
+        lb_pos = [0, 0, 0]
+        for i, phys_x in enumerate(phys_pos):
+            lb_pos[self.axes[i]] = int(self.padding[i] +
+                                       np.round((phys_x - self.phys_min_x[i]) / self.dx[i]))
+        return lb_pos
+
+    def from_lb(self, lb_pos):
+        phys_pos = [0, 0, 0]
+        for i, lb_x in enumerate(lb_pos):
+            i = self.axes.index(i)
+            phys_pos[i] = (self.dx[i] * (lb_x - self.padding[i]) + self.phys_min_x[i])
+        return phys_pos
+
+
 class UnitConverter(object):
     """Performs unit conversions."""
 
