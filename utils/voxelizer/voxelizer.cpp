@@ -51,13 +51,15 @@ int main(int argc, char **argv)
 
 	double voxel_size = 1.0 / 200.0;
 
-	if (argc < 2) {
-		cerr << "Usage: ./voxelizer <STL file> [voxel_size]" << endl;
+	if (argc < 3) {
+		cerr << "Usage: ./voxelizer <STL file> <output_base> [voxel_size]" << endl;
 		return -1;
 	}
 
-	if (argc >= 3) {
-		voxel_size = atof(argv[2]);
+	std::string output_fname(argv[2]);
+
+	if (argc >= 4) {
+		voxel_size = atof(argv[3]);
 	}
 
 	readSTL(geometry, argv[1]);
@@ -68,7 +70,7 @@ int main(int argc, char **argv)
 	       << geometry.min(2) << ":" << geometry.max(2) << std::endl;
 	// Start saving a config file in JSON. This config file can later be used
 	// to generate VTK data in the original coordinate system.
-	std::ofstream config("output.config");
+	std::ofstream config(output_fname + ".config");
 	config << "{\"bounding_box\": ["
 		<< "[" << geometry.min(0) << ", " << geometry.max(0) << "], "
 		<< "[" << geometry.min(1) << ", " << geometry.max(1) << "], "
@@ -89,7 +91,7 @@ int main(int argc, char **argv)
 	config << "\"size\": [" << ext[0] << ", " << ext[1] << ", " << ext[2] << "]}";
 	config.close();
 
-	std::ofstream out("output.npy");
+	std::ofstream out(output_fname + ".npy");
 	out << "\x93NUMPY\x01";
 
 	char buf[128] = {0};
@@ -115,7 +117,7 @@ int main(int argc, char **argv)
 	out.close();
 
 	// Export a VTK file with the voxelized geometry.
-	outputVTK(voxels, "output.vtk");
+	// outputVTK(voxels, (output_fname + ".vtk").c_str());
 
 	return 0;
 }
