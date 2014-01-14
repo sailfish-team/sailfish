@@ -1,6 +1,10 @@
 #!/usr/bin/python
 #
-# ./agregate_stats.py <output> <input ...>
+# Performs time-averaging of Reynolds stats files.
+# No space-averaging is done.
+#
+# Usage:
+#  ./agregate_stats.py <output> <input ...>
 
 from collections import defaultdict
 import numpy as np
