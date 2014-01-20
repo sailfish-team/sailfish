@@ -1546,9 +1546,14 @@ class SubdomainRunner(object):
                 self._sim.iteration))
 
     def need_quit(self):
-        if (self.config.max_iters > 0 and
-            self._sim.iteration >= self.config.max_iters):
-            return True
+        if self.config.max_iters > 0:
+            it = self._sim.iteration
+
+            # Request output data in the last step of the simulation.
+            if it == self.config.max_iters - 1:
+                self._sim.need_sync_fields = True
+            elif it >= self.config.max_iters:
+                return True
 
         # The quit event is used by the visualization interface.
         if self._quit_event.is_set():
