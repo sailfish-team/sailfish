@@ -53,7 +53,7 @@ class ChannelSubdomain(Subdomain3D):
         n1[:,-hB:,:] = n1[:,hB:B,:]
         n1[:,:hB,:] = n1[:,-B:-hB,:]
 
-        nn1 = scipy.ndimage.filters.gaussian_filter(n1, 5)
+        nn1 = scipy.ndimage.filters.gaussian_filter(n1, 5 * self.config.H / 40)
         # Remove the buffer layer. We also force the perturbations to be
         # smaller close to the wall. Select the right part of the random
         # field for this subdomain.
