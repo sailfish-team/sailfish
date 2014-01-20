@@ -15,6 +15,7 @@ cnt = 0
 
 for fname in sys.argv[2:]:
     a = np.load(fname)
+    print "\r", fname, np.max(a['uz_m1']),
     for field in a.files:
         if field in data:
             data[field] += a[field]
