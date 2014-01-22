@@ -1551,7 +1551,7 @@ class SubdomainRunner(object):
 
             # Request output data in the last step of the simulation.
             if it == self.config.max_iters - 1:
-                self._sim.need_sync_fields = True
+                self._sim.need_sync_flag = True
             elif it >= self.config.max_iters:
                 return True
 
