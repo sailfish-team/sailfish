@@ -234,6 +234,10 @@ class NPYOutput(LBOutput):
     def __init__(self, config, subdomain_id):
         LBOutput.__init__(self, config, subdomain_id)
         self.digits = filename_iter_digits(config.max_iters)
+        if config.output_compress:
+            self._save = np.savez_compressed
+        else:
+            self._save = np.savez
 
     def save(self, i):
         self.mask_nonfluid_nodes()
@@ -241,11 +245,11 @@ class NPYOutput(LBOutput):
         data = {}
         data.update(self._scalar_fields)
         data.update(self._vector_fields)
-        np.savez(fname, **data)
+        self._save(fname, **data)
 
     def dump_dists(self, dists, i):
         fname = dists_filename(self.basename, self.digits, self.subdomain_id, i)
-        np.savez(fname, *dists)
+        self._save(fname, *dists)
 
     def dump_node_type(self, node_type_map):
         fname = node_type_filename(self.basename, self.subdomain_id)

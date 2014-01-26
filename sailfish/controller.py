@@ -296,6 +296,10 @@ class LBSimulationController(object):
         group.add_argument('--output_format',
             help='output format', type=str,
             choices=io.format_name_to_cls.keys(), default='npy')
+        group.add_argument('--nooutput_compress', dest='output_compress',
+                           action='store_false', default=True,
+                           help='stores the output in compressed files'
+                           'if the selected format supports it')
         group.add_argument('--backends',
             type=str, default='cuda,opencl',
             help='computational backends to use; multiple backends '
@@ -747,6 +751,7 @@ class LBSimulationController(object):
         self.config = self._config_parser.parse(
             args, internal_defaults={'quiet': True} if hasattr(
                 __builtin__, '__IPYTHON__') else None)
+
         self._lb_class.modify_config(self.config)
         self.geo = self._lb_geo(self.config)
 
