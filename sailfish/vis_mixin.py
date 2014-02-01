@@ -41,6 +41,10 @@ class Vis2DSliceMixIn(LBMixIn):
                            help='Base port to use for visualization. '
                            'The subdomain ID will be added to it to '
                            'generate the actual port number.')
+        group.add_argument('--visualizer_data_port', type=int, default=0,
+                           help='Port to use for visualization data. '
+                           'The subdomain ID will be added to it to '
+                           'generate the actual port number.')
         group.add_argument('--visualizer_auth_token', type=str, default='',
                            help='Authentication token for control of the '
                            'visualizer. If empty, a token will be generated '
@@ -51,7 +55,12 @@ class Vis2DSliceMixIn(LBMixIn):
         self._ctx = zmq.Context()
         self._sock = self._ctx.socket(zmq.XPUB)
         self._ctrl_sock = self._ctx.socket(zmq.REP)
-        self._port = self._sock.bind_to_random_port('tcp://*')
+
+        if runner.config.visualizer_data_port > 0:
+            self._port = runner.config.visualizer_data_port
+            self._sock.bind('tcp://*:{0}'.format(self._port))
+        else:
+            self._port = self._sock.bind_to_random_port('tcp://*')
 
         if runner.config.visualizer_auth_token:
             self._authtoken = runner.config.visualizer_auth_token
