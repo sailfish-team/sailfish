@@ -101,6 +101,8 @@ class LBFluidSim(LBSim):
         gpu_dist1b = runner.gpu_dist(0, 1)
         gpu_map = runner.gpu_geo_map()
 
+        assert len(gpu_v) == self.dim
+
         args1 = [gpu_map, gpu_dist1a, gpu_dist1b, gpu_rho] + gpu_v
         args2 = [gpu_map, gpu_dist1b, gpu_dist1a, gpu_rho] + gpu_v
 
