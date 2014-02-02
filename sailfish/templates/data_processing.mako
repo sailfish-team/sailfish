@@ -397,13 +397,18 @@ ${kernel} void FinalizeReduce${name}(
 </%def>
 
 ${kernel} void ExtractSliceField(
-		int axis, int position,
 		${nodes_array_if_required()}
+		int axis, int position,
 		${global_ptr} ${const_ptr} int *__restrict__ type_map,
 		${global_ptr} ${const_ptr} float *__restrict__ in,
 		${global_ptr} float *out) {
 	${_compute_gi_for_slice()}
 	${indirect_index(orig=None, position_warning=False, check_invalid=False)}
+	// Custom handling of invalid node to prevent artifacts from being displayed.
+	if (gi == INVALID_NODE) {
+		out[go] = NAN;
+		return;
+	}
 	const int ncode = type_map[gi];
 	const int type = decodeNodeType(ncode);
 	if (isWetNode(type)) {

@@ -16,9 +16,10 @@ import zmq
 
 
 class Slice(object):
-    def __init__(self, pair, kernel):
+    def __init__(self, pair, kernel, min_arg):
         self.pair = pair
         self.kernel = kernel
+        self.min_arg = min_arg
 
 
 class VisConfig(object):
@@ -80,6 +81,8 @@ class Vis2DSliceMixIn(LBMixIn):
                 self.config.logger.info('Visualization server at tcp://%s@%s:%d',
                                         self._authtoken, addr, self._ctrl_port)
 
+        gpu_v = runner.gpu_field(self.v)
+
         self._buf_sizes = (runner._spec.ny * runner._spec.nz,
                            runner._spec.nx * runner._spec.nz,
                            runner._spec.nx * runner._spec.ny)
@@ -88,45 +91,55 @@ class Vis2DSliceMixIn(LBMixIn):
                             (runner._spec.nx, runner._spec.ny))
         self._axis_len = (runner._spec.nx, runner._spec.ny, runner._spec.nz)
 
-        # The buffer has to be large enough to hold any slice.
-        buffer_size = max(self._buf_sizes)
-        def _make_buf(size):
-            h = np.zeros(size, dtype=runner.float)
-            return ArrayPair(h, runner.backend.alloc_buf(like=h))
-
-        self._slices = []
-
         targets = [self.vx, self.vy, self.vz]
         targets.extend(self._scalar_fields)
         self._names = ['vx', 'vy', 'vz']
 
-        gpu_v = runner.gpu_field(self.v)
-        gpu_targets = gpu_v
+        gpu_targets = list(gpu_v)
         for f in self._scalar_fields:
             gpu_targets.append(runner.gpu_field(f.buffer))
             self._names.append(f.abstract.name)
 
-        gpu_map = runner.gpu_geo_map()
-        for gf in gpu_targets:
+        self._vis_gpu_targets = gpu_targets
+
+        # The buffer has to be large enough to hold any slice.
+        def _make_buf(size):
+            h = np.zeros(size, dtype=runner.float)
+            h[:] = np.nan
+            return ArrayPair(h, runner.backend.alloc_buf(like=h))
+
+        self._vis_pairs = []
+        buffer_size = max(self._buf_sizes)
+        for gf in self._vis_gpu_targets:
             pair = _make_buf(buffer_size)
+            self._vis_pairs.append(pair)
 
-            sig = 'ii'
-            args = [self._vis_config.axis, self._vis_config.position]
-            if self.config.node_addressing == 'indirect':
-                args.append(runner.gpu_indirect_address())
-                sig += 'P'
-
-            args.extend([gpu_map, gf, pair.gpu])
-            sig += 'PPP'
-
-            self._slices.append(Slice(pair, runner.get_kernel(
-                'ExtractSliceField', args, sig)))
-
-        self._vis_targets = targets
+        self._vis_update_kernels(runner)
         self._num_subs = 0
 
         self._poller = zmq.Poller()
         self._poller.register(self._ctrl_sock, zmq.POLLIN)
+
+    def _vis_update_kernels(self, runner):
+        gpu_map = runner.gpu_geo_map()
+        self._slices = []
+
+        base_args = []
+        base_sig = ''
+        min_arg = 0
+        if self.config.node_addressing == 'indirect':
+            base_args.append(runner.gpu_indirect_address())
+            base_sig += 'P'
+            min_arg = 1
+
+        for gf, pair in zip(self._vis_gpu_targets, self._vis_pairs):
+            self._slices.append(
+                Slice(pair, runner.get_kernel(
+                    'ExtractSliceField',
+                    base_args + [self._vis_config.axis,
+                                 self._vis_config.position, gpu_map, gf,
+                                 pair.gpu],
+                    base_sig + 'iiPPP'), min_arg))
 
     def _handle_commands(self):
         socks = dict(self._poller.poll(0))
@@ -220,8 +233,8 @@ class Vis2DSliceMixIn(LBMixIn):
 
             # Run kernel to extract slice data.
             sl = self._slices[self._vis_config.field]
-            sl.kernel.args[0] = self._vis_config.axis
-            sl.kernel.args[1] = self._vis_config.position
+            sl.kernel.args[sl.min_arg] = self._vis_config.axis
+            sl.kernel.args[sl.min_arg + 1] = self._vis_config.position
             runner.backend.run_kernel(sl.kernel, grid)
 
             # Selector to extract part of slice buffer that actually holds

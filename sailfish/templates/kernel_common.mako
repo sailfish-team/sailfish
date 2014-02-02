@@ -147,7 +147,7 @@
 				return;
 			}
 		%endif
-		if (gi >= DIST_SIZE) {
+		if (gi >= DIST_SIZE && gi != INVALID_NODE) {
 			%if position_warning:
 				%if dim == 3:
 					printf("invalid index %d @ %d %d %d\n", gi, gx, gy, gz);
