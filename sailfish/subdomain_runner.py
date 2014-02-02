@@ -1002,11 +1002,10 @@ class SubdomainRunner(object):
                 kernel = self._kernels_bnd_none[self._sim.iteration & 1][0]
             grid = self._boundary_blocks
         else:
-            # Run bulk kernel is there is no bulk/boundary split.
+            # Run bulk kernel if there is no bulk/boundary split.
             kernel, grid = self._get_bulk_kernel(sync_req)
 
         blk_str = self._calc_stream
-
         self._profile.record_gpu_start(TimeProfile.BOUNDARY, blk_str)
         self.backend.run_kernel(kernel, grid, blk_str)
         ev = self._profile.record_gpu_end(TimeProfile.BOUNDARY, blk_str,
