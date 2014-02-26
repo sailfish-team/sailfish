@@ -14,7 +14,7 @@ import time
 import numpy as np
 import zmq
 from sailfish import codegen, io
-from sailfish.lb_base import LBMixIn
+from sailfish.lb_base import LBMixIn, LBSim
 from sailfish.profile import profile, TimeProfile
 from sailfish.subdomain_connection import ConnectionBuffer, MacroConnectionBuffer
 import sailfish.node_type as nt
@@ -1533,7 +1533,8 @@ class SubdomainRunner(object):
         self._sim.before_main_loop(self)
         # Allow mix-ins to have their own before_main_loop routines.
         for c in self._sim.__class__.mro()[1:]:
-            if issubclass(c, LBMixIn) and hasattr(c, 'before_main_loop'):
+            if (issubclass(c, LBMixIn) and hasattr(c, 'before_main_loop') and not
+                issubclass(c, LBSim)):
                 c.before_main_loop(self._sim, self)
 
         self._install_signal_handlers()
@@ -1675,7 +1676,8 @@ class SubdomainRunner(object):
                 self._sim.after_step(self)
                 # Allow mix-ins to have their own after_step functions.
                 for c in self._sim.__class__.mro()[1:]:
-                    if issubclass(c, LBMixIn) and hasattr(c, 'after_step'):
+                    if (issubclass(c, LBMixIn) and hasattr(c, 'after_step') and
+                        not issubclass(c, LBSim)):
                         c.after_step(self._sim, self)
 
                 if self.config.checkpoint_file and (
