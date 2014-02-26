@@ -624,7 +624,7 @@ class TestBlock2DPeriodic(unittest.TestCase):
         b3 = SubdomainSpec2D((0, 32), (32, 32), envelope_size=1, id_=3)
         b4 = SubdomainSpec2D((32, 32), (32, 32), envelope_size=1, id_=4)
 
-        proc = LBGeometryProcessor([b1, b2, b3, b4], 2, geo)
+        proc = LBGeometryProcessor([b1, b2, b3, b4], 2, geo.gsize)
         proc._connect_subdomains(config)
 
         ## b1 - b4
@@ -695,7 +695,7 @@ class TestBlock2DPeriodic(unittest.TestCase):
         b4 = SubdomainSpec2D((0, 50), (25, 25), envelope_size=1, id_=4)
         b5 = SubdomainSpec2D((25, 50), (25, 25), envelope_size=1, id_=5)
 
-        proc = LBGeometryProcessor([b1, b2, b3, b4, b5], 2, geo)
+        proc = LBGeometryProcessor([b1, b2, b3, b4, b5], 2, geo.gsize)
         proc._connect_subdomains(config)
 
         cpair = b1.get_connection(SubdomainSpec2D.X_LOW, b5.id)
@@ -740,7 +740,7 @@ class TestBlock2DPeriodic(unittest.TestCase):
         b2 = SubdomainSpec2D((32, 0), (8, 64), envelope_size=1, id_=2)
         b3 = SubdomainSpec2D((40, 0), (24, 64), envelope_size=1, id_=3)
 
-        proc = LBGeometryProcessor([b1, b2, b3], 2, geo)
+        proc = LBGeometryProcessor([b1, b2, b3], 2, geo.gsize)
         proc._connect_subdomains(config)
 
         cpair = b1.get_connection(SubdomainSpec2D.X_LOW, b3.id)
@@ -764,7 +764,7 @@ class TestBlock2DPeriodic(unittest.TestCase):
         b1 = SubdomainSpec2D((0, 0), (32, 64), envelope_size=1, id_=1)
         b2 = SubdomainSpec2D((32, 0), (32, 64), envelope_size=1, id_=2)
 
-        proc = LBGeometryProcessor([b1, b2], 2, geo)
+        proc = LBGeometryProcessor([b1, b2], 2, geo.gsize)
         proc._connect_subdomains(config)
 
         cpairs = b1.get_connections(SubdomainSpec2D.X_HIGH, b2.id)
@@ -796,7 +796,7 @@ class TestBlock2DPeriodic(unittest.TestCase):
         b1 = SubdomainSpec2D((0, 0), (32, 64), envelope_size=1, id_=1)
         b2 = SubdomainSpec2D((32, 0), (32, 64), envelope_size=1, id_=2)
 
-        proc = LBGeometryProcessor([b1, b2], 2, geo)
+        proc = LBGeometryProcessor([b1, b2], 2, geo.gsize)
         proc._connect_subdomains(config)
 
         cpairs = b1.get_connections(SubdomainSpec2D.X_HIGH, b2.id)

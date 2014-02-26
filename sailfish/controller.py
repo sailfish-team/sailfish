@@ -111,13 +111,14 @@ class LBGeometryProcessor(object):
     Initializes logical connections between the subdomains based on their
     location."""
 
-    def __init__(self, subdomains, dim, geo):
+    def __init__(self, subdomains, dim, gsize):
         """
         :param subdomains: list of SubdomainSpec objects
+        :param gsize: tuple specifying the bounding box of the simulation domain
         """
         self.subdomains = subdomains
         self.dim = dim
-        self.geo = geo
+        self.gsize = gsize
 
     def _annotate(self):
         # Assign IDs to subdomains.  The subdomain ID corresponds to its position
@@ -158,10 +159,10 @@ class LBGeometryProcessor(object):
                 if subdomain.location[ax] == 0:
                     ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
                     # Subdomain at the end of the global domain.
-                    loc[ax] = self.geo.gsize[ax]
+                    loc[ax] = self.gsize[ax]
                     ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
                     axis_done = True
-                if subdomain.end_location[ax] == self.geo.gsize[ax]:
+                if subdomain.end_location[ax] == self.gsize[ax]:
                     ret.extend(_pbc_helper(list(loc), subdomain, list(axes)))
                     # Subdomain before the beginning of the global domain.
                     loc[ax] = -subdomain.size[ax]
@@ -224,7 +225,7 @@ class LBGeometryProcessor(object):
             for real, virtual in self._coord_map_list[axis][0]:
                 # If the subdomain spans a whole axis of the domain, mark it
                 # as locally periodic.
-                if real.end_location[axis] == self.geo.gsize[axis]:
+                if real.end_location[axis] == self.gsize[axis]:
                     real.enable_local_periodicity(axis)
 
         for axis in range(self.dim):
@@ -768,7 +769,7 @@ class LBSimulationController(object):
 
         self._init_subdomain_envelope(self._lb_class, subdomain_specs)
 
-        proc = LBGeometryProcessor(subdomain_specs, self.dim, self.geo)
+        proc = LBGeometryProcessor(subdomain_specs, self.dim, self.geo.gsize)
         subdomain_specs = proc.transform(self.config)
         self.save_subdomain_config(subdomain_specs)
 

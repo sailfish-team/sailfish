@@ -1,6 +1,7 @@
 import numpy as np
 import operator
 import unittest
+from sailfish.controller import LBGeometryProcessor
 from sailfish.node_type import NTEquilibriumDensity, NTEquilibriumVelocity, multifield, NTFullBBWall, _NTUnused, _NTPropagationOnly, NTHalfBBWall, DynamicValue, LinearlyInterpolatedTimeSeries
 from sailfish.subdomain import Subdomain2D, Subdomain3D, SubdomainSpec2D, SubdomainSpec3D, SubdomainPair
 from sailfish.subdomain_runner import SubdomainRunner
@@ -146,6 +147,8 @@ class TestOrientationDetection3D(TestCase3D):
         self.sim.config.periodic_z = True
         self.sim.config.periodic_y = True
         spec = SubdomainSpec3D((0, 0, 0), self.lattice_size, envelope_size=1, id_=0)
+        spec.enable_local_periodicity(1)
+        spec.enable_local_periodicity(2)
         spec.runner = SubdomainRunner(self.sim, spec, output=None,
                                       backend=self.backend, quit_event=None)
         spec.runner._init_shape()
@@ -165,8 +168,10 @@ class TestOrientationDetection3D(TestCase3D):
         self.sim.config.periodic_z = True
         self.sim.config.periodic_y = True
         spec0 = SubdomainSpec3D((0, 0, 0), self.lattice_size, envelope_size=1, id_=0)
+        spec0.enable_local_periodicity(1)
         spec1 = SubdomainSpec3D((0, 0, self.lattice_size[2]),
                                  self.lattice_size, envelope_size=1, id_=1)
+        spec1.enable_local_periodicity(1)
 
         self.assertTrue(spec0.connect(spec1, grid=D3Q19))
 
@@ -291,6 +296,45 @@ class TestLinkTagging3D(TestCase3D):
         hx_tags = reduce(operator.or_, ((1 << i) for i, vec in
                          enumerate(D3Q19.basis[1:]) if vec[0] <= 0))
         np.testing.assert_equal(hx_tags, sub._orientation[hx == nx - 1])
+
+    def test_periodic_yz_2subdomains(self):
+        self.sim.config.periodic_y = True
+        self.sim.config.periodic_z = True
+
+        spec0 = SubdomainSpec3D((0, 0, 0), self.lattice_size, envelope_size=1, id_=0)
+        spec1 = SubdomainSpec3D((0, 0, self.lattice_size[2]), self.lattice_size, envelope_size=1, id_=1)
+
+        nx, ny, nz = self.lattice_size
+        spec0, spec1 = LBGeometryProcessor([spec0, spec1], 3, (nx, ny, 2 * nz)).transform(self.sim.config)
+
+        spec0.runner = SubdomainRunner(self.sim, spec0, output=None,
+                                       backend=self.backend, quit_event=None)
+        spec0.runner._init_shape()
+        spec1.runner = SubdomainRunner(self.sim, spec1, output=None,
+                                       backend=self.backend, quit_event=None)
+        spec1.runner._init_shape()
+
+        class _LinkTaggingSubdomain3D(Subdomain3D):
+            def boundary_conditions(self, hx, hy, hz):
+                self.set_node((hx == 0) | (hx == self.gx - 1), NTHalfBBWall)
+
+        sub0 = _LinkTaggingSubdomain3D(list(reversed(self.lattice_size)), spec0, D3Q19)
+        sub0.allocate()
+        sub0.reset()
+        sub1 = _LinkTaggingSubdomain3D(list(reversed(self.lattice_size)), spec1, D3Q19)
+        sub1.allocate()
+        sub1.reset()
+
+        hx, hy, hz = sub1._get_mgrid()
+        hx_tags = reduce(operator.or_, ((1 << i) for i, vec in
+                         enumerate(D3Q19.basis[1:]) if vec[0] >= 0))
+        np.testing.assert_equal(hx_tags, sub0._orientation[hx == 0])
+        np.testing.assert_equal(hx_tags, sub1._orientation[hx == 0])
+
+        hx_tags = reduce(operator.or_, ((1 << i) for i, vec in
+                         enumerate(D3Q19.basis[1:]) if vec[0] <= 0))
+        np.testing.assert_equal(hx_tags, sub0._orientation[hx == nx - 1])
+        np.testing.assert_equal(hx_tags, sub1._orientation[hx == nx - 1])
 
     def test_periodic_xz(self):
         self.sim.config.periodic_x = True
