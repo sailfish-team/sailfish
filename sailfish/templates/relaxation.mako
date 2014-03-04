@@ -111,6 +111,8 @@ ${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
 
 	%if grid_idx == 1:
 		float omega = ${cex(1.0 / tau_phi)};
+	%elif grid_idx == 2:
+		float omega = ${cex(1.0 / tau_theta)};
 	%elif subgrid == 'les-smagorinsky' or (simtype == 'free-energy' and grid_idx == 0):
 		float omega = 1.0 / tau0;
 	%else:

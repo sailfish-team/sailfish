@@ -1057,6 +1057,7 @@ def _prepare_symbols():
     S.alias('vz', S.g0m1z)
     S.alias('rho', S.g0m0)
     S.alias('phi', S.g1m0)
+    S.alias('theta', S.g2m0)
 
     S.alias('eax', S.g0eax)
     S.alias('eay', S.g0eay)
