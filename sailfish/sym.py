@@ -100,6 +100,7 @@ class D2Q9(DxQy):
     @classmethod
     def _init_mrt_equilibrium(cls):
         cls.mrt_equilibrium = []
+        cls.mrt_eq_symbols = []
 
         c1 = -2
 
@@ -108,7 +109,10 @@ class D2Q9(DxQy):
         for i, name in enumerate(cls.mrt_names):
             n2i[name] = i
 
-        cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + S.visc * Rational(12, 2-c1))
+        inv_tau = Symbol('inv_tau')
+        cls.mrt_eq_symbols.append(Eq(inv_tau, 1 / (0.5 + S.visc * Rational(12, 2-c1))))
+
+        cls.mrt_collision[n2i['pxx']] = inv_tau
         cls.mrt_collision[n2i['pxy']] = cls.mrt_collision[n2i['pxx']]
 
         vec_rho = cls.mrt_matrix[n2i['rho'],:]
@@ -186,11 +190,15 @@ class D3Q13(DxQy):
     @classmethod
     def _init_mrt_equilibrium(cls):
         cls.mrt_equilibrium = []
+        cls.mrt_eq_symbols = []
 
         # Name -> index map.
         n2i = {}
         for i, name in enumerate(cls.mrt_names):
             n2i[name] = i
+
+        inv_rho = Symbol('inv_rho')
+        cls.mrt_eq_symbols.append(Eq(inv_rho, 1.0 / S.rho0))
 
         cls.mrt_collision[n2i['pxx']] = 2 / (8 * S.visc + 1)
         cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx']]
@@ -205,12 +213,12 @@ class D3Q13(DxQy):
             'm3x': 0,
             'm3y': 0,
             'm3z': 0,
-            'pxy': 1/S.rho0 * (cls.mx * cls.my),
-            'pyz': 1/S.rho0 * (cls.my * cls.mz),
-            'pzx': 1/S.rho0 * (cls.mx * cls.mz),
-            'pxx': 1/S.rho0 * (2 * cls.mx**2 - cls.my**2 - cls.mz**2),
-            'pww': 1/S.rho0 * (cls.my**2 - cls.mz**2),
-            'en': 3*S.rho*(13*cls.cssq - 8)/2 + 13/(2 * S.rho0)*(cls.mx**2 + cls.my**2 + cls.mz**2),
+            'pxy': inv_rho * (cls.mx * cls.my),
+            'pyz': inv_rho * (cls.my * cls.mz),
+            'pzx': inv_rho * (cls.mx * cls.mz),
+            'pxx': inv_rho * (2 * cls.mx**2 - cls.my**2 - cls.mz**2),
+            'pww': inv_rho * (cls.my**2 - cls.mz**2),
+            'en': 3 * S.rho * (13 * cls.cssq - 8)/2 + 13/2 * inv_rho * (cls.mx**2 + cls.my**2 + cls.mz**2),
         }
 
         for i, name in enumerate(cls.mrt_names):
@@ -263,13 +271,20 @@ class D3Q15(DxQy):
     @classmethod
     def _init_mrt_equilibrium(cls):
         cls.mrt_equilibrium = []
+        cls.mrt_eq_symbols = []
 
         # Name -> index map.
         n2i = {}
         for i, name in enumerate(cls.mrt_names):
             n2i[name] = i
 
-        cls.mrt_collision[n2i['pxx']] = 1 / (0.5 + 3*S.visc)
+        inv_tau = Symbol('inv_tau')
+        inv_rho = Symbol('inv_rho')
+
+        cls.mrt_eq_symbols.append(Eq(inv_tau, 1 / (0.5 + 3*S.visc)))
+        cls.mrt_eq_symbols.append(Eq(inv_rho, 1 / S.rho0))
+
+        cls.mrt_collision[n2i['pxx']] = inv_tau
         cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx']]
         cls.mrt_collision[n2i['pxy']] = cls.mrt_collision[n2i['pxx']]
         cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxx']]
@@ -278,16 +293,16 @@ class D3Q15(DxQy):
         # Form of the equilibrium functions follows that from
         # dHumieres, PhilTranA, 2002.
         mrt_eq = {
-            'en':  -S.rho + 1/S.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
+            'en':  -S.rho + inv_rho * (cls.mx**2 + cls.my**2 + cls.mz**2),
             'ens': -S.rho,
-            'ex':  -Rational(7,3)*cls.mx,
-            'ey':  -Rational(7,3)*cls.my,
-            'ez':  -Rational(7,3)*cls.mz,
-            'pxx': 1/S.rho0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
-            'pww': 1/S.rho0 * (cls.my**2 - cls.mz**2),
-            'pxy': 1/S.rho0 * (cls.mx * cls.my),
-            'pyz': 1/S.rho0 * (cls.my * cls.mz),
-            'pzx': 1/S.rho0 * (cls.mx * cls.mz),
+            'ex':  -Rational(7,3) * cls.mx,
+            'ey':  -Rational(7,3) * cls.my,
+            'ez':  -Rational(7,3) * cls.mz,
+            'pxx': inv_rho * (2 * cls.mx**2 - (cls.my**2 + cls.mz**2)),
+            'pww': inv_rho * (cls.my**2 - cls.mz**2),
+            'pxy': inv_rho * (cls.mx * cls.my),
+            'pyz': inv_rho * (cls.my * cls.mz),
+            'pzx': inv_rho * (cls.mx * cls.mz),
             'mxyz': 0
         }
 
@@ -348,13 +363,20 @@ class D3Q19(DxQy):
     @classmethod
     def _init_mrt_equilibrium(cls):
         cls.mrt_equilibrium = []
+        cls.mrt_eq_symbols = []
 
         # Name -> index map.
         n2i = {}
         for i, name in enumerate(cls.mrt_names):
             n2i[name] = i
 
-        cls.mrt_collision[n2i['pxx3']] = 1 / (0.5 + 3*S.visc)
+        inv_tau = Symbol('inv_tau')
+        inv_rho = Symbol('inv_rho')
+
+        cls.mrt_eq_symbols.append(Eq(inv_tau, 1 / (0.5 + 3 * S.visc)))
+        cls.mrt_eq_symbols.append(Eq(inv_rho, 1 / S.rho0))
+
+        cls.mrt_collision[n2i['pxx3']] = inv_tau
         cls.mrt_collision[n2i['pww']] = cls.mrt_collision[n2i['pxx3']]
         cls.mrt_collision[n2i['pxy']] = cls.mrt_collision[n2i['pxx3']]
         cls.mrt_collision[n2i['pyz']] = cls.mrt_collision[n2i['pxx3']]
@@ -363,16 +385,16 @@ class D3Q19(DxQy):
         # Form of the equilibrium functions follows that from
         # dHumieres, PhilTranA, 2002.
         mrt_eq = {
-            'en':  -11 * S.rho + 19/S.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
-            'eps': -Rational(475,63)/S.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
+            'en':  -11 * S.rho + 19 * inv_rho * (cls.mx**2 + cls.my**2 + cls.mz**2),
+            'eps': -Rational(475,63) * inv_rho * (cls.mx**2 + cls.my**2 + cls.mz**2),
             'ex':  -Rational(2,3)*cls.mx,
             'ey':  -Rational(2,3)*cls.my,
             'ez':  -Rational(2,3)*cls.mz,
-            'pxx3': 1/(S.rho0) * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
-            'pww': 1/S.rho0 * (cls.my**2 - cls.mz**2),
-            'pxy': 1/S.rho0 * (cls.mx * cls.my),
-            'pyz': 1/S.rho0 * (cls.my * cls.mz),
-            'pzx': 1/S.rho0 * (cls.mx * cls.mz),
+            'pxx3': inv_rho * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
+            'pww': inv_rho * (cls.my**2 - cls.mz**2),
+            'pxy': inv_rho * (cls.mx * cls.my),
+            'pyz': inv_rho * (cls.my * cls.mz),
+            'pzx': inv_rho * (cls.mx * cls.mz),
             'm3x': 0,
             'm3y': 0,
             'm3z': 0,

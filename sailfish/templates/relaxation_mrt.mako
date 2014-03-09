@@ -34,7 +34,8 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0 ${dynamic_va
 	DistM fm, feq;
 
 	%for mrt, val in sym.bgk_to_mrt(grid, 'fi', 'fm'):
-		${mrt} = ${val};
+		## Use cex() here to generate code that uses fewer division operations.
+		${mrt} = ${cex(val)};
 	%endfor
 
 	${body_force()}
@@ -43,6 +44,10 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0 ${dynamic_va
 	#define mx fm.mx
 	#define my fm.my
 	#define mz fm.mz
+
+	%for local_var in grid.mrt_eq_symbols:
+		float ${cex(local_var.lhs)} = ${cex(local_var.rhs, rho='fm.rho')};
+	%endfor
 
 	// Calculate equilibrium distributions in moment space.
 	%for i, eq in enumerate(grid.mrt_equilibrium):
@@ -85,7 +90,8 @@ ${device_func} void MS_relaxate(Dist *fi, int node_type, float *iv0 ${dynamic_va
 	${fluid_momentum()}
 
 	%for bgk, val in sym.mrt_to_bgk(grid, 'fi', 'fm'):
-		${bgk} = ${val};
+		## Use cex() here to generate code that uses fewer division operations.
+		${bgk} = ${cex(val)};
 	%endfor
 
 	${fluid_output_velocity()}
