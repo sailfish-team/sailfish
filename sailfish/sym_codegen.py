@@ -146,10 +146,10 @@ def _use_pointers(str):
 
 def _use_vectors(str):
     ret = str.replace('vx', 'v0[0]').replace('vy', 'v0[1]').replace('vz', 'v0[2]')
-    for dist in range(1,9):
-        s1 = 'g%sea' % dist; s2 = 'ea%s' % dist
-        ret = ret.replace(s1+'x', s2+'[0]').replace(s1+'y', s2+'[1]').replace(s1+'z', s2+'[2]')
-    ret = ret.replace('eax', 'ea0[0]').replace('eay', 'ea0[1]').replace('eaz', 'ea0[2]')
+    for dist in range(0,9):
+        ret = ret.replace('g%seax' % dist, 'ea%s[0]' % dist)
+        ret = ret.replace('g%seay' % dist, 'ea%s[1]' % dist)
+        ret = ret.replace('g%seaz' % dist, 'ea%s[2]' % dist)
 
     for dist in range(0, 9):
         ret = ret.replace('g%sd1m0x' % dist, 'grad%s[0]' % dist)
