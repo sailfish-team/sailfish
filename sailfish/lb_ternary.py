@@ -1,4 +1,4 @@
-"""Classes for binary fluid lattice Boltzmann simulations."""
+"""Classes for ternary fluid lattice Boltzmann simulations."""
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
