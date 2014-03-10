@@ -14,14 +14,13 @@
 	%endif
 </%def>
 
-%if simtype == 'shan-chen':
-	## In the free-energy model, the relaxation time is a local quantity.
-	${const_var} float tau0 = ${tau}f;		// relaxation time
-	${const_var} float tau0_inv = 1.0f / ${tau}f;
-	// Relaxation time for the 2nd fluid component.
-%else:
-	// Relaxation time for the order parameter field.
-%endif
+// TODO(nlooije): incorporate multiple species for FE model
+
+// Relaxation time for the 1st fluid component.
+${const_var} float tau0 = ${tau}f;		// relaxation time
+${const_var} float tau0_inv = 1.0f / ${tau}f;
+	
+// Relaxation time for the 2nd fluid component.
 ${const_var} float tau1 = ${tau_phi}f;
 ${const_var} float tau1_inv = 1.0f / ${tau_phi}f;
 
@@ -103,8 +102,6 @@ ${kernel} void SetInitialConditions(
 	${init_dist_with_eq()}
 }
 
-%if simtype == 'shan-chen':
 <%include file="ternary_shan_chen.mako"/>
-%endif  ## shan-chen
 
 <%include file="util_kernels.mako"/>
