@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+"""Stationary droplet in ternary system with multiple self-interactions"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -13,8 +15,8 @@ class DropSubdomain(Subdomain2D):
         pass
 
     def initial_conditions(self, sim, hx, hy):
-
         radius = 32
+        
         drop_map1 = (hx-self.gx/4)**2 + (hy-self.gy/4)**2 <= radius**2
         drop_map2 = (hx-3*self.gx/4)**2 + (hy-3*self.gy/4)**2 <= radius**2
 
@@ -50,7 +52,6 @@ class SCSim(LBTernaryFluidShanChen):
             })
 
     def after_step(self, runner):
-
         every_n = 10000
 
         if self.iteration % every_n == every_n - 1:
