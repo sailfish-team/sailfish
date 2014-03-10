@@ -53,10 +53,9 @@ class SCSim(LBTernaryFluidShanChen):
 
     def after_step(self, runner):
         every_n = 10000
-
+        
         if self.iteration % every_n == every_n - 1:
             self.need_sync_flag = True
-
         elif self.iteration % every_n == 0:
             rho = runner._sim.rho.astype(np.float64)
             phi = runner._sim.phi.astype(np.float64)
