@@ -214,6 +214,8 @@ class SubdomainRunner(object):
             ctx['dist_size'] = self._subdomain.active_nodes
         else:
             ctx['dist_size'] = self.num_phys_nodes
+        assert ctx['dist_size'] * self._sim.grid.Q <= 2**32 - 1,\
+                'Number of nodes too large for int32.'
         ctx['sim'] = self._sim
         ctx['block'] = self._spec
         ctx['time_dependence'] = self.config.time_dependence
