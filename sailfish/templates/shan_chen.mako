@@ -26,7 +26,7 @@
 </%def>
 
 // Calculates the Shan-Chan pseudopotential.
-${device_func} inline float sc_ppot(${global_ptr} ${const_ptr} float *__restrict__ field, int gi)
+${device_func} inline float sc_ppot(${global_ptr} ${const_ptr} float *__restrict__ field, unsigned int gi)
 {
 	float lfield = field[gi];
 	return ${cex(sym.SHAN_CHEN_POTENTIALS[sc_potential]('lfield'))};
@@ -53,7 +53,7 @@ float cc, float *out, ${position_decl(prefix='')})
 		int off;
 	%endif
 
-	int gi;		// global index
+	unsigned int gi;		// global index
 
 	%for i, ve in enumerate(grid.basis):
 		%if ve.dot(ve) != 0.0:

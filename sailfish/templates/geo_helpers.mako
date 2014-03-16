@@ -161,20 +161,20 @@ ${device_func} inline unsigned int decodeNodeParamIdx(unsigned int nodetype) {
 }
 
 %if dim == 2:
-	${device_func} inline int getGlobalIdx(int gx, int gy) {
+	${device_func} inline unsigned int getGlobalIdx(int gx, int gy) {
 		return gx + ${arr_nx} * gy;
 	}
 
-	${device_func} inline void decodeGlobalIdx(int gi, int *gx, int *gy) {
+	${device_func} inline void decodeGlobalIdx(unsigned int gi, int *gx, int *gy) {
 		*gx = gi % ${arr_nx};
 		*gy = gi / ${arr_nx};
 	}
 %else:
-	${device_func} inline int getGlobalIdx(int gx, int gy, int gz) {
+	${device_func} inline unsigned int getGlobalIdx(int gx, int gy, int gz) {
 		return gx + ${arr_nx} * gy + ${arr_nx * arr_ny} * gz;
 	}
 
-	${device_func} inline void decodeGlobalIdx(int gi, int *gx, int *gy, int *gz) {
+	${device_func} inline void decodeGlobalIdx(unsigned int gi, int *gx, int *gy, int *gz) {
 		*gz = gi / ${arr_nx * arr_ny};
 		int t = gi % ${arr_nx * arr_ny};
 		*gy = t / ${arr_nx};
@@ -248,7 +248,7 @@ ${device_func} void checkInvalidValues(Dist* d, ${position_decl()}) {
 <%def name="get_unpropagated_dist_from_opposite_slots()">
 	%for i, (dname, ei) in enumerate(zip(grid.idx_name, grid.basis)):
 		%if node_addressing == 'indirect':
-			dout->${dname} = ${get_dist('din', grid.idx_opposite[i], 'nodes[dense_gi + %d]' % rel_offset(*(-ei)))};
+			dout->${dname} = ${get_dist('din', grid.idx_opposite[i], 'nodes[dense_gi + (unsigned int)%d]' % rel_offset(*(-ei)))};
 		%else:
 			dout->${dname} = ${get_dist('din', grid.idx_opposite[i], 'gi', offset=rel_offset(*(-ei)))};
 		%endif
@@ -257,7 +257,7 @@ ${device_func} void checkInvalidValues(Dist* d, ${position_decl()}) {
 
 ${device_func} inline void getDist(
 		${nodes_array_if_required()}
-		Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, int gi
+		Dist *dout, ${global_ptr} ${const_ptr} float *__restrict__ din, unsigned int gi
 		${dense_gi_if_required()}
 		${iteration_number_if_required()}) {
 	%if access_pattern == 'AB':

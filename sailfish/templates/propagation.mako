@@ -92,9 +92,9 @@
 
 <%def name="get_odist(dist_out, idir, xoff=0, yoff=0, zoff=0, offset=0)" filter="trim">
 	%if node_addressing == 'indirect' and (offset != 0 or xoff != 0 or yoff != 0 or zoff != 0):
-		${dist_out}[nodes[dense_gi + ${offset} + ${rel_offset(xoff, yoff, zoff)}] + ${dist_size * idir}]
+		${dist_out}[nodes[dense_gi + (unsigned int)(${offset} + ${rel_offset(xoff, yoff, zoff)})] + ${dist_size * idir}u]
 	%else:
-		${dist_out}[gi + ${dist_size * idir + offset} + ${rel_offset(xoff, yoff, zoff)}]
+		${dist_out}[gi + (${dist_size * idir}u + (unsigned int)(${offset} + ${rel_offset(xoff, yoff, zoff)}))]
 	%endif
 </%def>
 
@@ -109,7 +109,7 @@
 
 	%if node_addressing == 'indirect':
 		{
-			int target_gi = nodes[dense_gi + ${rel_offset(xoff, yoff, zoff)} + ${offset}];
+			const unsigned int target_gi = nodes[dense_gi + (unsigned int)(${rel_offset(xoff, yoff, zoff)} + ${offset})];
 			if (target_gi != INVALID_NODE) {
 				${dist_out}[target_gi + ${dist_size * idir}] = ${rhs};
 			}

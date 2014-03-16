@@ -12,7 +12,7 @@ ${kernel} void LBMUpdateTracerParticles(${global_ptr} float *dist, ${global_ptr}
 {
 	float rho, v[${dim}];
 
-	int gi = get_global_id(0);
+	unsigned int gi = get_global_id(0);
 	float cx = x[gi];
 	float cy = y[gi];
 

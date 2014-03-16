@@ -22,7 +22,7 @@
 
 <%def name="nodes_array_if_required()" filter="trim">
 	%if node_addressing == 'indirect':
-		${global_ptr} ${const_ptr} int *__restrict__ nodes,
+		${global_ptr} ${const_ptr} unsigned int *__restrict__ nodes,
 	%endif
 </%def>
 
@@ -34,7 +34,7 @@
 
 <%def name="dense_gi_if_required()" filter="trim">
 	%if node_addressing == 'indirect':
-		, int dense_gi
+		, unsigned int dense_gi
 	%endif
 </%def>
 
@@ -100,7 +100,7 @@
 		int gz = get_global_id(1);
 	%endif
 
-	int gi = ${get_global_idx()};
+	unsigned int gi = ${get_global_idx()};
 
 	%if no_outside:
 		// Nothing to do if we're outside of the simulation domain.
@@ -118,7 +118,7 @@
 ##              outside of the simulation domain
 <%def name="local_indices_split(no_outside=True)">
 	%if boundary_size > 0:
-		int gx, gy, lx, gi;
+		unsigned int gx, gy, lx, gi;
 		%if dim == 3:
 			int gz;
 		%endif
@@ -139,7 +139,7 @@
 		// the 'nodes' table, while the index from that table is used for all
 		// fields and distributions.
 		%if orig is not None:
-			int ${orig} = gi;
+			unsigned int ${orig} = gi;
 		%endif
 		gi = nodes[gi];
 		%if check_invalid:
@@ -147,7 +147,7 @@
 				return;
 			}
 		%endif
-		if (gi >= DIST_SIZE || gi < 0) {
+		if (gi >= DIST_SIZE) {
 			%if position_warning:
 				%if dim == 3:
 					printf("invalid index %d @ %d %d %d\n", gi, gx, gy, gz);
@@ -439,7 +439,7 @@
 </%def>
 
 <%def name="get_dist(array, i, idx, offset=0)" filter="trim">
-	${array}[${idx} + DIST_SIZE * ${i} + ${offset}]
+	${array}[${idx} + DIST_SIZE * ${i} + (unsigned int)${offset}]
 </%def>
 
 ## FIXME: This should work in 3D.  Right now, there is no use case for that
@@ -479,7 +479,7 @@
 </%def>
 
 #define BLOCK_SIZE ${block_size}
-#define DIST_SIZE ${dist_size}
+#define DIST_SIZE ${dist_size}u
 #define OPTION_SAVE_MACRO_FIELDS 1
 #define OPTION_BULK 2
 

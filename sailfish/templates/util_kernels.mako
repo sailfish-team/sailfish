@@ -175,8 +175,8 @@
 	%>
 
 	%if node_addressing == 'indirect':
-		const int gi_low_dense = gi_low;
-		const int gi_high_dense = gi_high;
+		const unsigned int gi_low_dense = gi_low;
+		const unsigned int gi_high_dense = gi_high;
 		gi_low = nodes[gi_low];
 		gi_high = nodes[gi_high];
 		if (gi_low != INVALID_NODE)
@@ -211,7 +211,7 @@
 						%for cond, targ in zip(corner_cond, target):
 							%if cond:
 								else if (${cond}) {
-									int gi_high2 = getGlobalIdx(${targ});
+									unsigned int gi_high2 = getGlobalIdx(${targ});
 									%if node_addressing == 'indirect':
 										gi_high2 = nodes[gi_high2];
 										if (gi_high2 != INVALID_NODE)
@@ -236,8 +236,8 @@
 
 	%if node_addressing == 'indirect':
 		<% _offset = 0 %>
-		gi_high = nodes[gi_high_dense + ${offset}];
-		gi_low = nodes[gi_low_dense + ${offset}];
+		gi_high = nodes[gi_high_dense + (unsigned int)${offset}];
+		gi_low = nodes[gi_low_dense + (unsigned int)${offset}];
 		if (gi_high != INVALID_NODE)
 	%else:
 		<% _offset = offset %>
@@ -268,7 +268,7 @@
 						%for cond, targ in zip(corner_cond, target):
 							%if cond:
 								else if (${cond}) {
-									int gi_low2 = getGlobalIdx(${targ});
+									unsigned int gi_low2 = getGlobalIdx(${targ});
 									%if node_addressing == 'indirect':
 										gi_low2 = nodes[gi_low2];
 										if (gi_low2 != INVALID_NODE)
@@ -297,7 +297,7 @@ ${kernel} void ApplyPeriodicBoundaryConditions(
 	${global_ptr} float *dist, int axis)
 {
 	const int idx1 = get_global_id(0);
-	int gi_low, gi_high;
+	unsigned int gi_low, gi_high;
 
 	// For single block PBC, the envelope size (width of the ghost node
 	// layer) is always 1.
@@ -345,7 +345,7 @@ ${kernel} void ApplyPeriodicBoundaryConditionsWithSwap(
 		${global_ptr} float *dist, int axis)
 {
 	const int idx1 = get_global_id(0);
-	int gi_low, gi_high;
+	unsigned int gi_low, gi_high;
 
 	// For single block PBC, the envelope size (width of the ghost node
 	// layer) is always 1.
@@ -412,7 +412,7 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 		${global_ptr} float *field, int axis)
 {
 	const int idx1 = get_global_id(0);
-	int gi_low, gi_high;
+	unsigned int gi_low, gi_high;
 
 	// TODO(michalj): Generalize this for the case when envelope_size != 1.
 	%if dim == 2:
@@ -496,7 +496,7 @@ ${kernel} void ApplyMacroPeriodicBoundaryConditions(
 			const int dist_size = max_lx / ${len(dists)};
 			const int dist_num = idx / dist_size;
 			const int gx = idx % dist_size;
-			int gi = getGlobalIdx(base_gx + gx, ${gy});
+			unsigned int gi = getGlobalIdx(base_gx + gx, ${gy});
 			${indirect_index(orig=None, position_warning=False)}
 
 			switch (dist_num) {
@@ -570,7 +570,7 @@ ${kernel} void CollectContinuousDataWithSwap(
 <%def name="collect_continuous_data_body_3d(opposite=False)">
 	const int gx = get_global_id(0);
 	int idx = get_global_id(1);
-	int gi;
+	unsigned int gi;
 	float tmp;
 
 	if (gx >= max_lx || idx >= max_other) {
@@ -668,7 +668,7 @@ ${kernel} void CollectContinuousDataWithSwap(
 			const int dist_num = idx / dist_size;
 			const int gx = idx % dist_size;
 			const float tmp = buffer[idx];
-			int gi = getGlobalIdx(base_gx + gx, ${gy});
+			unsigned int gi = getGlobalIdx(base_gx + gx, ${gy});
 			${indirect_index(orig=None, position_warning=False)}
 			switch (dist_num) {
 				%for i, prop_dist in enumerate(dists):
@@ -733,7 +733,7 @@ ${kernel} void DistributeContinuousDataWithSwap(
 <%def name="distribute_continuous_data_body_3d(opposite)">
 	const int gx = get_global_id(0);
 	int idx = get_global_id(1);
-	int gi;
+	unsigned int gi;
 
 	if (gx >= max_lx || idx >= max_other) {
 		return;
@@ -794,7 +794,7 @@ ${kernel} void DistributeContinuousDataWithSwap(
 %endif
 
 ${kernel} void CollectSparseData(
-		${global_ptr} int *idx_array, ${global_ptr} float *dist,
+		${global_ptr} unsigned int *idx_array, ${global_ptr} float *dist,
 		${global_ptr} float *buffer, int max_idx)
 {
 	int idx = get_global_id(0);
@@ -805,9 +805,9 @@ ${kernel} void CollectSparseData(
 	if (idx >= max_idx) {
 		return;
 	}
-	int gi = idx_array[idx];
+	unsigned int gi = idx_array[idx];
 	if (gi == INVALID_NODE) return;
-	if (gi >= DIST_SIZE * ${grid.Q} || gi < 0) {
+	if (gi >= DIST_SIZE * ${grid.Q}) {
 		printf("invalid node index detected in sparse coll %d (%d, %d)\n", gi, get_global_id(0), get_global_id(1));
 		return;
 	}
@@ -815,7 +815,7 @@ ${kernel} void CollectSparseData(
 }
 
 ${kernel} void DistributeSparseData(
-		${global_ptr} int *idx_array, ${global_ptr} float *dist,
+		${global_ptr} unsigned int *idx_array, ${global_ptr} float *dist,
 		${global_ptr} float *buffer, int max_idx)
 {
 	int idx = get_global_id(0);
@@ -825,9 +825,9 @@ ${kernel} void DistributeSparseData(
 	if (idx >= max_idx) {
 		return;
 	}
-	int gi = idx_array[idx];
+	unsigned int gi = idx_array[idx];
 	if (gi == INVALID_NODE) return;
-	if (gi >= DIST_SIZE * ${grid.Q} || gi < 0) {
+	if (gi >= DIST_SIZE * ${grid.Q}) {
 		printf("invalid node index detected in sparse dist %d (%d, %d)\n", gi, get_global_id(0), get_global_id(1));
 		return;
 	}
@@ -846,7 +846,7 @@ ${kernel} void CollectContinuousMacroData(
 		return;
 	}
 
-	int gi = getGlobalIdx(base_gx + idx, gy);
+	unsigned int gi = getGlobalIdx(base_gx + idx, gy);
 	${indirect_index(orig=None, position_warning=False)}
 	buffer[idx] = field[gi];
 }
@@ -886,7 +886,7 @@ ${kernel} void CollectContinuousMacroData(
 	switch (face) {
 	%for axis in range(2, 2 * dim):
 		case ${axis}: {
-			int gi;
+			unsigned int gi;
 			${_get_global_macro_idx(axis)};
 			buffer[idx] = field[gi];
 			break;
@@ -907,7 +907,7 @@ ${kernel} void DistributeContinuousMacroData(
 		return;
 	}
 
-	int gi = getGlobalIdx(base_gx + idx, gy);
+	unsigned int gi = getGlobalIdx(base_gx + idx, gy);
 	${indirect_index(orig=None, position_warning=False)}
 	field[gi] = buffer[idx];
 }
@@ -942,7 +942,7 @@ ${kernel} void DistributeContinuousMacroData(
 	switch (face) {
 	%for axis in range(2, 2 * dim):
 		case ${axis}: {
-			int gi;
+			unsigned int gi;
 			${_get_global_macro_dist_idx(axis)};
 			field[gi] = tmp;
 			break;

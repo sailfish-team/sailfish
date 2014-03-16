@@ -446,7 +446,7 @@ ${device_func} inline void getMacro(
 // Uses extrapolation/other schemes to compute missing distributions for some implementations
 // of boundary condtitions.
 ${device_func} inline void fixMissingDistributions(
-		Dist *fi, ${global_ptr} float *dist_in, int ncode, int node_type, int orientation, int gi,
+		Dist *fi, ${global_ptr} float *dist_in, int ncode, int node_type, int orientation, unsigned int gi,
 		${kernel_args_1st_moment('iv')}
 		${global_ptr} float *gg0m0
 		${misc_bc_args_decl()}
@@ -554,7 +554,7 @@ ${device_func} inline void fixMissingDistributions(
 // node_type and orientation instead of passing them as variables.
 ${device_func} inline void postcollisionBoundaryConditions(
 		Dist *fi, int ncode, int node_type, int orientation,
-		float *rho, float *v0, int gi, ${global_ptr} float *dist_out
+		float *rho, float *v0, unsigned int gi, ${global_ptr} float *dist_out
 		${iteration_number_if_required()}
 		${misc_bc_args_decl()}
 		${scratch_space_if_required()})
@@ -620,7 +620,7 @@ ${device_func} inline void postcollisionBoundaryConditions(
 
 ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode,
 		int node_type, int orientation, float *rho, float *v0
-		${', ' + global_ptr + 'float *dist_out, int gi' + (', %s const int *nodes, int dense_gi' % global_ptr if node_addressing == 'indirect'  else '') if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
+		${', ' + global_ptr + 'float *dist_out, unsigned int gi' + (', %s const int *nodes, int dense_gi' % global_ptr if node_addressing == 'indirect'  else '') if access_pattern == 'AA' and nt.NTDoNothing in node_types else ''}
 		${iteration_number_if_required()})
 {
 	if (0) {}

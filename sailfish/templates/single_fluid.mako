@@ -76,7 +76,7 @@ ${kernel_common.body(bgk_args_decl)}
 		%if dim > 2:
 			int gz_n;
 		%endif
-		int gi_n, ncode_n, type_n;
+		unsigned int gi_n, ncode_n, type_n;
 		%for i, ve in enumerate(grid.basis):
 			gx_n = gx + (${ve[0]});
 			gy_n = gy + (${ve[1]});

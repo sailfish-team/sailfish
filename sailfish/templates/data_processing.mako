@@ -31,44 +31,44 @@ ${kernel} void ComputeSquareVelocityAndVorticity(
 	float duz_dy, dux_dy;
 	// TODO(mjanusz): Modify this for variable-size neighborhood.
 	if (gy > 1 && gy < ${lat_ny-2}) {
-		duz_dy = (vz[gi + ${rel_offset(0, 1, 0)}] -
-				  vz[gi + ${rel_offset(0, -1, 0)}]) * 0.5f;
-		dux_dy = (vx[gi + ${rel_offset(0, 1, 0)}] -
-				  vx[gi + ${rel_offset(0, -1, 0)}]) * 0.5f;
+		duz_dy = (vz[gi + (unsigned int)${rel_offset(0, 1, 0)}] -
+				  vz[gi + (unsigned int)${rel_offset(0, -1, 0)}]) * 0.5f;
+		dux_dy = (vx[gi + (unsigned int)${rel_offset(0, 1, 0)}] -
+				  vx[gi + (unsigned int)${rel_offset(0, -1, 0)}]) * 0.5f;
 	} else if (gy == ${lat_ny-2}) {
-		duz_dy = lvz - vz[gi + ${rel_offset(0, -1, 0)}];
-		dux_dy = lvx - vx[gi + ${rel_offset(0, -1, 0)}];
+		duz_dy = lvz - vz[gi + (unsigned int)${rel_offset(0, -1, 0)}];
+		dux_dy = lvx - vx[gi + (unsigned int)${rel_offset(0, -1, 0)}];
 	} else if (gy == 1) {
-		duz_dy = vz[gi + ${rel_offset(0, 1, 0)}] - lvz;
-		dux_dy = vx[gi + ${rel_offset(0, 1, 0)}] - lvx;
+		duz_dy = vz[gi + (unsigned int)${rel_offset(0, 1, 0)}] - lvz;
+		dux_dy = vx[gi + (unsigned int)${rel_offset(0, 1, 0)}] - lvx;
 	}
 
 	float duy_dz, dux_dz;
 	if (gz > 1 && gz < ${lat_nz-2}) {
-		duy_dz = (vy[gi + ${rel_offset(0, 0, 1)}] -
-				  vy[gi + ${rel_offset(0, 0, -1)}]) * 0.5f;
-		dux_dz = (vx[gi + ${rel_offset(0, 0, 1)}] -
-				  vx[gi + ${rel_offset(0, 0, -1)}]) * 0.5f;
+		duy_dz = (vy[gi + (unsigned int)${rel_offset(0, 0, 1)}] -
+				  vy[gi + (unsigned int)${rel_offset(0, 0, -1)}]) * 0.5f;
+		dux_dz = (vx[gi + (unsigned int)${rel_offset(0, 0, 1)}] -
+				  vx[gi + (unsigned int)${rel_offset(0, 0, -1)}]) * 0.5f;
 	} else if (gz == ${lat_nz-2}) {
-		duy_dz = lvy - vy[gi + ${rel_offset(0, 0, -1)}];
-		dux_dz = lvx - vx[gi + ${rel_offset(0, 0, -1)}];
+		duy_dz = lvy - vy[gi + (unsigned int)${rel_offset(0, 0, -1)}];
+		dux_dz = lvx - vx[gi + (unsigned int)${rel_offset(0, 0, -1)}];
 	} else if (gz == 1) {
-		duy_dz = vy[gi + ${rel_offset(0, 0, 1)}] - lvy;
-		dux_dz = vx[gi + ${rel_offset(0, 0, 1)}] - lvx;
+		duy_dz = vy[gi + (unsigned int)${rel_offset(0, 0, 1)}] - lvy;
+		dux_dz = vx[gi + (unsigned int)${rel_offset(0, 0, 1)}] - lvx;
 	}
 
 	float duz_dx, duy_dx;
 	if (gx >= 2 && gx < ${lat_nx-2}) {
-		duz_dx = (vz[gi + ${rel_offset(1, 0, 0)}] -
-				  vz[gi + ${rel_offset(-1, 0, 0)}]) * 0.5f;
-		duy_dx = (vy[gi + ${rel_offset(1, 0, 0)}] -
-				  vy[gi + ${rel_offset(-1, 0, 0)}]) * 0.5f;
+		duz_dx = (vz[gi + (unsigned int)${rel_offset(1, 0, 0)}] -
+				  vz[gi + (unsigned int)${rel_offset(-1, 0, 0)}]) * 0.5f;
+		duy_dx = (vy[gi + (unsigned int)${rel_offset(1, 0, 0)}] -
+				  vy[gi + (unsigned int)${rel_offset(-1, 0, 0)}]) * 0.5f;
 	} else if (gx == ${lat_nx-2}) {
-		duz_dx = lvz - vz[gi + ${rel_offset(-1, 0, 0)}];
-		duy_dx = lvy - vy[gi + ${rel_offset(-1, 0, 0)}];
+		duz_dx = lvz - vz[gi + (unsigned int)${rel_offset(-1, 0, 0)}];
+		duy_dx = lvy - vy[gi + (unsigned int)${rel_offset(-1, 0, 0)}];
 	} else if (gx == 1) {
-		duz_dx = vz[gi + ${rel_offset(1, 0, 0)}] - lvz;
-		duy_dx = vy[gi + ${rel_offset(1, 0, 0)}] - lvy;
+		duz_dx = vz[gi + (unsigned int)${rel_offset(1, 0, 0)}] - lvz;
+		duy_dx = vy[gi + (unsigned int)${rel_offset(1, 0, 0)}] - lvy;
 	}
 
 	float vort_x = duz_dy - duy_dz;
@@ -124,15 +124,15 @@ ${kernel} void ComputeSquareVelocityAndVorticity(
 	if (gx > 0) {
 		%if dim == 2:
 			// +1 shift due to ghost nodes.
-			int gi = getGlobalIdx(gx, g_scan + 1);
+			unsigned int gi = getGlobalIdx(gx, g_scan + 1);
 			${_compute_stats(num_inputs, stats, out_type)}
 		%else:
 			<% other_nx = lat_ny if axis == 2 else lat_nz %>
 			for (int g_other = 1; g_other < ${other_nx - 1}; g_other++) {
 				%if axis == 1:
-					int gi = getGlobalIdx(gx, g_scan + 1, g_other);
+					unsigned int gi = getGlobalIdx(gx, g_scan + 1, g_other);
 				%else:
-					int gi = getGlobalIdx(gx, g_other, g_scan + 1);
+					unsigned int gi = getGlobalIdx(gx, g_other, g_scan + 1);
 				%endif
 				${_compute_stats(num_inputs, stats, out_type)}
 			}
@@ -200,11 +200,11 @@ ${kernel} void ComputeSquareVelocityAndVorticity(
 	for (int gy = 1; gy < ${lat_ny - 1}; gy++) {
 		%if dim == 3:
 			for (int gz = 1; gz < ${lat_nz - 1}; gz++) {
-				int gi = getGlobalIdx(gx, gy, gz);
+				unsigned int gi = getGlobalIdx(gx, gy, gz);
 				${_compute_stats(num_inputs, stats, out_type)}
 			}
 		%else:
-			int gi = getGlobalIdx(gx, gy);
+			unsigned int gi = getGlobalIdx(gx, gy);
 			${_compute_stats(num_inputs, stats, out_type)}
 		%endif
 	}
@@ -238,19 +238,19 @@ ${kernel} void AggregateSlice${name}(
 		if (ga >= ${lat_ny - 1} || ga == 0 || gb == 0 || gb >= ${lat_nz - 1}) {
 			return;
 		}
-		int gi = getGlobalIdx(position, ga, gb);
+		unsigned int gi = getGlobalIdx(position, ga, gb);
 		<% width = lat_ny %>
 	%elif axis == 1:
 		if (ga >= ${lat_nx - 1} || ga == 0 || gb == 0 || gb >= ${lat_nz - 1}) {
 			return;
 		}
-		int gi = getGlobalIdx(ga, position, gb);
+		unsigned int gi = getGlobalIdx(ga, position, gb);
 		<% width = lat_nx %>
 	%else:
 		if (ga >= ${lat_nx - 1} || ga == 0 || gb == 0 || gb >= ${lat_ny - 1}) {
 			return;
 		}
-		int gi = getGlobalIdx(ga, gb, position);
+		unsigned int gi = getGlobalIdx(ga, gb, position);
 		<% width = lat_nx %>
 	%endif
 	${_compute_stats(num_inputs, stats, out_type)}
@@ -333,7 +333,7 @@ ${kernel} void FinalizeReduce${name}(
 	${out_type} acc = 0.0f;
 
 	if (gx < ${real_block_size}) {
-		int gi = gx + g_scan * ${real_block_size};
+		unsigned int gi = gx + g_scan * ${real_block_size};
 		acc = acc + in[gi];
 	}
 	sdata[gx] = acc;
@@ -373,7 +373,7 @@ ${kernel} void FinalizeReduce${name}(
 	<% es = envelope_size %>
 	const int c0 = get_global_id(0) + ${es};  // x or y
 	const int c1 = get_global_id(1) + ${es};  // y or z
-	int gi, go;
+	unsigned int gi, go;
 
 	if (axis == 0) {
 		if (c0 >= ${lat_ny - es} || c1 >= ${lat_nz - es}) {
@@ -440,26 +440,26 @@ ${kernel} void ${name}(int position,
 		if (c0 >= ${lat_ny-1} || c1 >= ${lat_nz-1}) {
 			return;
 		}
-		const int gi = getGlobalIdx(1 + position, c0, c1);
+		const unsigned int gi = getGlobalIdx(1 + position, c0, c1);
 		const int stride = ${lat_ny - 2};
 	%elif axis == 1:
 		if (c0 >= ${lat_nx-1} || c1 >= ${lat_nz-1}) {
 			return;
 		}
-		const int gi = getGlobalIdx(c0, 1 + position, c1);
+		const unsigned int gi = getGlobalIdx(c0, 1 + position, c1);
 		const int stride = ${lat_nx - 2};
 	%else:
 		if (c0 >= ${lat_nx-1} || c1 >= ${lat_ny-1}) {
 			return;
 		}
-		const int gi = getGlobalIdx(c0, c1, 1 + position);
+		const unsigned int gi = getGlobalIdx(c0, c1, 1 + position);
 		const int stride = ${lat_nx - 2};
 	%endif
 	%for i in range(len(stats)):
 		${out_type} acc${i} = 0.0f;
 	%endfor
 	${_compute_stats(num_inputs, stats, out_type)}
-	const int gi_dst = (c1 - 1) * stride + (c0 - 1);
+	const unsigned int gi_dst = (c1 - 1) * stride + (c0 - 1);
 	%for i in range(len(stats)):
 		out${i}[gi_dst] += acc${i};
 	%endfor
