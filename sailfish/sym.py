@@ -1028,7 +1028,6 @@ def _prepare_symbols():
         setattr(S, name, t)
         S.relaxation_times.append(t)
 
-
     # Commonly used aliases.
     S.alias('vx', S.g0m1x)
     S.alias('vy', S.g0m1y)
@@ -1036,10 +1035,6 @@ def _prepare_symbols():
     S.alias('rho', S.g0m0)
     S.alias('phi', S.g1m0)
     S.alias('theta', S.g2m0)
-
-    S.alias('eax', S.g0eax)
-    S.alias('eay', S.g0eay)
-    S.alias('eaz', S.g0eaz)
 
     # For incompressible models, this symbol is replaced with the average
     # density, usually 1.0.  For compressible models, it is the same as
