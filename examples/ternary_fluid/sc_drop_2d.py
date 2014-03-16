@@ -32,9 +32,6 @@ class DropSubdomain(Subdomain2D):
         sim.phi[drop_map2] = 0.02
         sim.theta[drop_map2] = 2.0
 
-        ny, nx = sim.rho.shape
-        hy, hx = np.mgrid[0:ny, 0:nx]
-
 class SCSim(LBTernaryFluidShanChen):
     subdomain = DropSubdomain
 
