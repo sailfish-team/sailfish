@@ -311,6 +311,7 @@ class CUDABackend(object):
         return {
             'warp_size': self._device.get_attribute(cuda.device_attribute.WARP_SIZE),
             'supports_shuffle': self._device.compute_capability()[0] >= 3,
+            'supports_printf': self._device.compute_capability()[0] >= 2,
             'backend': 'cuda',
             'shared_var': '__shared__',
             'kernel': '__global__',

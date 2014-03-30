@@ -478,6 +478,10 @@
 	}
 </%def>
 
+%if not supports_printf:
+	#define printf(...)
+%endif
+
 #define BLOCK_SIZE ${block_size}
 #define DIST_SIZE ${dist_size}u
 #define OPTION_SAVE_MACRO_FIELDS 1

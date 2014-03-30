@@ -53,6 +53,7 @@ class DummyBackend(object):
         return {
             'warp_size': 32,
             'supports_shuffle': False,
+            'supports_printf': False,
             'shared_var': '__shared__',
             'kernel': '__global__',
             'global_ptr': '',

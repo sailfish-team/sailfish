@@ -200,6 +200,7 @@ class OpenCLBackend(object):
             # FIXME
             'warp_size': 32,
             'supports_shuffle': False,
+            'supports_printf': False,
             'shared_var': '__local',
             'kernel': '__kernel',
             'global_ptr': '__global',
