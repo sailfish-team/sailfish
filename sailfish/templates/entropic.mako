@@ -12,12 +12,13 @@ ${device_func} inline void ComputeACoeff(Dist* fi, Dist* fneq, float *a1,
 	*a2 = 0.0f;
 	*a3 = 0.0f;
 	*a4 = 0.0f;
-	float t, p;
+	float t, p, inv;
 
 	%for name in grid.idx_name:
 		t = fneq->${name};
-		p = t * t / fi->${name};
-		t /= fi->${name};
+		inv = 1.0f / fi->${name};
+		p = t * t * inv;
+		t *= inv;
 		*a1 += p;
 		p = p * t;
 		*a2 += p;
