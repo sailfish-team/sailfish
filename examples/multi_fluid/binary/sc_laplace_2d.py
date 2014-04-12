@@ -11,7 +11,7 @@ from sailfish.geo import LBGeometry2D
 from sailfish.subdomain import Subdomain2D
 from sailfish.node_type import NTHalfBBWall, NTFullBBWall, _NTUnused
 from sailfish.controller import LBSimulationController
-from sailfish.lb_binary import LBBinaryFluidShanChen
+from sailfish.lb_multi import LBMultiFluidShanChen
 from sailfish.sym import relaxation_time
 
 H = 128
@@ -26,28 +26,29 @@ class PoiseuilleDomain(Subdomain2D):
         drop = ((hx - H / 2)**2 + (hy - H / 2)**2) < R**2
         not_drop = np.logical_not(drop)
 
-        sim.rho[drop] = 1.0
-        sim.phi[drop] = 1e-4
+        sim.g0m0[drop] = 1.0
+        sim.g1m0[drop] = 1e-4
 
-        sim.rho[not_drop] = 1e-4
-        sim.phi[not_drop] = 1.0
+        sim.g0m0[not_drop] = 1e-4
+        sim.g1m0[not_drop] = 1.0
 
     def boundary_conditions(self, hx, hy):
         pass
 
-class PoiseuilleSim(LBBinaryFluidShanChen):
+class PoiseuilleSim(LBMultiFluidShanChen):
     subdomain = PoiseuilleDomain
 
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
+            'lat_nc': 2,
             'lat_nx': H,
             'lat_ny': H,
             'grid': 'D2Q9',
-            'visc': visc1,
-            'tau_phi': relaxation_time(visc2),
+            'tau0': relaxation_time(visc1),
+            'tau1': relaxation_time(visc2),
             'force_implementation': 'edm',
-            'G12': G,
+            'G01': G,
             'periodic_y': True,
             'periodic_x': True,
         })
@@ -59,16 +60,16 @@ class PoiseuilleSim(LBBinaryFluidShanChen):
             self.need_sync_flag = True
 
         if self.iteration % every == 0:
-            phi1 = runner._sim.phi[H/2, H/2]
-            rho1 = runner._sim.rho[H/2, H/2]
+            g1m0a = runner._sim.g1m0[H/2, H/2]
+            g0m0a = runner._sim.g0m0[H/2, H/2]
 
-            phi2 = runner._sim.phi[10, 10]
-            rho2 = runner._sim.rho[10, 10]
+            g1m0b = runner._sim.g1m0[10, 10]
+            g0m0b = runner._sim.g0m0[10, 10]
 
-            p1 = (phi1 + rho1) + G * phi1 * rho1
-            p2 = (phi2 + rho2) + G * phi2 * rho2
+            p1 = (g1m0a + g0m0a) + G * g1m0a * g0m0a
+            p2 = (g1m0b + g0m0b) + G * g1m0b * g0m0b
 
-            print p1 - p2, p1, np.nansum(runner._sim.phi), np.nansum(runner._sim.rho)
+            print p1 - p2, p1, np.nansum(runner._sim.g1m0), np.nansum(runner._sim.g0m0)
 
 if __name__ == '__main__':
     LBSimulationController(PoiseuilleSim).run()

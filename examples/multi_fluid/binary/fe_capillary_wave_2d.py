@@ -2,7 +2,7 @@
 
 """Capillary wave.
 
-Two components are initially are separated by an interface perturbed with a
+Two components are initially separated by an interface perturbed with a
 sinusoidal wave. The code simulates free relaxation of the interface.
 
 Interface thickness = 2\sqrt{2} \sqrt{\kappa/A} should be kept wide to avoid
@@ -28,7 +28,7 @@ from sailfish.geo import LBGeometry2D
 from sailfish.subdomain import Subdomain2D
 from sailfish.node_type import NTHalfBBWall, NTFullBBWall, _NTUnused
 from sailfish.controller import LBSimulationController
-from sailfish.lb_binary import LBBinaryFluidFreeEnergy
+from sailfish.lb_multi import LBBinaryFluidFreeEnergy
 from sailfish.sym import relaxation_time
 
 import scipy.ndimage.filters
@@ -66,7 +66,7 @@ class CapillaryWaveSim(LBBinaryFluidFreeEnergy):
             'tau_a': relaxation_time(visc1),
             'tau_b': relaxation_time(visc2),
             'tau_phi': 1.0,
-            # A wider interface helps with aliasing effects when decting the
+            # A wider interface helps with aliasing effects when detecting the
             # position of the interface.
             'kappa': 0.04,
             'A': 0.02,

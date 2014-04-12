@@ -6,7 +6,7 @@ from sailfish.geo import LBGeometry3D
 from sailfish.subdomain import Subdomain3D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
-from sailfish.lb_binary import LBBinaryFluidFreeEnergy
+from sailfish.lb_multi import LBBinaryFluidFreeEnergy
 from sailfish.lb_base import LBForcedSim
 
 

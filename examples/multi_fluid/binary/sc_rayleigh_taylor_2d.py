@@ -8,7 +8,7 @@ from sailfish.geo import LBGeometry2D
 from sailfish.subdomain import Subdomain2D
 from sailfish.node_type import NTFullBBWall
 from sailfish.controller import LBSimulationController
-from sailfish.lb_binary import LBBinaryFluidShanChen
+from sailfish.lb_multi import LBMultiFluidShanChen
 from sailfish.lb_base import LBForcedSim
 
 class RayleighTaylorDomain(Subdomain2D):
@@ -17,32 +17,30 @@ class RayleighTaylorDomain(Subdomain2D):
                 NTFullBBWall)
 
     def initial_conditions(self, sim, hx, hy):
-        sim.rho[:] = np.random.rand(*sim.rho.shape) / 100.0
-        sim.phi[:] = np.random.rand(*sim.phi.shape) / 100.0
+        sim.g0m0[:] = np.random.rand(*sim.g0m0.shape) / 100.0
+        sim.g1m0[:] = np.random.rand(*sim.g1m0.shape) / 100.0
 
-        sim.rho[(hy <= self.gy / 2)] += 1.0
-        sim.phi[(hy <= self.gy / 2)] = 1e-4
+        sim.g0m0[(hy <= self.gy / 2)] += 1.0
+        sim.g1m0[(hy <= self.gy / 2)] = 1e-4
 
-        sim.rho[(hy > self.gy / 2)] = 1e-4
-        sim.phi[(hy > self.gy / 2)] += 1.0
+        sim.g0m0[(hy > self.gy / 2)] = 1e-4
+        sim.g1m0[(hy > self.gy / 2)] += 1.0
 
 
-class RayleighTaylorSCSim(LBBinaryFluidShanChen, LBForcedSim):
+class RayleighTaylorSCSim(LBMultiFluidShanChen, LBForcedSim):
     subdomain = RayleighTaylorDomain
 
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
+            'lat_nc': 2,
             'lat_nx': 640,
             'lat_ny': 400,
             'grid': 'D2Q9',
-            'G12': 1.2,
-            'visc': 1.0 / 6.0,
+            'G01': 1.2,
+            'visc0': 1.0/6.0,
+            'visc1': 1.0/6.0,
             'periodic_x': True})
-
-    @classmethod
-    def modify_config(cls, config):
-        config.tau_phi = sym.relaxation_time(config.visc)
 
     def __init__(self, config):
         super(RayleighTaylorSCSim, self).__init__(config)
