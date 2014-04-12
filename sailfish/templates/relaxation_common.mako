@@ -38,7 +38,7 @@
 	// Guo's method, eqs. 19 and 20 from 10.1103/PhysRevE.65.046308.
 	const float pref = ${cex(sym_force.guo_external_force_pref(grids[i], config, grid_num=i).subs(subs))};
 	%for val, idx in zip(sym_force.guo_external_force(grid, grid_num=i), grid.idx_name):
-		d0->${idx} += ${cex(val.subs(subs))};
+		d${i}->${idx} += ${cex(val.subs(subs))};
 	%endfor
 }
 </%def>
@@ -47,7 +47,7 @@
 {
 	// Exact difference method.
 	%for feq_shifted, idx in zip(sym_force.edm_shift_velocity(equilibria[i](grids[i], config).expression, grid, i), grid.idx_name):
-		d0->${idx} += ${cex(feq_shifted)} - feq0.${idx};
+		d${i}->${idx} += ${cex(feq_shifted)} - feq${i}.${idx};
 	%endfor
 }
 </%def>
@@ -67,7 +67,7 @@
 <%def name="apply_body_force(i, no_feq=False, subs={})">
 	%if simtype == 'free-energy':
 		%for val, idx in zip(sym_force.free_energy_external_force(sim, grid_num=i), grid.idx_name):
-			d0->${idx} += ${cex(val)};
+			d${i}->${idx} += ${cex(val)};
 		%endfor
 	%else:
 		%if force_implementation == 'guo':
@@ -135,11 +135,11 @@
 	## constant and does not need to be declared here.
 	%if simtype == 'free-energy' and grid_idx == 0:
 		// Linear interpolation of relaxation time.
-		float tau0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) * 0.5f;
+		float tau_0 = tau_b + (phi + 1.0f) * (tau_a - tau_b) * 0.5f;
 		if (phi < -1.0f) {
-			tau0 = tau_b;
+			tau_0 = tau_b;
 		} else if (phi > 1.0f) {
-			tau0 = tau_a;
+			tau_0 = tau_a;
 		}
 	%endif
 
@@ -189,15 +189,15 @@
 	float v0[${dim}];
 
 	<% eq = equilibria[grid_idx](grids[grid_idx], config) %>
-	Dist feq0;
-	${fluid_velocity(grid_idx, equilibrium=True)};
+	Dist feq${grid_idx};
+	${fluid_velocity(grid_idx, equilibrium=True)}
 
 	%for local_var in eq.local_vars:
 		float ${cex(local_var.lhs)} = ${cex(local_var.rhs)};
 	%endfor
 
 	%for feq, idx in zip(eq.expression, grid.idx_name):
-		feq0.${idx} = ${cex(feq)};
+		feq${grid_idx}.${idx} = ${cex(feq)};
 	%endfor
 
 	${update_relaxation_time(grid_idx)}

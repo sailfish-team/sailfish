@@ -148,7 +148,7 @@ class LBSim(object):
                 sources.append(c)
 
         for src in sources:
-            for field in src.fields():
+            for field in src.fields(self.grids):
                 if type(field) is ScalarField:
                     f, _ = runner.make_scalar_field(name=field.name, async=True,
                                                     gpu_array=field.gpu_array)

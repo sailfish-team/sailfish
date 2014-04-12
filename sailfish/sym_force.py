@@ -142,24 +142,20 @@ def guo_external_force_pref(grid, config, grid_num=0):
     :param grid: grid object corresponding to grid_num:
     :param grid_num: grid number
     """
-    if grid_num == 0:
-        rho = S.rho
-    elif grid_num == 1:
-        rho = S.phi
-    else:
-        rho = S.densities[grid_num]
+
+    dens = eval('S.g{}m0'.format(grid_num))
 
     if config.minimize_roundoff:
-        rho += 1
+        dens += 1
 
     tau = S.relaxation_times[grid_num]
 
     # This includes a density factor as the device code always computes
     # accelerations, not forces.
-    return rho / grid.cssq * (1 - 1/(2 * tau))
+    return dens / grid.cssq * (1 - 1/(2 * tau))
 
 def free_energy_external_force(sim, grid_num=0):
-    """Creates expressions for the external body force term in the free-energy model.
+    """Creates expressions for the external body force term ingedit the free-energy model.
 
     This implements the external force as in Eq. 2.13 from Halim Kusumaatmaja's PhD
     thesis ("Lattice Boltzmann Studies of Wetting and Spreading on Patterned Surfaces").

@@ -3,7 +3,7 @@
 %>
 
 <%def name="cex(ex, pointers=False, rho=None, vectors=True, phi=None, vel=None)">
-${sym_codegen.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors, phi=phi, vel=vel)}
+${sym_codegen.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors, phi=phi, vel=vel, shanchen=(simtype == 'shan-chen' and len(grids) > 1))}
 </%def>
 
 <%def name="dump_dists(name, short=False, precision=5)">

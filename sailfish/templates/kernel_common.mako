@@ -195,12 +195,12 @@
 	int orientation = decodeNodeOrientation(ncode);
 </%def>
 
-<%def name="check_invalid_values()">
+<%def name="check_invalid_values(grid_idx=0)">
 	%if gpu_check_invalid_values:
 		## Grad outflow nodes use invalid values to tag directions lacking distribution
 		## data.
 		if (isWetNode(type) ${'&& !isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
-			checkInvalidValues(&d0, ${position()});
+			checkInvalidValues(&d${grid_idx}, ${position()});
 		}
 	%endif
 </%def>
@@ -477,6 +477,10 @@
 		%endif
 	}
 </%def>
+
+%if not supports_printf:
+	#define printf(...)
+%endif
 
 #define BLOCK_SIZE ${block_size}
 #define DIST_SIZE ${dist_size}

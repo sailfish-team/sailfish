@@ -8,19 +8,19 @@
 
 ## Declares and evaluate the Shan-Chen forces.
 <%def name="sc_calculate_force(grid_idx=0)">
-	float sca0[${dim}]={};
+	float sca${grid_idx}[${dim}]={};
 
 	if (isWetNode(type)) {
 		%for dists, coupling_const in force_couplings.iteritems():
 			%if (dists[0] == grid_idx) and (constants[coupling_const] != 0.0):
 				shan_chen_force(gi, g${grid_idx}m0, gg${dists[1]}m0,
-								${coupling_const}, sca0, ${position()});
+								${coupling_const}, sca${grid_idx}, ${position()});
 			%endif
 		%endfor
 
 		// Convert momentum and force into velocity and acceleration.
 		%for i in range(0, dim):
-			sca0[${i}] /= g${grid_idx}m0;
+			sca${grid_idx}[${i}] /= g${grid_idx}m0;
 		%endfor
 	}
 </%def>

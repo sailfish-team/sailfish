@@ -15,7 +15,7 @@ ${mrt.body()}
 
 %if model == 'mrt' and simtype == 'free-energy':
 %for grid_idx in range(0, len(grids)):
-${device_func} inline void FE_MRT_relaxate${grid_idx}(${bgk_args_decl(grid_idx)}, Dist *d0,
+${device_func} inline void FE_MRT_relaxate${grid_idx}(${bgk_args_decl(grid_idx)}, Dist *d${grid_idx},
 	int node_type
 	${dynamic_val_args_decl()})
 {
@@ -28,9 +28,9 @@ ${device_func} inline void FE_MRT_relaxate${grid_idx}(${bgk_args_decl(grid_idx)}
 	%for idx in grid.idx_name:
 		## Use the BGK approximation for the relaxation of the order parameter field.
 		%if grid_idx == 1:
-			d0->${idx} += (feq0.${idx} - d0->${idx}) / tau1;
+			d${grid_idx}->${idx} += (feq${grid_idx}.${idx} - d${grid_idx}->${idx}) / tau1;
 		%else:
-			feq0.${idx} = d0->${idx} - feq0.${idx};
+			feq${grid_idx}.${idx} = d${grid_idx}->${idx} - feq${grid_idx}.${idx};
 		%endif
 	%endfor
 
@@ -45,7 +45,7 @@ ${device_func} inline void FE_MRT_relaxate${grid_idx}(${bgk_args_decl(grid_idx)}
 		${fluid_velocity(grid_idx)};
 
 		%for val, idx in zip(sym_force.free_energy_external_force(sim, grid_num=grid_idx), grid.idx_name):
-			d0->${idx} += ${cex(val)};
+			d${grid_idx}->${idx} += ${cex(val)};
 		%endfor
 	%endif
 
@@ -103,24 +103,22 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 // the velocity v and the distribution fi.
 %for grid_idx in range(len(grids)):
 ${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
-	Dist *d0, int node_type, int ncode
+	Dist *d${grid_idx}, int node_type, int ncode
 	${dynamic_val_args_decl()})
 {
 	${body_force(grid_idx)}
 	${bgk_relaxation_preamble(grid_idx)}
 
-	%if grid_idx == 1:
-		float omega = ${cex(1.0 / tau_phi)};
-	%elif grid_idx == 2:
-		float omega = ${cex(1.0 / tau_theta)};
-	%elif subgrid == 'les-smagorinsky' or (simtype == 'free-energy' and grid_idx == 0):
-		float omega = 1.0 / tau0;
+	%if subgrid == 'les-smagorinsky' or (simtype == 'free-energy' and grid_idx == 0):
+		float omega${grid_idx} = 1.0 / tau_0;
+	%elif simtype == 'shan-chen' or (simtype == 'free-energy' and grid_idx != 0):
+		float omega${grid_idx} = 1.0 / tau${grid_idx};
 	%else:
-		float omega = ${cex(1.0 / tau)};
+		float omega${grid_idx} = ${cex(1.0 / tau)}; //TODO(nlooije): why hardcoded? params not used!
 	%endif
 
 	%for idx in grid.idx_name:
-		d0->${idx} += omega * (feq0.${idx} - d0->${idx});
+		d${grid_idx}->${idx} += omega${grid_idx} * (feq${grid_idx}.${idx} - d${grid_idx}->${idx});
 	%endfor
 
 	%if nt.NTGuoDensity in node_types:
@@ -137,7 +135,7 @@ ${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
 		// The code below takes care of the -f_eq(B) of the formula.
 		if (isNTGuoDensity(node_type)) {
 			%for idx in grid.idx_name:
-				d0->${idx} -= feq0.${idx};
+				d${grid_idx}->${idx} -= feq${grid_idx}.${idx};
 			%endfor
 		}
 	%endif
@@ -162,7 +160,7 @@ ${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
 					${cex(local_var.rhs, rho='par_rho', phi='par_phi')};
 			%endfor
 			%for feq, idx in zip(eq.expression, grid.idx_name):
-				d0->${idx} += ${cex(feq, rho='par_rho', phi='par_phi')};
+				d${grid_idx}->${idx} += ${cex(feq, rho='par_rho', phi='par_phi')};
 			%endfor
 		}
 	%endif
@@ -174,13 +172,13 @@ ${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
 
 <%def name="_relaxate(bgk_args, grid_idx)">
 	%if model == 'bgk':
-		BGK_relaxate${grid_idx}(${bgk_args(grid_idx)}, &d0, type, ncode ${dynamic_val_call_args()});
+		BGK_relaxate${grid_idx}(${bgk_args(grid_idx)}, &d${grid_idx}, type, ncode ${dynamic_val_call_args()});
 	%elif model == 'mrt' and simtype == 'free-energy':
-		FE_MRT_relaxate${grid_idx}(${bgk_args(grid_idx)}, &d0, type ${dynamic_val_call_args()});
+		FE_MRT_relaxate${grid_idx}(${bgk_args(grid_idx)}, &d${grid_idx}, type ${dynamic_val_call_args()});
 	%elif model == 'elbm':
-		ELBM_relaxate(${bgk_args()}, &d0 ${dynamic_val_call_args()} ${cond(alpha_output, ', alpha + gi')});
+		ELBM_relaxate(${bgk_args()}, &d${grid_idx} ${dynamic_val_call_args()} ${cond(alpha_output, ', alpha + gi')});
 	%else:
-		MS_relaxate(&d0, type, v ${dynamic_val_call_args()});
+		MS_relaxate(&d${grid_idx}, type, v ${dynamic_val_call_args()});
 	%endif
 </%def>
 

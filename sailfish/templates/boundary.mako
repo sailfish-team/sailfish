@@ -211,6 +211,7 @@ ${device_func} inline void compute_1st_moment(Dist *fi, float *out, int add, flo
 	}
 }
 
+%if nt.NTGradFreeflow in node_types:
 // Compute the 2nd moments of the distributions.  Order of components is:
 // 2D: xx, xy, yy
 // 3D: xx, xy, xz, yy, yz, zz
@@ -220,7 +221,9 @@ ${device_func} inline void compute_2nd_moment(Dist *fi, float *out)
 		out[${i}] = ${cex(sym.ex_flux(grid, 'fi', a, b, config), pointers=True)};
 	%endfor
 }
+%endif
 
+%if nt.NTRegularizedVelocity in node_types or nt.NTRegularizedDensity in node_types:
 // Computes the 2nd moment of the non-equilibrium distribution function
 // given the full distribution fuction 'fi'.
 ${device_func} inline void compute_noneq_2nd_moment(Dist* fi, const float rho, float *v0, float *out)
@@ -230,6 +233,7 @@ ${device_func} inline void compute_noneq_2nd_moment(Dist* fi, const float rho, f
 					${cex(sym.ex_eq_flux(grid, a, b))};
 	%endfor
 }
+%endif
 
 // Compute the 1st moments of the distributions and divide it by the 0-th moment
 // i.e. compute velocity.

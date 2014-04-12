@@ -202,7 +202,7 @@ class KernelCodePrinter(CCodePrinter):
 
 
 def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=True,
-          phi=None, vel=None):
+          phi=None, vel=None, shanchen=False):
     """Convert a SymPy expression into a string containing valid C code.
 
     :param sim: the main simulation class (descendant of :class:`LBMSim`)
@@ -215,6 +215,7 @@ def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=True,
     :param rho: density symbol (sympy Symbol, string).  If ``None`` the
         standard rho symbol for the grid will be used.
     :param vel: symbol to use for velocity
+    :param shanchen: set correct aliases for multicomp SC model
     :rtype: string representing the C code
     """
 
@@ -236,13 +237,14 @@ def cexpr(sim, incompressible, pointers, ex, rho, aliases=True, vectors=True,
         t = t.subs(S.phi, phi)
 
     if incompressible:
-        t = t.subs(S.rho0, 1)
+        t = t.subs(S.rho_0, 1)
     else:
-        t = t.subs(S.rho0, rho)
+        t = t.subs(S.rho_0, rho)
 
     if aliases:
         for src, dst in S.aliases.iteritems():
-            t = t.subs(src, dst)
+            if not (shanchen and ((dst == 'rho') or (dst == 'phi'))):
+                t = t.subs(src, dst)
 
     t = KernelCodePrinter().doprint(t)
     if pointers:

@@ -205,12 +205,12 @@ class D3Q13(DxQy):
             'm3x': 0,
             'm3y': 0,
             'm3z': 0,
-            'pxy': 1/S.rho0 * (cls.mx * cls.my),
-            'pyz': 1/S.rho0 * (cls.my * cls.mz),
-            'pzx': 1/S.rho0 * (cls.mx * cls.mz),
-            'pxx': 1/S.rho0 * (2 * cls.mx**2 - cls.my**2 - cls.mz**2),
-            'pww': 1/S.rho0 * (cls.my**2 - cls.mz**2),
-            'en': 3*S.rho*(13*cls.cssq - 8)/2 + 13/(2 * S.rho0)*(cls.mx**2 + cls.my**2 + cls.mz**2),
+            'pxy': 1/S.rho_0 * (cls.mx * cls.my),
+            'pyz': 1/S.rho_0 * (cls.my * cls.mz),
+            'pzx': 1/S.rho_0 * (cls.mx * cls.mz),
+            'pxx': 1/S.rho_0 * (2 * cls.mx**2 - cls.my**2 - cls.mz**2),
+            'pww': 1/S.rho_0 * (cls.my**2 - cls.mz**2),
+            'en': 3*S.rho*(13*cls.cssq - 8)/2 + 13/(2 * S.rho_0)*(cls.mx**2 + cls.my**2 + cls.mz**2),
         }
 
         for i, name in enumerate(cls.mrt_names):
@@ -278,16 +278,16 @@ class D3Q15(DxQy):
         # Form of the equilibrium functions follows that from
         # dHumieres, PhilTranA, 2002.
         mrt_eq = {
-            'en':  -S.rho + 1/S.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
+            'en':  -S.rho + 1/S.rho_0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
             'ens': -S.rho,
             'ex':  -Rational(7,3)*cls.mx,
             'ey':  -Rational(7,3)*cls.my,
             'ez':  -Rational(7,3)*cls.mz,
-            'pxx': 1/S.rho0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
-            'pww': 1/S.rho0 * (cls.my**2 - cls.mz**2),
-            'pxy': 1/S.rho0 * (cls.mx * cls.my),
-            'pyz': 1/S.rho0 * (cls.my * cls.mz),
-            'pzx': 1/S.rho0 * (cls.mx * cls.mz),
+            'pxx': 1/S.rho_0 * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
+            'pww': 1/S.rho_0 * (cls.my**2 - cls.mz**2),
+            'pxy': 1/S.rho_0 * (cls.mx * cls.my),
+            'pyz': 1/S.rho_0 * (cls.my * cls.mz),
+            'pzx': 1/S.rho_0 * (cls.mx * cls.mz),
             'mxyz': 0
         }
 
@@ -363,16 +363,16 @@ class D3Q19(DxQy):
         # Form of the equilibrium functions follows that from
         # dHumieres, PhilTranA, 2002.
         mrt_eq = {
-            'en':  -11 * S.rho + 19/S.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
-            'eps': -Rational(475,63)/S.rho0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
+            'en':  -11 * S.rho + 19/S.rho_0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
+            'eps': -Rational(475,63)/S.rho_0 * (cls.mx**2 + cls.my**2 + cls.mz**2),
             'ex':  -Rational(2,3)*cls.mx,
             'ey':  -Rational(2,3)*cls.my,
             'ez':  -Rational(2,3)*cls.mz,
-            'pxx3': 1/(S.rho0) * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
-            'pww': 1/S.rho0 * (cls.my**2 - cls.mz**2),
-            'pxy': 1/S.rho0 * (cls.mx * cls.my),
-            'pyz': 1/S.rho0 * (cls.my * cls.mz),
-            'pzx': 1/S.rho0 * (cls.mx * cls.mz),
+            'pxx3': 1/(S.rho_0) * (2*cls.mx**2 - (cls.my**2 + cls.mz**2)),
+            'pww': 1/S.rho_0 * (cls.my**2 - cls.mz**2),
+            'pxy': 1/S.rho_0 * (cls.mx * cls.my),
+            'pyz': 1/S.rho_0 * (cls.my * cls.mz),
+            'pzx': 1/S.rho_0 * (cls.mx * cls.mz),
             'm3x': 0,
             'm3y': 0,
             'm3z': 0,
@@ -429,7 +429,7 @@ def alpha_series():
 
 
 def free_energy_mrt_matrix(grid):
-    tau0 = Symbol('tau0')
+    tau_0 = Symbol('tau_0')
 
     def matrix_constructor(i, j):
         if i == j:
@@ -439,7 +439,7 @@ def free_energy_mrt_matrix(grid):
                 else:
                     return 1.0
             else:
-                return 1.0 / tau0
+                return 1.0 / tau_0
         else:
             return 0
 
@@ -533,7 +533,7 @@ def ex_rho(grid, distp, incompressible, missing_dir=None):
     # quantities and cancelling out the unknown distributions so as to get an
     # expression for rho using only known quantities.
     if incompressible:
-        return S.rho + S.rho0 * grid.dir_to_vec(missing_dir).dot(grid.v)
+        return S.rho + S.rho_0 * grid.dir_to_vec(missing_dir).dot(grid.v)
     else:
         return S.rho / (1 - grid.dir_to_vec(missing_dir).dot(grid.v))
 
@@ -565,7 +565,7 @@ def ex_velocity(grid, distp, comp, config, momentum=False, missing_dir=None,
             ret += grid.basis[i][comp] * sym
 
         if config.incompressible:
-            rho = S.rho0
+            rho = S.rho_0
         elif config.minimize_roundoff:
             rho = S.rho + 1.0
         else:
@@ -599,7 +599,7 @@ def ex_flux(grid, distp, comp_a, comp_b, config):
     for i, sym in enumerate(syms):
         ret += grid.basis[i][comp_a] * grid.basis[i][comp_b] * sym
 
-    # rho_0 c_s^2 δ_αβ
+    # rho_0 c_s^2 Î´_Î±Î²
     if config.minimize_roundoff and comp_a == comp_b:
         ret += grid.cssq  # rho_0 == 1
 
@@ -809,9 +809,9 @@ def shan_chen_linear(field):
     return f
 
 def shan_chen_classic(field):
-    rho0 = 1.0
+    rho_0 = 1.0
     f = Symbol(field)
-    return rho0 * (1.0 - sympy.exp(-f / rho0))
+    return rho_0 * (1.0 - sympy.exp(-f / rho_0))
 
 SHAN_CHEN_POTENTIALS = {
     'linear': shan_chen_linear,
@@ -1000,6 +1000,7 @@ def _prepare_symbols():
         # Laplacian.
         name = 'g%sd2m0' % grid_num
         setattr(S, name, Symbol(name))
+
         # Gradient.
         name = 'g%sd1m0' % grid_num
         for comp in ('x', 'y', 'z'):
@@ -1032,9 +1033,8 @@ def _prepare_symbols():
     S.alias('vx', S.g0m1x)
     S.alias('vy', S.g0m1y)
     S.alias('vz', S.g0m1z)
-    S.alias('rho', S.g0m0)
-    S.alias('phi', S.g1m0)
-    S.alias('theta', S.g2m0)
+    S.alias('rho',S.g0m0)
+    S.alias('phi',S.g1m0)
 
     # For incompressible models, this symbol is replaced with the average
     # density, usually 1.0.  For compressible models, it is the same as
@@ -1043,7 +1043,7 @@ def _prepare_symbols():
     # The incompressible model is described in:
     #   X. He, L.-S. Luo, Lattice Boltzmann model for the incompressible Navier-Stokes
     #   equation, J. Stat. Phys. 88 (1997) 927-944
-    S.rho0 = Symbol('rho0')
+    S.rho_0 = Symbol('rho_0')
     S.visc = Symbol('visc')
     S.gravity = Symbol('gravity')
 

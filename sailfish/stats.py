@@ -17,7 +17,7 @@ class KineticEnergyEnstrophyMixIn(FlowStatsMixIn):
     aux_code = ['data_processing.mako']
 
     @classmethod
-    def fields(cls):
+    def fields(cls, grids):
         return [ScalarField('v_sq', gpu_array=True, init=0.0),
                 ScalarField('vort_sq', gpu_array=True, init=0.0)]
 

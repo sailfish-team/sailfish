@@ -179,7 +179,7 @@ class LBFluidSim(LBSim):
         return kernels
 
     @classmethod
-    def fields(cls):
+    def fields(cls, grids):
         return [ScalarField('rho'), VectorField('v')]
 
     @classmethod
@@ -207,7 +207,7 @@ class LBEntropicFluidSim(LBFluidSim):
         config.model = 'elbm'
 
     @classmethod
-    def fields(cls):
+    def fields(cls, grids):
         return [ScalarField('rho'), VectorField('v'),
                 ScalarField('alpha', init=2.0)]
 
@@ -255,7 +255,7 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
                 help='Shan-Chen pseudopotential function to use')
 
     @classmethod
-    def fields(cls):
+    def fields(cls, grids):
         return [ScalarField('rho', need_nn=True), VectorField('v')]
 
     def constants(self):
