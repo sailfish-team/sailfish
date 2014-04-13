@@ -19,7 +19,7 @@ ldc_2d.LDCBlock.max_v = 0.01
 
 class EnhancedEntropicFluidSim(LBEntropicFluidSim):
     @classmethod
-    def fields(cls):
+    def fields(cls, grids):
         return [ScalarField('rho'), VectorField('v'),
                 ScalarField('alpha', init=2.0),
                 ScalarField('entropy')]
