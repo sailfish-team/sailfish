@@ -2,7 +2,7 @@
 
 import numpy as np
 from sailfish.controller import LBSimulationController
-from examples.ldc_2d import LDCGeometry, LDCBlock, LDCSim
+from examples.ldc_2d import LDCBlock, LDCSim
 
 class LDCSimUnorm(LDCSim):
     @classmethod
@@ -42,7 +42,7 @@ class LDCSimUnorm(LDCSim):
 
 if __name__ == '__main__':
     LDCBlock.max_v = 0.05
-    ctrl = LBSimulationController(LDCSimUnorm, LDCGeometry)
+    ctrl = LBSimulationController(LDCSimUnorm)
     ctrl.run()
 
     # simple pylab code displaying time evolution of the norm ||u-u0||
