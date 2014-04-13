@@ -407,7 +407,8 @@ class LBMultiFluidShanChen(LBMultiFluidBase, LBForcedSim):
         LBMultiFluidBase.add_options(group, dim)
 
         for c1 in range(0, 9):
-            group.add_argument('--visc{}'.format(c1), type=float, default=1.0/6.0, help='numerical viscosity for component {}'.format(c1))
+            group.add_argument('--visc{}'.format(c1), type=float, default=1.0/6.0, 
+                    help='numerical viscosity for component {}'.format(c1))
             group.add_argument('--tau{}'.format(c1), type=float, default=1.0,
                     help='relaxation time for component {}'.format(c1))
             for c2 in range(0, 9):
