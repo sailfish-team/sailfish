@@ -75,15 +75,6 @@ class WomersleySubdomain(PoiseuilleSubdomain):
         return -np.real((1 - jv(0, 1j**1.5 * alpha * r) / jv(0, 1j**1.5 * alpha)) *
                         exp(1j * omega * t) * A / L / omega)
 
-    @classmethod
-    def channel_length(cls, config):
-        if config.flow_direction == 'x':
-            return config.lat_nx
-        elif config.flow_direction == 'y':
-            return config.lat_ny
-        else:
-            return config.lat_nz
-
 
 class WomersleySim(PoiseuilleSim):
     subdomain = WomersleySubdomain
