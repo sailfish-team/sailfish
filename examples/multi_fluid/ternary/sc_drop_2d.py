@@ -5,7 +5,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from sailfish.geo import LBGeometry2D
 from sailfish.subdomain import Subdomain2D
 from sailfish.controller import LBSimulationController
 from sailfish.lb_multi import LBMultiFluidShanChen
@@ -15,10 +14,12 @@ class DropSubdomain(Subdomain2D):
         pass
 
     def initial_conditions(self, sim, hx, hy):
-        radius = 32
+        radius1, radius2 = 32, 32
+        hx1, hy1 = self.gx / 4, self.gy / 4
+        hx2, hy2 = 3 * self.gx / 4, 3 * self.gy / 4
 
-        drop_map1 = (hx-self.gx/4)**2 + (hy-self.gy/4)**2 <= radius**2
-        drop_map2 = (hx-3*self.gx/4)**2 + (hy-3*self.gy/4)**2 <= radius**2
+        drop_map1 = (hx - hx1)**2 + (hy - hy1)**2 <= radius1**2
+        drop_map2 = (hx - hx2)**2 + (hy - hy2)**2 <= radius2**2
 
         sim.g0m0[:] = 2.0
         sim.g1m0[:] = 0.02
@@ -48,25 +49,20 @@ class SCSim(LBMultiFluidShanChen):
             'sc_potential': 'classic'
             })
 
-    def after_step(self, runner):
-        every_n = 10000
+    def after_main_loop(self, runner):
+        rho0 = runner._sim.g0m0
+        rho1 = runner._sim.g1m0
+        rho2 = runner._sim.g2m0
 
-        if self.iteration % every_n == every_n - 1:
-            self.need_sync_flag = True
-        elif self.iteration % every_n == 0:
-            rho0 = runner._sim.g0m0.astype(np.float64)
-            rho1 = runner._sim.g1m0.astype(np.float64)
-            rho2 = runner._sim.g2m0.astype(np.float64)
+        ny, nx = rho0.shape
+        hy, hx = np.mgrid[0:ny, 0:nx]
 
-            ny, nx = runner._sim.g0m0.shape
-            hy, hx = np.mgrid[0:ny, 0:nx]
-
-            fig1 = plt.figure(1); fig1.clf();
-            plt.plot( hx[hx==hy], rho0[hx==hy], 'r',
-                      hx[hx==hy], rho1[hx==hy], 'g',
-                      hx[hx==hy], rho2[hx==hy], 'b', )
-            plt.legend(['rho0','rho1','rho2'])
-            fig1.savefig('profiles.png')
+        fig1 = plt.figure(1); fig1.clf();
+        plt.plot(hx[hx == hy], rho0[hx == hy], 'r',
+                 hx[hx == hy], rho1[hx == hy], 'g',
+                 hx[hx == hy], rho2[hx == hy], 'b')
+        plt.legend(['rho0','rho1','rho2'])
+        fig1.savefig('profiles.png')
 
 if __name__ == '__main__':
-    LBSimulationController(SCSim, LBGeometry2D).run()
+    LBSimulationController(SCSim).run()
