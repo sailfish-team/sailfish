@@ -18,8 +18,13 @@ class DropSubdomain(Subdomain2D):
         hx1, hy1 = self.gx / 4, self.gy / 4
         hx2, hy2 = 3 * self.gx / 4, 3 * self.gy / 4
 
+<<<<<<< HEAD
         drop_map1 = (hx - hx1)**2 + (hy - hy1)**2 <= radius1**2
         drop_map2 = (hx - hx2)**2 + (hy - hy2)**2 <= radius2**2
+=======
+        drop_map1 = (hx - self.gx / 4)**2 + (hy - self.gy / 4)**2 <= radius**2
+        drop_map2 = (hx - 3 * self.gx / 4)**2 + (hy - 3 * self.gy / 4)**2 <= radius**2
+>>>>>>> origin/multicomp
 
         sim.g0m0[:] = 2.0
         sim.g1m0[:] = 0.02
