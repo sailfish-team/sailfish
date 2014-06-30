@@ -28,37 +28,45 @@
 ## Code rendering.
 #############################################################################
 
-%if time_dependence:
-	${device_func} inline float get_time_from_iteration(unsigned int iteration) {
-		return iteration * ${cex(dt_per_lattice_time_unit)};
-	}
-%endif
-
 %if timeseries_data:
-	__device__ float bc_timeseries[] = {
-		${', '.join('%.16e' % x for x in timeseries_data)}
-	};
+// All timeseries used in the simulation concatenated into a single array.
+__device__ float bc_timeseries[] = {
+	${', '.join('%.16e' % x for x in timeseries_data)}
+};
 
-	${device_func} inline float interpolate_linear(const float d0, const float d1, const float pos) {
-		return pos * d1 + d0 * (1.0f - pos);
-	}
+// Returns a linearly interpolated value between (0, d0) and (1, d1) at pos \in (0, 1)
+${device_func} inline float interpolate_linear(const float d0, const float d1, const float pos) {
+	return pos * d1 + d0 * (1.0f - pos);
+}
 
-	${device_func} inline float timeseries_interpolate(
-			const unsigned int offset,
-			const unsigned int size,
-			const float step,
-			const unsigned int iteration) {
-		const float buf_position = fmodf(iteration, step * size);
-		float w = buf_position / step;
-		const unsigned int idx = floor(w);
-		w -= idx;
-		unsigned int idx2 = (idx + 1);
-		if (idx2 >= size) {
-			idx2 -= size;
-		}
-		return interpolate_linear(bc_timeseries[offset + idx], bc_timeseries[offset + idx2], w);
+// Arguments are:
+//  offset - offset in the global timeseries array (bc_timeseries)
+//  size - size of the current timeseries
+//  step - number LB iterations corresponding to two neighboring data points
+//  iteration - current LB iteration number
+${device_func} inline float timeseries_interpolate(
+		const unsigned int offset,
+		const unsigned int size,
+		const float step,
+		const unsigned int iteration) {
+	const float buf_position = fmodf(iteration, step * size);
+	float w = buf_position / step;
+	const unsigned int idx = floor(w);
+	w -= idx;
+	unsigned int idx2 = (idx + 1);
+	if (idx2 >= size) {
+		idx2 -= size;
 	}
-%endif
+	return interpolate_linear(bc_timeseries[offset + idx], bc_timeseries[offset + idx2], w);
+}
+%endif  ## timeseries_data
+
+%if time_dependence:
+// Returns the physical time corresponding to the given LB iteration.
+${device_func} inline float get_time_from_iteration(unsigned int iteration) {
+	return iteration * ${cex(dt_per_lattice_time_unit)};
+}
+%endif  ## time_dependence
 
 ## Renders functions to compute dynamic values.
 %for i, expressions in symbol_idx_map.iteritems():

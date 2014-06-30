@@ -489,7 +489,7 @@ class LinearlyInterpolatedTimeSeries(Symbol):
                                                   step_size))
 
     def __init__(self, data, step_size=1.0):
-        """A continous scalar data source from a discrete time series.
+        """A continuous scalar data source from a discrete time series.
 
         Time series data points are linearly interpolated in order to generate
         values for points not present in the time series. The time series is
