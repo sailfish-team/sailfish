@@ -5,7 +5,6 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 import operator
-import time
 
 import pycuda.compiler
 import pycuda.tools

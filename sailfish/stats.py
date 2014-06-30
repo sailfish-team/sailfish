@@ -4,6 +4,7 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+import math
 from sailfish.lb_base import ScalarField, LBMixIn
 import numpy as np
 

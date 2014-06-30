@@ -6,8 +6,7 @@ __license__ = 'LGPL3'
 
 import hashlib
 import zlib
-from collections import namedtuple
-from sailfish.lb_base import ScalarField, LBMixIn
+from sailfish.lb_base import LBMixIn
 from sailfish.util import ArrayPair
 import numpy as np
 
@@ -222,7 +221,7 @@ class Vis2DSliceMixIn(LBMixIn):
             # Send the metadata first.
             try:
                 self._sock.send_json(md, zmq.SNDMORE | zmq.NOBLOCK)
-            except zmq.ZMQError, e:
+            except zmq.ZMQError:
                 # This most likely indicates that the socket is not connected.
                 # Bail out early to avoid running kernels to extract slice data.
                 return

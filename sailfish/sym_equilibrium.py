@@ -124,7 +124,6 @@ def elbm_equilibrium(grid):
     prefactor = Symbol('prefactor')
     coeff1 = Symbol('coeff1')
     coeff2 = Symbol('coeff2')
-    rho = S.rho
 
     out = []
     lvars = []

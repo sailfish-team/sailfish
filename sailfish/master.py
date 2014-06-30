@@ -8,15 +8,13 @@ __license__ = 'LGPL3'
 
 import atexit
 import ctypes
-import logging
-import operator
 import os
 import subprocess
 import tempfile
 import time
 
 import multiprocessing as mp
-from multiprocessing import Process, Array, Event, Value
+from multiprocessing import Process, Event, Value
 
 import zmq
 

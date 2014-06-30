@@ -4,7 +4,7 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPLv3'
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 import numpy as np
 
 from sailfish import subdomain_runner, sym, sym_equilibrium

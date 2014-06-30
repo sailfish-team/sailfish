@@ -1,7 +1,6 @@
 """Util functions for plots using internal Sailfish data structures."""
 
-from mpl_toolkits.mplot3d import Axes3D, proj3d
-import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import proj3d
 from matplotlib.patches import FancyArrowPatch, Circle
 from mpl_toolkits.mplot3d import art3d
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection

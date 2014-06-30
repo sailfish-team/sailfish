@@ -7,12 +7,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 import copy
-from collections import namedtuple
-import operator
-from operator import itemgetter
 import math
-import re
-import numpy
 import sympy
 from sympy import Matrix, Rational, Symbol, Eq
 

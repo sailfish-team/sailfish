@@ -323,7 +323,7 @@ class LBSimulationController(object):
                 default=False, help='Dump the contents of the node type map '
                 'into a file'),
         group.add_argument('--base_name', type=str, default='',
-                           'Specifies the base file name that will be used for '
+                           help='Specifies the base file name that will be used for '
                            'logging, checkpoint and data output. This makes it '
                            'possible to avoid specifying --log, --output, and '
                            '--checkpoint_file separately. Whenever some of '
@@ -482,7 +482,7 @@ class LBSimulationController(object):
         if cluster is None:
             try:
                 cluster = imp.load_source('cluster', self.config.cluster_spec)
-            except IOError, e:
+            except IOError:
                 cluster = imp.load_source('cluster',
                         os.path.expanduser('~/.sailfish/{0}'.format(self.config.cluster_spec)))
 
@@ -553,7 +553,7 @@ class LBSimulationController(object):
             port = node.get_port() + 1
             node.set_port(port)
             print 'retrying node %s:%s...' % (node.host, node.addr)
-            self._node_handlers[i] = _start_socketserver(node.addr, port)
+            self._node_handlers[i] = start_socketserver(node.addr, port)
             still_starting.append((i, node))
 
         starting_nodes = list(enumerate(cluster.nodes))

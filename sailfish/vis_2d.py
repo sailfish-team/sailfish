@@ -10,7 +10,7 @@ import os
 import numpy as np
 import pygame
 
-from sailfish import lb_base, node_type, util, vis
+from sailfish import node_type, util, vis
 
 def _font_name():
     import platform
