@@ -47,6 +47,7 @@ def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
     import sys
     import traceback
 
+    early_termination = True
     try:
         sys.path.append(os.path.dirname(main_script))
         import imp
