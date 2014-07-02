@@ -501,6 +501,22 @@ class SubdomainRunner(object):
             self.lat_linear_dist.extend([self._lat_size[-3] - 1 - evs, evs])
             self.lat_linear_macro.extend([evs, self._lat_size[-3] - 1 - evs])
 
+        # Compute the total memory required for the simulation and log it early
+        # for easier debugging.
+        total_dist_bytes = sum([self._get_dist_bytes(g) for g in self._sim.grids])
+        if self.config.access_pattern == 'AB':
+            total_dist_bytes *= 2
+
+        self.config.logger.info('Required memory: ')
+        self.config.logger.info('. distributions: %d MiB' %
+                                (total_dist_bytes / 1024 / 1024))
+
+        scalar, vector = self._sim.count_fields(self)
+        total_field_bytes = (self.num_active_nodes *
+                             (scalar + self.dim * vector) * self.float().nbytes)
+        self.config.logger.info('. fields: %d MiB' %
+                                (total_field_bytes / 1024 / 1024))
+
     def _get_strides(self, type_):
         """Returns a list of strides for the NumPy array storing the lattice."""
         t = type_().nbytes

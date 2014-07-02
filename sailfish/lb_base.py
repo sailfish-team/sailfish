@@ -160,8 +160,30 @@ class LBSim(object):
                     self._vector_fields.append(FieldPair(field, f))
                     for i in range(0, self.grid.dim):
                         setattr(self, field.name + suffixes[i], f[i])
+                else:
+                    assert False, 'Invalid field type %s' % type(field)
                 setattr(self, field.name, f)
                 self._fields[field.name] = FieldPair(field, f)
+
+    def count_fields(self, runner):
+        sources = [self]
+        scalar = 0
+        vector = 0
+        # Scan for mixin classes adding their own fields.
+        for c in self.__class__.mro()[1:]:
+            if issubclass(c, LBMixIn) and hasattr(c, 'fields'):
+                sources.append(c)
+
+        for src in sources:
+            for field in src.fields():
+                if type(field) is ScalarField:
+                    scalar += 1
+                elif type(field) is VectorField:
+                    vector += 1
+                else:
+                    assert False, 'Invalid field type %s' % type(field)
+
+        return scalar, vector
 
     def verify_fields(self):
         """Verifies that fields have not accidentally been overridden."""
