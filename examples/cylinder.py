@@ -1,4 +1,9 @@
 #!/usr/bin/env python -u
+"""
+Simulates the flow around a 2D cylinder.
+
+The flow is periodic and driven by a body force.
+"""
 
 import numpy as np
 from sailfish.geo import EqualSubdomainsGeometry2D
