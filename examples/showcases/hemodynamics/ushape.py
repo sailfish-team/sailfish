@@ -43,9 +43,7 @@ class UshapeSim(common.HemoSim, Vis2DSliceMixIn):
             'from_': 31563 * 5,
             'model': 'bgk',
 
-            'log': 're100_ushape_802_osc.log',
-            'checkpoint_file': 're100_ushape_802_osc',
-            'output': 're100_ushape_802_osc',
+            'base_name': 're100_ushape_802_osc',
 
             # Subdomains configuration.
             'subdomains': 1,
