@@ -322,6 +322,14 @@ class LBSimulationController(object):
         group.add_argument('--debug_dump_node_type_map', action='store_true',
                 default=False, help='Dump the contents of the node type map '
                 'into a file'),
+        group.add_argument('--base_name', type=str, default='',
+                           'Specifies the base file name that will be used for '
+                           'logging, checkpoint and data output. This makes it '
+                           'possible to avoid specifying --log, --output, and '
+                           '--checkpoint_file separately. Whenever some of '
+                           'these options are specified, their value takes '
+                           'precedence over the one automatically generated '
+                           'using --base_name.')
         group.add_argument('--log', type=str, default='',
                 help='name of the file to which data is to be logged')
         group.add_argument('--loglevel', type=int, default=logging.INFO,
@@ -740,6 +748,17 @@ class LBSimulationController(object):
             pickle.dump(subdomains,
                     open(io.subdomains_filename(self.config.output), 'w'))
 
+    def set_default_filenames(self):
+        if not self.config.base_name:
+            return
+
+        if not self.config.log:
+            self.config.log = self.config.base_name + '.log'
+        if not self.config.output:
+            self.config.output = self.config.base_name
+        if not self.config.checkpoint_file:
+            self.config.checkpoint_file = self.config.base_name
+
     def run(self, ignore_cmdline=False):
         """Runs a simulation."""
 
@@ -754,7 +773,9 @@ class LBSimulationController(object):
             args, internal_defaults={'quiet': True} if hasattr(
                 __builtin__, '__IPYTHON__') else None)
 
+        self.set_default_filenames()
         self._lb_class.modify_config(self.config)
+
         self.geo = self._lb_geo(self.config)
 
         ctx = zmq.Context()
