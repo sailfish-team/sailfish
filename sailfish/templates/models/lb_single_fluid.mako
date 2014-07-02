@@ -169,6 +169,7 @@ ${kernel} void CollideAndPropagate(
 	${scratch_space_if_required()}
 	${scalar_field_if_required('alpha', alpha_output)}
 	${iteration_number_if_required()}
+	${force_field_if_required()}
 	)
 {
 	${local_indices_split()}

@@ -219,6 +219,13 @@
 			${'ovz[gi] = v[2]' if dim == 3 else ''};
 		%endif
 	}
+	%if force_field and not initialization:
+		else {
+			ovx[gi] = v[0];
+			ovy[gi] = v[1];
+			${'ovz[gi] = v[2]' if dim == 3 else ''};
+		}
+	%endif
 </%def>
 
 ## Defines local indices for bulk kernels.

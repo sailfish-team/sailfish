@@ -1735,6 +1735,68 @@ class SubdomainRunner(object):
             self.config.logger.error("Requesting quit.")
             self._quit_event.set()
 
+
+class IBMSubdomainRunner(SubdomainRunner):
+    """Subdomain runner for immersed boundary models."""
+
+    def _prepare_compute_kernels(self):
+        super(IBMSubdomainRunner, self)._prepare_compute_kernels()
+        self._k_particle_update, self._k_particle_spread = self._sim.get_ibm_kernels(self)
+
+    def _init_gpu_data(self):
+        super(IBMSubdomainRunner, self)._init_gpu_data()
+
+        particles = self._sim._particles
+        self._part_position_x = self.float([p.position[0] for p in particles])
+        self._part_position_y = self.float([p.position[1] for p in particles])
+        self._part_ref_position_x = self.float([p.ref_position[0] for p in particles])
+        self._part_ref_position_y = self.float([p.ref_position[1] for p in particles])
+
+        alloc = self.backend.alloc_buf
+        self._gpu_part_position_x = alloc(like=self._part_position_x)
+        self._gpu_part_position_y = alloc(like=self._part_position_y)
+        self._gpu_part_ref_position_x = alloc(like=self._part_ref_position_x)
+        self._gpu_part_ref_position_y = alloc(like=self._part_ref_position_y)
+
+        if self.dim == 3:
+            self._part_position_z = self.float([p.position[2] for p in particles])
+            self._part_ref_position_z = self.float([p.ref_position[2] for p in particles])
+
+            self._gpu_part_position_z = alloc(like=self._part_position_z)
+            self._gpu_part_ref_position_z = alloc(like=self._part_ref_position_z)
+
+        self._part_stiffness = self.float([p.stiffness for p in particles])
+        self._gpu_part_stiffness = alloc(like=self._part_stiffness)
+        self._part_grid = [(self._sim.num_particles + 127) / 128, 1]
+
+    @property
+    def gpu_particle_position(self):
+        ret = [self._gpu_part_position_x, self._gpu_part_position_y]
+        if self.dim == 3:
+            ret.append(self._gpu_part_position_z)
+        return ret
+
+    @property
+    def gpu_particle_ref_position(self):
+        ret = [self._gpu_part_ref_position_x, self._gpu_part_ref_position_y]
+        if self.dim == 3:
+            ret.append(self._gpu_part_position_z)
+        return ret
+
+    @property
+    def gpu_particle_stiffness(self):
+        return self._gpu_part_stiffness
+
+    def step(self, sync_req):
+        # Spread particle forces to the global force field.
+        self.backend.run_kernel(self._k_particle_spread, self._part_grid,
+                                self._calc_stream)
+        SubdomainRunner.step(self, sync_req)
+        # Update particle positions based on the fluid velocity field.
+        self.backend.run_kernel(self._k_particle_update, self._part_grid,
+                                self._calc_stream)
+
+
 class NNSubdomainRunner(SubdomainRunner):
     """Runs a fluid simulation for a single subdomain.
 

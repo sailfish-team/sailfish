@@ -239,3 +239,27 @@ ${sym_codegen.cexpr(sim, incompressible, pointers, ex, rho=rho, vectors=vectors,
 		%endif
 	%endif
 </%def>
+
+<%def name="ifdim3(val)" filter='trim'>
+	%if dim == 3:
+		val
+	%endif
+</%def>
+
+## TODO(michalj): Consider using only a single float field for this with a
+## known offset to minimize number of arguments.
+<%def name="force_field_if_required()">
+	%if force_field:
+		, ${global_ptr} float *__restrict__ force_x
+		, ${global_ptr} float *__restrict__ force_y
+		%if dim == 3:
+			, ${global_ptr} float *__restrict__ force_z
+		%endif
+	%endif
+</%def>
+
+<%def name="force_field_arg_if_required()">
+	%if force_field:
+		, force_x, force_y ${ifdim3(', force_z')}
+	%endif
+</%def>

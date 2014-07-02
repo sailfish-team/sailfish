@@ -103,7 +103,9 @@ ${device_func} inline void ELBM_relaxate(${bgk_args_decl()}, Dist* d0
 %for grid_idx in range(len(grids)):
 ${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
 	Dist *d0, int node_type, int ncode
-	${dynamic_val_args_decl()})
+	${dynamic_val_args_decl()}
+	${force_field_if_required()}
+	${', int gi' if force_field else ''})
 {
 	${body_force(grid_idx)}
 	${bgk_relaxation_preamble(grid_idx)}
@@ -173,7 +175,8 @@ ${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
 
 <%def name="_relaxate(bgk_args, grid_idx)">
 	%if model == 'bgk':
-		BGK_relaxate${grid_idx}(${bgk_args(grid_idx)}, &d0, type, ncode ${dynamic_val_call_args()});
+		BGK_relaxate${grid_idx}(${bgk_args(grid_idx)}, &d0, type, ncode ${dynamic_val_call_args()}
+			${force_field_arg_if_required()} ${', gi' if force_field else ''});
 	%elif model == 'mrt' and simtype == 'free-energy':
 		FE_MRT_relaxate${grid_idx}(${bgk_args(grid_idx)}, &d0, type ${dynamic_val_call_args()});
 	%elif model == 'elbm':
