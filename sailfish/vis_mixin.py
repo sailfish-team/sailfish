@@ -5,8 +5,10 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 import hashlib
+import os
+import subprocess
 import zlib
-from sailfish.lb_base import LBMixIn
+from sailfish import lb_base
 from sailfish.util import ArrayPair
 import numpy as np
 
@@ -31,7 +33,7 @@ class VisConfig(object):
         self.levels = 256
 
 
-class Vis2DSliceMixIn(LBMixIn):
+class Vis2DSliceMixIn(lb_base.LBMixIn):
     """Extracts 2D slices of 3D fields for on-line visualization."""
     aux_code = ['data_processing.mako']
 
@@ -49,6 +51,9 @@ class Vis2DSliceMixIn(LBMixIn):
                            help='Authentication token for control of the '
                            'visualizer. If empty, a token will be generated '
                            'automatically.')
+        group.add_argument('--visualizer_start', action='store_true',
+                           default=False, help='Automatically start the '
+                           'visualizer frontend.')
 
     def before_main_loop(self, runner):
         self._vis_config = VisConfig()
@@ -73,12 +78,15 @@ class Vis2DSliceMixIn(LBMixIn):
         else:
             self._ctrl_port = self._ctrl_sock.bind_to_random_port('tcp://*')
 
+        server_url = ''
         for iface in netifaces.interfaces():
             addr = netifaces.ifaddresses(iface).get(
                 netifaces.AF_INET, [{}])[0].get('addr', '')
             if addr:
-                self.config.logger.info('Visualization server at tcp://%s@%s:%d',
-                                        self._authtoken, addr, self._ctrl_port)
+                server_url = 'tcp://%s@%s:%d' % (self._authtoken, addr,
+                                                 self._ctrl_port)
+                self.config.logger.info('Visualization server at %s',
+                                        server_url)
 
         gpu_v = runner.gpu_field(self.v)
 
@@ -118,6 +126,12 @@ class Vis2DSliceMixIn(LBMixIn):
 
         self._poller = zmq.Poller()
         self._poller.register(self._ctrl_sock, zmq.POLLIN)
+
+        if server_url and self.config.visualizer_start:
+            self.config.logger.info('Starting visualizer..')
+            path = os.path.realpath(os.path.join(os.path.dirname(
+                lb_base.__file__), '../utils'))
+            subprocess.Popen([os.path.join(path, 'visualizer.py'), server_url])
 
     def _vis_update_kernels(self, runner):
         gpu_map = runner.gpu_geo_map()
