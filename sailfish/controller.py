@@ -26,6 +26,7 @@ from multiprocessing import Process
 import zmq
 from sailfish import codegen, config, io, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
+from sailfish.lb_base import LBMixIn
 from sailfish.subdomain import SubdomainPair
 
 def _start_machine_master(config, subdomains, lb_class):
@@ -417,13 +418,16 @@ class LBSimulationController(object):
         # If the simulation class does not define an add_options method
         # explicitly and inherits from multiple base classes, call add_options
         # from additional bases.
-        if ('add_options' not in lb_class.__dict__ and
-            len(lb_class.__bases__) > 1):
-            first_base = lb_class.__bases__[0]
-            for base_class in lb_class.__bases__[1:]:
-                if (base_class not in first_base.mro() and
-                    'add_options' in base_class.__dict__):
-                    base_class.add_options(group, self.dim)
+        prior_add_options = False
+        for base in lb_class.mro():
+            if 'add_options' in base.__dict__ and not prior_add_options:
+                prior_add_options = True
+                continue
+            # Call add_options for all mix-in subclasses.
+            if not issubclass(base, LBMixIn):
+                continue
+            if prior_add_options and 'add_options' in base.__dict__:
+                base.add_options(group, self.dim)
 
         group = self._config_parser.add_group('Geometry settings')
         lb_geo.add_options(group)
@@ -773,8 +777,8 @@ class LBSimulationController(object):
             args, internal_defaults={'quiet': True} if hasattr(
                 __builtin__, '__IPYTHON__') else None)
 
-        self.set_default_filenames()
         self._lb_class.modify_config(self.config)
+        self.set_default_filenames()
 
         self.geo = self._lb_geo(self.config)
 
