@@ -1,12 +1,43 @@
-# Input location is: -0.254, 0.0635, 0
-#  X - flow direction
-#  Y - other flow direction
-#  Z - short dimension
+"""
+Flow through a U-shaped pipe.
+
+The pipe dimensions are:
+ - diameter   D: 1 in = 2.54e-2 m
+ - bow radius R: 3 in
+ - arm length L: 10 in
+
+Inflow center is: -0.254, 0.0635, 0
+(original geometry coordinates)
+
+Original dimensions:
+ X - inflow direction (longest; ~ L + R)
+ Y - flow direction in the bow area
+ Z - depth (shortest -- comparable to D)
+
+Geometry bounding box:
+ X: -0.25659:0.076243
+ Y: -0.0762:0.076239
+ Z: -0.0127:0.0127
+
+Simulation dimensions (z, y, x order):
+ X - flow direction in the bow area
+ Y - inflow direction
+ Z - depth
+
+Other physical parameters:
+ - U_avg = 1.3111e-2 m/s
+ - U_max = 2*U_avg
+ - visc = 3.33e-6
+
+Approximate flow length: 2 * L + pi * R_1
+
+The oscillation period (in lattice units) should be significantly longer
+than this so that pressure wave propagation effects are not visible.
+"""
 
 import numpy as np
 
-from sailfish.controller import LBSimulationController
-from sailfish.geo import EqualSubdomainsGeometry3D
+from sailfish.lb_base import LBMixIn
 from sailfish.vis_mixin import Vis2DSliceMixIn
 
 import common
@@ -28,22 +59,35 @@ class UshapeSubdomain(common.InflowOutflowSubdomain):
         return inlet, outlet
 
 
-class UshapeSim(common.HemoSim, Vis2DSliceMixIn):
+class DynamicViscosity(LBMixIn):
+    """Dynamically adjusts viscosity while the simulation is running."""
+    # iteration number -> new viscosity
+    viscosity_map = {}
+
+    def after_step(self, runner):
+        if self.iteration not in viscosity_map:
+            return
+
+        runner.config.visc = viscosity_map[self.iteration]
+        runner._update_compute_code()
+        runner._prepare_compute_kernels()
+        self._vis_update_kernels(runner)
+
+
+class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
     subdomain = UshapeSubdomain
     phys_diam = 2.54e-2     # meters
-    lb_v = 0.001   # for oscillatory
+    lb_v = 0.001            # for oscillatory flow
 
     @classmethod
     def update_defaults(cls, defaults):
-        super(UshapeSim, cls).update_defaults(defaults)
+        super(UshapeBaseSim, cls).update_defaults(defaults)
         defaults.update({
-            'max_iters': 31563 * 10,
+            'max_iters': 500000,
             'checkpoint_every': 200000,
-            'every': 31563 / 20,
-            'from_': 31563 * 5,
+            'every': 50000,
+            'from_': 0,
             'model': 'bgk',
-
-            'base_name': 're100_ushape_802_osc',
 
             # Subdomains configuration.
             'subdomains': 1,
@@ -51,12 +95,11 @@ class UshapeSim(common.HemoSim, Vis2DSliceMixIn):
             'conn_axis': 'y',
             'geometry': 'geo/ushape_802_0.00125.npy.gz',
 
-            'velocity': 'oscillatory',
-
             # Start the simulation from a lower Reynolds numbers to
             # remove spurious oscillations. During the simulation, the
             # viscosity is going to be dynamically adjusted.
             'reynolds': 100,
+            'velocity': 'constant',
         })
 
     @classmethod
@@ -67,41 +110,49 @@ class UshapeSim(common.HemoSim, Vis2DSliceMixIn):
         wall_map = cls.load_geometry(config.geometry)
         wall_map = np.rollaxis(wall_map, 2)  # make z the smallest dimension
 
-        # Remove wall blocking the inlet/outlet
-        # 2002: 17,  1669: 14,  1002: 9,  802: 7,  402: 4
-        wall_map = wall_map[:,7:,:]
+        np.save('test.npy', wall_map)
 
-        # Smooth out the wall...
-        # 2002: 1500,  1669: 1270,  1002: 768,  802: 610,  402: 310
-        for i in range(1, 610):
+        # Longest dimension determines configuration to use.
+        size = wall_map.shape[1]
+
+        if not config.base_name:
+            config.base_name = 'results/re%d_ushape_%d_%s' % (
+                config.reynolds, size, config.velocity)
+
+        # Remove wall blocking the inlet/outlet.
+        block = {
+            2002: 17,
+            1669: 14,
+            1002: 9,
+            802: 7,
+            402: 4
+        }
+        wall_map = wall_map[:,block[size]:,:]
+
+        # Smooth out the wall.
+        smooth = {
+            2002: 1500,
+            1669: 1270,
+            1002: 768,
+            802: 610,
+            402: 310
+        }
+
+        for i in range(1, smooth[size]):
             wall_map[:,i,:] = wall_map[:,0,:]
 
         # Make it symmetric.
-        # 2002: 459,  1669: 394,  1002: 230,  802: 184,  402: 92
         hw = wall_map.shape[2] / 2
         wall_map[:,:,-hw:] = wall_map[:,:,:hw][:,:,::-1]
 
         # Override lattice size based on the geometry file.
         config.lat_nz, config.lat_ny, config.lat_nx = wall_map.shape
 
-        # Geometry is:
-        # - diameter: 1in
-        # - bow radius: 3in
-        # - arm length: 10in
-
-        # U_avg = 1.3111e-2 m/s, U_max = 2*U_avg
-        # visc = 3.33 e-6
-        # D_h = 2.54e-2 m
-        #
-        # Flow length: 1860 [lattice units] (2 * L + pi * R_1 + 0.5) * 60
-        # The oscillation period (in lattice units) should be significantly longer
-        # than this so that pressure wave propagation effects are not visible.
-
         # Add ghost nodes.
         wall_map = np.pad(wall_map, (1, 1), 'constant', constant_values=True)
         config._wall_map = wall_map
 
-        super(UshapeSim, cls).modify_config(config)
+        super(UshapeBaseSim, cls).modify_config(config)
 
     prev_rho = None
     prev_v = None
@@ -142,14 +193,3 @@ class UshapeSim(common.HemoSim, Vis2DSliceMixIn):
 
             self.prev_rho = self.rho.copy()
             self.prev_v = (self.vx.copy(), self.vy.copy(), self.vz.copy())
-
-        # Dynamically update viscosity to set Re = 1000.
-        if self.iteration == 20000:
-            runner.config.visc = runner.config.visc / 10.0
-            runner._update_compute_code()
-            runner._prepare_compute_kernels()
-            self._vis_update_kernels(runner)
-
-
-if __name__ == '__main__':
-    LBSimulationController(UshapeSim, EqualSubdomainsGeometry3D).run()
