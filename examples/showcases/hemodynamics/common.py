@@ -324,6 +324,7 @@ class HemoSim(LBFluidSim):
                                       Re=config.reynolds, freq=cls.phys_freq)
         _, _, xs = config._wall_map.shape
         diam = 2.0 * np.sqrt(np.sum(np.logical_not(config._wall_map[:,1,:(xs/2)])) / np.pi)
+        # Automatically compute the LB viscosity.
         converter.set_lb(velocity=cls.lb_v, length=diam)
         config.visc = converter.visc_lb
         config._converter = converter
