@@ -92,7 +92,6 @@ class BoxSimulation(LBFluidSim):
     prev_f = None
     every = 500
     def after_step(self, runner):
-
         if self.iteration % self.every == 0:
             runner.update_force_objects()
             for fo in self.force_objects:
@@ -116,7 +115,6 @@ class BoxSimulation(LBFluidSim):
                     if np.all(diff < 1e-6):
                         runner._quit_event.set()
                     self.prev_f = f
-
 
 
 if __name__ == '__main__':
