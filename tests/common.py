@@ -25,6 +25,7 @@ class TestCase2D(unittest.TestCase):
         config.use_link_tags = False
         config.time_dependence = False
         config.space_dependence = False
+        config.access_pattern = 'AB'
         self.sim = LBSim(config)
         self.config = config
         self.backend = DummyBackend()
@@ -51,5 +52,6 @@ class TestCase3D(unittest.TestCase):
         config.use_link_tags = False
         config.time_dependence = False
         config.space_dependence = False
+        config.access_pattern = 'AB'
         self.sim = LBSim(config)
         self.backend = DummyBackend()
