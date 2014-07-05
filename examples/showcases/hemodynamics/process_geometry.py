@@ -1,15 +1,19 @@
 #!/usr/bin/env pyhton
 """
+Preprocesses a geometry .npy file.
 
 Usage:
     ./process_geometry.py <in> <out> <axes> <exp>
 
 Expects in.config and in.npy to be present.
-<axes> is a string such 'xyz' indicating the target axis order.
-<exp> is a sequence of 6 letters (two per axis), indicating the expected
-    number of outlets/inlets.
+Arguments:
+  out: base filename for outputs
+  axes: a string such 'xyz' indicating the target axis order
+  exp: a sequence of 6 digits (two per axis), indicating the expected
+       number of outlets/inlets, e.g. 012000.
 """
 
+import gzip
 import json
 import sys
 import numpy as np
