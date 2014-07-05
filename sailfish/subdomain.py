@@ -604,6 +604,7 @@ class Subdomain(object):
         orient_map = (
             util.in_anyd_fast(self._type_map_base[ngs], orient_types) &
             (self._orientation_base[ngs] == 0))
+
         l = self.grid.dim - 1
         # Skip the stationary vector.
         for i, vec in enumerate(self.grid.basis[1:]):
@@ -618,6 +619,7 @@ class Subdomain(object):
             idx = orient_map & util.in_anyd_fast(shifted_map, wet_types)
             self._orientation_base[ngs][idx] |= (1 << i)
 
+        self.config.logger.debug('... link tagging done.')
         return True
 
     def detect_orientation(self, use_tags):
@@ -671,6 +673,13 @@ class Subdomain(object):
         # way for link tagging to work correctly.
         self._define_ghosts(unset_only=True)
 
+        # Detects unused and propagation-only nodes. Note that this has to take
+        # place before ghost nodes are set, as otherwise wall nodes at subdomain
+        # boundaries could be marked as unused, i.e.:
+        #   G W W W -> G U U W instead of G W U W
+        self._postprocess_nodes()
+        self.config.logger.debug('... postprocessing done.')
+
         if self._needs_orientation:
             # We do not reset the orientation array here as it is possible to
             # have orientation defined for some nodes and use autodetection for
@@ -680,12 +689,6 @@ class Subdomain(object):
             self.detect_orientation(self.config.use_link_tags)
             self.config.logger.debug('... orientation done.')
 
-        # Detects unused and propagation-only nodes. Note that this has to take
-        # place before ghost nodes are set, as otherwise wall nodes at subdomain
-        # boundaries could be marked as unused, i.e.:
-        #   G W W W -> G U U W instead of G W U W
-        self._postprocess_nodes()
-        self.config.logger.debug('... postprocessing done.')
         self._define_ghosts()
         self.config.logger.debug('... ghosts done.')
 
@@ -785,23 +788,28 @@ class Subdomain(object):
         postprocessing purposes."""
         return self._type_vis_map
 
-    def fluid_map(self):
+    def fluid_map(self, wet=True):
         """Returns a boolean array indicating which nodes are "wet" (
         represent fluid and have valid macroscopic fields)."""
         fm = self.visualization_map()
-        uniq_types = set(np.unique(fm))
-        wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
-        wet_types = self._type_map.dtype.type(wet_types)
-        return util.in_anyd_fast(fm, wet_types)
+        if wet:
+            uniq_types = set(np.unique(fm))
+            wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
+            wet_types = self._type_map.dtype.type(wet_types)
+            return util.in_anyd_fast(fm, wet_types)
+        else:
+            return fm == 0
 
-    def _fluid_map_base(self):
+    def _fluid_map_base(self, wet=True):
         assert not self._type_map_encoded
 
-        uniq_types = set(np.unique(self._type_map_base))
-        wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
-        wet_types = self._type_map.dtype.type(wet_types)
-        return util.in_anyd_fast(self._type_map_base, wet_types)
-
+        if wet:
+            uniq_types = set(np.unique(self._type_map_base))
+            wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
+            wet_types = self._type_map.dtype.type(wet_types)
+            return util.in_anyd_fast(self._type_map_base, wet_types)
+        else:
+            return self._type_map_base == 0
 
 class Subdomain2D(Subdomain):
     dim = 2
@@ -862,17 +870,19 @@ class Subdomain2D(Subdomain):
         _set(self._type_map_base[:, es + self.spec.nx:], self.spec.X_HIGH)
 
     def _postprocess_nodes(self):
-        fluid_map = self._fluid_map_base().astype(np.uint8)
+        fluid_map = self._fluid_map_base(wet=False).astype(np.uint8)
         neighbors = np.zeros((3, 3), dtype=np.uint8)
         neighbors[1,1] = 1
         for ei in self.grid.basis:
             neighbors[1 + ei[1], 1 + ei[0]] = 1
 
-        # Any node not connected to at least one wet node is marked unused.
+        # Any node not connected to at least one fluid node is marked unused.
+        # For instance, for HBB walls: .. W W W F -> .. U U W F.
         where = (filters.convolve(fluid_map, neighbors, mode='wrap') == 0)
         self._type_map_base[where] = nt._NTUnused.id
 
         # If an unused node touches a wet node, mark it as propagation only.
+        # For instance, for HBB walls: .. U U W F -> .. U P W F.
         used_map = (self._type_map_base != nt._NTUnused.id).astype(np.uint8)
         where = (filters.convolve(used_map, neighbors, mode='wrap') > 0)
         self._type_map_base[where & (self._type_map_base == nt._NTUnused.id)] = nt._NTPropagationOnly.id
@@ -944,17 +954,19 @@ class Subdomain3D(Subdomain):
         _set(self._type_map_base[:, :, es + self.spec.nx:], self.spec.X_HIGH)
 
     def _postprocess_nodes(self):
-        fluid_map = self._fluid_map_base().astype(np.uint8)
+        fluid_map = self._fluid_map_base(wet=False).astype(np.uint8)
         neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
         neighbors[1,1,1] = 1
         for ei in self.grid.basis:
             neighbors[1 + ei[2], 1 + ei[1], 1 + ei[0]] = 1
 
         # Any node not connected to at least one wet node is marked unused.
+        # For instance, for HBB walls: .. W W W F -> .. U U W F.
         where = (filters.convolve(fluid_map, neighbors, mode='wrap') == 0)
         self._type_map_base[where] = nt._NTUnused.id
 
         # If an unused node touches a wet node, mark it as propagation only.
+        # For instance, for HBB walls: .. U U W F -> .. U P W F.
         used_map = (self._type_map_base != nt._NTUnused.id).astype(np.uint8)
         where = (filters.convolve(used_map, neighbors, mode='wrap') > 0)
         self._type_map_base[where & (self._type_map_base == nt._NTUnused.id)] = nt._NTPropagationOnly.id

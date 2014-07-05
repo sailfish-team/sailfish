@@ -262,6 +262,43 @@ class TestOrientationDetection3D(TestCase3D):
 # Link tagging.
 # =============
 
+class TestLinkTaggingInterior2D(TestCase2D):
+    def setUp(self):
+        TestCase2D.setUp(self)
+        self.sim.config.use_link_tags = True
+
+    def testSolidInteriorNodes(self):
+        spec = SubdomainSpec2D((0, 0), self.lattice_size, envelope_size=1, id_=0)
+        spec.runner = SubdomainRunner(self.sim, spec, output=None,
+                                      backend=self.backend, quit_event=None)
+        spec.runner._init_shape()
+
+        class _LinkTaggingSubdomain2D(Subdomain2D):
+            def boundary_conditions(self, hx, hy):
+                box = (hx >= 5) & (hx <= 10) & (hy >= 5) & (hy <= 10)
+                self.set_node(box, NTHalfBBWall)
+
+        sub = _LinkTaggingSubdomain2D(list(reversed(self.lattice_size)), spec,
+                                      D2Q9)
+        sub.allocate()
+        sub.reset(encode=False)
+
+        # Outer layer is bounce-back nodes.
+        np.testing.assert_equal(sub._type_map[5:11, 5], NTHalfBBWall.id)
+        np.testing.assert_equal(sub._type_map[5:11, 10], NTHalfBBWall.id)
+        np.testing.assert_equal(sub._type_map[5, 5:11], NTHalfBBWall.id)
+        np.testing.assert_equal(sub._type_map[10, 5:11], NTHalfBBWall.id)
+
+        # Inner layer are propagation-only nodes.
+        np.testing.assert_equal(sub._type_map[6:10, 6], _NTPropagationOnly.id)
+        np.testing.assert_equal(sub._type_map[6:10, 9], _NTPropagationOnly.id)
+        np.testing.assert_equal(sub._type_map[6, 6:10], _NTPropagationOnly.id)
+        np.testing.assert_equal(sub._type_map[9, 6:10], _NTPropagationOnly.id)
+
+        # Core of unused nodes.
+        np.testing.assert_equal(sub._type_map[7:9, 7:9], _NTUnused.id)
+
+
 class TestLinkTagging3D(TestCase3D):
     def setUp(self):
         TestCase3D.setUp(self)
