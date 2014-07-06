@@ -149,6 +149,10 @@ class Fluid2DVis(vis.FluidVis):
 
     def __init__(self, config, subdomains, quit_event, sim_quit_event,
                  vis_config, geo_queues=None):
+        """
+        Args:
+          subdomains: iterable of SubdomainSpec objects
+        """
         pygame.init()
         pygame.font.init()
         pygame.surfarray.use_arraytype('numpy')
