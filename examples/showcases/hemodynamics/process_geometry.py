@@ -15,6 +15,7 @@ Arguments:
 
 import gzip
 import json
+import os
 import sys
 import numpy as np
 from scipy import ndimage
@@ -23,13 +24,13 @@ if len(sys.argv) < 5:
     print 'Usage: ./process_geometry.py <in> <out> <axes> <exp>'
     sys.exit(0)
 
-fname_in = sys.argv[1]
-fname_out = sys.argv[2]
-axes = sys.argv[3]
-exp = sys.argv[4]
+fname_in, fname_out, axes, exp = sys.argv[1:5]
 
 config = json.load(open(fname_in + '.config', 'r'))
-geo = np.load(open(fname_in + '.npy'))
+if os.path.exists(fname_in + '.npy.gz'):
+    geo = np.load(gzip.GFile(fname_in + '.npy.gz', 'r'))
+else:
+    geo = np.load(open(fname_in + '.npy'))
 fluid = np.logical_not(geo)
 
 def make_slice(axis, pos):
@@ -41,10 +42,13 @@ def make_slice(axis, pos):
             ret.append(slice(None))
     return ret
 
+# Find the envelope of nodes that needs to be discarded in order
+# for every axis to have the desired number of outlets/inlets.
 padding = []
 slices = []
 idx = 0
 for axis in range(0, 3):
+    # Scan lower end of the current axis.
     outlets = int(exp[idx])
     if outlets > 0:
         for i in range(0, geo.shape[axis]):
@@ -60,6 +64,7 @@ for axis in range(0, 3):
         start = 0
         padding.append(1)   # geometry already has 1 node of padding
 
+    # Scan higher end of the current axis.
     idx += 1
     outlets = int(exp[idx])
     if outlets > 0:
@@ -79,16 +84,19 @@ for axis in range(0, 3):
     slices.append(slice(start, end))
     idx += 1
 
+# Discard envelope if necessary,
 geo = geo[slices]
+
+# Start building a new config file.
 config['size'] = geo.shape
 config['padding'] = padding
 config['axes'] = axes
-
 
 name_to_idx = {'x': 0, 'y': 1, 'z': 2}
 targets = [0, 0, 0]
 actual = [0, 1, 2]
 
+# Reoder axes.
 for i, a in enumerate(axes):
     ai = name_to_idx[a]
     targets[i] = ai
