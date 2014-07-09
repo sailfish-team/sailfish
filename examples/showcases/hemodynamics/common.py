@@ -23,12 +23,17 @@ class CoordinateConverter(object):
 
         self.padding = []
         self.phys_min_x = []
-        self.actual_size = []
+
         for i, size in enumerate(config['size']):
             self.padding.append(config['padding'][2 * i])
             size -= config['padding'][2 * i]
             size -= config['padding'][2 * i + 1]
-            self.actual_size.append(size)
+
+            if 'orig_size' in config:
+                # -2 to get rid of padding
+                size = config['orig_size'][i] - 2
+
+            # Physical size BEFORE cutting nodes from the envelope.
             phys_size = config['bounding_box'][i]
             self.dx.append((phys_size[1] - phys_size[0]) / size)
             self.phys_min_x.append(phys_size[0])

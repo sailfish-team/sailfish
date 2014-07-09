@@ -28,7 +28,7 @@ fname_in, fname_out, axes, exp = sys.argv[1:5]
 
 config = json.load(open(fname_in + '.config', 'r'))
 if os.path.exists(fname_in + '.npy.gz'):
-    geo = np.load(gzip.GFile(fname_in + '.npy.gz', 'r'))
+    geo = np.load(gzip.GzipFile(fname_in + '.npy.gz', 'r'))
 else:
     geo = np.load(open(fname_in + '.npy'))
 fluid = np.logical_not(geo)
@@ -83,6 +83,8 @@ for axis in range(0, 3):
 
     slices.append(slice(start, end))
     idx += 1
+
+config['orig_size'] = geo.shape
 
 # Discard envelope if necessary,
 geo = geo[slices]
