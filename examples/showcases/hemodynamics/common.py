@@ -29,20 +29,28 @@ class CoordinateConverter(object):
             size -= config['padding'][2 * i]
             size -= config['padding'][2 * i + 1]
 
-            if 'orig_size' in config:
-                # -2 to get rid of padding
-                size = config['orig_size'][i] - 2
-
             # Physical size BEFORE cutting nodes from the envelope.
             phys_size = config['bounding_box'][i]
-            self.dx.append((phys_size[1] - phys_size[0]) / size)
-            self.phys_min_x.append(phys_size[0])
 
-    def to_lb(self, phys_pos):
+            if 'cuts' in config:
+                # -2 to get rid of padding
+                size += config['cuts'][i][0] + config['cuts'][i][1]
+
+            dx = (phys_size[1] - phys_size[0]) / size
+            self.dx.append(dx)
+            if 'cuts' in config:
+                self.phys_min_x.append(phys_size[0] + config['cuts'][i][0] * dx)
+            else:
+                self.phys_min_x.append(phys_size[0])
+
+
+    def to_lb(self, phys_pos, rnd=True):
         lb_pos = [0, 0, 0]
         for i, phys_x in enumerate(phys_pos):
-            lb_pos[self.axes[i]] = int(self.padding[i] +
-                                       np.round((phys_x - self.phys_min_x[i]) / self.dx[i]))
+            lb_pos[self.axes[i]] = (self.padding[i] + (phys_x - self.phys_min_x[i]) / self.dx[i])
+
+        if rnd:
+            lb_pos = [int(round(x)) for x in lb_pos]
         return lb_pos
 
     def from_lb(self, lb_pos):
