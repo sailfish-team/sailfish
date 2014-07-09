@@ -81,6 +81,8 @@ int main(int argc, char **argv)
 	geometry.scaleTo(1.0);
 
 	voxelize(geometry, voxels, voxel_size, 1 /* pad */, (char)0 /* inside */, (char)1 /*outside */);
+	config << "\"padding\": [1, 1, 1, 1, 1, 1],";
+	config << "\"axes\": \"xyz\",";
 
 	int fluid = count(voxels.begin(), voxels.end(), 0);
 	std::cout << "Nodes total: " << voxels.size() << " active: "
