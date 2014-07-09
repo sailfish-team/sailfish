@@ -46,6 +46,7 @@ def make_slice(axis, pos):
 # for every axis to have the desired number of outlets/inlets.
 padding = []
 slices = []
+cuts = [[0,0], [0,0], [0,0]]
 idx = 0
 for axis in range(0, 3):
     # Scan lower end of the current axis.
@@ -59,6 +60,8 @@ for axis in range(0, 3):
             if outlets == num:
                 padding.append(0)
                 start = i
+                # -1 to account for padding
+                cuts[axis][0] = i - 1
                 break
     else:
         start = 0
@@ -76,6 +79,8 @@ for axis in range(0, 3):
             if outlets == num:
                 padding.append(0)
                 end = geo.shape[axis] - i + 1
+                # -1 to account for padding
+                cuts[axis][1] = i - 1
                 break
     else:
         end = None
@@ -84,8 +89,6 @@ for axis in range(0, 3):
     slices.append(slice(start, end))
     idx += 1
 
-config['orig_size'] = geo.shape
-
 # Discard envelope if necessary,
 geo = geo[slices]
 
@@ -93,12 +96,13 @@ geo = geo[slices]
 config['size'] = geo.shape
 config['padding'] = padding
 config['axes'] = axes
+config['cuts'] = cuts
 
 name_to_idx = {'x': 0, 'y': 1, 'z': 2}
 targets = [0, 0, 0]
 actual = [0, 1, 2]
 
-# Reoder axes.
+# Reorder axes.
 for i, a in enumerate(axes):
     ai = name_to_idx[a]
     targets[i] = ai
@@ -108,8 +112,12 @@ for i, tg in enumerate(targets):
         other = actual.index(tg)
         geo = np.swapaxes(geo, i, other)
         t = actual[i]
-        actual[i] = other
+        actual[i] = tg
         actual[other] = t
+
+assert 0 in actual
+assert 1 in actual
+assert 2 in actual
 
 np.save(fname_out + '.npy', geo)
 json.dump(config, open(fname_out + '.config', 'w'))
