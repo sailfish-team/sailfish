@@ -171,8 +171,16 @@ class UnitConverter(object):
 
 
 class InflowOutflowSubdomain(Subdomain3D):
+    # Vector pointing in the direction of the flow.
     _flow_orient = D3Q19.vec_to_dir([0, 1, 0])
     oscillatory_amplitude = 0.1
+
+    # Location of the center of the inflow in physical coordinates, using
+    # the original axis ordering of the mesh.
+    inflow_loc = [0, 0, 0]
+
+    # Radius of the inflow, in physical units.
+    inflow_rad = 0
 
     # Override this to return a boolean array selecting inflow
     # and outflow nodes, or None if the inflow/outflow is not contained in
@@ -182,7 +190,10 @@ class InflowOutflowSubdomain(Subdomain3D):
         return None, None
 
     def _inflow_velocity(self, initial=False):
-        """
+        """Returns an expression describing the max inflow velocity
+
+        The velocity can be as a function of time for unsteady flows.
+
         initial: whether velocity for initial conditions should be returned'
         """
         if self.config.velocity == 'constant' or initial:
@@ -209,6 +220,11 @@ class InflowOutflowSubdomain(Subdomain3D):
 
     def _velocity_params(self, hx, hy, hz, wall_map):
         """Finds the center of the inlet and its diameter."""
+        diam = self.inflow_rad / self.config._converter.dx * 2
+        loc = self.config._coord_conv.to_lb(self.inflow_loc, rnd=False)
+        return loc, diam
+
+        # TODO: Remove the code below.
         inflow, _ = self._inflow_outflow(hx, hy, hz, wall_map)
         z, _, x = np.where(inflow)
         zm = (min(z) + max(z)) / 2.0
@@ -219,10 +235,9 @@ class InflowOutflowSubdomain(Subdomain3D):
         return xm, zm, diam
 
     def _velocity_profile(self, hx, hy, hz, wall_map):
-        xm, zm, diam = self._velocity_params(hx, hy, hz, wall_map)
-        xm = int(round(xm))
-        zm = int(round(zm))
-        r = np.sqrt((hz - hz[zm, 0, 0])**2 + (hx - hx[0, xm, 0])**2)
+        """Returns a velocity profile array."""
+        (zm, ym, xm), loc, diam = self._velocity_params(hx, hy, hz, wall_map)
+        r = np.sqrt((hz - 0.5 - zm)**2 + (hx - 0.5 - xm)**2)
 
         R = diam / 2.0
         v = vel * 2.0 * (1.0 - r**2 / R**2)
@@ -234,15 +249,15 @@ class InflowOutflowSubdomain(Subdomain3D):
         inlet, outlet = self._inflow_outflow(hx, hy, hz, wall_map)
 
         self.set_node(wall_map, NTFullBBWall)
-        # Vector pointing into the flow domain. The direction of the flow is y+.
         if inlet is not None:
-            xm, zm, diam = self._velocity_params(hx, hy, hz, wall_map)
+            (zm, ym, xm), diam = self._velocity_params(hx, hy, hz, wall_map)
             radius_sq = (diam / 2.0)**2
-            self.config.logger.info('.. setting inlet, center at (%d, %d), diam=%f',
-                                    xm, zm, diam)
+            self.config.logger.info('.. setting inlet, center at (%d, %d, %d), diam=%f',
+                                    xm, ym, zm, diam)
             self.config.logger.info('.. using the "%s" velocity profile',
                                     self.config.velocity)
             v = self._inflow_velocity()
+            # Vector pointing into the flow domain. The direction of the flow is y+.
             self.set_node(inlet, NTRegularizedVelocity(
                 DynamicValue(0.0,
                              2.0 * v *
@@ -258,11 +273,9 @@ class InflowOutflowSubdomain(Subdomain3D):
         self.set_node(outlet, NTEquilibriumDensity(1.0, orientation=self._flow_orient))
 
     def velocity_profile(self, hx, hy, hz, wall_map, inlet):
-        xm, zm, diam = self._velocity_params(hx, hy, hz, wall_map)
+        (zm, ym, xm), diam = self._velocity_params(hx, hy, hz, wall_map)
         radius_sq = (diam / 2.0)**2
-        xm = int(round(xm))
-        zm = int(round(zm))
-        r = np.sqrt((hz - zm)**2 + (hx - xm)**2)
+        r = np.sqrt((hz - 0.5 - zm)**2 + (hx - 0.5 - xm)**2)
         v = self._inflow_velocity(initial=True) * 2.0 * (1.0 - r**2 / radius_sq)
         return v
 
@@ -341,3 +354,14 @@ class HemoSim(LBFluidSim):
         converter.set_lb(velocity=cls.lb_v, length=diam)
         config.visc = converter.visc_lb
         config._converter = converter
+
+        # Instantiate a coordinate converter.
+        if config.geometry.endswith('.npy'):
+            geo_config_fn = config.geometry.replace('.npy', '.config')
+        else:
+            geo_config_fn = config.geometry.replace('.npy.gz', '.config')
+
+        import json
+        geo_config = json.load(open(geo_config_fn, 'r'))
+        config._coord_conv = CoordinateConverter(geo_config)
+

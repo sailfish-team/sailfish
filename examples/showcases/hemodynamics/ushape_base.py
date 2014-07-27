@@ -7,6 +7,7 @@ The pipe dimensions are:
  - arm length L: 10 in
 
 Inflow center is: -0.254, 0.0635, 0
+                  -0.254, -0.063461, 0
 (original geometry coordinates)
 
 Original dimensions:
@@ -43,6 +44,9 @@ from sailfish.vis_mixin import Vis2DSliceMixIn
 import common
 
 class UshapeSubdomain(common.InflowOutflowSubdomain):
+    inflow_loc = [-0.254, -0.063461, 0]
+    inflow_rad = 2.54e-2
+
     def _inflow_outflow(self, hx, hy, hz, wall_map):
         inlet = None
         outlet = None
@@ -57,6 +61,9 @@ class UshapeSubdomain(common.InflowOutflowSubdomain):
             outlet = np.logical_not(wall_map) & (hy == 0) & (hx > self.gx / 2)
 
         return inlet, outlet
+
+#    def _velocity_profile(self, hx, hy, hz, wall_map):
+
 
 
 class DynamicViscosity(LBMixIn):
@@ -108,9 +115,6 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
             return
 
         wall_map = cls.load_geometry(config.geometry)
-        wall_map = np.rollaxis(wall_map, 2)  # make z the smallest dimension
-
-        np.save('test.npy', wall_map)
 
         # Longest dimension determines configuration to use.
         size = wall_map.shape[1]
@@ -119,30 +123,20 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
             config.base_name = 'results/re%d_ushape_%d_%s' % (
                 config.reynolds, size, config.velocity)
 
-        # Remove wall blocking the inlet/outlet.
-        block = {
-            2002: 17,
-            1669: 14,
-            1002: 9,
-            802: 7,
-            402: 4
-        }
-        wall_map = wall_map[:,block[size]:,:]
-
         # Smooth out the wall.
         smooth = {
             2002: 1500,
             1669: 1270,
             1002: 768,
             802: 610,
-            402: 310
+            398: 310
         }
 
         for i in range(1, smooth[size]):
             wall_map[:,i,:] = wall_map[:,0,:]
 
         # Make it symmetric.
-        hw = wall_map.shape[2] / 2
+        hw = wall_map.shape[1] / 2
         wall_map[:,:,-hw:] = wall_map[:,:,:hw][:,:,::-1]
 
         # Override lattice size based on the geometry file.
