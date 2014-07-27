@@ -345,7 +345,7 @@ class NTNeumann(LBNodeType):
     via:
         .. math:: \phi(t, x_{j0}) = u(t, x_{j1}) + 2 \\varphi (t, x_j)
         .. math:: f_i(t+1, x_{j0}) = f_{\mathrm{\\bar{i}}}^c(t, x_{j0} + c_i) +
-                      6 f^{\mathrm{eq}}_i (u(t, x_{j1}) + 2\phi(t, x_{j0})) \cdot c_i
+                      6 w_i \phi(t, x_{j0}) \cdot c_i
     with:
 
      * :math:`x_j`: boundary node
@@ -353,9 +353,12 @@ class NTNeumann(LBNodeType):
      * :math:`x_{j1}`: fluid node at :math:`x_{j0}` - 2 * normal
      * :math:`c_i`: incoming distributions
      * :math:`\\bar{i}`: direction opposite to i
-     * :math:`f^{\mathrm{eq}}_i`: :math:`f^{\mathrm{eq}}_i(1, 0)`
      * :math:`f_i^c`: distribution after collision (prior to streaming)
     """
+    wet_node = True
+    standard_macro = True
+    needs_orientation = True
+
 
 ############################################################################
 # Other nodes.
