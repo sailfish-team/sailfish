@@ -328,6 +328,12 @@ class HemoSim(LBFluidSim):
         group.add_argument('--reynolds', type=float,
                            default=10.0, help='Reynolds number; only works '
                            'for --velocity=constant|oscillatory')
+        group.add_argument('--track_errors', action='store_true',
+                           default=False, help='Enables L2 error tracking to '
+                           'determine convergence properties of the simulation.')
+        group.add_argument('--errors_every', type=int, default=1000,
+                           help='Number of iterations between data collection '
+                           'used to calculate errors.')
 
     @classmethod
     def load_geometry(cls, fname):
@@ -366,3 +372,44 @@ class HemoSim(LBFluidSim):
         geo_config = json.load(open(geo_config_fn, 'r'))
         config._coord_conv = CoordinateConverter(geo_config)
 
+    prev_rho = None
+    prev_v = None
+    def track_errors(self, runner):
+        mod = self.iteration % self.config.errors_every
+
+        # Used for convergence analysis.
+        if mod == self.config.errors_every - 1:
+            self.need_sync_flag = True
+        elif mod == 0:
+            self.config.logger.info(
+                'sums it=%d: %e %e %e %e' % (
+                    self.iteration, np.nansum(self.rho), np.nansum(self.vx),
+                    np.nansum(self.vy), np.nansum(self.vz)))
+
+            nodes = np.sum(np.logical_not(np.isnan(self.rho)))
+            if self.prev_rho is not None:
+                drho = np.abs(self.rho - self.prev_rho)
+                dv = np.sqrt((self.vx - self.prev_v[0])**2 +
+                      (self.vy - self.prev_v[1])**2 +
+                      (self.vz - self.prev_v[2])**2)
+                vn = np.sqrt(self.prev_v[0]**2 + self.prev_v[1]**2 + self.prev_v[2]**2)
+
+                rho_rel = np.nansum(drho / self.prev_rho)
+                rho_rel2 = np.nansum(drho) / np.nansum(self.prev_rho)
+
+                v_rel = np.nansum(dv / vn)
+                v_rel2 = np.nansum(dv) / np.nansum(vn)
+
+                self.config.logger.info(
+                    'errs it=%d: %e %e %e %e' % (
+                        self.iteration, rho_rel / nodes, rho_rel2 / nodes,
+                        v_rel / nodes, v_rel2 / nodes))
+            else:
+                self.config.logger.info('total fluid nodes: %d' % nodes)
+
+            self.prev_rho = self.rho.copy()
+            self.prev_v = (self.vx.copy(), self.vy.copy(), self.vz.copy())
+
+    def after_step(self, runner):
+        if self.config.track_errors:
+            self.track_errors(runner)
