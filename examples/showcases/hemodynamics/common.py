@@ -328,10 +328,7 @@ class HemoSim(LBFluidSim):
         group.add_argument('--reynolds', type=float,
                            default=10.0, help='Reynolds number; only works '
                            'for --velocity=constant|oscillatory')
-        group.add_argument('--track_errors', action='store_true',
-                           default=False, help='Enables L2 error tracking to '
-                           'determine convergence properties of the simulation.')
-        group.add_argument('--errors_every', type=int, default=1000,
+        group.add_argument('--errors_every', type=int, default=0,
                            help='Number of iterations between data collection '
                            'used to calculate errors.')
 
@@ -411,5 +408,5 @@ class HemoSim(LBFluidSim):
             self.prev_v = (self.vx.copy(), self.vy.copy(), self.vz.copy())
 
     def after_step(self, runner):
-        if self.config.track_errors:
+        if self.config.errors_every > 0:
             self.track_errors(runner)
