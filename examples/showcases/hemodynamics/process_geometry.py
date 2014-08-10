@@ -8,7 +8,8 @@ Usage:
 Expects in.config and in.npy to be present.
 Arguments:
   out: base filename for outputs
-  axes: a string such 'xyz' indicating the target axis order
+  axes: a string such 'xyz' indicating the target axis order (original order
+        is 'xyz')
   exp: a sequence of 6 digits (two per axis), indicating the expected
        number of outlets/inlets, e.g. 012000.
 """

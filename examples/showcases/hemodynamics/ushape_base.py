@@ -125,10 +125,12 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
 
         # Smooth out the wall.
         smooth = {
+            # Update the 3 following values to be compatible with the
+            # process_geometry script.
             2002: 1500,
             1669: 1270,
             1002: 768,
-            802: 610,
+            795: 610,
             398: 310
         }
 
@@ -136,7 +138,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
             wall_map[:,i,:] = wall_map[:,0,:]
 
         # Make it symmetric.
-        hw = wall_map.shape[1] / 2
+        hw = wall_map.shape[2] / 2
         wall_map[:,:,-hw:] = wall_map[:,:,:hw][:,:,::-1]
 
         # Override lattice size based on the geometry file.
