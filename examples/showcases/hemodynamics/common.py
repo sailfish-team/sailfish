@@ -44,12 +44,12 @@ class CoordinateConverter(object):
                 self.phys_min_x.append(phys_size[0])
 
 
-    def to_lb(self, phys_pos, rnd=True):
+    def to_lb(self, phys_pos, round_=True):
         lb_pos = [0, 0, 0]
         for i, phys_x in enumerate(phys_pos):
             lb_pos[self.axes[i]] = (self.padding[i] + (phys_x - self.phys_min_x[i]) / self.dx[i])
 
-        if rnd:
+        if round_:
             lb_pos = [int(round(x)) for x in lb_pos]
         return lb_pos
 
@@ -221,19 +221,9 @@ class InflowOutflowSubdomain(Subdomain3D):
     def _velocity_params(self, hx, hy, hz, wall_map):
         """Finds the center of the inlet and its diameter."""
         diam = self.inflow_rad / self.config._converter.dx * 2
-        loc = self.config._coord_conv.to_lb(self.inflow_loc, rnd=False)
+        loc = self.config._coord_conv.to_lb(self.inflow_loc, round_=False)
         assert diam > 0
         return loc, diam
-
-        # TODO: Remove the code below.
-        inflow, _ = self._inflow_outflow(hx, hy, hz, wall_map)
-        z, _, x = np.where(inflow)
-        zm = (min(z) + max(z)) / 2.0
-        xm = (min(x) + max(x)) / 2.0
-
-        # XXX: compute actual diameter here.
-        diam = min(max(z) - min(z), max(x) - min(x))
-        return xm, zm, diam
 
     def _velocity_profile(self, hx, hy, hz, wall_map):
         """Returns a velocity profile array."""
