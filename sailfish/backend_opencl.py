@@ -199,6 +199,7 @@ class OpenCLBackend(object):
         return {
             # FIXME
             'warp_size': 32,
+            'backend': 'opencl',
             'supports_shuffle': False,
             'supports_printf': False,
             'shared_var': '__local',

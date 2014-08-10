@@ -5,6 +5,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 import os
+import re
 import sys
 import tempfile
 import mako.exceptions
@@ -34,6 +35,9 @@ def _remove_math_function_suffix(t):
     t = t.replace('cosf(', 'cos(')
     t = t.replace('tanhf(', 'tan(')
     return t
+
+def _remove_printf_calls(t):
+    return re.sub('printf([^;]*);', '', t)
 
 def _use_intrinsics(t):
     t = t.replace('logf(', '__logf(')
@@ -163,6 +167,7 @@ class BlockCodeGenerator(object):
         # TODO(michalj): Consider using native_ or half_ functions here.
         if target_type == 'opencl':
             src = _remove_math_function_suffix(src)
+            src = _remove_printf_calls(src)
 
         if self.config.save_src:
             self.save_code(src,

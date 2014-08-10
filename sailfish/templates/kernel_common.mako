@@ -478,7 +478,9 @@
 	}
 </%def>
 
-%if not supports_printf:
+## OpenCL completely removes calls to printf() from the code as according
+## to the OpenCL specification, variadic macros are not supported.
+%if not supports_printf and backend != 'opencl':
 	#define printf(...)
 %endif
 
