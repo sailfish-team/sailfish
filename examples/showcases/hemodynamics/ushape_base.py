@@ -2,7 +2,7 @@
 Flow through a U-shaped pipe.
 
 The pipe dimensions are:
- - diameter   D: 1 in = 2.54e-2 m
+ - diamter    D: 1 in = 2.54e-2 m
  - bow radius R: 3 in
  - arm length L: 10 in
 
@@ -45,7 +45,7 @@ import common
 
 class UshapeSubdomain(common.InflowOutflowSubdomain):
     inflow_loc = [-0.254, -0.063461, 0]
-    inflow_rad = 2.54e-2
+    inflow_rad = 2.54e-2 / 2.0
 
     def _inflow_outflow(self, hx, hy, hz, wall_map):
         inlet = None
@@ -100,7 +100,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
             'subdomains': 1,
             'node_addressing': 'direct',
             'conn_axis': 'y',
-            'geometry': 'geo/ushape_802_0.00125.npy.gz',
+            'geometry': 'geo/proc_ushape_802.npy.gz',
 
             # Start the simulation from a lower Reynolds numbers to
             # remove spurious oscillations. During the simulation, the
@@ -131,7 +131,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
             1669: 1270,
             1002: 768,
             795: 610,
-            398: 310
+            368: 310
         }
 
         for i in range(1, smooth[size]):

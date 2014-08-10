@@ -222,6 +222,7 @@ class InflowOutflowSubdomain(Subdomain3D):
         """Finds the center of the inlet and its diameter."""
         diam = self.inflow_rad / self.config._converter.dx * 2
         loc = self.config._coord_conv.to_lb(self.inflow_loc, rnd=False)
+        assert diam > 0
         return loc, diam
 
         # TODO: Remove the code below.
