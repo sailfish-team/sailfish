@@ -71,10 +71,10 @@ class DynamicViscosity(LBMixIn):
     viscosity_map = {}
 
     def after_step(self, runner):
-        if self.iteration not in viscosity_map:
+        if self.iteration not in self.viscosity_map:
             return
 
-        runner.config.visc = viscosity_map[self.iteration]
+        runner.config.visc = self.viscosity_map[self.iteration]
         runner._update_compute_code()
         runner._prepare_compute_kernels()
         self._vis_update_kernels(runner)
@@ -99,7 +99,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
             'subdomains': 1,
             'node_addressing': 'direct',
             'conn_axis': 'y',
-            'geometry': 'geo/proc_ushape_802.npy.gz',
+            'geometry': 'geo/proc_ushape_802_0.00125.npy.gz',
 
             # Start the simulation from a lower Reynolds numbers to
             # remove spurious oscillations. During the simulation, the
@@ -135,7 +135,8 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
             # process_geometry script.
             2002: 1500,
             1669: 1270,
-            1002: 768,
+            1241: 968,
+            993: 768,
             795: 610,
             368: 310
         }

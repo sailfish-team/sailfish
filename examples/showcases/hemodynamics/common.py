@@ -174,6 +174,7 @@ class InflowOutflowSubdomain(Subdomain3D):
     # Vector pointing in the direction of the flow.
     _flow_orient = D3Q19.vec_to_dir([0, 1, 0])
     oscillatory_amplitude = 0.1
+    bc_velocity = NTRegularizedVelocity
 
     # Location of the center of the inflow in physical coordinates, using
     # the original axis ordering of the mesh.
@@ -249,7 +250,7 @@ class InflowOutflowSubdomain(Subdomain3D):
                                     self.config.velocity)
             v = self._inflow_velocity()
             # Vector pointing into the flow domain. The direction of the flow is y+.
-            self.set_node(inlet, NTRegularizedVelocity(
+            self.set_node(inlet, self.bc_velocity(
                 DynamicValue(0.0,
                              2.0 * v *
                              (1.0 - ((S.gz - zm)**2 + (S.gx - xm)**2) / radius_sq),
