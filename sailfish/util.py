@@ -305,3 +305,13 @@ def energy_spectrum(velocity, buckets=None, density=False):
             spectrum[i] /= (high**3 - low**3)
 
     return spectrum
+
+
+def lazy_property(f):
+    attr_name = '_lazy_' + f.__name__
+    @property
+    def _lazy_property(self):
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, f(self))
+        return getattr(self, attr_name)
+    return _lazy_property

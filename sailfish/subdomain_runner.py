@@ -1658,7 +1658,7 @@ class SubdomainRunner(object):
                     t_now = time.time()
                     if self.t_prev_checkpoint > 0.0:
                         dt = t_now - self.t_prev_checkpoint
-                        mlups = self._subdomain.active_nodes * pse / dt * 1e-6
+                        mlups = self._subdomain.num_fluid_nodes * pse / dt * 1e-6
                         self.config.logger.info(
                             "iteration:{0}  speed:{1:.2f} MLUPS".format(
                                 self._sim.iteration, mlups))

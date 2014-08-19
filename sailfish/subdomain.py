@@ -482,6 +482,13 @@ class Subdomain(object):
         else:
             return reduce(operator.mul, self.lat_shape)
 
+    @util.lazy_property
+    def num_fluid_nodes(self):
+        if self.active_node_mask is not None:
+            return active_nodes
+        else:
+            return np.sum(self.fluid_map())
+
     def _verify_params(self, where, node_type):
         """Verifies that the node parameters are set correctly."""
 
