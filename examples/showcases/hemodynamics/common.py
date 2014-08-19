@@ -10,7 +10,7 @@ from sympy import sin
 
 
 class CoordinateConverter(object):
-    """Converts between physical coordinates and LB coordinates"""
+    """Converts between physical coordinates and LB coordinates."""
 
     def __init__(self, config):
         """Initializes the converter.
@@ -193,11 +193,16 @@ class InflowOutflowSubdomain(Subdomain3D):
 
     def sym_velocity_profile(self, v, xm, ym, zm, diam):
         radius_sq = (diam / 2.0)**2
-        vv = 2.0 * v * (1.0 - ((S.gz - zm)**2 + (S.gx - xm)**2) / radius_sq)
+
+        # Add 0.5 to the grid symbols to indicate that the node is located in the
+        # middle of the grid cell.
+        # The velocity vector direction matches the flow orientation vector.
 
         if self._flow_orient == D3Q19.vec_to_dir([1, 0, 0]):
+            vv = 2.0 * v * (1.0 - ((S.gz + 0.5 - zm)**2 + (S.gy + 0.5 - ym)**2) / radius_sq)
             return DynamicValue(vv, 0.0, 0.0)
         elif self._flow_orient == D3Q19.vec_to_dir([0, 1, 0]):
+            vv = 2.0 * v * (1.0 - ((S.gz + 0.5 - zm)**2 + (S.gx + 0.5 - xm)**2) / radius_sq)
             return DynamicValue(0.0, vv, 0.0)
         else:
             raise ValueError('Unsupported orientation: %d' % self._flow_orient)
@@ -207,10 +212,12 @@ class InflowOutflowSubdomain(Subdomain3D):
         (zm, ym, xm), diam = self._velocity_params(hx, hy, hz, wall_map)
         radius_sq = (diam / 2.0)**2
 
+        # Add 0.5 to the grid arrays to indicate that the node is located in the
+        # middle of the grid cell.
         if self._flow_orient == D3Q19.vec_to_dir([1, 0, 0]):
-            r = np.sqrt((hz - 0.5 - zm)**2 + (hy - 0.5 - ym)**2)
+            r = np.sqrt((hz + 0.5 - zm)**2 + (hy + 0.5 - ym)**2)
         elif self._flow_orient == D3Q19.vec_to_dir([0, 1, 0]):
-            r = np.sqrt((hz - 0.5 - zm)**2 + (hx - 0.5 - xm)**2)
+            r = np.sqrt((hz + 0.5 - zm)**2 + (hx + 0.5- xm)**2)
         else:
             raise ValueError('Unsupported orientation: %d' % self._flow_orient)
         v = self._inflow_velocity(initial=True) * 2.0 * (1.0 - r**2 / radius_sq)
@@ -249,6 +256,7 @@ class InflowOutflowSubdomain(Subdomain3D):
         """Finds the center of the inlet and its diameter."""
         diam = self.inflow_rad / self.config._converter.dx * 2
         loc = self.config._coord_conv.to_lb(self.inflow_loc, round_=False)
+
         assert diam > 0
         return loc, diam
 
