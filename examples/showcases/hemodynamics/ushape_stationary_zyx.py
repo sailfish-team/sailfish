@@ -10,7 +10,7 @@ import common
 
 class UshapeZyxSubdomain(ushape_base.UshapeSubdomain):
     # The direction of the flow is x+.
-    _flow_orient = D3Q19.vec_to_dir([0, 0, 1])
+    _flow_orient = D3Q19.vec_to_dir([1, 0, 0])
 
     def _inflow_outflow(self, hx, hy, hz, wall_map):
         inlet = None

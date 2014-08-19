@@ -276,7 +276,7 @@ class InflowOutflowSubdomain(Subdomain3D):
 
             if self._flow_orient == D3Q19.vec_to_dir([0, 1, 0]):
                 sim.vy[inlet] = v[inlet]
-            elif self._flow_orient == D3Q19.vec_to_dir([0, 0, 1]):
+            elif self._flow_orient == D3Q19.vec_to_dir([1, 0, 0]):
                 sim.vx[inlet] = v[inlet]
             else:
                 raise ValueError('Unsupported flow orientation: %d' %
