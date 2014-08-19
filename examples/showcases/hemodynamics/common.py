@@ -175,6 +175,7 @@ class InflowOutflowSubdomain(Subdomain3D):
     _flow_orient = D3Q19.vec_to_dir([0, 1, 0])
     oscillatory_amplitude = 0.1
     bc_velocity = NTRegularizedVelocity
+    bc_outflow = NTEquilibriumDensity
 
     # Location of the center of the inflow in physical coordinates, using
     # the original axis ordering of the mesh.
@@ -248,6 +249,7 @@ class InflowOutflowSubdomain(Subdomain3D):
                                     xm, ym, zm, diam)
             self.config.logger.info('.. using the "%s" velocity profile',
                                     self.config.velocity)
+            self.config.logger.info('.. using the "%s" BC', self.bc_velocity.__name__)
             v = self._inflow_velocity()
             # Vector pointing into the flow domain. The direction of the flow is y+.
             self.set_node(inlet, self.bc_velocity(
@@ -258,11 +260,11 @@ class InflowOutflowSubdomain(Subdomain3D):
                 orientation=self._flow_orient))
 
         if outlet is not None:
-            self.config.logger.info('.. setting outlet')
+            self.config.logger.info('.. setting outlet using the "%s" BC', self.bc_outflow.__name__)
             self._set_outlet(outlet, hx, hy, hz)
 
     def _set_outlet(self, outlet, hx, hy, hz):
-        self.set_node(outlet, NTEquilibriumDensity(1.0, orientation=self._flow_orient))
+        self.set_node(outlet, self.bc_outflow(1.0, orientation=self._flow_orient))
 
     def velocity_profile(self, hx, hy, hz, wall_map, inlet):
         (zm, ym, xm), diam = self._velocity_params(hx, hy, hz, wall_map)
