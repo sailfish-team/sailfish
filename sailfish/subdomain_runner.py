@@ -1688,6 +1688,13 @@ class SubdomainRunner(object):
                         self._quit_event.set()
                         break
                     self._output.save(self._sim.iteration)
+                elif sync_req:
+                    # Required so that custom code in "after_step" below does
+                    # not get access to potentially invalid field values. If
+                    # output is enabled, this is already done for us when
+                    # calling "output.save".
+                    self._output.mask_nonfluid_nodes()
+
                 self._profile.end_step()
 
                 self._sim.after_step(self)

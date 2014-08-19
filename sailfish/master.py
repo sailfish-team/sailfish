@@ -183,6 +183,8 @@ class LBMachineMaster(object):
         if self.config.output:
             output_cls = io.format_name_to_cls[self.config.output_format]
         else:
+            # Dummy output class. Does not actually save data, but does provide
+            # utility functions common to all output classes.
             output_cls = io.LBOutput
 
         if self.config.mode != 'visualization':
