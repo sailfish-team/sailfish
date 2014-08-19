@@ -459,6 +459,9 @@ class DynamicValue(object):
         else:
             return 1
 
+    def __str__(self):
+        return 'DynamicValue(' + ', '.join(str(x) for x in self.params) + ')'
+
     def __getitem__(self, i):
         return self.params[i]
 
