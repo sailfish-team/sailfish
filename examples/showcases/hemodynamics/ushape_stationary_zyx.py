@@ -27,14 +27,6 @@ class UshapeZyxSubdomain(ushape_base.UshapeSubdomain):
 
         return inlet, outlet
 
-    def velocity_profile(self, hx, hy, hz, wall_map):
-        """Returns a velocity profile array."""
-        (zm, ym, xm), diam = self._velocity_params(hx, hy, hz, wall_map)
-        radius_sq = (diam / 2.0)**2
-        r = np.sqrt((hz - 0.5 - zm)**2 + (hy - 0.5 - ym)**2)
-        v = self._inflow_velocity(initial=True) * 2.0 * (1.0 - r**2 / radius_sq)
-        return v
-
 class UshapeSim(ushape_base.UshapeBaseSim):
     lb_v = 0.05
     subdomain = UshapeZyxSubdomain

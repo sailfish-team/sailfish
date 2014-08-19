@@ -206,7 +206,13 @@ class InflowOutflowSubdomain(Subdomain3D):
         """Returns a velocity profile array."""
         (zm, ym, xm), diam = self._velocity_params(hx, hy, hz, wall_map)
         radius_sq = (diam / 2.0)**2
-        r = np.sqrt((hz - 0.5 - zm)**2 + (hx - 0.5 - xm)**2)
+
+        if self._flow_orient == D3Q19.vec_to_dir([1, 0, 0]):
+            r = np.sqrt((hz - 0.5 - zm)**2 + (hy - 0.5 - ym)**2)
+        elif self._flow_orient == D3Q19.vec_to_dir([0, 1, 0]):
+            r = np.sqrt((hz - 0.5 - zm)**2 + (hx - 0.5 - xm)**2)
+        else:
+            raise ValueError('Unsupported orientation: %d' % self._flow_orient)
         v = self._inflow_velocity(initial=True) * 2.0 * (1.0 - r**2 / radius_sq)
         return v
 
