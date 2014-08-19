@@ -116,7 +116,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
                 'simulation domain')
 
     @classmethod
-    def modify_config(cls, config):
+    def set_walls(cls, config):
         if not config.geometry:
             return
 
@@ -138,7 +138,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
             1241: 968,
             993: 768,
             795: 610,
-            368: 310
+            398: 310
         }
 
         for i in range(1, smooth[size]):
@@ -155,7 +155,23 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
         wall_map = np.pad(wall_map, (1, 1), 'constant', constant_values=True)
         config._wall_map = wall_map
 
+    @classmethod
+    def modify_config(cls, config):
+        cls.set_walls(config)
         super(UshapeBaseSim, cls).modify_config(config)
+
+    def _get_midslice(self, runner):
+        diam = int(runner._subdomain.inflow_rad / self.config._converter.dx * 2)
+        wall_nonghost = self.config._wall_map[1:-1,1:-1,1:-1]
+        size = wall_nonghost.shape[2]
+        self.midslice = [slice(None), slice(-(diam + 10), None)]
+        m = size / 2
+        if size % 2 == 0:
+            # Extracts a 2-node wide slice.
+            self.midslice.append(slice(m - 1, m + 1))
+        else:
+            # Extracts a 3-node wide slice.
+            self.midslice.append(slice(m - 1, m + 2))
 
     midslice = None
     mask = None
@@ -175,18 +191,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
             self.need_sync_flag = True
         elif mod == 0:
             if self.midslice is None:
-                diam = int(runner._subdomain.inflow_rad / self.config._converter.dx * 2)
-                wall_nonghost = self.config._wall_map[1:-1,1:-1,1:-1]
-                size = wall_nonghost.shape[2]
-                self.midslice = [slice(None), slice(-(diam + 10), None)]
-                m = size / 2
-                if size % 2 == 0:
-                    # Extracts a 2-node wide slice.
-                    self.midslice.append(slice(m - 1, m + 1))
-                else:
-                    # Extracts a 3-node wide slice.
-                    self.midslice.append(slice(m - 1, m + 2))
-
+                self._get_midslice(runner)
                 hx, hy, hz = runner._subdomain._get_mgrid()
                 hx = hx[self.midslice]
                 hy = hy[self.midslice]

@@ -191,6 +191,20 @@ class InflowOutflowSubdomain(Subdomain3D):
     def _inflow_outflow(self, hx, hy, hz, wall_map):
         return None, None
 
+    def sym_velocity_profile(self, v, xm, ym, zm, diam):
+        radius_sq = (diam / 2.0)**2
+        return DynamicValue(0.0,
+                            2.0 * v * (1.0 - ((S.gz - zm)**2 + (S.gx - xm)**2) / radius_sq),
+                            0.0)
+
+    def velocity_profile(self, hx, hy, hz, wall_map):
+        """Returns a velocity profile array."""
+        (zm, ym, xm), diam = self._velocity_params(hx, hy, hz, wall_map)
+        radius_sq = (diam / 2.0)**2
+        r = np.sqrt((hz - 0.5 - zm)**2 + (hx - 0.5 - xm)**2)
+        v = self._inflow_velocity(initial=True) * 2.0 * (1.0 - r**2 / radius_sq)
+        return v
+
     def _inflow_velocity(self, initial=False):
         """Returns an expression describing the max inflow velocity
 
@@ -227,15 +241,6 @@ class InflowOutflowSubdomain(Subdomain3D):
         assert diam > 0
         return loc, diam
 
-    def _velocity_profile(self, hx, hy, hz, wall_map):
-        """Returns a velocity profile array."""
-        (zm, ym, xm), loc, diam = self._velocity_params(hx, hy, hz, wall_map)
-        r = np.sqrt((hz - 0.5 - zm)**2 + (hx - 0.5 - xm)**2)
-
-        R = diam / 2.0
-        v = vel * 2.0 * (1.0 - r**2 / R**2)
-        return v
-
     def boundary_conditions(self, hx, hy, hz):
         self.config.logger.info(self.config._converter.info_lb)
         wall_map = self._wall_map(hx, hy, hz)
@@ -244,19 +249,14 @@ class InflowOutflowSubdomain(Subdomain3D):
         self.set_node(wall_map, NTFullBBWall)
         if inlet is not None:
             (zm, ym, xm), diam = self._velocity_params(hx, hy, hz, wall_map)
-            radius_sq = (diam / 2.0)**2
             self.config.logger.info('.. setting inlet, center at (%d, %d, %d), diam=%f',
                                     xm, ym, zm, diam)
             self.config.logger.info('.. using the "%s" velocity profile',
                                     self.config.velocity)
             self.config.logger.info('.. using the "%s" BC', self.bc_velocity.__name__)
             v = self._inflow_velocity()
-            # Vector pointing into the flow domain. The direction of the flow is y+.
             self.set_node(inlet, self.bc_velocity(
-                DynamicValue(0.0,
-                             2.0 * v *
-                             (1.0 - ((S.gz - zm)**2 + (S.gx - xm)**2) / radius_sq),
-                             0.0),
+                self.sym_velocity_profile(v, xm, ym, zm, diam),
                 orientation=self._flow_orient))
 
         if outlet is not None:
@@ -266,22 +266,21 @@ class InflowOutflowSubdomain(Subdomain3D):
     def _set_outlet(self, outlet, hx, hy, hz):
         self.set_node(outlet, self.bc_outflow(1.0, orientation=self._flow_orient))
 
-    def velocity_profile(self, hx, hy, hz, wall_map, inlet):
-        (zm, ym, xm), diam = self._velocity_params(hx, hy, hz, wall_map)
-        radius_sq = (diam / 2.0)**2
-        r = np.sqrt((hz - 0.5 - zm)**2 + (hx - 0.5 - xm)**2)
-        v = self._inflow_velocity(initial=True) * 2.0 * (1.0 - r**2 / radius_sq)
-        return v
-
     def initial_conditions(self, sim, hx, hy, hz):
         sim.rho[:] = 1.0
         wall_map = self._wall_map(hx, hy, hz)
         inlet, outlet = self._inflow_outflow(hx, hy, hz, wall_map)
 
         if inlet is not None:
-            v = self.velocity_profile(hx, hy, hz, wall_map, inlet)
-            sim.vy[inlet] = v[inlet]
+            v = self.velocity_profile(hx, hy, hz, wall_map)
 
+            if self._flow_orient == D3Q19.vec_to_dir([0, 1, 0]):
+                sim.vy[inlet] = v[inlet]
+            elif self._flow_orient == D3Q19.vec_to_dir([0, 0, 1]):
+                sim.vx[inlet] = v[inlet]
+            else:
+                raise ValueError('Unsupported flow orientation: %d' %
+                                 self._flow_orient)
 
 class HemoSim(LBFluidSim):
     phys_visc = 3.33e-6
@@ -333,6 +332,11 @@ class HemoSim(LBFluidSim):
             return np.load(fname)
 
     @classmethod
+    def get_diam(cls, config):
+        _, _, xs = config._wall_map.shape
+        return 2.0 * np.sqrt(np.sum(np.logical_not(config._wall_map[:,1,:(xs/2)])) / np.pi)
+
+    @classmethod
     def modify_config(cls, config):
         converter = None
         if config.velocity_profile and config.velocity == 'external':
@@ -345,10 +349,8 @@ class HemoSim(LBFluidSim):
             # Unit conversion based on Reynolds number.
             converter = UnitConverter(cls.phys_visc, cls.phys_diam,
                                       Re=config.reynolds, freq=cls.phys_freq)
-        _, _, xs = config._wall_map.shape
-        diam = 2.0 * np.sqrt(np.sum(np.logical_not(config._wall_map[:,1,:(xs/2)])) / np.pi)
         # Automatically compute the LB viscosity.
-        converter.set_lb(velocity=cls.lb_v, length=diam)
+        converter.set_lb(velocity=cls.lb_v, length=cls.get_diam(config))
         config.visc = converter.visc_lb
         config._converter = converter
 
