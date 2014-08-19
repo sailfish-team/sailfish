@@ -171,7 +171,7 @@ class UnitConverter(object):
 
 
 class InflowOutflowSubdomain(Subdomain3D):
-    # Vector pointing in the direction of the flow.
+    # Vector pointing in the direction of the flow (y+).
     _flow_orient = D3Q19.vec_to_dir([0, 1, 0])
     oscillatory_amplitude = 0.1
     bc_velocity = NTRegularizedVelocity
@@ -193,9 +193,14 @@ class InflowOutflowSubdomain(Subdomain3D):
 
     def sym_velocity_profile(self, v, xm, ym, zm, diam):
         radius_sq = (diam / 2.0)**2
-        return DynamicValue(0.0,
-                            2.0 * v * (1.0 - ((S.gz - zm)**2 + (S.gx - xm)**2) / radius_sq),
-                            0.0)
+        vv = 2.0 * v * (1.0 - ((S.gz - zm)**2 + (S.gx - xm)**2) / radius_sq)
+
+        if self._flow_orient == D3Q19.vec_to_dir([1, 0, 0]):
+            return DynamicValue(vv, 0.0, 0.0)
+        elif self._flow_orient == D3Q19.vec_to_dir([0, 1, 0]):
+            return DynamicValue(0.0, vv, 0.0)
+        else:
+            raise ValueError('Unsupported orientation: %d' % self._flow_orient)
 
     def velocity_profile(self, hx, hy, hz, wall_map):
         """Returns a velocity profile array."""

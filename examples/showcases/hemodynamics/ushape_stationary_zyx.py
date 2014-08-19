@@ -35,14 +35,6 @@ class UshapeZyxSubdomain(ushape_base.UshapeSubdomain):
         v = self._inflow_velocity(initial=True) * 2.0 * (1.0 - r**2 / radius_sq)
         return v
 
-    def sym_velocity_profile(self, v, xm, ym, zm, diam):
-        radius_sq = (diam / 2.0)**2
-        return DynamicValue(
-            2.0 * v * (1.0 - ((S.gz - zm)**2 + (S.gy - ym)**2) / radius_sq),
-            0.0,
-            0.0)
-
-
 class UshapeSim(ushape_base.UshapeBaseSim):
     lb_v = 0.05
     subdomain = UshapeZyxSubdomain
