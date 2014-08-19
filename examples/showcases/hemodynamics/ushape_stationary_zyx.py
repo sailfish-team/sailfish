@@ -28,7 +28,6 @@ class UshapeZyxSubdomain(ushape_base.UshapeSubdomain):
         return inlet, outlet
 
 class UshapeSim(ushape_base.UshapeBaseSim):
-    lb_v = 0.05
     subdomain = UshapeZyxSubdomain
 
     @classmethod
@@ -55,18 +54,7 @@ class UshapeSim(ushape_base.UshapeBaseSim):
                 config.reynolds, size, config.velocity)
 
         # Smooth out the wall.
-        smooth = {
-            # Update the 3 following values to be compatible with the
-            # process_geometry script.
-            2002: 1500,
-            1669: 1270,
-            1241: 968,
-            993: 768,
-            795: 610,
-            398: 310
-        }
-
-        for i in range(1, smooth[size]):
+        for i in range(1, cls.smooth[size]):
             wall_map[:,:,i] = wall_map[:,:,0]
 
         # Make it symmetric.

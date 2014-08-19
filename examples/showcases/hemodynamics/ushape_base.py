@@ -85,6 +85,17 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
     phys_diam = 2.54e-2     # meters
     lb_v = 0.001            # for oscillatory flow
 
+    smooth = {
+        # Update the 2 following values to be compatible with the
+        # process_geometry script.
+        2002: 1500,
+        1669: 1270,
+        1241: 968,
+        993: 768,
+        795: 610,
+        398: 310
+    }
+
     @classmethod
     def update_defaults(cls, defaults):
         super(UshapeBaseSim, cls).update_defaults(defaults)
@@ -130,18 +141,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
                 config.reynolds, size, config.velocity)
 
         # Smooth out the wall.
-        smooth = {
-            # Update the 3 following values to be compatible with the
-            # process_geometry script.
-            2002: 1500,
-            1669: 1270,
-            1241: 968,
-            993: 768,
-            795: 610,
-            398: 310
-        }
-
-        for i in range(1, smooth[size]):
+        for i in range(1, cls.smooth[size]):
             wall_map[:,i,:] = wall_map[:,0,:]
 
         # Make it symmetric.
