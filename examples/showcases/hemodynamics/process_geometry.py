@@ -11,7 +11,8 @@ Arguments:
   axes: a string such 'xyz' indicating the target axis order (original order
         is 'xyz')
   exp: a sequence of 6 digits (two per axis), indicating the expected
-       number of outlets/inlets, e.g. 012000.
+       number of outlets/inlets, e.g. 012000; order is xyz, prior to axes
+       reshuffling
 """
 
 import gzip
