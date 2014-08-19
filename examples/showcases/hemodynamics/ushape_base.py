@@ -172,6 +172,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
         else:
             # Extracts a 3-node wide slice.
             self.midslice.append(slice(m - 1, m + 2))
+        return wall_nonghost
 
     midslice = None
     mask = None
@@ -191,7 +192,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
             self.need_sync_flag = True
         elif mod == 0:
             if self.midslice is None:
-                self._get_midslice(runner)
+                wall_nonghost = self._get_midslice(runner)
                 hx, hy, hz = runner._subdomain._get_mgrid()
                 hx = hx[self.midslice]
                 hy = hy[self.midslice]

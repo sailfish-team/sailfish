@@ -118,6 +118,7 @@ class UshapeSim(ushape_base.UshapeBaseSim):
             # Extracts a 3-node wide slice.
             self.midslice.append(slice(m - 1, m + 2))
         self.midslice.append(slice(-(diam + 10), None))
+        return wall_nonghost
 
 if __name__ == '__main__':
     LBSimulationController(UshapeSim, EqualSubdomainsGeometry3D).run()
