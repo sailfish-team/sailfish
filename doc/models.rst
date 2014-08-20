@@ -32,7 +32,7 @@ Supported features and models
 |                           +----------------------------------------+
 |                           | shallow water                          |
 |                           +----------------------------------------+
-|                           | incompressible LBGK                    |
+|                           | incompressible LBGK [JCP98]            |
 +---------------------------+----------------------------------------+
 | other features            | round-off minimization model           |
 |                           +----------------------------------------+
@@ -64,10 +64,11 @@ Supported features and models
 |                           | 1D profiles of correlations of         |
 |                           | velocity components and density        |
 |                           +----------------------------------------+
-|                           | total kientic energy and enstrophy     |
+|                           | total kinetic energy and enstrophy     |
 +---------------------------+----------------------------------------+
 
 .. [PRE78] Contact line dynamics in binary lattice Boltzmann simulations, Phys. Rev. E 78, 056709 (2008). DOI: 10.1103/PhysRevE.78.056709
+.. [JPC98] He, Xiaoyi, Shiyi Chen, and Gary D. Doolen. "A novel thermal model for the lattice Boltzmann method in incompressible limit." Journal of Computational Physics 146.1 (1998): 282-300.
 
 Boundary conditions
 -------------------
