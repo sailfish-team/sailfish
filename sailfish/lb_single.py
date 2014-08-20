@@ -69,6 +69,7 @@ class LBFluidSim(LBSim):
         ctx['alpha_tolerance'] = self.config.alpha_tolerance
         ctx['alpha_output'] = self.alpha_output
         ctx['regularized'] = self.config.regularized
+        ctx['incompressible'] = self.config.incompressible
 
     def initial_conditions(self, runner):
         gpu_rho = runner.gpu_field(self.rho)
