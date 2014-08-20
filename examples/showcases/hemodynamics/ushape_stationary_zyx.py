@@ -29,6 +29,7 @@ class UshapeZyxSubdomain(ushape_base.UshapeSubdomain):
 
 class UshapeSim(ushape_base.UshapeBaseSim):
     subdomain = UshapeZyxSubdomain
+    lb_v = 0.05
 
     @classmethod
     def update_defaults(cls, defaults):
