@@ -1,5 +1,5 @@
 import unittest
-import common
+import converter
 import numpy as np
 
 config = {
@@ -11,7 +11,7 @@ config = {
 
 class CoordinateConversionTest(unittest.TestCase):
     def test_from_lb(self):
-        conv = common.CoordinateConverter(config)
+        conv = converter.CoordinateConverter(config)
         pos = [15, 5, 7]
         exp = [0.0, 0.0, 1.29]
 
@@ -20,10 +20,10 @@ class CoordinateConversionTest(unittest.TestCase):
                                1.0 / np.array(config['size'])))
 
     def test_to_lb(self):
-        conv = common.CoordinateConverter(config)
+        conv = converter.CoordinateConverter(config)
         pos = [0.0, 0.0, 1.29]
-        exp = [15, 5, 7]
-        self.assertEqual(exp, conv.to_lb(pos))
+        exp = [15, 6, 7]
+        self.assertEqual(exp, conv.to_lb(pos, round_=True))
 
 if __name__ == '__main__':
     unittest.main()
