@@ -14,7 +14,7 @@ from sailfish.lb_base import LBSim, LBForcedSim, ScalarField, VectorField, Kerne
 class LBFluidSim(LBSim):
     """Simulates a single fluid."""
 
-    kernel_file = "single_fluid.mako"
+    kernel_file = "models/lb_single_fluid.mako"
     alpha_output = False
     equilibria = sym_equilibrium.bgk_equilibrium,
 

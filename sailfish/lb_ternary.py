@@ -15,7 +15,7 @@ class LBTernaryFluidBase(LBSim):
     """Base class for ternary fluid simulations."""
 
     subdomain_runner = subdomain_runner.NNSubdomainRunner
-    kernel_file = 'ternary_fluid.mako'
+    kernel_file = 'models/lb_ternary_fluid.mako'
     nonlocality = 1
 
     def __init__(self, config):
@@ -234,7 +234,7 @@ class LBTernaryFluidShanChen(LBTernaryFluidBase, LBForcedSim):
         gpu_dist2b = runner.gpu_dist(1, 1)
         gpu_dist3a = runner.gpu_dist(2, 0)
         gpu_dist3b = runner.gpu_dist(2, 1)
-        
+
         options = 0
         if full_output:
             options |= 1

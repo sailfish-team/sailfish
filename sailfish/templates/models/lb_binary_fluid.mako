@@ -41,22 +41,22 @@
 	${const_var} float tau1_inv = 1.0f / ${tau_phi}f;
 %endif
 
-<%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
-<%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
+<%namespace file="../opencl_compat.mako" import="*" name="opencl_compat"/>
+<%namespace file="../kernel_common.mako" import="*" name="kernel_common"/>
 %if simtype == 'shan-chen':
-	<%namespace file="shan_chen.mako" import="*" name="shan_chen"/>
+	<%namespace file="../shan_chen.mako" import="*" name="shan_chen"/>
 	${kernel_common.body(bgk_args_decl_sc)}
 	${shan_chen.body()}
 %elif simtype == 'free-energy':
 	${kernel_common.body(bgk_args_decl_fe)}
 %endif
-<%namespace file="mako_utils.mako" import="*"/>
-<%namespace file="boundary.mako" import="*" name="boundary"/>
-<%namespace file="relaxation.mako" import="*" name="relaxation"/>
-<%namespace file="propagation.mako" import="*"/>
+<%namespace file="../mako_utils.mako" import="*"/>
+<%namespace file="../boundary.mako" import="*" name="boundary"/>
+<%namespace file="../relaxation.mako" import="*" name="relaxation"/>
+<%namespace file="../propagation.mako" import="*"/>
 
 %if simtype == 'free-energy':
-<%include file="finite_difference_optimized.mako"/>
+<%include file="../finite_difference_optimized.mako"/>
 %endif
 
 <%def name="init_dist_with_eq()">
@@ -372,4 +372,4 @@ ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
 <%include file="binary_shan_chen.mako"/>
 %endif  ## shan-chen
 
-<%include file="kernel_utils.mako"/>
+<%include file="../kernel_utils.mako"/>

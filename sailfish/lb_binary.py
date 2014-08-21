@@ -15,7 +15,7 @@ class LBBinaryFluidBase(LBSim):
     """Base class for binary fluid simulations."""
 
     subdomain_runner = subdomain_runner.NNSubdomainRunner
-    kernel_file = 'binary_fluid.mako'
+    kernel_file = 'models/lb_binary_fluid.mako'
     nonlocality = 1
 
     def __init__(self, config):

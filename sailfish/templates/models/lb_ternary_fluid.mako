@@ -28,17 +28,17 @@ ${const_var} float tau1_inv = 1.0f / ${tau_phi}f;
 ${const_var} float tau2 = ${tau_theta}f;
 ${const_var} float tau2_inv = 1.0f / ${tau_theta}f;
 
-<%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
-<%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
+<%namespace file="../opencl_compat.mako" import="*" name="opencl_compat"/>
+<%namespace file="../kernel_common.mako" import="*" name="kernel_common"/>
 %if simtype == 'shan-chen':
-	<%namespace file="shan_chen.mako" import="*" name="shan_chen"/>
+	<%namespace file="../shan_chen.mako" import="*" name="shan_chen"/>
 	${kernel_common.body(bgk_args_decl_sc)}
 	${shan_chen.body()}
 %endif
-<%namespace file="mako_utils.mako" import="*"/>
-<%namespace file="boundary.mako" import="*" name="boundary"/>
-<%namespace file="relaxation.mako" import="*" name="relaxation"/>
-<%namespace file="propagation.mako" import="*"/>
+<%namespace file="../mako_utils.mako" import="*"/>
+<%namespace file="../boundary.mako" import="*" name="boundary"/>
+<%namespace file="../relaxation.mako" import="*" name="relaxation"/>
+<%namespace file="../propagation.mako" import="*"/>
 
 <%def name="init_dist_with_eq()">
 	%for eq, dist_name in zip([f(g, config) for f, g in zip(equilibria, grids)], ['dist1_in', 'dist2_in', 'dist3_in']):
@@ -102,4 +102,4 @@ ${kernel} void SetInitialConditions(
 
 <%include file="ternary_shan_chen.mako"/>
 
-<%include file="kernel_utils.mako"/>
+<%include file="../kernel_utils.mako"/>
