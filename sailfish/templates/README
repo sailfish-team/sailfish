@@ -1,0 +1,8 @@
+File naming and organization convention:
+- files containing kernels for specific LB models should be
+  in the models/ subdirectory
+- main template files (used as kernel_file in the simulation class)
+  should be in the models/ subdirectory and should start with the
+  prefix 'lb_'
+- files containing mainly kernel code should start with the
+  prefix 'kernel_'
