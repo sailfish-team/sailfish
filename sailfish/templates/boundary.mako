@@ -3,7 +3,7 @@
     import sailfish.node_type as nt
 %>
 
-<%namespace file="code_common.mako" import="*"/>
+<%namespace file="mako_utils.mako" import="*"/>
 <%namespace file="propagation.mako" import="rel_offset,get_odist,set_odist"/>
 <%namespace file="utils.mako" import="*"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>

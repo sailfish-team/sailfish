@@ -4,7 +4,7 @@
 %>
 
 <%namespace file="utils.mako" import="*"/>
-<%namespace file="code_common.mako" import="*"/>
+<%namespace file="mako_utils.mako" import="*"/>
 <%namespace file="relaxation_common.mako" import="*"/>
 
 ## TODO: support multiple grids with MRT?

@@ -3,7 +3,7 @@
   import sympy
 %>
 
-<%namespace file="code_common.mako" import="*"/>
+<%namespace file="mako_utils.mako" import="*"/>
 
 ## Defines the actual acceleration vectors.
 <%def name="body_force(grid_idx=0, vector_decl=True)">

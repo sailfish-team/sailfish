@@ -3,7 +3,7 @@
 %>
 
 <%namespace file="utils.mako" import="get_field_loc,get_field_off"/>
-<%namespace file="code_common.mako" import="cex"/>
+<%namespace file="mako_utils.mako" import="cex"/>
 <%namespace file="kernel_common.mako" import="*"/>
 
 ## Declares and evaluate the Shan-Chen forces.

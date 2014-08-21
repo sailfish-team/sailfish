@@ -7,7 +7,7 @@
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="utils.mako" import="*"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
-<%namespace file="code_common.mako" import="*"/>
+<%namespace file="mako_utils.mako" import="*"/>
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 <%namespace file="propagation.mako" import="*"/>

@@ -3,7 +3,7 @@
 %>
 
 <%namespace file="kernel_common.mako" import="*"/>
-<%namespace file="code_common.mako" import="*"/>
+<%namespace file="mako_utils.mako" import="*"/>
 <%namespace file="opencl_compat.mako" import="*"/>
 
 ## Note: all code protected by periodic_[xyz] or periodicity is never

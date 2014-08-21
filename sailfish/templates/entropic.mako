@@ -3,7 +3,7 @@
 	from math import log
 %>
 
-<%namespace file="code_common.mako" import="*"/>
+<%namespace file="mako_utils.mako" import="*"/>
 
 // See PRL 97, 010201 (2006), Eq. 12 for form of coefficients.
 ${device_func} inline void ComputeACoeff(Dist* fi, Dist* fneq, float *a1,

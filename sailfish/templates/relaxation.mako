@@ -4,7 +4,7 @@
 %>
 
 <%page args="bgk_args_decl"/>
-<%namespace file="code_common.mako" import="*"/>
+<%namespace file="mako_utils.mako" import="*"/>
 <%namespace file="utils.mako" import="*"/>
 <%namespace file="relaxation_common.mako" import="*"/>
 

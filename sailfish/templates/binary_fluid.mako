@@ -37,11 +37,9 @@
 	${const_var} float tau0 = ${tau}f;		// relaxation time
 	${const_var} float tau0_inv = 1.0f / ${tau}f;
 	// Relaxation time for the 2nd fluid component.
-%else:
-	// Relaxation time for the order parameter field.
+	${const_var} float tau1 = ${tau_phi}f;
+	${const_var} float tau1_inv = 1.0f / ${tau_phi}f;
 %endif
-${const_var} float tau1 = ${tau_phi}f;
-${const_var} float tau1_inv = 1.0f / ${tau_phi}f;
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
@@ -52,7 +50,7 @@ ${const_var} float tau1_inv = 1.0f / ${tau_phi}f;
 %elif simtype == 'free-energy':
 	${kernel_common.body(bgk_args_decl_fe)}
 %endif
-<%namespace file="code_common.mako" import="*"/>
+<%namespace file="mako_utils.mako" import="*"/>
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 <%namespace file="propagation.mako" import="*"/>

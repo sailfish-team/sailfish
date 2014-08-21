@@ -4,7 +4,7 @@
 %>
 
 <%page args="bgk_args_decl"/>
-<%namespace file="code_common.mako" import="cex"/>
+<%namespace file="mako_utils.mako" import="cex"/>
 
 <%def name="kernel_args_1st_moment(name, const=False)">
 	${global_ptr} ${const_ptr if const else ''} float *__restrict__ ${name}x,
