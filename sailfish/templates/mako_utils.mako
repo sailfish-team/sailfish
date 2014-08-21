@@ -1,3 +1,6 @@
+## Mako helper functions. This file should not contain any code that is
+## rendered directly (i.e. not inside a Mako function).
+
 <%namespace file="propagation.mako" import="rel_offset"/>
 
 <%!
