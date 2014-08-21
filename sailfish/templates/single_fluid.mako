@@ -220,4 +220,4 @@ ${kernel} void CollideAndPropagate(
 	${propagate('dist_out', 'd0')}
 }
 
-<%include file="util_kernels.mako"/>
+<%include file="kernel_utils.mako"/>

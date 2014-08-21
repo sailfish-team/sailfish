@@ -372,4 +372,4 @@ ${kernel} void FreeEnergyCollideAndPropagateOrderParam(
 <%include file="binary_shan_chen.mako"/>
 %endif  ## shan-chen
 
-<%include file="util_kernels.mako"/>
+<%include file="kernel_utils.mako"/>

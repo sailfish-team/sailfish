@@ -102,4 +102,4 @@ ${kernel} void SetInitialConditions(
 
 <%include file="ternary_shan_chen.mako"/>
 
-<%include file="util_kernels.mako"/>
+<%include file="kernel_utils.mako"/>
