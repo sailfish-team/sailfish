@@ -54,7 +54,6 @@
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 <%namespace file="propagation.mako" import="*"/>
-<%namespace file="utils.mako" import="*"/>
 
 %if simtype == 'free-energy':
 <%include file="finite_difference_optimized.mako"/>

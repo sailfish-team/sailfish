@@ -2,8 +2,7 @@
 	from sailfish import sym
 %>
 
-<%namespace file="utils.mako" import="get_field_loc,get_field_off"/>
-<%namespace file="mako_utils.mako" import="cex"/>
+<%namespace file="mako_utils.mako" import="cex,get_field_loc,get_field_off"/>
 <%namespace file="kernel_common.mako" import="*"/>
 
 ## Declares and evaluate the Shan-Chen forces.

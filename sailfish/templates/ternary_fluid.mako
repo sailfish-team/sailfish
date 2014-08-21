@@ -39,7 +39,6 @@ ${const_var} float tau2_inv = 1.0f / ${tau_theta}f;
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 <%namespace file="propagation.mako" import="*"/>
-<%namespace file="utils.mako" import="*"/>
 
 <%def name="init_dist_with_eq()">
 	%for eq, dist_name in zip([f(g, config) for f, g in zip(equilibria, grids)], ['dist1_in', 'dist2_in', 'dist3_in']):

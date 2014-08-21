@@ -1,4 +1,4 @@
-<%namespace file="utils.mako" import="get_field_off,zero_gradient_at_boundaries"/>
+<%namespace file="mako_utils.mako" import="get_field_off,zero_gradient_at_boundaries"/>
 
 // More sophisticated finite difference formulas optimized to minimize spurious velocities
 // at the surface of a spherical drop.  Fomulas taken from:

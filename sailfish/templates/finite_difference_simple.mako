@@ -1,4 +1,4 @@
-<%namespace file="utils.mako" import="get_field_off,zero_gradient_at_boundaries"/>
+<%namespace file="mako_utils.mako" import="get_field_off,zero_gradient_at_boundaries"/>
 
 ${device_func} inline void laplacian_and_grad(${global_ptr} ${const_ptr} float *__restrict__ field, int fi, int i, float *laplacian, float *grad, int x, int y
 %if dim == 3:

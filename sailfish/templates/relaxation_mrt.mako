@@ -3,7 +3,6 @@
   import sailfish.node_type as nt
 %>
 
-<%namespace file="utils.mako" import="*"/>
 <%namespace file="mako_utils.mako" import="*"/>
 <%namespace file="relaxation_common.mako" import="*"/>
 

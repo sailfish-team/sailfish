@@ -5,7 +5,6 @@
 %>
 
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
-<%namespace file="utils.mako" import="*"/>
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
 <%namespace file="mako_utils.mako" import="*"/>
 <%namespace file="boundary.mako" import="*" name="boundary"/>

@@ -39,7 +39,6 @@ ${kernel_common.body(bgk_args_decl)}
 <%namespace file="boundary.mako" import="*" name="boundary"/>
 <%namespace file="relaxation.mako" import="*" name="relaxation"/>
 <%namespace file="propagation.mako" import="*"/>
-<%namespace file="utils.mako" import="*"/>
 
 <%def name="init_dist_with_eq()">
 	<% eq = equilibria[0](grid, config) %>

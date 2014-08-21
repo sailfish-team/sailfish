@@ -5,7 +5,6 @@
 
 <%page args="bgk_args_decl"/>
 <%namespace file="mako_utils.mako" import="*"/>
-<%namespace file="utils.mako" import="*"/>
 <%namespace file="relaxation_common.mako" import="*"/>
 
 %if model == 'mrt' and simtype == 'lbm':
