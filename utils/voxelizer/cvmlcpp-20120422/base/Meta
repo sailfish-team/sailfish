@@ -325,7 +325,7 @@ template < template<typename T, std::size_t D, typename Aux> class Array,
 void clear(Array<T, N, A> &matrix)
 {
 	std::array<std::size_t, N> zeros;
-	zeros.assign(0);
+	zeros.fill(0);
 	array_traits<Array, T, N, A>::resize(matrix, zeros.begin());
 	assert( (array_traits<Array, T, N, A>::size(matrix) == 0) );
 }
