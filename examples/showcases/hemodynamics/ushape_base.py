@@ -93,7 +93,10 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
         1241: 968,
         993: 768,
         795: 610,
-        398: 310
+        894: 697,
+        596: 465,
+        398: 310,
+        266: 204
     }
 
     @classmethod

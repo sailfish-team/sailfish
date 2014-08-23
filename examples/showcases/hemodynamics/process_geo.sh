@@ -2,7 +2,7 @@
 
 for i in geo/ushape_*.config; do
 	src=${i//.config/}
-	dst=${src//ushape/proc_ushape}
-	python process_geometry.py ${src} ${dst} zxy 200000
+	dst=${src//ushape/proc_ushape_zyx}
+	python process_geometry.py ${src} ${dst} zyx 200000
 	gzip ${dst}.npy
 done
