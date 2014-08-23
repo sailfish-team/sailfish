@@ -1,3 +1,4 @@
+from functools import partial
 import math
 import numpy as np
 import gzip
@@ -14,7 +15,7 @@ class InflowOutflowSubdomain(Subdomain3D):
     _flow_orient = D3Q19.vec_to_dir([0, 1, 0])
     oscillatory_amplitude = 0.1
     bc_velocity = NTRegularizedVelocity
-    bc_outflow = NTEquilibriumDensity
+    bc_outflow = partial(NTEquilibriumDensity, 1.0)
 
     # Location of the center of the inflow in physical coordinates, using
     # the original axis ordering of the mesh.
@@ -118,11 +119,12 @@ class InflowOutflowSubdomain(Subdomain3D):
                 orientation=self._flow_orient))
 
         if outlet is not None:
-            self.config.logger.info('.. setting outlet using the "%s" BC', self.bc_outflow.__name__)
             self._set_outlet(outlet, hx, hy, hz)
 
     def _set_outlet(self, outlet, hx, hy, hz):
-        self.set_node(outlet, self.bc_outflow(1.0, orientation=self._flow_orient))
+        bc = self.bc_outflow(orientation=self._flow_orient)
+        self.config.logger.info('.. setting outlet using the "%s" BC', bc.__class__.__name__)
+        self.set_node(outlet, bc)
 
     def initial_conditions(self, sim, hx, hy, hz):
         sim.rho[:] = 1.0
