@@ -1,3 +1,5 @@
+import math
+
 class CoordinateConverter(object):
     """Converts between physical coordinates and LB coordinates."""
 
@@ -93,6 +95,7 @@ class UnitConverter(object):
         if (self._lb_visc is None and self._lb_len is not None and
             self._lb_vel is not None):
             self._lb_visc = self._lb_len * self._lb_vel / self.Re
+            assert self._lb_visc <= 1.0/6.0
             return
 
         if (self._lb_len is None and self._lb_visc is not None and
