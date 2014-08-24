@@ -5,7 +5,7 @@
 <%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
 ${kernel_common.body(dummy)}
 <%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
-<%namespace file="code_common.mako" import="*"/>
+<%namespace file="mako_utils.mako" import="*"/>
 
 // Writes data to the node scratch space.
 ${kernel} void TestNodeScratchSpaceWrite(
