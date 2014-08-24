@@ -247,6 +247,11 @@ class GeoEncoderConst(GeoEncoder):
         for orig_code, new_code in self._type_id_remap.iteritems():
             self._type_choice_map[orig_code] = new_code
 
+        self.config.logger.debug('... type map is %s' % self._type_id_remap)
+        for k in self._type_id_remap.iterkeys():
+            self.config.logger.debug('... ID %d: %s' % (k,
+                                                        nt._NODE_TYPES[k].__name__))
+
         self._type_map[:] = self._encode_node(orientation,
                 self._encoded_param_map,
                 np.choose(np.int32(self._type_map), self._type_choice_map),
