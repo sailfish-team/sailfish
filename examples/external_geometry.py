@@ -45,8 +45,6 @@ class ExternalSimulation(LBFluidSim, LBForcedSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
         group.add_argument('--geometry', type=str, default='pipe.npy',
                            help='file defining the geometry')
 

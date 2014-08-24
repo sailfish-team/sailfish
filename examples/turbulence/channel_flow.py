@@ -173,9 +173,6 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
-        Vis2DSliceMixIn.add_options(group, dim)
         group.add_argument('--H', type=int, default=40, help='channel half-height')
         group.add_argument('--Re_tau', type=float, default=180.0, help='Re_tau')
 

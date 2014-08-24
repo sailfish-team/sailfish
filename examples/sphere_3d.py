@@ -50,11 +50,6 @@ class SphereSimulation(LBFluidSim, LBForcedSim):
     def modify_config(cls, config):
         config.periodic_x = True
 
-    @classmethod
-    def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
-
     def __init__(self, config):
         super(SphereSimulation, self).__init__(config)
         self.add_body_force((1e-5, 0.0, 0.0))

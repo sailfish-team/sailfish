@@ -58,8 +58,6 @@ class KidaSim(LBFluidSim, KineticEnergyEnstrophyMixIn):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
-
         # Parameters used to verify phase shift invariance.
         group.add_argument('--shift_x', type=int, default=0)
         group.add_argument('--shift_y', type=int, default=0)

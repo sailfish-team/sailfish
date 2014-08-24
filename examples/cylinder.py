@@ -54,9 +54,6 @@ class CylinderSimulation(LBFluidSim, LBForcedSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
-
         group.add_argument('--vertical', action='store_true')
 
     @classmethod

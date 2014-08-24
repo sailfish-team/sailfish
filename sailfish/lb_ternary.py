@@ -26,7 +26,6 @@ class LBTernaryFluidBase(LBSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBSim.add_options(group, dim)
         group.add_argument('--tau_phi', type=float, default=1.0,
                 help='relaxation time for the phase field 1 ')
         group.add_argument('--tau_theta', type=float, default=1.0,
@@ -194,9 +193,6 @@ class LBTernaryFluidShanChen(LBTernaryFluidBase, LBForcedSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBForcedSim.add_options(group, dim)
-        LBTernaryFluidBase.add_options(group, dim)
-
         group.add_argument('--visc', type=float, default=1.0, help='numerical viscosity')
         group.add_argument('--G11', type=float, default=0.0,
                 help='Shan-Chen component 1 self-interaction strength constant')

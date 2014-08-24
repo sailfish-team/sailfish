@@ -347,6 +347,7 @@ class SubdomainRunner(object):
         self.config.logger.debug("Initializing geometry.")
         self._init_shape()
         self._subdomain = self._sim.subdomain(self._global_size, self._spec, self._sim.grid)
+        self._log_required_memory()
         self._subdomain.allocate()
         self._subdomain.reset()
         self._output.set_fluid_map(self._subdomain.fluid_map())
@@ -501,6 +502,7 @@ class SubdomainRunner(object):
             self.lat_linear_dist.extend([self._lat_size[-3] - 1 - evs, evs])
             self.lat_linear_macro.extend([evs, self._lat_size[-3] - 1 - evs])
 
+    def _log_required_memory(self):
         # Compute the total memory required for the simulation and log it early
         # for easier debugging.
         total_dist_bytes = sum([self._get_dist_bytes(g) for g in self._sim.grids])

@@ -96,8 +96,6 @@ class TaylorGreenSim(LBFluidSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
-
         group.add_argument('--max_v', type=float, default=0.01,
                            help='Maximum velocity in LB units.')
         group.add_argument('--lambda_x', type=int, default=1)

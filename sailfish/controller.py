@@ -26,7 +26,7 @@ from multiprocessing import Process
 import zmq
 from sailfish import codegen, config, io, util
 from sailfish.geo import LBGeometry2D, LBGeometry3D
-from sailfish.lb_base import LBMixIn
+from sailfish.lb_base import LBMixIn, LBForcedSim
 from sailfish.subdomain import SubdomainPair
 
 def _start_machine_master(config, subdomains, lb_class):
@@ -414,19 +414,8 @@ class LBSimulationController(object):
                            'for purposes of standard deviation calculation.')
         group = self._config_parser.add_group('Simulation-specific settings')
 
-        lb_class.add_options(group, self.dim)
-        # If the simulation class does not define an add_options method
-        # explicitly and inherits from multiple base classes, call add_options
-        # from additional bases.
-        prior_add_options = False
         for base in lb_class.mro():
-            if 'add_options' in base.__dict__ and not prior_add_options:
-                prior_add_options = True
-                continue
-            # Call add_options for all mix-in subclasses.
-            if not issubclass(base, LBMixIn):
-                continue
-            if prior_add_options and 'add_options' in base.__dict__:
+            if 'add_options' in base.__dict__:
                 base.add_options(group, self.dim)
 
         group = self._config_parser.add_group('Geometry settings')

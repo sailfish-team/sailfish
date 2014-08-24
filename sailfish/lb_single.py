@@ -20,8 +20,6 @@ class LBFluidSim(LBSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBSim.add_options(group, dim)
-
         group.add_argument('--visc', type=float, default=1.0, help='numerical viscosity')
         group.add_argument('--incompressible',
                 action='store_true', default=False,
@@ -232,7 +230,6 @@ class LBFreeSurface(LBFluidSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
         group.add_argument('--gravity', type=float, default=0.001,
             help='gravitational acceleration')
 
@@ -254,8 +251,6 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
         group.add_argument('--G', type=float, default=1.0,
                 help='Shan-Chen interaction strength constant')
         group.add_argument('--sc_potential', type=str,
@@ -365,11 +360,6 @@ class LBIBMFluidSim(LBFluidSim, LBForcedSim):
     @property
     def num_particles(self):
         return len(self._particles)
-
-    @classmethod
-    def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
 
     def get_ibm_kernels(self, runner):
         gpu_v = runner.gpu_field(self.v)

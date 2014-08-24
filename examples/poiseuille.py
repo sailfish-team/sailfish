@@ -102,9 +102,6 @@ class PoiseuilleSim(LBFluidSim, LBForcedSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
-
         group.add_argument('--horizontal', type=bool, default=False,
                 help='simulate a horizontal flow (along the X axis)')
         group.add_argument('--stationary', type=bool, default=False,

@@ -166,9 +166,6 @@ class PoiseuilleSim(LBFluidSim, LBForcedSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
-        LBForcedSim.add_options(group, dim)
-
         group.add_argument('--flow_direction', type=str, default='x',
                 choices=['x', 'y', 'z'],
                 help='direction along which the fluid is to flow')
