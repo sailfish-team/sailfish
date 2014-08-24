@@ -4,13 +4,13 @@
     import sympy
 %>
 
-<%namespace file="opencl_compat.mako" import="*" name="opencl_compat"/>
-<%namespace file="kernel_common.mako" import="*" name="kernel_common"/>
-<%namespace file="mako_utils.mako" import="*"/>
-<%namespace file="boundary.mako" import="*" name="boundary"/>
-<%namespace file="relaxation.mako" import="*" name="relaxation"/>
-<%namespace file="propagation.mako" import="*"/>
-<%namespace file="shan_chen.mako" import="*" name="shan_chen"/>
+<%namespace file="../opencl_compat.mako" import="*" name="opencl_compat"/>
+<%namespace file="../kernel_common.mako" import="*" name="kernel_common"/>
+<%namespace file="../mako_utils.mako" import="*"/>
+<%namespace file="../boundary.mako" import="*" name="boundary"/>
+<%namespace file="../relaxation.mako" import="*" name="relaxation"/>
+<%namespace file="../propagation.mako" import="*"/>
+<%namespace file="../shan_chen.mako" import="*" name="shan_chen"/>
 
 <%def name="bgk_args_sc(grid_idx)">
 	g${grid_idx}m0, v, sca0
