@@ -1,5 +1,5 @@
 ## Code supporting the immersed bondary method.
-<%namespace file="utils.mako" import="*"/>
+<%namespace file="mako_utils.mako" import="*"/>
 <%namespace file="kernel_common.mako" import="kernel_args_1st_moment" />
 
 // Interpolates fluid velocity and updates particle positions.
