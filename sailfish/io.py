@@ -90,6 +90,9 @@ class VisualizationWrapper(LBOutput):
     def register_field(self, field, name, visualization=False):
         self._output.register_field(field, name, visualization)
 
+    def mask_nonfluid_nodes(self):
+        self._output.mask_nonfluid_nodes()
+
     def set_fluid_map(self, fluid_map):
         self._output.set_fluid_map(fluid_map)
 
