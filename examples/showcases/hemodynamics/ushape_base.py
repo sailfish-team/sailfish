@@ -124,7 +124,6 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
 
     @classmethod
     def add_options(cls, group, dim):
-        common.HemoSim.add_options(group, dim)
         group.add_argument('--midslice_every', type=int, default=0,
                 help='how often to save data from the middle of the '
                 'simulation domain')

@@ -167,7 +167,6 @@ class HemoSim(LBFluidSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
         group.add_argument('--geometry', type=str,
                            default='',
                            help='file defining the geometry')
