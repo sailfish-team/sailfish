@@ -317,7 +317,7 @@ class CanvasFrame(wx.Frame):
             self.plot = None
 
         if self.field.GetItems() != data['names']:
-            self.field.Set(data['names'])
+            self.field.SetItems(data['names'])
             self.field.SetValue(self.field.GetItems()[data['field']])
 
         # Update the color map. Keep max/min values to prevent "oscillating"
