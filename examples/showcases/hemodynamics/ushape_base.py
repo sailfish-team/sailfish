@@ -20,11 +20,6 @@ Geometry bounding box:
  Y: -0.0762:0.076239
  Z: -0.0127:0.0127
 
-Simulation dimensions (z, y, x order):
- X - flow direction in the bow area
- Y - inflow direction
- Z - depth
-
 Other physical parameters:
  - U_avg = 1.3111e-2 m/s
  - U_max = 2*U_avg
@@ -56,11 +51,11 @@ class UshapeSubdomain(common.InflowOutflowSubdomain):
         # This needs to cover both the boundary conditions case, where
         # hx, hy, hz can refer to ghost nodes, as well as the initial
         # conditions case where hx, hy, hz will not cover ghost nodes.
-        if np.min(hx) <= 0 and np.min(hy) <= 0:
-            inlet = np.logical_not(wall_map) & (hy == 0) & (hx < self.gx / 2)
+        if np.min(hy) <= 0 and np.min(hx) <= 0:
+            inlet = np.logical_not(wall_map) & (hx == 0) & (hy < self.gy / 2)
 
-        if np.max(hx) >= self.gx - 1 and np.min(hy) <= 0:
-            outlet = np.logical_not(wall_map) & (hy == 0) & (hx > self.gx / 2)
+        if np.max(hy) >= self.gy - 1 and np.min(hx) <= 0:
+            outlet = np.logical_not(wall_map) & (hx == 0) & (hy > self.gy / 2)
 
         return inlet, outlet
 
@@ -113,7 +108,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
             'subdomains': 1,
             'node_addressing': 'direct',
             'conn_axis': 'y',
-            'geometry': 'geo/proc_ushape_802_0.00125.npy.gz',
+            'geometry': 'geo/proc_ushape_800.npy.gz',
 
             # Start the simulation from a lower Reynolds numbers to
             # remove spurious oscillations. During the simulation, the
@@ -136,7 +131,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
         wall_map = cls.load_geometry(config.geometry)
 
         # Longest dimension determines configuration to use.
-        size = wall_map.shape[1]
+        size = wall_map.shape[2]
 
         if not config.base_name:
             config.base_name = 'results/re%d_ushape_%d_%s' % (
@@ -144,11 +139,11 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
 
         # Smooth out the wall.
         for i in range(1, cls.smooth[size]):
-            wall_map[:,i,:] = wall_map[:,0,:]
+            wall_map[:,:,i] = wall_map[:,:,0]
 
         # Make it symmetric.
-        hw = wall_map.shape[2] / 2
-        wall_map[:,:,-hw:] = wall_map[:,:,:hw][:,:,::-1]
+        hw = wall_map.shape[1] / 2
+        wall_map[:,-hw:,:] = wall_map[:,:hw,:][:,::-1,:]
 
         # Override lattice size based on the geometry file.
         config.lat_nz, config.lat_ny, config.lat_nx = wall_map.shape
@@ -158,6 +153,11 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
         config._wall_map = wall_map
 
     @classmethod
+    def get_diam(cls, config):
+        _, ys, _ = config._wall_map.shape
+        return 2.0 * np.sqrt(np.sum(np.logical_not(config._wall_map[:,:(ys/2),1])) / np.pi)
+
+    @classmethod
     def modify_config(cls, config):
         cls.set_walls(config)
         super(UshapeBaseSim, cls).modify_config(config)
@@ -165,8 +165,8 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
     def _get_midslice(self, runner):
         diam = int(runner._subdomain.inflow_rad / self.config._converter.dx * 2)
         wall_nonghost = self.config._wall_map[1:-1,1:-1,1:-1]
-        size = wall_nonghost.shape[2]
-        self.midslice = [slice(None), slice(-(diam + 10), None)]
+        size = wall_nonghost.shape[1]
+        self.midslice = [slice(None)]
         m = size / 2
         if size % 2 == 0:
             # Extracts a 2-node wide slice.
@@ -174,6 +174,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
         else:
             # Extracts a 3-node wide slice.
             self.midslice.append(slice(m - 1, m + 2))
+        self.midslice.append(slice(-(diam + 10), None))
         return wall_nonghost
 
     midslice = None

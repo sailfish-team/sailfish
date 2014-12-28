@@ -29,7 +29,7 @@ class InflowOutflowSubdomain(Subdomain3D):
     # the current subdomain. wall_map is the part of the global wall map
     # corresponding to the current subdomain (with ghosts).
     def _inflow_outflow(self, hx, hy, hz, wall_map):
-        return None, None
+        raise NotImplementedError
 
     def sym_velocity_profile(self, v, xm, ym, zm, diam):
         radius_sq = (diam / 2.0)**2
@@ -192,8 +192,7 @@ class HemoSim(LBFluidSim):
 
     @classmethod
     def get_diam(cls, config):
-        _, _, xs = config._wall_map.shape
-        return 2.0 * np.sqrt(np.sum(np.logical_not(config._wall_map[:,1,:(xs/2)])) / np.pi)
+        raise NotImplementedError
 
     @classmethod
     def modify_config(cls, config):

@@ -11,7 +11,6 @@ class UshapeSim(ushape_base.UshapeBaseSim):
         super(UshapeSim, cls).update_defaults(defaults)
         defaults.update({
             'velocity': 'constant',
-
             # For benchmarking, disable error checking.
         })
 
