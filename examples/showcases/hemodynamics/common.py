@@ -11,8 +11,8 @@ from sympy import sin
 import converter
 
 class InflowOutflowSubdomain(Subdomain3D):
-    # Vector pointing in the direction of the flow (y+).
-    _flow_orient = D3Q19.vec_to_dir([0, 1, 0])
+    # Vector pointing in the direction of the flow (x+).
+    _flow_orient = D3Q19.vec_to_dir([1, 0, 0])
     oscillatory_amplitude = 0.1
     bc_velocity = NTRegularizedVelocity
     bc_outflow = partial(NTEquilibriumDensity, 1.0)
