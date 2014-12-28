@@ -8,15 +8,21 @@ class CoordinateConverter(object):
 
         :param config: dictionary of settings from the .config file
         """
-        self.dx = []
         ax = config['axes']
         self.axes = [ax.index('x'), ax.index('y'), ax.index('z')]
 
+        # These fields are stored in the natural order (x, y, z) of the
+        # underlying geometry.
+        self.dx = []
         self.padding = []
         self.phys_min_x = []
 
-        for i, size in enumerate(config['size']):
+        for i, phys_size in enumerate(config['bounding_box']):
             self.padding.append(config['padding'][2 * i])
+
+            # Convert the natural index to physical LB order.
+            lb_i = 2 - i
+            size = config['size'][lb_i]
             size -= config['padding'][2 * i]
             size -= config['padding'][2 * i + 1]
 
@@ -24,7 +30,6 @@ class CoordinateConverter(object):
             phys_size = config['bounding_box'][i]
 
             if 'cuts' in config:
-                # -2 to get rid of padding
                 size += config['cuts'][i][0] + config['cuts'][i][1]
 
             dx = (phys_size[1] - phys_size[0]) / size
@@ -34,20 +39,24 @@ class CoordinateConverter(object):
             else:
                 self.phys_min_x.append(phys_size[0])
 
-
+    # Physical coordinates are always given in natural order (x, y, z).
+    # The return value is in physical LB order.
     def to_lb(self, phys_pos, round_=True):
         lb_pos = [0, 0, 0]
         for i, phys_x in enumerate(phys_pos):
-            lb_pos[self.axes[i]] = (self.padding[i] + (phys_x - self.phys_min_x[i]) / self.dx[i])
+            lb_pos[2 - self.axes[i]] = (self.padding[i] + (phys_x - self.phys_min_x[i]) / self.dx[i])
 
         if round_:
             lb_pos = [int(round(x)) for x in lb_pos]
         return lb_pos
 
+    # lb_pos is in physical LB order.
+    # The return value is in natural order (x, y, z) for the underlying
+    # geometry.
     def from_lb(self, lb_pos):
         phys_pos = [0, 0, 0]
         for i, lb_x in enumerate(lb_pos):
-            i = self.axes.index(i)
+            i = self.axes.index(2 - i)
             phys_pos[i] = (self.dx[i] * (lb_x - self.padding[i]) + self.phys_min_x[i])
         return phys_pos
 

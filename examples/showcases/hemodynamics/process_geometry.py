@@ -8,11 +8,11 @@ Usage:
 Expects in.config and in.npy to be present.
 Arguments:
   out: base filename for outputs
-  axes: a string such 'xyz' indicating the target axis order (original order
+  axes: a string such as 'xyz' indicating the target axis order (original order
         is 'xyz')
   exp: a sequence of 6 digits (two per axis), indicating the expected
-       number of outlets/inlets, e.g. 012000; order is xyz, prior to axes
-       reshuffling
+       number of outlets/inlets, e.g. 012000; order is the same as the original
+       order of axes, prior to any reshuffling
 """
 
 import gzip
@@ -26,7 +26,7 @@ if len(sys.argv) < 5:
     print 'Usage: ./process_geometry.py <in> <out> <axes> <exp>'
     sys.exit(0)
 
-fname_in, fname_out, axes, exp = sys.argv[1:5]
+fname_in, fname_out, axes, expected_io = sys.argv[1:5]
 
 config = json.load(open(fname_in + '.config', 'r'))
 if os.path.exists(fname_in + '.npy.gz'):
@@ -38,7 +38,7 @@ fluid = np.logical_not(geo)
 def make_slice(axis, pos):
     ret = []
     for i in range(0, 3):
-        if axis == i:
+        if 2 - axis == i:
             ret.append(pos)
         else:
             ret.append(slice(None))
@@ -49,12 +49,14 @@ def make_slice(axis, pos):
 padding = []
 slices = []
 cuts = [[0,0], [0,0], [0,0]]
-idx = 0
+io_idx = 0
+
+# Iterate over the natural axes (x, y, z).
 for axis in range(0, 3):
     # Scan lower end of the current axis.
-    outlets = int(exp[idx])
+    outlets = int(expected_io[io_idx])
     if outlets > 0:
-        for i in range(0, geo.shape[axis]):
+        for i in range(0, geo.shape[2 - axis]):
             tmp = fluid[make_slice(axis, i)]
             if np.sum(tmp) == 0:
                 continue
@@ -70,17 +72,17 @@ for axis in range(0, 3):
         padding.append(1)   # geometry already has 1 node of padding
 
     # Scan higher end of the current axis.
-    idx += 1
-    outlets = int(exp[idx])
+    io_idx += 1
+    outlets = int(expected_io[io_idx])
     if outlets > 0:
-        for i in range(1, geo.shape[axis]):
+        for i in range(1, geo.shape[2 - axis]):
             tmp = fluid[make_slice(axis, geo.shape[axis] - i)]
             if np.sum(tmp) == 0:
                 continue
             _, num = ndimage.label(tmp)
             if outlets == num:
                 padding.append(0)
-                end = geo.shape[axis] - i + 1
+                end = geo.shape[2 - axis] - i + 1
                 # -1 to account for padding
                 cuts[axis][1] = i - 1
                 break
@@ -89,15 +91,20 @@ for axis in range(0, 3):
         padding.append(1)   # geometry already has 1 node of padding
 
     slices.append(slice(start, end))
-    idx += 1
+    io_idx += 1
 
 # Discard envelope if necessary,
-geo = geo[slices]
+geo = geo[list(reversed(slices))]
 
 # Start building a new config file.
+
+# Size is stored in the physical order corresponding to how data in the
+# underlying array is laid out.
 config['size'] = geo.shape
-config['padding'] = padding
+# The axes positions, as well as the fields below, use the natural axis order
+# -- xyz. This is the  opposite of the storage order in the LB arrays.
 config['axes'] = axes
+config['padding'] = padding
 config['cuts'] = cuts
 
 name_to_idx = {'x': 0, 'y': 1, 'z': 2}

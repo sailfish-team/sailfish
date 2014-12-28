@@ -108,7 +108,7 @@ class InflowOutflowSubdomain(Subdomain3D):
         self.set_node(wall_map, NTFullBBWall)
         if inlet is not None:
             (zm, ym, xm), diam = self._velocity_params(hx, hy, hz, wall_map)
-            self.config.logger.info('.. setting inlet, center at (%d, %d, %d), diam=%f',
+            self.config.logger.info('.. setting inlet, center at (x=%d, y=%d, z=%d), diam=%f',
                                     xm, ym, zm, diam)
             self.config.logger.info('.. using the "%s" velocity profile',
                                     self.config.velocity)
