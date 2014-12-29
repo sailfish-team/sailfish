@@ -17,7 +17,7 @@ class UshapeSim(ushape_base.UshapeBaseSim, ushape_base.DynamicViscosity):
 
     @classmethod
     def modify_config(cls, config):
-        ushape_base.UshapeBaseSim.modify_config(config)
+        super(UshapeSim, cls).modify_config(config)
         # At 10k iterations, lower viscosity to reach Re = 1k. This is
         # necessary for the simulation to remain stable. Starting at Re = 1k
         # does not work since the initial conditions are very far from

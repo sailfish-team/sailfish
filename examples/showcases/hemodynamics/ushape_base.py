@@ -78,7 +78,7 @@ class DynamicViscosity(LBMixIn):
 class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
     subdomain = UshapeSubdomain
     phys_diam = 2.54e-2     # meters
-    lb_v = 0.001            # for oscillatory flow
+    lb_v = None             # for oscillatory flow, use 0.001
 
     @classmethod
     def update_defaults(cls, defaults):
