@@ -342,6 +342,8 @@ class LBMachineMaster(object):
                     ' Make sure pycuda/pyopencl is installed.')
             return
 
+        self.config.logger.info('Selected backend: {0}'.format(backend_cls.name))
+
         if self.config.debug_single_process:
             assert len(self.subdomain_specs) == 1, ('Only a single subdomain can be'
                     'simulated in the single process mode.')
