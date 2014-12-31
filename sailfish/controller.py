@@ -285,7 +285,7 @@ class LBSimulationController(object):
             type=int, default=0)
         group.add_argument('--perf_stats_every',
                            help='how often to display performance stats',
-                           metavar='N', type=int, default=0)
+                           metavar='N', type=int, default=1000)
         group.add_argument('--max_iters',
             help='number of iterations to run; use 0 to run indefinitely',
             type=int, default=0)
@@ -399,7 +399,7 @@ class LBSimulationController(object):
         group.add_argument('--final_checkpoint', action='store_true',
                 default=False, help='Generates a checkpoint after the simulation '
                 'is completed.')
-        group.add_argument('--checkpoint_every', type=int, default=100,
+        group.add_argument('--checkpoint_every', type=int, default=0,
                 metavar='N', help='Generates a checkpoint every N steps.')
         group.add_argument('--checkpoint_from', type=int, default=0,
                 metavar='N', help='Starts generating checkpoints after N '

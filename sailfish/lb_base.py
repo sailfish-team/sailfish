@@ -250,8 +250,9 @@ class LBSim(object):
         """Returns True when a checkpoint is requested after the current
         iteration."""
 
-        return ((self.iteration % self.config.checkpoint_every) == 0 and
-            self.iteration >= self.config.checkpoint_from)
+        return (self.config.checkpoint_every > 0 and
+                (self.iteration % self.config.checkpoint_every) == 0 and
+                self.iteration >= self.config.checkpoint_from)
 
     def before_main_loop(self, runner):
         """Called from the subdomain runner before entering the main loop
