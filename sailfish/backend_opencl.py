@@ -82,6 +82,13 @@ class OpenCLBackend(object):
     def alloc_async_host_buf(self, shape, dtype):
         """Allocates a buffer that can be used for asynchronous data
         transfers."""
+        return np.zeros(shape, dtype=dtype)
+
+        # Note: it looks like as of mid 2014, PyOpenCL no longer allows the use
+        # of ALLOC_HOST_PTR. For now, we just return a standard numpy array,
+        # which however will not be page-locked and thus performance might
+        # suffer.
+
         mf = cl.mem_flags
         # OpenCL does not offer direct control over how memory is allocated,
         # but ALLOC_HOST_PTR is supposed to prefer pinned memory.
@@ -190,7 +197,7 @@ class OpenCLBackend(object):
 
     def make_stream(self):
         return StreamWrapper(cl.CommandQueue(self.ctx,
-            properties=cl.command_queue_properties.PROFILING_ENABLE))
+                properties=cl.command_queue_properties.PROFILING_ENABLE))
 
     def make_event(self, stream, timing=False):
         return EventWrapper(cl.enqueue_marker(stream.queue))
@@ -229,7 +236,7 @@ class StreamWrapper(object):
         self.queue = cmd_queue
 
     def wait_for_event(self, event):
-        cl.enqueue_wait_for_events(self.queue, [event.event])
+        cl.enqueue_marker(self.queue, [event.event])
 
     def synchronize(self):
         self.queue.finish()
