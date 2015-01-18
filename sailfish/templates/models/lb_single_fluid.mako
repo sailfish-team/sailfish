@@ -172,7 +172,8 @@ ${kernel} void CollideAndPropagate(
 	${force_field_if_required()}
 	)
 {
-	${local_indices_split()}
+  ${cond(barrier_needs_all_threads, 'bool alive = true;')}
+	${local_indices_split(barriers=True)}
 	${indirect_index()}
 	${shared_mem_propagation_vars()}
 	${load_node_type()}
@@ -180,7 +181,7 @@ ${kernel} void CollideAndPropagate(
 
 	// Cache the distributions in local variables
 	Dist d0;
-	if (!isPropagationOnly(type)) {
+	if (!isPropagationOnly(type) ${cond(barrier_needs_all_threads, '&& alive')}) {
 		getDist(
 			${nodes_array_arg_if_required()}
 			&d0, dist_in, gi

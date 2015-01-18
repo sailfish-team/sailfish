@@ -4,7 +4,7 @@
 %>
 
 <%page args="bgk_args_decl"/>
-<%namespace file="mako_utils.mako" import="cex"/>
+<%namespace file="mako_utils.mako" import="cex,cond"/>
 
 <%def name="kernel_args_1st_moment(name, const=False)">
 	${global_ptr} ${const_ptr if const else ''} float *__restrict__ ${name}x,
@@ -80,7 +80,7 @@
 
 ## Defines local indices for kernels that do not distinguish between
 ## bulk and boundary regions.
-<%def name="local_indices(no_outside=True)">
+<%def name="local_indices(no_outside=True, barriers=False)">
 	int lx = get_local_id(0);	// ID inside the current block
 	%if dim == 2:
 		int gx = get_global_id(0);
@@ -105,7 +105,11 @@
 	%if no_outside:
 		// Nothing to do if we're outside of the simulation domain.
 		if (gx > ${lat_nx-1}) {
-			return;
+      %if barrier_needs_all_threads and barriers:
+        alive = false;
+      %else:
+        return;
+      %endif
 		}
 	%endif
 </%def>
@@ -116,7 +120,7 @@
 ## Args:
 ##  no_outside: if True, will call 'return' in case the indices end up pointing
 ##              outside of the simulation domain
-<%def name="local_indices_split(no_outside=True)">
+<%def name="local_indices_split(no_outside=True, barriers=False)">
 	%if boundary_size > 0:
 		unsigned int gx, gy, lx, gi;
 		%if dim == 3:
@@ -129,7 +133,7 @@
 			${local_indices_boundary(no_outside=no_outside)}
 		}
 	%else:
-		${local_indices(no_outside=no_outside)}
+		${local_indices(no_outside=no_outside, barriers=barriers)}
 	%endif
 </%def>
 
@@ -189,8 +193,9 @@
 	int type = decodeNodeType(ncode);
 
 	// Unused nodes do not participate in the simulation.
-	if (isExcludedNode(type))
-		return;
+	if (isExcludedNode(type)) {
+		${cond(barrier_needs_all_threads, 'alive = false', 'return')};
+  }
 
 	int orientation = decodeNodeOrientation(ncode);
 </%def>

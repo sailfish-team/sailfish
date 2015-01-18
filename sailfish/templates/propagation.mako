@@ -301,7 +301,7 @@
 		${barrier()}
 	%endif
 
-	if (!propagation_only) {
+	if (!propagation_only ${cond(barrier_needs_all_threads, '&& alive')}) {
 		// Update the 0-th direction distribution
 		${dist_out}[gi] = ${dist_in}.fC;
 
@@ -333,7 +333,7 @@
 
 	// Save locally propagated distributions into global memory.
 	// The leftmost thread is not updated in this block.
-	if (lx > 0 && gx < ${lat_nx} && !propagation_only)
+	if (lx > 0 && gx < ${lat_nx} && !propagation_only ${cond(barrier_needs_all_threads, '&& alive')})
 	%if propagation_sentinels:
 		if (prop_${first_prop_dist}[lx] != -1.0f)
 	%endif
@@ -349,7 +349,7 @@
 
 	${barrier()}
 
-	if (!propagation_only) {
+	if (!propagation_only ${cond(barrier_needs_all_threads, '&& alive')}) {
 		// W propagation in shared memory
 		// Note: propagation to ghost nodes is done directly in global memory as there
 		// are no threads running for the ghost nodes.
@@ -372,7 +372,7 @@
 	${barrier()}
 
 	// The rightmost thread is not updated in this block.
-	if (lx < ${block_size-1} && gx < ${lat_nx-1} && !propagation_only)
+	if (lx < ${block_size-1} && gx < ${lat_nx-1} && !propagation_only ${cond(barrier_needs_all_threads, '&& alive')})
 	%if propagation_sentinels:
 		if (prop_${first_prop_dist}[lx] != -1.0f)
 	%endif
