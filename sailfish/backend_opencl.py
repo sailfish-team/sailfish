@@ -215,6 +215,7 @@ class OpenCLBackend(object):
             'const_ptr': '',
             'device_func': '',
             'const_var': '__constant',
+            'barrier_needs_all_threads': True,
         }
 
     def sync_stream(self, *streams):
