@@ -9,6 +9,7 @@ import cPickle as pickle
 import math
 import operator
 import os
+import platform
 import signal
 import time
 import numpy as np
@@ -1506,6 +1507,8 @@ class SubdomainRunner(object):
         self._checkpoint_req = 2
 
     def _install_signal_handlers(self):
+        if platform.system() == 'Windows':
+            return
         signal.signal(signal.SIGHUP, self.sighup_handler)
 
     def run(self):
