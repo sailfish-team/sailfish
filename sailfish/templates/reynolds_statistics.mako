@@ -15,10 +15,10 @@
 ##
 ## Velocity component correlations can be used to compute the Reynolds stress components:
 ##  <u_i u_j> = <(u_i* + u_i') (u_j* + u_j')> =
-##   = u_i* u_j* +			# known from single variable profiles: <u_i> * <u_j>
-##	   u_i* <u_j'> +		# = 0 since <u_j'> = 0
-##	   u_j* <u_i'> +		# = 0 since <u_i'> = 0
-##	   <u_i' u_j'>			# Reynolds stress components
+##   = u_i* u_j* +      # known from single variable profiles: <u_i> * <u_j>
+##     u_i* <u_j'> +    # = 0 since <u_j'> = 0
+##     u_j* <u_i'> +    # = 0 since <u_i'> = 0
+##     <u_i' u_j'>      # Reynolds stress components
 ##
 ## where the star indicates the mean values.
 
