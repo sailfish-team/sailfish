@@ -788,5 +788,6 @@ class LBSimulationController(object):
         subdomain_specs = proc.transform(self.config)
         self.save_subdomain_config(subdomain_specs)
 
+        self.config.cmdline = ' '.join(sys.argv)
         self._start_simulation(subdomain_specs)
         return self._finish_simulation(subdomain_specs, summary_receiver)
