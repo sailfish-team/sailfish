@@ -182,6 +182,9 @@ class HemoSim(LBFluidSim):
         group.add_argument('--errors_every', type=int, default=0,
                            help='Number of iterations between data collection '
                            'used to calculate errors.')
+        group.add_argument('--errors_reference', type=str, default='',
+                           help='Reference fields against which errors will be '
+                           'calculated.')
 
     @classmethod
     def load_geometry(cls, fname):
@@ -225,6 +228,14 @@ class HemoSim(LBFluidSim):
         geo_config = json.load(open(geo_config_fn, 'r'))
         config._coord_conv = converter.CoordinateConverter(geo_config)
 
+    def __init__(self, config):
+        super(HemoSim, self).__init__(config)
+        if self.config.errors_reference:
+            self.config.logger.info('Loading reference data for error calculation.')
+            data = np.load(self.config.errors_reference)
+            self.prev_v = data['v']
+            self.prev_rho = data['rho']
+
     prev_rho = None
     prev_v = None
     def track_errors(self, runner):
@@ -260,8 +271,9 @@ class HemoSim(LBFluidSim):
             else:
                 self.config.logger.info('total fluid nodes: %d' % nodes)
 
-            self.prev_rho = self.rho.copy()
-            self.prev_v = (self.vx.copy(), self.vy.copy(), self.vz.copy())
+            if not self.config.errors_reference:
+                self.prev_rho = self.rho.copy()
+                self.prev_v = (self.vx.copy(), self.vy.copy(), self.vz.copy())
 
     def after_step(self, runner):
         if self.config.errors_every > 0:
