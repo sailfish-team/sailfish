@@ -8,3 +8,12 @@ for i in geo/ushape_*.config; do
 	python process_geometry.py ${src} ${dst} xyz 200000
 	gzip ${dst}.npy
 done
+
+# Process ICA geometry.
+# TODO: reorder axes to keep X longest (currently Y, Z, X in descending length)
+for i in geo/c0006_*.config; do
+	src=${i//.config/}
+	dst=${src//c0006/proc_c0006}
+	python process_geometry.py ${src} ${dst} xyz 011000
+	gzip ${dst}.npy
+done
