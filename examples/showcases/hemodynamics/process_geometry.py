@@ -76,7 +76,7 @@ for axis in range(0, 3):
     outlets = int(expected_io[io_idx])
     if outlets > 0:
         for i in range(1, geo.shape[2 - axis]):
-            tmp = fluid[make_slice(axis, geo.shape[axis] - i)]
+            tmp = fluid[make_slice(axis, geo.shape[2 - axis] - i)]
             if np.sum(tmp) == 0:
                 continue
             _, num = ndimage.label(tmp)
