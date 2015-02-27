@@ -144,7 +144,8 @@ class LBSim(object):
         sources = [self]
         # Scan for mixin classes adding their own fields.
         for c in self.__class__.mro()[1:]:
-            if issubclass(c, LBMixIn) and hasattr(c, 'fields'):
+            if (issubclass(c, LBMixIn) and hasattr(c, 'fields') and
+                not issubclass(c, LBSim)):
                 sources.append(c)
 
         for src in sources:
@@ -163,6 +164,8 @@ class LBSim(object):
                 else:
                     assert False, 'Invalid field type %s' % type(field)
                 setattr(self, field.name, f)
+                assert field.name not in self._fields,\
+                        'Field %s defined more than once.' % field.name
                 self._fields[field.name] = FieldPair(field, f)
 
     def count_fields(self, runner):
@@ -171,7 +174,8 @@ class LBSim(object):
         vector = 0
         # Scan for mixin classes adding their own fields.
         for c in self.__class__.mro()[1:]:
-            if issubclass(c, LBMixIn) and hasattr(c, 'fields'):
+            if (issubclass(c, LBMixIn) and hasattr(c, 'fields') and
+                not issubclass(c, LBSim)):
                 sources.append(c)
 
         for src in sources:
