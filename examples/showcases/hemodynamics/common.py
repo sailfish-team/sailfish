@@ -13,6 +13,7 @@ import converter
 class InflowOutflowSubdomain(Subdomain3D):
     # Vector pointing in the direction of the flow (x+).
     _flow_orient = D3Q19.vec_to_dir([1, 0, 0])
+    _outlet_orient = D3Q19.vec_to_dir([1, 0, 0])
     oscillatory_amplitude = 0.1
     bc_velocity = NTRegularizedVelocity
     bc_outflow = partial(NTEquilibriumDensity, 1.0)
@@ -122,7 +123,7 @@ class InflowOutflowSubdomain(Subdomain3D):
             self._set_outlet(outlet, hx, hy, hz)
 
     def _set_outlet(self, outlet, hx, hy, hz):
-        bc = self.bc_outflow(orientation=self._flow_orient)
+        bc = self.bc_outflow(orientation=self._outlet_orient)
         self.config.logger.info('.. setting outlet using the "%s" BC', bc.__class__.__name__)
         self.set_node(outlet, bc)
 
@@ -144,8 +145,8 @@ class InflowOutflowSubdomain(Subdomain3D):
 
 class HemoSim(LBFluidSim):
     phys_visc = 3.33e-6
-    phys_diam = 0.0  # Set in a subclass.
-    phys_freq = 1.0  # NOT angular frequency.
+    phys_diam = None   # Set in a subclass.
+    phys_freq = 1.0    # NOT angular frequency.
     lb_v = 0.025
 
     @classmethod
