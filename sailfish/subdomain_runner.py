@@ -382,8 +382,11 @@ class SubdomainRunner(object):
         grid_nx = int(math.ceil(float(self._spec.actual_size[0]) / bs)) * bs
         self._code_context['grid_nx'] = grid_nx
 
-        self.config.logger.debug('Effective lattice size is: {0}'.format(
-            list(reversed(self._physical_size))))
+        self.config.logger.debug('Effective lattice size is: {0}. Access '
+                                 'pattern: {1} ({2})'.format(
+            list(reversed(self._physical_size)),
+            self.config.access_pattern,
+            self.config.node_addressing))
 
         # CUDA block/grid size for standard kernel call.
         self._kernel_block_size = (bs, 1)
@@ -816,7 +819,7 @@ class SubdomainRunner(object):
         # Mark all nodes as invalid.
         addr[:] = self.INVALID_NODE
         self._host_indirect_address = addr
-        addr[self._subdomain.active_node_mask] = np.arange(self._subdomain.active_nodes)
+        addr[self._subdomain.active_node_mask] = np.arange(self._subdomain.active_nodes, dtype=np.uint32)
         self._gpu_indirect_address = self.backend.alloc_buf(like=self._field_base[id(addr.base)])
 
     def _init_gpu_data_indirect(self):
