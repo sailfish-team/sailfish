@@ -379,17 +379,19 @@ class Subdomain(object):
         self._seen_types = set([0])
         self._needs_orientation = False
 
-        # A dense boolean array indicaing which nodes are active in the
+        # A dense boolean array indicating which nodes are active in the
         # simulation (marked as True). This is only used in the indirect
         # addressing node. This array covers all nodes, including ghosts.
         self.active_node_mask = None
 
-    def allocate(self):
-        runner = self.spec.runner
         if self.spec.runner.config.node_addressing == 'indirect':
+            self.config.logger.debug('Loading active node map..')
             self.load_active_node_map(*self._get_mgrid_base(self.config))
             self.spec.runner.config.logger.info('Fill ratio is: %0.2f%%' %
                     (self.active_nodes / float(self.spec.num_actual_nodes) * 100))
+
+    def allocate(self):
+        runner = self.spec.runner
         self._type_map_ghost, self._sparse_type_map = runner.make_scalar_field(np.uint32, register=False, nonghost_view=False)
         self._type_map = self._type_map_ghost[self.spec._nonghost_slice]
         self._type_map_base = runner.field_base(self._type_map_ghost)
@@ -457,7 +459,8 @@ class Subdomain(object):
             True indicates a solid node not participating in the simulation.
             These nodes would typically be set to NTFullBBWall or similar.
         """
-        fluid_map = np.logical_not(wall_map)
+        self.config.logger.debug('... setting active node map from wall map')
+        fluid_map = np.logical_not(wall_map).astype(np.uint8)
         # Build a convolution kernel to count active neighbor nodes.
         if self.dim == 3:
             neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
@@ -470,8 +473,7 @@ class Subdomain(object):
 
         # Mark nodes connected to at least one active node as active.
         # We need these nodes for walls and ghost nodes.
-        where = (filters.convolve(fluid_map.astype(np.uint8),
-                                  neighbors, mode='wrap') > 0)
+        where = (filters.convolve(fluid_map, neighbors, mode='wrap') > 0)
         fluid_map[where] = True
         self.active_node_mask = fluid_map
 
@@ -485,7 +487,7 @@ class Subdomain(object):
     @util.lazy_property
     def num_fluid_nodes(self):
         if self.active_node_mask is not None:
-            return active_nodes
+            return self.active_nodes
         else:
             return np.sum(self.fluid_map())
 
