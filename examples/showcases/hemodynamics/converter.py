@@ -168,4 +168,4 @@ class UnitConverter(object):
         return ('Re:%.2f  Wo:%.2f  visc:%.3e  vel:%.3e  len:%.3e  T:%d  '
                 'dx:%.4e  dt:%.4e' % (
                     self.Re_lb, self.Womersley_lb, self.visc_lb, self.velocity_lb,
-                    self.len_lb, 1.0 / self.freq_lb, self.dx, self.dt))
+                    self.len_lb, int(1.0 / self.freq_lb), self.dx, self.dt))
