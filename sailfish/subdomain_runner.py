@@ -266,20 +266,15 @@ class SubdomainRunner(object):
             dtype = self.float
 
         if async:
-            buf = self.backend.alloc_async_host_buf(self.num_phys_nodes, dtype=dtype)
+            field = self.backend.alloc_async_host_buf(self._physical_size, dtype=dtype)
         else:
-            buf = np.zeros(self.num_phys_nodes, dtype=dtype)
-
-        strides = self._get_strides(dtype)
-        field = np.ndarray(self._physical_size, buffer=buf,
-                           dtype=dtype, strides=strides)
+            field = np.zeros(self._physical_size, dtype=dtype)
 
         # Initialize floating point fields to inf to help surfacing problems
         # with uninitialized nodes.
         if dtype == self.float:
             field[:] = np.inf
 
-        assert field.base is buf
         if nonghost_view:
             fview = field[self._spec._nonghost_slice]
         else:
@@ -289,8 +284,8 @@ class SubdomainRunner(object):
         if gpu_array:
             self._array_fields.add(id(fview.base))
 
-        # Prior to numpy 1.7.0, the base was field (first element up the chain).
-        assert fview.base is buf or fview.base is field
+        # Make sure that no copy was created.
+        assert fview.base is field.base or fview.base is field
 
         # Zero the non-ghost part of the field.
         fview[:] = 0
@@ -522,12 +517,6 @@ class SubdomainRunner(object):
                              (scalar + self.dim * vector) * self.float().nbytes)
         self.config.logger.info('. fields: %d MiB' %
                                 (total_field_bytes / 1024 / 1024))
-
-    def _get_strides(self, type_):
-        """Returns a list of strides for the NumPy array storing the lattice."""
-        t = type_().nbytes
-        return list(reversed(reduce(lambda x, y: x + [x[-1] * y],
-                self._physical_size[-1:0:-1], [t])))
 
     @property
     def num_phys_nodes(self):
