@@ -460,7 +460,7 @@ class Subdomain(object):
             These nodes would typically be set to NTFullBBWall or similar.
         """
         self.config.logger.debug('... setting active node map from wall map')
-        fluid_map = np.logical_not(wall_map).astype(np.uint8)
+        fluid_map = np.logical_not(wall_map)
         # Build a convolution kernel to count active neighbor nodes.
         if self.dim == 3:
             neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
@@ -473,7 +473,7 @@ class Subdomain(object):
 
         # Mark nodes connected to at least one active node as active.
         # We need these nodes for walls and ghost nodes.
-        where = (filters.convolve(fluid_map, neighbors, mode='wrap') > 0)
+        where = (filters.convolve(fluid_map.astype(np.uint8), neighbors, mode='wrap') > 0)
         fluid_map[where] = True
         self.active_node_mask = fluid_map
 

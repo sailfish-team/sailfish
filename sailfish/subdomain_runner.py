@@ -278,13 +278,14 @@ class SubdomainRunner(object):
         if nonghost_view:
             fview = field[self._spec._nonghost_slice]
         else:
-            fview = field
+            fview = field.view()
         self._field_base[id(fview.base)] = field
 
         if gpu_array:
             self._array_fields.add(id(fview.base))
 
         # Make sure that no copy was created.
+        assert fview.base is not None
         assert fview.base is field.base or fview.base is field
 
         # Zero the non-ghost part of the field.
