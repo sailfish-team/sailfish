@@ -25,3 +25,11 @@ In order to prepare the geometries for use, you need to run the process_geometry
 script, e.g.:
 
 python process_geometry.py geo/ushape_402_0.0025 geo/proc_ushape_402 zxy 200000
+
+The profiles directory contains velocity profiles extracted from FIXME:
+
+ - ica_ford_profile.orig: original file with two cycles
+ - ica_ford_profile.dat: single cycle extracted out of the orig file
+ - ica_ford_profile_uniform_lin_int.dat: single cycle, with data points resampled
+   with a constant time step (using linear interpolation between original data
+   points)
