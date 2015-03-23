@@ -71,16 +71,30 @@ class InflowOutflowSubdomain(Subdomain3D):
 
         initial: whether velocity for initial conditions should be returned'
         """
+        conv = self.config._converter
+
         if self.config.velocity == 'constant' or initial:
-            return self.config._converter.velocity_lb
+            return conv.velocity_lb
         elif self.config.velocity == 'oscillatory':
-            return self.config._converter.velocity_lb * (
+            return conv.velocity_lb * (
                 1 + self.oscillatory_amplitude * sin(
-                    2.0 * np.pi * self.config._converter.freq_lb * S.time))
+                    2.0 * np.pi * conv.freq_lb * S.time))
         elif self.config._velocity_profile is not None:
             data = self.config._velocity_profile
             t = data[:, 0]
             v = data[:, 1]
+            v_phys_min, v_phys_max = np.min(v), np.max(v)
+            v *= 1.0 / np.max(v) * conv.velocity_lb
+
+            v_lb_min, v_lb_max = np.min(v), np.max(v)
+            Re_min = v_lb_min * conv.len_lb / conv.visc_lb
+            Re_max = v_lb_max * conv.len_lb / conv.visc_lb
+
+            self.config.logger.info('External velocity range: LB: [%.4e, %.4e]'
+                                    '  physical: [%.4e, %.4e]  Re: [%d, %d]' %
+                                    (np.min(v), np.max(v), v_phys_min,
+                                    v_phys_max, Re_min, Re_max))
+
             phys_step = t[1] - t[0]
             return LinearlyInterpolatedTimeSeries(v, step_size=phys_step /
                                                   self.config._converter.dt)
@@ -203,11 +217,12 @@ class HemoSim(LBFluidSim):
         uconv = None
         if config.velocity_profile and config.velocity == 'external':
             config._velocity_profile = np.loadtxt(config.velocity_profile)
+            t_cycle = np.max(config._velocity_profile[:,0])
             # Unit conversion based on velocity.
             uconv = converter.UnitConverter(cls.phys_visc,
                                             cls.phys_diam,
                                             velocity=np.max(np.abs(config._velocity_profile[:,1])),
-                                            freq=cls.phys_freq)
+                                            freq=1.0 / t_cycle)
         else:
             # Unit conversion based on Reynolds number.
             uconv = converter.UnitConverter(cls.phys_visc,

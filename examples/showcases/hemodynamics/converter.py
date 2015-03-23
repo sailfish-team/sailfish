@@ -71,7 +71,7 @@ class UnitConverter(object):
         :param length: physical reference length
         :param velocity: physical reference velocity
         :param Re: Reynolds number
-        :param freq: physical frequency
+        :param freq: physical frequency [Hz]
         """
         self._phys_visc = visc
         self._phys_len = length
