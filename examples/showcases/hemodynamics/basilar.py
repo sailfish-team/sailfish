@@ -17,14 +17,14 @@ from sailfish.sym import S, D3Q19
 
 import common
 
-class BssilarSubdomain(common.InflowOutflowSubdomain):
+class BasilarSubdomain(common.InflowOutflowSubdomain):
     _flow_orient = D3Q19.vec_to_dir([0, 1, 0])
     _outlet_orient = (D3Q19.vec_to_dir([-1, 0, 0]),
                       D3Q19.vec_to_dir([-1, 0, 0]),
                       D3Q19.vec_to_dir([ 1, 0, 0]),
                       D3Q19.vec_to_dir([ 1, 0, 0]))
     inflow_loc = [0.0369357, 0.028672, 0.0126818]
-    inflow_raw = 0.00168079
+    inflow_rad = 0.00168079
 
     def _inflow_outflow(self, hx, hy, hz, wall_map):
         inlet = None
