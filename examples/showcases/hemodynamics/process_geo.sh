@@ -17,3 +17,11 @@ for i in geo/c0006_*.config; do
 	python process_geometry.py ${src} ${dst} xyz 011000
 	gzip ${dst}.npy
 done
+
+# Process Basilar geometry.
+for i in geo/basilar_*.config; do
+  src=${i//.config}
+  dst=${src//basilar/proc_basilar}
+  python process_geometry.py ${src} ${dst} xyz 221000
+  gzip ${dst}.npy
+done
