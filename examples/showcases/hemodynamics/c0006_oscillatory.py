@@ -9,7 +9,7 @@ from c0006 import C0006Subdomain, C0006Sim
 
 
 class OscillatoryC0006Sim(C0006Sim):
-    lb_v = 0.001
+    lb_v = 0.05
 
     @classmethod
     def update_defaults(cls, defaults):
@@ -22,4 +22,4 @@ class OscillatoryC0006Sim(C0006Sim):
 
 
 if __name__ == '__main__':
-    LBSimulationController(OsciallatoryC0006Sim, EqualSubdomainsGeometry3D).run()
+    LBSimulationController(OscillatoryC0006Sim, EqualSubdomainsGeometry3D).run()
