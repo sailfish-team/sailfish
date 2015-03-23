@@ -136,15 +136,22 @@ class InflowOutflowSubdomain(Subdomain3D):
         if outlet is not None:
             self._set_outlet(outlet, hx, hy, hz)
 
-    def _set_outlet(self, outlet, hx, hy, hz):
-        bc = self.bc_outflow(orientation=self._outlet_orient)
+    def _set_single_outlet(self, outlet, orient, hx, hy, hz):
+        bc = self.bc_outflow(orientation=orient)
         self.config.logger.info('.. setting outlet using the "%s" BC', bc.__class__.__name__)
         self.set_node(outlet, bc)
+
+    def _set_outlet(self, outlet, hx, hy, hz):
+        if type(outlet) is np.array:
+            self._set_single_outlet(outlet, self._outlet_orient, hx, hy, hz)
+        else:
+            for out, orient in zip(outlet, self._outlet_orient):
+                self._set_single_outlet(out, orient, hx, hy, hz)
 
     def initial_conditions(self, sim, hx, hy, hz):
         sim.rho[:] = 1.0
         wall_map = self._wall_map(hx, hy, hz)
-        inlet, outlet = self._inflow_outflow(hx, hy, hz, wall_map)
+        inlet, _ = self._inflow_outflow(hx, hy, hz, wall_map)
 
         if inlet is not None:
             v = self.velocity_profile(hx, hy, hz, wall_map)
@@ -213,7 +220,23 @@ class HemoSim(LBFluidSim):
         raise NotImplementedError
 
     @classmethod
+    def set_walls(cls, config):
+        if not config.geometry:
+            return
+
+        wall_map = cls.load_geometry(config.geometry)
+
+        # Override lattice size based on the geometry file.
+        config.lat_nz, config.lat_ny, config.lat_nx = wall_map.shape
+
+        # Add ghost nodes.
+        wall_map = np.pad(wall_map, (1, 1), 'constant', constant_values=True)
+        config._wall_map = wall_map
+
+    @classmethod
     def modify_config(cls, config):
+        cls.set_walls(config)
+
         uconv = None
         if config.velocity_profile and config.velocity == 'external':
             config._velocity_profile = np.loadtxt(config.velocity_profile)

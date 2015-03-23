@@ -36,7 +36,7 @@ class C0006Subdomain(common.InflowOutflowSubdomain):
 
 class C0006Sim(common.HemoSim, Vis2DSliceMixIn):
     subdomain = C0006Subdomain
-    phys_diam = 0.0019868 * 2
+    phys_diam = C0006Subdomain.inflow_rad * 2
     lb_v = 0.05
 
     @classmethod
@@ -58,34 +58,18 @@ class C0006Sim(common.HemoSim, Vis2DSliceMixIn):
         })
 
     @classmethod
-    def set_walls(cls, config):
-        if not config.geometry:
-            return
-
-        wall_map = cls.load_geometry(config.geometry)
-
-        # TODO: Flip the domain so that the longest dimension is X.
-        size = wall_map.shape[1]
-        if not config.base_name:
-            config.base_name = 'results/re%d_c0006_%d_%s' % (
-                config.reynolds, size, config.velocity)
-
-        # Override lattice size based on the geometry file.
-        config.lat_nz, config.lat_ny, config.lat_nx = wall_map.shape
-
-        # Add ghost nodes.
-        wall_map = np.pad(wall_map, (1, 1), 'constant', constant_values=True)
-        config._wall_map = wall_map
-
-    @classmethod
     def get_diam(cls, config):
         return 2.0 * np.sqrt(np.sum(np.logical_not(config._wall_map[:,1,:])) /
                              np.pi)
 
     @classmethod
     def modify_config(cls, config):
-        cls.set_walls(config)
         super(C0006Sim, cls).modify_config(config)
+
+        size = config._wall_map.shape[1]
+        if not config.base_name:
+            config.base_name = 'results/re%d_c0006_%d_%s' % (
+                config.reynolds, size, config.velocity)
 
 
 if __name__ == '__main__':
