@@ -82,9 +82,8 @@ class DuctSim(LBFluidSim, LBForcedSim):
             'visc': 0.0064,
             'max_iters': 500000,
             'every': 50000,
-            'output': 'square_duct',
             'periodic_z': True,
-            'block_size': 128,
+            'block_size': 64,
             # Double precision is required for convergence studies.
             'precision': 'double'
         })
@@ -95,9 +94,10 @@ class DuctSim(LBFluidSim, LBForcedSim):
         self.add_body_force((0.0, 0.0, DuctSubdomain.accel(config)))
 
         a = DuctSubdomain.width(config) / 2.0
-        self.config.logger.info('Re = %.2f' % (a * DuctSubdomain.max_v / config.visc))
+        self.config.logger.info('Re = %.2f, width = %d' % (a * DuctSubdomain.max_v / config.visc, a))
 
     _ref = None
+    _prev_l2 = 0.0
     def after_step(self, runner):
         every = 1000
         mod = self.iteration % every
@@ -114,8 +114,13 @@ class DuctSim(LBFluidSim, LBForcedSim):
             m = runner._output._fluid_map
             l2 = (np.linalg.norm(self._ref[m] - runner._sim.vz[m]) /
                   np.linalg.norm(self._ref[m]))
-            print self.iteration, l2, np.nanmax(runner._sim.vz)
 
+            self.config.logger.info('%d %e %e' % (self.iteration, l2, np.nanmax(runner._sim.vz)))
+
+            if (np.abs(self._prev_l2 - l2) / l2 < 1e-6):
+                runner._quit_event.set()
+
+            self._prev_l2 = l2
 
 if __name__ == '__main__':
     ctrl = LBSimulationController(DuctSim, EqualSubdomainsGeometry3D)
