@@ -44,14 +44,18 @@ class WomersleySubdomain(PoiseuilleSubdomain):
         self.set_node(outlet_map, pressure_bc(
             DynamicValue(1.0 - 3.0 * pressure / 2.0)))
 
-        print 'Re = %.2f' % (self.max_v * self.channel_width(self.config) / 2.0 / visc)
-        print 'Wo = %.2f' % (self.channel_width(self.config) / 2.0 * sqrt(omega / visc))
-        print 'dP = %.8e' % self.pressure_delta
+        self.config.logger.info(
+            'Re = %.2f' % (self.max_v * self.channel_width(self.config) / 2.0 /
+                           visc))
+        self.config.logger.info(
+            'Wo = %.2f' % (self.channel_width(self.config) / 2.0 * sqrt(omega /
+                                                                        visc)))
+        self.config.logger.info('dP = %.8e' % self.pressure_delta)
 
         # The oscillation period (in lattice time units) should be significantly longer
         # than the length of the pipe (in lattice length units) in order for the
         # compressibility effects of LBM to be minimized.
-        print 'T = %.2f' % (2 * np.pi / omega)
+        self.config.logger.info('T = %.2f' % (2 * np.pi / omega))
 
     def womersley_profile(self, r, t, alpha, omega):
         """Returns the analytical velocity profile for a flow driven by pressure
@@ -100,11 +104,12 @@ class WomersleySim(PoiseuilleSim):
             # Dump data from the middle of the channel to stdout so that the
             # ~pi/2 phase lag between pressure and velocity oscillations can be
             # easily observed.
-            print '%d %.8e %.8e %.8e %.8e' % (self.iteration,
+            self.config.logger.info('%d %.8e %.8e %.8e %.8e' % (self.iteration,
                                               runner._sim.vx[nz/2,ny/2,nx/2],
                                               runner._sim.vy[nz/2,ny/2,nx/2],
                                               runner._sim.vz[nz/2,ny/2,nx/2],
-                                              runner._sim.rho[nz/2,ny/2,nx/2] - 1.0)
+                                              runner._sim.rho[nz/2,ny/2,nx/2] -
+                                                                1.0))
 
 if __name__ == '__main__':
     LBSimulationController(WomersleySim, EqualSubdomainsGeometry3D).run()
