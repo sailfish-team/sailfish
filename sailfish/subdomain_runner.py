@@ -378,6 +378,8 @@ class SubdomainRunner(object):
         grid_nx = int(math.ceil(float(self._spec.actual_size[0]) / bs)) * bs
         self._code_context['grid_nx'] = grid_nx
 
+        self.config.logger.info('Actual lattice size is: {0}'.format(
+            list(reversed(self._lat_size))))
         self.config.logger.debug('Effective lattice size is: {0}. Access '
                                  'pattern: {1} ({2})'.format(
             list(reversed(self._physical_size)),
