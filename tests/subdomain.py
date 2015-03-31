@@ -304,6 +304,66 @@ class TestLinkTagging3D(TestCase3D):
         TestCase3D.setUp(self)
         self.sim.config.use_link_tags = True
 
+    def testBoundaryNodes(self):
+        spec = SubdomainSpec3D((0, 0, 0), (5, 8, 3), envelope_size=1, id_=0)
+        spec.runner = SubdomainRunner(self.sim, spec, output=None,
+                                      backend=self.backend, quit_event=None)
+        spec.runner._init_shape()
+
+        class _LinkTaggingSubdomain3D(Subdomain3D):
+            def boundary_conditions(self, hx, hy, hz):
+                wall_map = np.array([
+                    [[0, 0, 0, 0, 1],
+                     [0, 0, 0, 0, 1],
+                     [0, 0, 0, 1, 1],
+                     [0, 0, 0, 1, 1],  # There was a bug once that caused the
+                                       # middle node here to be marked
+                                       # PropagationOnly.
+                     [0, 0, 1, 1, 1],
+                     [0, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1]],
+                    [[0, 0, 0, 1, 1],
+                     [0, 0, 0, 1, 1],
+                     [0, 0, 1, 1, 1],
+                     [0, 1, 1, 1, 1],
+                     [0, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1]],
+                    [[0, 0, 1, 1, 1],
+                     [0, 1, 1, 1, 1],
+                     [0, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1]]], dtype=np.bool)
+                wall_map = np.pad(wall_map, (1, 1), mode='constant',
+                                  constant_values=0)
+                self.set_node(wall_map, NTFullBBWall)
+                self.set_node(np.logical_not(wall_map) & (hz == 0),
+                            NTEquilibriumDensity(1.0))
+
+        sub = _LinkTaggingSubdomain3D((3, 8, 5), spec, D3Q19)
+        sub.allocate()
+        sub.reset(encode=False)
+
+        expected = np.array([
+             [ 3,  3,  3,  3,  5],
+             [ 3,  3,  3,  3,  5],
+             [ 3,  3,  3,  5,  5],
+             [ 3,  3,  3,  5, 19],
+             [ 3,  3,  5,  5, 19],
+             [ 3,  5,  5, 19, 19],
+             [ 5,  5, 19, 19, 20],
+             [19, 19, 19, 20, 20]])
+        expected[expected == 3] = NTEquilibriumDensity.id
+        expected[expected == 5] = NTFullBBWall.id
+        expected[expected == 19] = _NTPropagationOnly.id
+        expected[expected == 20] = _NTUnused.id
+        np.testing.assert_equal(expected, sub._type_map[0,:,:])
+
     def test_periodic_yz(self):
         self.sim.config.periodic_y = True
         self.sim.config.periodic_z = True
