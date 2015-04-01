@@ -107,8 +107,11 @@ ${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
   ${force_field_if_required()}
   ${', int gi' if force_field else ''})
 {
-  ${body_force(grid_idx)}
+  ${body_force(force_for_eq.get(grid_idx, grid_idx))}
   ${bgk_relaxation_preamble(grid_idx)}
+  ## The acceleration vector needs to declared if no force was set in the
+  ## previous call to body_force().
+  ${body_force(grid_idx, vector_decl=(force_for_eq.get(grid_idx, -1) is None))}
 
   %if grid_idx == 1:
     float omega = ${cex(1.0 / tau_phi)};
