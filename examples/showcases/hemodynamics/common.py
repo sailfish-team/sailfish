@@ -142,7 +142,7 @@ class InflowOutflowSubdomain(Subdomain3D):
         self.set_node(outlet, bc)
 
     def _set_outlet(self, outlet, hx, hy, hz):
-        if type(outlet) is np.array:
+        if type(outlet) is np.ndarray:
             self._set_single_outlet(outlet, self._outlet_orient, hx, hy, hz)
         else:
             for out, orient in zip(outlet, self._outlet_orient):
