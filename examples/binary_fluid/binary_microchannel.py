@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from math import sqrt
 import numpy as np
 
 from sailfish.geo import EqualSubdomainsGeometry2D
@@ -32,6 +33,8 @@ class MicrochannelSim(LBBinaryFluidFreeEnergy, LBForcedSim):
     def add_options(cls, group, dim):
         group.add_argument('--H', type=int, default=51,
                 help='channel height')
+        group.add_argument('--Ca', type=float, default=1.0,
+                help='target capillary number')
         group.add_argument('--film_thickness', type=int,
                 default=6, help='film thickness in nodes')
 
@@ -48,13 +51,28 @@ class MicrochannelSim(LBBinaryFluidFreeEnergy, LBForcedSim):
 
     @classmethod
     def modify_config(cls, config):
+        # Lattice size based on a 15 H x H geometry.
         config.lat_nx = 15 * config.H
+
+        # 2 additional nodes because of NTFullBB walls.
         config.lat_ny = config.H + 2 + MicrochannelDomain.wall_thickness
 
     def __init__(self, config):
         super(MicrochannelSim, self).__init__(config)
 
-        self.add_body_force((6.0e-6, 0.0), grid=0, accel=False)
+        # Interface tension and width.
+        gamma = sqrt(8 * config.kappa * config.A / 9.0)
+        xi = 2 * sqrt(2 * config.kappa / config.A)
+
+        visc_liq = 1.0/3.0 * (config.tau_a - 0.5)
+        u_bubble = config.Ca * gamma / config.tau_a
+        Rey = config.H * u_bubble / visc_liq
+        force = u_bubble * 8.0 * visc_liq / config.H**2
+
+        config.logger.info('Ca:{0:.2f}   Re:{1:.2f}  u_bubble:{2:.4e}  force:{3:.4e}'.format(
+            config.Ca, Rey, u_bubble, force))
+
+        self.add_body_force((force, 0.0), grid=0, accel=False)
 
         # Use the fluid velocity in the relaxation of the order parameter field,
         # and the molecular velocity in the relaxation of the density field.
