@@ -18,7 +18,6 @@ class ProfileC0006Sim(C0006Sim):
         defaults.update({
             'velocity': 'external',
             'velocity_profile': 'profiles/ica_ford_profile_uniform_lin_int.dat',
-            'reynolds': 100,
         })
 
     @classmethod
@@ -28,7 +27,6 @@ class ProfileC0006Sim(C0006Sim):
                 'simulation domain')
 
     def _get_midslice(self, runner):
-        diam = int(runner._subdomain.inflow_rad / self.config._converter.dx * 2)
         wall_nonghost = self.config._wall_map[1:-1,1:-1,1:-1]
         size_y = wall_nonghost.shape[1]
         m = size_y / 2
