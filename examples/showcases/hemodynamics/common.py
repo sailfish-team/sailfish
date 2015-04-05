@@ -3,11 +3,11 @@ import math
 import numpy as np
 import gzip
 
-from sailfish.node_type import NTRegularizedVelocity, DynamicValue, NTDoNothing, LinearlyInterpolatedTimeSeries, NTFullBBWall, NTRegularizedDensity, NTEquilibriumDensity
+from sailfish.node_type import NTRegularizedVelocity, DynamicValue, NTDoNothing, LinearlyInterpolatedTimeSeries, NTFullBBWall, NTRegularizedDensity, NTEquilibriumDensity, NTEquilibriumVelocity
 from sailfish.subdomain import Subdomain3D
 from sailfish.lb_single import LBFluidSim
 from sailfish.sym import S, D3Q19
-from sympy import sin
+from sympy import sin, Piecewise
 import converter
 
 class InflowOutflowSubdomain(Subdomain3D):
@@ -15,6 +15,10 @@ class InflowOutflowSubdomain(Subdomain3D):
     _flow_orient = D3Q19.vec_to_dir([1, 0, 0])
     _outlet_orient = D3Q19.vec_to_dir([1, 0, 0])
     oscillatory_amplitude = 0.1
+    # Number of iteratiosn after which the oscillatory profile
+    # starts to become active.
+    oscillatory_delay = 100000
+
     bc_velocity = NTRegularizedVelocity
     bc_outflow = partial(NTEquilibriumDensity, 1.0)
 
@@ -77,14 +81,19 @@ class InflowOutflowSubdomain(Subdomain3D):
             return conv.velocity_lb
         elif self.config.velocity == 'oscillatory':
             return conv.velocity_lb * (
-                1 + self.oscillatory_amplitude * sin(
-                    2.0 * np.pi * conv.freq_lb * S.time))
+                1 + self.oscillatory_amplitude * Piecewise(
+                    (0, S.time < self.oscillatory_delay),
+                    (sin(2.0 * np.pi * conv.freq_lb * S.time), True)))
         elif self.config._velocity_profile is not None:
             data = self.config._velocity_profile
             t = data[:, 0]
             v = data[:, 1]
             v_phys_min, v_phys_max = np.min(v), np.max(v)
-            v *= 1.0 / np.max(v) * conv.velocity_lb
+
+            if self.config.velocity == 'external_init':
+                return conv.velocity_lb * v[0] / v_phys_max
+
+            v *= 1.0 / v_phys_max * conv.velocity_lb
 
             v_lb_min, v_lb_max = np.min(v), np.max(v)
             Re_min = v_lb_min * conv.len_lb / conv.visc_lb
@@ -217,7 +226,8 @@ class HemoSim(LBFluidSim):
 
     @classmethod
     def get_diam(cls, config):
-        raise NotImplementedError
+        dx = np.average(np.array(config._coord_conv.dx))
+        return cls.subdomain.inflow_rad * 2.0 / dx
 
     @classmethod
     def set_walls(cls, config):
@@ -234,11 +244,9 @@ class HemoSim(LBFluidSim):
         config._wall_map = wall_map
 
     @classmethod
-    def modify_config(cls, config):
-        cls.set_walls(config)
-
+    def get_uconv(cls, config):
         uconv = None
-        if config.velocity_profile and config.velocity == 'external':
+        if config.velocity_profile and config.velocity.startswith('external'):
             config._velocity_profile = np.loadtxt(config.velocity_profile)
             t_cycle = np.max(config._velocity_profile[:,0])
             # Unit conversion based on velocity.
@@ -252,10 +260,11 @@ class HemoSim(LBFluidSim):
                                             cls.phys_diam,
                                             Re=config.reynolds,
                                             freq=cls.phys_freq)
-        # Automatically compute the LB viscosity.
-        uconv.set_lb(velocity=cls.lb_v, length=cls.get_diam(config))
-        config.visc = uconv.visc_lb
-        config._converter = uconv
+        return uconv
+
+    @classmethod
+    def modify_config(cls, config):
+        cls.set_walls(config)
 
         # Instantiate a coordinate converter.
         if config.geometry.endswith('.npy'):
@@ -266,6 +275,12 @@ class HemoSim(LBFluidSim):
         import json
         geo_config = json.load(open(geo_config_fn, 'r'))
         config._coord_conv = converter.CoordinateConverter(geo_config)
+
+        # Automatically compute the LB viscosity.
+        uconv = cls.get_uconv(config)
+        config._converter = uconv
+        uconv.set_lb(velocity=cls.lb_v, length=cls.get_diam(config))
+        config.visc = uconv.visc_lb
 
     def __init__(self, config):
         super(HemoSim, self).__init__(config)
