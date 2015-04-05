@@ -46,7 +46,6 @@ def make_slice(axis, pos):
 
 # Find the envelope of nodes that needs to be discarded in order
 # for every axis to have the desired number of outlets/inlets.
-padding = []
 slices = []
 cuts = [[0,0], [0,0], [0,0]]
 io_idx = 0
@@ -62,14 +61,11 @@ for axis in range(0, 3):
                 continue
             _, num = ndimage.label(tmp)
             if outlets == num:
-                padding.append(0)
                 start = i
-                # -1 to account for padding
-                cuts[axis][0] = i - 1
+                cuts[axis][0] = i
                 break
     else:
         start = 0
-        padding.append(1)   # geometry already has 1 node of padding
 
     # Scan higher end of the current axis.
     io_idx += 1
@@ -81,14 +77,11 @@ for axis in range(0, 3):
                 continue
             _, num = ndimage.label(tmp)
             if outlets == num:
-                padding.append(0)
                 end = geo.shape[2 - axis] - i + 1
-                # -1 to account for padding
-                cuts[axis][1] = i - 1
+                cuts[axis][1] = i
                 break
     else:
         end = None
-        padding.append(1)   # geometry already has 1 node of padding
 
     slices.append(slice(start, end))
     io_idx += 1
@@ -104,7 +97,6 @@ config['size'] = geo.shape
 # The axes positions, as well as the fields below, use the natural axis order
 # -- xyz. This is the  opposite of the storage order in the LB arrays.
 config['axes'] = axes
-config['padding'] = padding
 config['cuts'] = cuts
 
 name_to_idx = {'x': 0, 'y': 1, 'z': 2}

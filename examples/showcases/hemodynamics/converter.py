@@ -14,11 +14,11 @@ class CoordinateConverter(object):
         # These fields are stored in the natural order (x, y, z) of the
         # underlying geometry.
         self.dx = []
-        self.padding = []
+        self.offset = []
         self.phys_min_x = []
 
         for i, phys_size in enumerate(config['bounding_box']):
-            self.padding.append(config['padding'][2 * i])
+            offset = config['padding'][2 * i])
 
             # Convert the natural index to physical LB order.
             lb_i = 2 - i
@@ -29,22 +29,22 @@ class CoordinateConverter(object):
             # Physical size BEFORE cutting nodes from the envelope.
             phys_size = config['bounding_box'][i]
 
+            # Lattice size BEFORE cutting nodes, after padding was removed.
             if 'cuts' in config:
                 size += config['cuts'][i][0] + config['cuts'][i][1]
+                offset += config['cuts'][i][0]
 
+            self.offset.append(offset)
             dx = (phys_size[1] - phys_size[0]) / size
             self.dx.append(dx)
-            if 'cuts' in config:
-                self.phys_min_x.append(phys_size[0] + config['cuts'][i][0] * dx)
-            else:
-                self.phys_min_x.append(phys_size[0])
+            self.phys_min_x.append(phys_size[0])
 
     # Physical coordinates are always given in natural order (x, y, z).
     # The return value is in physical LB order.
     def to_lb(self, phys_pos, round_=True):
         lb_pos = [0, 0, 0]
         for i, phys_x in enumerate(phys_pos):
-            lb_pos[2 - self.axes[i]] = (self.padding[i] + (phys_x - self.phys_min_x[i]) / self.dx[i])
+            lb_pos[2 - self.axes[i]] = (self.offset[i] + (phys_x - self.phys_min_x[i]) / self.dx[i])
 
         if round_:
             lb_pos = [int(round(x)) for x in lb_pos]
@@ -57,7 +57,7 @@ class CoordinateConverter(object):
         phys_pos = [0, 0, 0]
         for i, lb_x in enumerate(lb_pos):
             i = self.axes.index(2 - i)
-            phys_pos[i] = (self.dx[i] * (lb_x - self.padding[i]) + self.phys_min_x[i])
+            phys_pos[i] = (self.dx[i] * (lb_x - self.offset[i]) + self.phys_min_x[i])
         return phys_pos
 
 
