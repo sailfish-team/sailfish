@@ -1410,6 +1410,8 @@ class SubdomainRunner(object):
         cpoint = np.load(fname)
         sim_state = pickle.loads(str(cpoint['state']))
         self._sim.set_state(sim_state)
+        if not self.config.restore_time:
+            self._sim.iteration = 0
 
         for k, v in cpoint.iteritems():
             if not k.startswith('dist'):

@@ -396,6 +396,10 @@ class LBSimulationController(object):
         group.add_argument('--restore_from', type=str, metavar='PATH',
                 help='Location of a checkpoint file from which to start the '
                 'simulation.', default='')
+        group.add_argument('--norestore_time', action='store_false',
+                           dest='restore_time',
+                           default=True, help='If True, and simulation time'
+                ' will be restored when reading a checkpoint.')
         group.add_argument('--final_checkpoint', action='store_true',
                 default=False, help='Generates a checkpoint after the simulation '
                 'is completed.')
@@ -738,6 +742,9 @@ class LBSimulationController(object):
 
     def save_subdomain_config(self, subdomains):
         if self.config.output:
+            dname = os.path.dirname(self.config.output)
+            if not os.path.exists(dname):
+                os.makedirs(dname)
             pickle.dump(subdomains,
                     open(io.subdomains_filename(self.config.output), 'w'))
 
