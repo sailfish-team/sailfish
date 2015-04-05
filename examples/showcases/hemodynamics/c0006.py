@@ -58,11 +58,6 @@ class C0006Sim(common.HemoSim, Vis2DSliceMixIn):
         })
 
     @classmethod
-    def get_diam(cls, config):
-        return 2.0 * np.sqrt(np.sum(np.logical_not(config._wall_map[:,1,:])) /
-                             np.pi)
-
-    @classmethod
     def modify_config(cls, config):
         super(C0006Sim, cls).modify_config(config)
 
