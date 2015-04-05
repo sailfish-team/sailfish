@@ -22,7 +22,7 @@ from sailfish.vis_mixin import Vis2DSliceMixIn
 import scipy.ndimage.filters
 
 class ChannelSubdomain(Subdomain3D):
-    wall_bc = NTHalfBBWall
+    wall_bc = NTFullBBWall
     u0 = 0.05
 
     @classmethod
@@ -148,23 +148,27 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
         config.lat_nz = config.H * az  # streamwise (PBC)
         config.visc = cls.subdomain.u_tau(config.Re_tau) * config.H / config.Re_tau
 
-        cls.show_info(config)
+        # Show data early. This is helpful for quick debugging.
+        print '\n'.join(cls.get_info(config))
 
     @classmethod
-    def show_info(cls, config):
+    def get_info(cls, config):
         u_tau = cls.subdomain.u_tau(config.Re_tau)
         Re = cls.subdomain.u0 * 2.0 * config.H / config.visc
-        print 'Delta_+ = %.2f' % (u_tau / config.visc)
-        print 'Re_tau = %.2f' % (config.Re_tau)
-        print 'Re = %.2f' % Re
-        print 'visc = %e' % config.visc
-        print 'u_tau = %e' % u_tau
-        print 'eta = %e' % (2.0 * config.H / Re**0.75)  # Kolmogorov scale
-        print 'force = %e' % (config.Re_tau**2 * config.visc**2 / config.H**3)
+        ret = []
+        ret.append('Delta_+ = %.2f' % (u_tau / config.visc))
+        ret.append('Re_tau = %.2f' % (config.Re_tau))
+        ret.append('Re = %.2f' % Re)
+        ret.append('visc = %e' % config.visc)
+        ret.append('u_tau = %e' % u_tau)
+        ret.append('eta = %e' % (2.0 * config.H / Re**0.75))  # Kolmogorov scale
+        ret.append('force = %e' % (config.Re_tau**2 * config.visc**2 /
+                                   config.H**3))
 
         # Timescales: large eddies, flow-through time in the wall layer.
-        print 't_eddy = %d' % (config.H * 2.0 / cls.subdomain.u0)
-        print 't_flow = %d' % cls.t_flow(config)
+        ret.append('t_eddy = %d' % (config.H * 2.0 / cls.subdomain.u0))
+        ret.append('t_flow = %d' % cls.t_flow(config))
+        return ret
 
     @classmethod
     def t_flow(cls, config):
@@ -181,6 +185,9 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
         # force = u_tau^2 / H
         self.add_body_force((0.0, 0.0, config.Re_tau**2 * config.visc**2 /
                              config.H**3))
+
+        for line in self.get_info(self.config):
+            self.config.logger.info(line)
 
     def before_main_loop(self, runner):
         self.prepare_reynolds_stats(runner, axis='x')
