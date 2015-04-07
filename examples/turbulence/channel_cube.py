@@ -22,12 +22,10 @@ Legend:
  > - PBC within the buffer subdomain; data is transferred from buffer to main,
      but not vice-versa
  = - wall
- R - replicated node (all distributions are synced from buffer to main after
-     every step
  O - outflow nodes
 
 Reference data is for Re_m = 5610. The original geometry is (current values are
-provided in the :
+provided in the parentheses):
  X - streamwise (Z)
  Y - channel height (X)
  Z - spanwise (Y)
@@ -119,7 +117,7 @@ class CubeChannelSubdomain(ChannelSubdomain):
                     (hy >= 2.7 * h) & (hy < 3.7 * h))
         self.set_node(cube_map, self.wall_bc)
 
-        # Outlet
+        # Outlet.
         outlet_map = (hz == self.gz - 1) & np.logical_not(wall_map)
         self.set_node(outlet_map, NTEquilibriumDensity(1.0,
                                                       orientation=D3Q19.vec_to_dir([0,0,-1])))
@@ -153,12 +151,12 @@ class CubeChannelSim(ChannelSim):
             'periodic_z': True,
 
             # Performance tuning.
-            'check_invalid_results_gpu': True,
+            'check_invalid_results_gpu': False,
             'block_size': 128,
 
             # Output.
             'max_iters': 3500000,
-            'every': 200000,
+            'every': 100000,
             'perf_stats_every': 5000,
             'final_checkpoint': True,
             'checkpoint_every': 500000,
@@ -177,19 +175,20 @@ class CubeChannelSim(ChannelSim):
                          int(config.main_az * cube_h))  # streamwise
         config.visc = cls.subdomain.u_tau(config.Re_tau) * config.H / config.Re_tau
 
-        cls.show_info(config)
+        # Show data early. This is helpful for quick debugging.
+        print '\n'.join(cls.get_info(config))
 
     @classmethod
-    def show_info(cls, config):
+    def get_info(cls, config):
         cube_h = config.H * 2 / 3
-        print 'cube:   %d' % cube_h
-        print 'buffer: %d x %d x %d' % (int(config.buf_az * cube_h), config.lat_ny, config.lat_nx)
-        print 'main:   %d x %d x %d' % (int(config.main_az * cube_h), config.lat_ny, config.lat_nx)
-        ChannelSim.show_info(config)
+        ret = ChannelSim.get_info(config)
+        ret.append('cube:   %d' % cube_h)
+        ret.append('buffer: %d x %d x %d' % (int(config.buf_az * cube_h), config.lat_ny, config.lat_nx))
+        ret.append('main:   %d x %d x %d' % (int(config.main_az * cube_h), config.lat_ny, config.lat_nx))
+        return ret
 
     @classmethod
     def add_options(cls, group, dim):
-        ChannelSim.add_options(group, dim)
         # The reference DNS simulation uses: 9, 14, 6.4, respectively.
         group.add_argument('--buf_az', type=float, default=9.0)
         group.add_argument('--main_az', type=float, default=14.0)
