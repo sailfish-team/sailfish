@@ -77,7 +77,7 @@ for axis in range(0, 3):
                 continue
             _, num = ndimage.label(tmp)
             if outlets == num:
-                end = geo.shape[2 - axis] - i + 1
+                end = geo.shape[2 - axis] - i
                 cuts[axis][1] = i
                 break
     else:
