@@ -134,6 +134,7 @@ class LBSim(object):
         ctx['needs_iteration_num'] = self.config.needs_iteration_num
         ctx['equilibria'] = self.equilibria
         ctx['config'] = self.config
+        ctx['force_for_eq'] = {}
 
     def init_fields(self, runner):
         suffixes = ['x', 'y', 'z']
