@@ -308,9 +308,6 @@ class CanvasFrame(wx.Frame):
         if self.transpose.GetValue():
             f = f.transpose()
 
-        if np.all(np.isnan(f)):
-            return
-
         if self._last_transpose != self.transpose.GetValue():
             self._last_transpose = self.transpose.GetValue()
             self.figure.clear()
