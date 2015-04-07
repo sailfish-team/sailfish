@@ -18,7 +18,7 @@ class CoordinateConverter(object):
         self.phys_min_x = []
 
         for i, phys_size in enumerate(config['bounding_box']):
-            offset = config['padding'][2 * i])
+            offset = config['padding'][2 * i]
 
             # Convert the natural index to physical LB order.
             lb_i = 2 - i
@@ -123,7 +123,7 @@ class UnitConverter(object):
 
     @property
     def Womersley(self):
-        return math.sqrt(self._phys_freq * self._phys_len**2 / self.phys_visc)
+        return math.sqrt(2 * math.pi * self._phys_freq * self._phys_len**2 / self._phys_visc)
 
     @property
     def Re_lb(self):
@@ -131,7 +131,7 @@ class UnitConverter(object):
 
     @property
     def Womersley_lb(self):
-        return math.sqrt(self.freq_lb * self.len_lb**2 / self.visc_lb)
+        return math.sqrt(2 * math.pi * self.freq_lb * self.len_lb**2 / self.visc_lb)
 
     @property
     def visc_lb(self):
