@@ -429,48 +429,33 @@ ${kernel} void ExtractSliceUsq(int axis, int position,
   out[go] = sqrtf(vx * vx + vy * vy + vz * vz);
 }
 
-<%def name="stats_slice(name, axis, num_inputs=1, stats=[[(0,1)]], out_type='float')">
-${kernel} void ${name}(int position,
-  %for i in range(num_inputs):
-    ${global_ptr} float *f${i},
-  %endfor
-  %for i in range(len(stats)):
-    ${global_ptr} ${out_type} *out${i} ${',' if i < len(stats) - 1 else ''}
-  %endfor
+## Computes statistics on a 2D slice.
+## No space averaging.
+<%def name="stats_slice(name, num_inputs=1, stats=[[(0,1)]], out_type='float')">
+// position: position along the axis
+${kernel} void ${name}(
+	int axis,
+	int position,
+	%for i in range(num_inputs):
+		${global_ptr} float *f${i},
+	%endfor
+	%for i in range(len(stats)):
+		${global_ptr} ${out_type} *out${i} ${',' if i < len(stats) - 1 else ''}
+	%endfor
 ){
-  const int c0 = get_global_id(0) + 1;
-  const int c1 = get_global_id(1) + 1;
-
-  %if axis == 0:
-    if (c0 >= ${lat_ny-1} || c1 >= ${lat_nz-1}) {
-      return;
-    }
-    const unsigned int gi = getGlobalIdx(1 + position, c0, c1);
-    const int stride = ${lat_ny - 2};
-  %elif axis == 1:
-    if (c0 >= ${lat_nx-1} || c1 >= ${lat_nz-1}) {
-      return;
-    }
-    const unsigned int gi = getGlobalIdx(c0, 1 + position, c1);
-    const int stride = ${lat_nx - 2};
-  %else:
-    if (c0 >= ${lat_nx-1} || c1 >= ${lat_ny-1}) {
-      return;
-    }
-    const unsigned int gi = getGlobalIdx(c0, c1, 1 + position);
-    const int stride = ${lat_nx - 2};
-  %endif
-  %for i in range(len(stats)):
-    ${out_type} acc${i} = 0.0f;
-  %endfor
-  ${_compute_stats(num_inputs, stats, out_type)}
-  const unsigned int gi_dst = (c1 - 1) * stride + (c0 - 1);
-  %for i in range(len(stats)):
-    out${i}[gi_dst] += acc${i};
-  %endfor
+	${_compute_gi_for_slice()}
+	%for i in range(len(stats)):
+		${out_type} acc${i} = 0.0f;
+	%endfor
+	${_compute_stats(num_inputs, stats, out_type)}
+	%for i in range(len(stats)):
+		out${i}[go] += acc${i};
+	%endfor
 }
 </%def>
 
+## Computes statistics on all nodes in the domain.
+## No space averaging.
 <%def name="stats_global(name, num_inputs=1, stats=[], out_type='float')">
 ${kernel} void ${name}(
   %for i in range(num_inputs):

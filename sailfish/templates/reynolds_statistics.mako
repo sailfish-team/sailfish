@@ -43,7 +43,7 @@ ${reduction('ComputeMomentsZ64', 2, num_inputs=1, stats=[[(0, 1)], [(0, 2)], [(0
 // Inputs:
 //  u_x, u_y, u_z, rho
 //
-// Computes
+// Computes:
 //  <u_x u_y>, <u_x u_z>, <u_y u_z>
 //  <u_x rho>, <u_y rho>, <u_z rho>
 ${reduction('ComputeCorrelationsX32', 0, num_inputs=4, stats=[ [(0, 1), (1, 1)], [(0, 1), (2, 1)], [(1, 1), (2, 1)], [(0, 1), (3, 1)], [(1, 1), (3, 1)], [(2, 1), (3, 1)] ], block_size=512, out_type='float', want_offset=True)}
@@ -55,8 +55,17 @@ ${reduction('ComputeCorrelationsY64', 1, num_inputs=4, stats=[ [(0, 1), (1, 1)],
 ${reduction('ComputeCorrelationsZ32', 2, num_inputs=4, stats=[ [(0, 1), (1, 1)], [(0, 1), (2, 1)], [(1, 1), (2, 1)], [(0, 1), (3, 1)], [(1, 1), (3, 1)], [(2, 1), (3, 1)] ], block_size=512, out_type='float', want_offset=True)}
 ${reduction('ComputeCorrelationsZ64', 2, num_inputs=4, stats=[ [(0, 1), (1, 1)], [(0, 1), (2, 1)], [(1, 1), (2, 1)], [(0, 1), (3, 1)], [(1, 1), (3, 1)], [(2, 1), (3, 1)] ], block_size=512, out_type='double', want_offset=True)}
 
+// Computes the all quantities necessary to compute the components of the
+// Reynolds stress tensor.
+//
 // Inputs:
 //  u_x, u_y, u_z
-${stats_slice('ReynoldsX64', 0, num_inputs=3, stats=[ [(0, 1)], [(0, 2)], [(1, 1)], [(1, 2)], [(2, 1)], [(2, 2)], [(0, 1), (1, 1)], [(0, 1), (2, 1)], [(1, 1), (2, 1)]], out_type='double')}
-${stats_slice('ReynoldsY64', 1, num_inputs=3, stats=[ [(0, 1)], [(0, 2)], [(1, 1)], [(1, 2)], [(2, 1)], [(2, 2)], [(0, 1), (1, 1)], [(0, 1), (2, 1)], [(1, 1), (2, 1)]], out_type='double')}
+//
+// Computes:
+//  <u_x> <u_x^2> <u_y> <u_y^2> <u_z> <u_z^2> <u_x u_y> <u_x u_z> <u_y u_z>
+
+// Point-wise statistics on a 2D slice (no space averaging).
+${stats_slice('Reynolds64', num_inputs=3, stats=[ [(0, 1)], [(0, 2)], [(1, 1)], [(1, 2)], [(2, 1)], [(2, 2)], [(0, 1), (1, 1)], [(0, 1), (2, 1)], [(1, 1), (2, 1)]], out_type='double')}
+
+// Global point-wise statistics (one set of stats per LB node, no space averaging).
 ${stats_global('ReynoldsGlobal', num_inputs=3, stats=[ [(0, 1)], [(0, 2)], [(1, 1)], [(1, 2)], [(2, 1)], [(2, 2)], [(0, 1), (1, 1)], [(0, 1), (2, 1)], [(1, 1), (2, 1)]], out_type='double')}
