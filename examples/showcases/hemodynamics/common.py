@@ -15,9 +15,13 @@ class InflowOutflowSubdomain(Subdomain3D):
     _flow_orient = D3Q19.vec_to_dir([1, 0, 0])
     _outlet_orient = D3Q19.vec_to_dir([1, 0, 0])
     oscillatory_amplitude = 0.1
-    # Number of iteratiosn after which the oscillatory profile
+    # Number of iterations after which the oscillatory profile
     # starts to become active.
     oscillatory_delay = 100000
+
+    # Number of iterations used for a linear ramp-up of flow velocity
+    # in the 'constant_rampup' mode.
+    rampup_time = 500000
 
     bc_velocity = NTRegularizedVelocity
     bc_outflow = partial(NTEquilibriumDensity, 1.0)
@@ -69,28 +73,41 @@ class InflowOutflowSubdomain(Subdomain3D):
         return v
 
     def _inflow_velocity(self, initial=False):
-        """Returns an expression describing the max inflow velocity
+        """Returns an expression describing the mean inflow velocity.
 
-        The velocity can be as a function of time for unsteady flows.
+        When used with the parabolic profile, the maximum velocity will be
+        twice the returned value. The velocity can be a function of time for
+        unsteady flows.
 
         initial: whether velocity for initial conditions should be returned'
         """
         conv = self.config._converter
 
-        if self.config.velocity == 'constant' or initial:
+        if self.config.velocity == 'constant':
             return conv.velocity_lb
+        elif self.config.velocity == 'constant_rampup':
+            if initial:
+                return 0.0
+            return conv.velocity_lb * Piecewise(
+                (S.time / self.rampup_time, S.time < self.rampup_time),
+                (1.0, True))
+
         elif self.config.velocity == 'oscillatory':
+            if initial:
+                return conv.velocity_lb
+
             return conv.velocity_lb * (
                 1 + self.oscillatory_amplitude * Piecewise(
                     (0, S.time < self.oscillatory_delay),
-                    (sin(2.0 * np.pi * conv.freq_lb * S.time), True)))
+                    (sin(2.0 * np.pi * conv.freq_lb * (S.time -
+                                                       self.oscillatory_delay)), True)))
         elif self.config._velocity_profile is not None:
             data = self.config._velocity_profile
             t = data[:, 0]
             v = data[:, 1]
             v_phys_min, v_phys_max = np.min(v), np.max(v)
 
-            if self.config.velocity == 'external_init':
+            if self.config.velocity == 'external_init' or initial:
                 return conv.velocity_lb * v[0] / v_phys_max
 
             v *= 1.0 / v_phys_max * conv.velocity_lb
@@ -202,7 +219,9 @@ class HemoSim(LBFluidSim):
                            default='',
                            help='file defining the geometry')
         group.add_argument('--velocity', type=str,
-                           choices=['constant', 'oscillatory', 'external'],
+                           choices=['constant', 'constant_rampup',
+                                    'oscillatory', 'external',
+                                    'external_init'],
                            default='constant')
         group.add_argument('--velocity_profile', type=str,
                            default='', help='external velocity profile in a '
