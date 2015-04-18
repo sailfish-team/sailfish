@@ -7,6 +7,7 @@ from sailfish.node_type import NTRegularizedVelocity, DynamicValue, NTDoNothing,
 from sailfish.subdomain import Subdomain3D
 from sailfish.lb_single import LBFluidSim
 from sailfish.sym import S, D3Q19
+from sailfish import util
 from sympy import sin, Piecewise
 import converter
 
@@ -237,13 +238,6 @@ class HemoSim(LBFluidSim):
                            'calculated.')
 
     @classmethod
-    def load_geometry(cls, fname):
-        if fname.endswith('.gz'):
-            return np.load(gzip.GzipFile(fname))
-        else:
-            return np.load(fname)
-
-    @classmethod
     def get_diam(cls, config):
         dx = np.average(np.array(config._coord_conv.dx))
         return cls.subdomain.inflow_rad * 2.0 / dx
@@ -253,7 +247,7 @@ class HemoSim(LBFluidSim):
         if not config.geometry:
             return
 
-        wall_map = cls.load_geometry(config.geometry)
+        wall_map = util.load_array(config.geometry)
 
         # Override lattice size based on the geometry file.
         config.lat_nz, config.lat_ny, config.lat_nx = wall_map.shape

@@ -44,8 +44,8 @@ class SubdomainSpec(object):
     Z_HIGH = 5
 
     def __init__(self, location, size, envelope_size=None, id_=None, *args, **kwargs):
-        self.location = location
-        self.size = size
+        self.location = tuple(location)
+        self.size = tuple(size)
 
         if envelope_size is not None:
             self.set_actual_size(envelope_size)
@@ -473,7 +473,8 @@ class Subdomain(object):
 
         # Mark nodes connected to at least one active node as active.
         # We need these nodes for walls and ghost nodes.
-        where = (filters.convolve(fluid_map.astype(np.uint8), neighbors, mode='wrap') > 0)
+        where = (filters.convolve(fluid_map.astype(np.uint8), neighbors,
+                                  mode='wrap') > 0)
         fluid_map[where] = True
         self.active_node_mask = fluid_map
 
