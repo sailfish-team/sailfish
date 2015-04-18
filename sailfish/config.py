@@ -4,7 +4,11 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
-import ConfigParser
+# Py 2/3 compat.
+try:
+    import ConfigParser as configparser
+except ImportError:
+    import configparser
 import argparse
 import os
 import re
@@ -53,7 +57,7 @@ class LBConfigParser(object):
         return self._parser.set_defaults(**defaults)
 
     def parse(self, args, internal_defaults=None):
-        config = ConfigParser.ConfigParser()
+        config = configparser.ConfigParser()
         config.read(['/etc/sailfishrc', os.path.expanduser('~/.sailfishrc'),
                 '.sailfishrc'])
 
@@ -63,7 +67,7 @@ class LBConfigParser(object):
         self.config.incompressible = False
         try:
             self._parser.set_defaults(**dict(config.items('main')))
-        except ConfigParser.NoSectionError:
+        except configparser.NoSectionError:
             pass
 
         if internal_defaults is not None:
