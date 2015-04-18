@@ -102,7 +102,7 @@ class CUDABackend(object):
         self._iteration_kernels = []
 
     def __del__(self):
-        self._ctx.pop()
+        self._ctx.detach()
 
     @property
     def supports_printf(self):
