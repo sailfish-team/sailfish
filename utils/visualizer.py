@@ -207,6 +207,7 @@ class CanvasFrame(wx.Frame):
             'will result in better compression ratios.'))
 
         self.transpose = wx.CheckBox(self)
+        self.freeze = wx.CheckBox(self)
         self.sizer = wx.BoxSizer(wx.VERTICAL)
 
         self.toolbar = Toolbar(self.canvas)
@@ -241,6 +242,9 @@ class CanvasFrame(wx.Frame):
         self.stat_sizer.Add(self.buckets, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
         self.stat_sizer.Add(wx.StaticText(self, -1, 'Transpose: '), 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
         self.stat_sizer.Add(self.transpose, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
+        self.stat_sizer.Add(wx.StaticText(self, -1, 'Freeze scale: '), 0,
+                            wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
+        self.stat_sizer.Add(self.freeze, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
 
         self.sizer.Add(self.stat_sizer, 0, wx.TOP | wx.LEFT | wx.ADJUST_MINSIZE)
 
@@ -319,8 +323,9 @@ class CanvasFrame(wx.Frame):
 
         # Update the color map. Keep max/min values to prevent "oscillating"
         # colors which make the features of the flow more difficult to see.
-        self._cmax = max(self._cmax, np.nanmax(f))
-        self._cmin = min(self._cmin, np.nanmin(f))
+        if not self.freeze.GetValue():
+            self._cmax = max(self._cmax, np.nanmax(f))
+            self._cmin = min(self._cmin, np.nanmin(f))
 
         if self.plot is None:
             self.axes = self.figure.add_subplot(111)
