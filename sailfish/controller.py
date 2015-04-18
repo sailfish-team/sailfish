@@ -743,7 +743,7 @@ class LBSimulationController(object):
     def save_subdomain_config(self, subdomains):
         if self.config.output:
             dname = os.path.dirname(self.config.output)
-            if not os.path.exists(dname):
+            if dname and not os.path.exists(dname):
                 os.makedirs(dname)
             pickle.dump(subdomains,
                     open(io.subdomains_filename(self.config.output), 'w'))
