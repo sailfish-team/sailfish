@@ -4,7 +4,7 @@ from sailfish.geo import EqualSubdomainsGeometry3D
 import ushape_base
 
 class UshapeSim(ushape_base.UshapeBaseSim, ushape_base.DynamicViscosity):
-    lb_v = 0.05
+    lb_v = 0.08
 
     @classmethod
     def update_defaults(cls, defaults):
