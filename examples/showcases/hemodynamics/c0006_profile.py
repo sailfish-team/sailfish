@@ -33,6 +33,11 @@ class ProfileC0006Sim(C0006Sim):
         self.midslice = [slice(None), slice(m - 1, m + 1), slice(None)]
         return wall_nonghost
 
+    def _inflow_velocity(self, initial=False):
+        v = super(ProfileC0006Sim, cls)._inflow_velocity(initial)
+        if self.config.velocity == 'constant_rampup':
+            return v * 0.43029628168273754
+
     midslice = None
     mask = None
     def after_step(self, runner):
