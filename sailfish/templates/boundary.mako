@@ -256,16 +256,7 @@ ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 %if nt.NTZouHeVelocity in node_types or nt.NTZouHeDensity in node_types or nt.NTRegularizedVelocity in node_types:
 <%def name="do_noneq_bb(orientation)">
   case ${orientation}:
-    <%
-      import copy
-      tmp_config = copy.copy(config)
-
-      # When this function is called, rho is the node parameter, and therefore
-      # the full density, not the density delta. We turn off the round-off
-      # minimization locally so that the standard form of equilibrium is used.
-      tmp_config.minimize_roundoff = False
-    %>
-    %for arg, val in sym.noneq_bb(grid, orientation, equilibria[0](grid, tmp_config).expression):
+    %for arg, val in sym.noneq_bb(grid, orientation, equilibria[0](grid, config).expression):
       ${cex(arg, pointers=True)} = ${cex(val, pointers=True)};
     %endfor
     break;
