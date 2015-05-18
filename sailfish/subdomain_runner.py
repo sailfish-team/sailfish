@@ -521,6 +521,20 @@ class SubdomainRunner(object):
         self.config.logger.info('. fields: %d MiB' %
                                 (total_field_bytes / 1024 / 1024))
 
+    def _log_relaxation_model(self):
+        model = 'Relaxation model: {0}'.format(self.config.model)
+        options = []
+        if self.config.regularized:
+            options.append('regularized')
+        elif self.config.incompressible:
+            options.append('incompressible')
+        elif self.config.minimize_roundoff:
+            options.append('round-off minimization')
+        if options:
+            model += ' ({0})'.format(', '.join(options))
+
+        self.config.logger.info(model)
+
     @property
     def num_phys_nodes(self):
         """Returns the total number of actual nodes (including padding) in the lattice."""
@@ -1512,6 +1526,7 @@ class SubdomainRunner(object):
         self.config.logger.info("Initializing subdomain.")
         self.config.logger.debug(self.backend.info)
 
+        self._log_relaxation_model()
         self._init_geometry()
 
         # Creates scalar fields on the host. They are used for gpu-host
