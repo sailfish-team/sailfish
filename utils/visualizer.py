@@ -196,6 +196,12 @@ class CanvasFrame(wx.Frame):
         self.field.Bind(wx.EVT_COMBOBOX, self.OnFieldSelect)
         self.field.SetToolTip(wx.ToolTip('Field to visualize.'))
 
+        self.cmin = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
+        self.cmin.Bind(wx.EVT_TEXT_ENTER, self.OnCminChange)
+
+        self.cmax = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
+        self.cmax.Bind(wx.EVT_TEXT_ENTER, self.OnCmaxChange)
+
         # Buckets control.
         self.buckets = wx.SpinCtrl(self, style=wx.TE_PROCESS_ENTER |
                                 wx.SP_ARROW_KEYS)
@@ -225,6 +231,8 @@ class CanvasFrame(wx.Frame):
         field_txt = wx.StaticText(self, -1, 'Field: ')
         buckets_txt = wx.StaticText(self, -1, 'Buckets: ')
 
+        cminmax_txt = wx.StaticText(self, -1, 'Val min/max: ')
+
         self.stat_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.stat_sizer.Add(pos_txt, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
         self.stat_sizer.Add(self.position, 0, wx.LEFT)
@@ -245,6 +253,10 @@ class CanvasFrame(wx.Frame):
         self.stat_sizer.Add(wx.StaticText(self, -1, 'Freeze scale: '), 0,
                             wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
         self.stat_sizer.Add(self.freeze, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
+        self.stat_sizer.AddSpacer(10)
+        self.stat_sizer.Add(cminmax_txt, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
+        self.stat_sizer.Add(self.cmin, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
+        self.stat_sizer.Add(self.cmax, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL)
 
         self.sizer.Add(self.stat_sizer, 0, wx.TOP | wx.LEFT | wx.ADJUST_MINSIZE)
 
@@ -306,6 +318,16 @@ class CanvasFrame(wx.Frame):
     def OnTimer(self, event):
         self.figure.canvas.draw()
 
+    def OnCminChange(self, event):
+        self._cmin = float(event.GetString())
+        if self.plot is not None:
+            self.plot.set_clim(self._cmin, self._cmax)
+
+    def OnCmaxChange(self, event):
+        self._cmax = float(event.GetString())
+        if self.plot is not None:
+            self.plot.set_clim(self._cmin, self._cmax)
+
     def OnData(self, evt):
         data = evt.data
         f = data['fields'][0]
@@ -326,6 +348,8 @@ class CanvasFrame(wx.Frame):
         if not self.freeze.GetValue():
             self._cmax = max(self._cmax, np.nanmax(f))
             self._cmin = min(self._cmin, np.nanmin(f))
+            self.cmax.SetValue(str(self._cmax))
+            self.cmin.SetValue(str(self._cmin))
 
         if self.plot is None:
             self.axes = self.figure.add_subplot(111)
