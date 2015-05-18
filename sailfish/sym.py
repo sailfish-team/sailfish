@@ -527,7 +527,8 @@ def get_missing_dists(grid, orientation):
     return unknown
 
 
-def ex_rho(grid, distp, incompressible, missing_dir=None):
+def ex_rho(grid, distp, incompressible, missing_dir=None,
+           minimize_roundoff=False):
     """Express density as a function of the distributions.
 
     :param distp: name of the pointer to the distribution structure
@@ -537,6 +538,8 @@ def ex_rho(grid, distp, incompressible, missing_dir=None):
         a node where not all distributions are known is necessary. This
         parameter identifies the normal vector pointing towards the
         fluid (i.e. the distributions in this direction are unknown).
+    :param minimize_roundoff: whether the round-off minimization model is to be
+        used
 
     :rtype: sympy expression for the density
     """
@@ -574,6 +577,9 @@ def ex_rho(grid, distp, incompressible, missing_dir=None):
     # reasoning.
     if incompressible:
         return S.rho + S.rho0 * grid.dir_to_vec(missing_dir).dot(grid.v)
+    elif minimize_roundoff:
+        return ((S.rho + grid.dir_to_vec(missing_dir).dot(grid.v)) /
+            (1 - grid.dir_to_vec(missing_dir).dot(grid.v)))
     else:
         return S.rho / (1 - grid.dir_to_vec(missing_dir).dot(grid.v))
 
