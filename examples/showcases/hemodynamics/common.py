@@ -24,7 +24,7 @@ class InflowOutflowSubdomain(Subdomain3D):
     # in the 'constant_rampup' mode.
     rampup_time = 500000
 
-    bc_velocity = NTRegularizedVelocity
+    bc_velocity = NTEquilibriumVelocity
     bc_outflow = partial(NTEquilibriumDensity, 1.0)
 
     # Location of the center of the inflow in physical coordinates, using
