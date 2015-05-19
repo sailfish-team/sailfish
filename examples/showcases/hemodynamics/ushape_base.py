@@ -36,6 +36,7 @@ import numpy as np
 from sailfish.lb_base import LBMixIn
 from sailfish.vis_mixin import Vis2DSliceMixIn
 from sailfish import io
+from sailfish import util
 
 import common
 
@@ -114,7 +115,7 @@ class UshapeBaseSim(common.HemoSim, Vis2DSliceMixIn):
         if not config.geometry:
             return
 
-        wall_map = cls.load_geometry(config.geometry)
+        wall_map = util.load_array(config.geometry)
 
         # Longest dimension determines configuration to use.
         size = wall_map.shape[2]
