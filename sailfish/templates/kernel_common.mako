@@ -216,7 +216,13 @@
     ## Nodes using the Grad approximation use the velocity from the
     ## previous time step to compute the approximated distributions.
     ${'|| isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
-    gg0m0[gi] = g0m0 ${' +1.0f' if config.minimize_roundoff else ''};
+
+    ## If minimize_roundoff is used, this just the density delta, not
+    ## actual density. We keep it this way to avoid precision loss in
+    ## saving output data, which could otherwise occur as we could
+    ## be adding values that are of the order of the machine epsilon
+    ## to 1.0f.
+    gg0m0[gi] = g0m0;
 
     %if not initialization and velocity:
       ovx[gi] = v[0];
