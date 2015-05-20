@@ -25,5 +25,18 @@ class CoordinateConversionTest(unittest.TestCase):
         exp = [15, 6, 7]
         self.assertEqual(exp, conv.to_lb(pos, round_=True))
 
+    def test_ushape(self):
+        config = {
+            "padding": [1, 1, 1, 1, 1, 1],
+            "cuts": [[5, 0], [0, 0], [0, 0]],
+            "bounding_box": [[-0.25659, 0.076243], [-0.0762, 0.076239], [-0.0127, 0.0127]],
+            "axes": "xyz",
+            "size": [40, 231, 497]
+        }
+        conv = converter.CoordinateConverter(config)
+        pos = [-0.254, -0.063461, 0]
+
+        self.assertTrue(abs(conv.from_lb([0,0,0])[0] - pos[0]) < 1e-3)
+
 if __name__ == '__main__':
     unittest.main()
