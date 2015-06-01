@@ -31,9 +31,9 @@ def free_energy_equilibrium_fluid(grid, config):
     for i, ei in enumerate(grid.basis[1:]):
         t = (S.wi[i] * (pb - S.kappa * S.phi * S.g1d2m0 + S.rho * ei.dot(grid.v) +
             Rational(3,2) * (
-                (ei.dot(grid.v))**2 * S.rho + lambda_ *
-                    (2 * ei.dot(grid.v) * ei.dot(S.grad0) + ei.dot(ei) * grid.v.dot(S.grad0))
-                 - Rational(1,3) * (S.rho * grid.v.dot(grid.v) + lambda_ * 3 * grid.v.dot(S.grad0))
+                (ei.dot(grid.v))**2 * S.rho +
+                lambda_ * (2 * ei.dot(grid.v) * ei.dot(S.grad0) + ei.dot(ei) * grid.v.dot(S.grad0))
+                - Rational(1,3) * (S.rho * grid.v.dot(grid.v) + lambda_ * 3 * grid.v.dot(S.grad0))
             )) +
             S.kappa * (S.wxx[i] * S.g1d1m0x**2 + S.wyy[i] * S.g1d1m0y**2 + S.wzz[i] * S.g1d1m0z**2 +
                        S.wyz[i] * S.g1d1m0y * S.g1d1m0z +
@@ -56,8 +56,12 @@ def free_energy_equilibrium_order_param(grid, config):
     out = []
     t_sum = 0
     for i, ei in enumerate(grid.basis[1:]):
-        t = S.wi[i] * (S.Gamma * mu + ei.dot(grid.v) * S.phi + Rational(3,2) * S.phi * (
-                -Rational(1,3) * grid.v.dot(grid.v) + (ei.dot(grid.v))**2))
+        t = S.wi[i] * (
+            S.Gamma * mu +
+            ei.dot(grid.v) * S.phi +
+            Rational(3,2) * S.phi * (
+                -Rational(1,3) * grid.v.dot(grid.v) +
+                (ei.dot(grid.v))**2))
 
         t_sum += t
         out.append(t)
