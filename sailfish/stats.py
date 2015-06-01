@@ -82,14 +82,17 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
         self._reyn_moments = moments
         self._reyn_corr = correlations
         self._reyn_normalizer = normalizer
+        self._reyn_bytes = 0
 
         def _alloc_stat_buf(name, helper_size, need_finalize):
             h = np.zeros([self.stat_buf_size, NX], dtype=np.float64)
+            self._reyn_bytes += h.nbytes
             setattr(self, 'stat_%s' % name, h)
             setattr(self, 'gpu_stat_%s' % name, runner.backend.alloc_buf(like=h))
 
             if need_finalize:
                 h = np.zeros([NX, helper_size], dtype=np.float64)
+                self._reyn_bytes += h.nbytes
                 setattr(self, 'stat_tmp_%s' % name, h)
                 setattr(self, 'gpu_stat_tmp_%s' % name, runner.backend.alloc_buf(like=h))
 
@@ -115,6 +118,8 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
         _alloc_stat_buf('ux_rho', self.stat_corr_grid_size, corr_finalize)
         _alloc_stat_buf('uy_rho', self.stat_corr_grid_size, corr_finalize)
         _alloc_stat_buf('uz_rho', self.stat_corr_grid_size, corr_finalize)
+
+        self.config.logger.info('Size of Reynolds stats buffer: %d' % self._reyn_bytes)
 
         gpu_rho = runner.gpu_field(self.rho)
         gpu_v = runner.gpu_field(self.v)
