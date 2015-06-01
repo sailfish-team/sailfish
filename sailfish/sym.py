@@ -651,7 +651,7 @@ def ex_flux(grid, distp, comp_a, comp_b, config):
 
     return ret
 
-# rho / 3 * \delta_{ab} + rho u_a u_b
+# rho c_s^2 \delta_{ab} + rho u_a u_b
 def ex_eq_flux(grid, comp_a, comp_b):
     if comp_a != comp_b:
         return S.rho * grid.v[comp_a] * grid.v[comp_b]
