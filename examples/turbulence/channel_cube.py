@@ -111,9 +111,11 @@ class CubeChannelSubdomain(ChannelSubdomain):
         h = self.config.H * 2 / 3
         buf_len = CubeChannelGeometry.buf_nz(self.config)
 
-        # For BBL, the number of nodes has to be extended by 1 due to
-        # the effective wall location.
-        ext = 1 if cls.subdomain.wall_bc.location == -0.5 else 0
+        # For BBL, the number of nodes has to be extended by 1 in every
+        # direction other than wall-normal due to the effective wall location,
+        # i.e. due to the fact that a sequence of N BBL nodes corresponds to
+        # a solid body N-2 across.
+        ext = 1 if self.wall_bc.location == -0.5 else 0
 
         # Cube.
         cube_map = ((hx > 0) & (hx <= h) &
