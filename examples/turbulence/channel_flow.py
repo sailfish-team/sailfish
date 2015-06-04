@@ -23,7 +23,7 @@ import scipy.ndimage.filters
 
 class ChannelSubdomain(Subdomain3D):
     wall_bc = NTFullBBWall
-    u0 = 0.05
+    u0 = 0.025
 
     @classmethod
     def u_tau(cls, Re_tau):
@@ -67,7 +67,7 @@ class ChannelSubdomain(Subdomain3D):
         return field[z0:z1+1, y0:y1+1, x0:x1+1]
 
     def set_profile(self, sim, hx, hy, hz, NX, NY, NZ, pert=0.03):
-        H = NX / 2
+        H = self.config.H
 
         u_tau = self.u_tau(self.config.Re_tau)
         hhx = np.abs(hx - self.wall_bc.location - H)
