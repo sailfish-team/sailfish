@@ -23,7 +23,7 @@ import scipy.ndimage.filters
 
 class ChannelSubdomain(Subdomain3D):
     wall_bc = NTFullBBWall
-    u0 = 0.025
+    u0 = 0.05
 
     @classmethod
     def u_tau(cls, Re_tau):
