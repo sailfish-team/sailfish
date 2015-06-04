@@ -22,7 +22,7 @@ data = {}
 cnt = 0
 
 for arg in sys.argv[3:]:
-    for fname in glob.glob(arg):
+    for fname in sorted(glob.glob(arg)):
         a = np.load(fname)
         for field in a.files:
             avg = np.average(a[field], axis=axis)
