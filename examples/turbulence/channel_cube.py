@@ -201,7 +201,8 @@ class CubeChannelSim(ChannelSim):
         group.add_argument('--ay', type=float, default=6.4)
 
     def before_main_loop(self, runner):
-        self._prepare_reynolds_stats_global(runner)
+        if runner._spec.id > 0:
+            self._prepare_reynolds_stats_global(runner)
 
     def _prepare_reynolds_stats_global(self, runner):
         # All components of the Reynolds stress tensor and mean velocities.
