@@ -30,7 +30,7 @@ provided in the parentheses):
  Y - channel height (X)
  Z - spanwise (Y)
 
-Available measurements:
+Available measurements [DNS with IB, Yakhot, 2006]:
  - streamlines / pressure in the X-Y symmetry plane
  - streamlines / pressure in the X-Z plane at y/h = 0.003
  - streamlines in the X-Z plane at y/h = 0.1, 0.25, 0.5, 0.75
@@ -187,7 +187,7 @@ class CubeChannelSim(ChannelSim):
     @classmethod
     def get_info(cls, config):
         cube_h = config.H * 2 / 3
-        ret = ChannelSim.get_info(config)
+        ret = super(CubeChannelSim, cls).get_info(config)
         ret.append('cube:   %d' % cube_h)
         ret.append('buffer: %d x %d x %d' % (int(config.buf_az * cube_h), config.lat_ny, config.lat_nx))
         ret.append('main:   %d x %d x %d' % (int(config.main_az * cube_h), config.lat_ny, config.lat_nx))
