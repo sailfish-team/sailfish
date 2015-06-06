@@ -154,12 +154,20 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
     @classmethod
     def get_info(cls, config):
         u_tau = cls.subdomain.u_tau(config.Re_tau)
-        Re = cls.subdomain.u0 * 2.0 * config.H / config.visc
+        Re = cls.subdomain.u0 * config.H / config.visc
+
+        y_plus = (np.arange(config.H) + 0.5) * u_tau / config.visc
+        u = (1/0.41 * np.log(y_plus) + 5.5) * u_tau
+        u_bulk = np.sum(u) / config.H
+        Re_bulk = u_bulk * config.H / config.visc
+
         ret = []
         ret.append('Delta_+ = %.2f' % (u_tau / config.visc))
         ret.append('Re_tau = %.2f' % (config.Re_tau))
-        ret.append('Re = %.2f' % Re)
+        ret.append('Re_H,max = %.2f' % Re)
+        ret.append('Re_H,bulk = %.2f' % Re_bulk)
         ret.append('visc = %e' % config.visc)
+        ret.append('u_b = %e' % u_bulk)
         ret.append('u_tau = %e' % u_tau)
         ret.append('eta = %e' % (2.0 * config.H / Re**0.75))  # Kolmogorov scale
         ret.append('force = %e' % (config.Re_tau**2 * config.visc**2 /
