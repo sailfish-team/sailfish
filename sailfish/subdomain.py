@@ -717,6 +717,10 @@ class Subdomain(object):
             self.encoded_map()
         self.config.logger.debug('... encoder done.')
 
+        self.config.logger.info('Fluid node fraction: %.1f%%' %
+                                (self.num_fluid_nodes * 100.0 /
+                                 self.spec.num_nodes))
+
     def get_fo_distributions(self, fo):
         """Computes an array indicating which distributions correspond to
         momentum trasferred from the object to the fluid.
