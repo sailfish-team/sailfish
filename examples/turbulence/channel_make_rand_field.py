@@ -5,7 +5,7 @@ The data is saved in numpy arrays. They can be used to limit memory usage
 when the channel simulation is starting.
 
 Usage:
-    ./channel_make_rand_field.py NX NY NZ H
+    ./channel_make_rand_field.py NX NY NZ H target_directory
 """
 
 import numpy as np
