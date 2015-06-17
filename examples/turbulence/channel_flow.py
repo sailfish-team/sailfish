@@ -176,12 +176,19 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
         # Timescales: large eddies, flow-through time in the wall layer.
         ret.append('t_eddy = %d' % (config.H * 2.0 / cls.subdomain.u0))
         ret.append('t_flow = %d' % cls.t_flow(config))
+        ret.append('t_char = %d' % cls.t_char(config))
         return ret
 
     @classmethod
     def t_flow(cls, config):
+        """Flow-through time."""
+        return cls.t_char(config) * (config.lat_nz / config.H)
+
+    @classmethod
+    def t_char(cls, config):
+        """Characteristic time."""
         u_tau = cls.subdomain.u_tau(config.Re_tau)
-        return config.H / u_tau * (config.lat_nz / config.H)
+        return config.H / u_tau
 
     @classmethod
     def add_options(cls, group, dim):
