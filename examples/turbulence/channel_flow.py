@@ -9,6 +9,7 @@ direction so that copying data between subdomains is fast).
 import time
 import math
 import numpy as np
+import os
 
 from sailfish.geo import EqualSubdomainsGeometry3D
 from sailfish.subdomain import Subdomain3D
@@ -38,7 +39,7 @@ class ChannelSubdomain(Subdomain3D):
         wall_map = ((hx == 0) | (hx == self.gx - 1))
         self.set_node(wall_map, self.wall_bc)
 
-    def make_gradients(self, NX, NY, NZ, hx, hy, hz, u):
+    def make_gradients(self, NX, NY, NZ, hx, hy, hz):
         # Buffer size (used to make the random perturbation continuous
         # along the streamwise direction.
         B = 40
@@ -56,7 +57,7 @@ class ChannelSubdomain(Subdomain3D):
         # Remove the buffer layer. We also force the perturbations to be
         # smaller close to the wall. Select the right part of the random
         # field for this subdomain.
-        return [self.select_subdomain(x[hB:-hB,hB:-hB,:], hx, hy, hz) * u / self.u0 for x in np.gradient(nn1)]
+        return [self.select_subdomain(x[hB:-hB,hB:-hB,:], hx, hy, hz) for x in np.gradient(nn1)]
 
     def select_subdomain(self, field, hx, hy, hz):
         # Determine subdomain span.
@@ -64,6 +65,28 @@ class ChannelSubdomain(Subdomain3D):
         y0, y1 = np.min(hy), np.max(hy)
         z0, z1 = np.min(hz), np.max(hz)
         return field[z0:z1+1, y0:y1+1, x0:x1+1]
+
+    def get_divfree_perturbation(self, NX, NY, NZ, hx, hy, hz):
+        if self.config.external_perturbation:
+            base = os.path.join(self.config.external_perturbation,
+                                'rng_%d_%d_%d_' % (NX, NY, NZ))
+            dvx = self.select_subdomain(np.load(base + 'dvx.npz')['data'],
+                                        hx, hy, hz)
+            dvy = self.select_subdomain(np.load(base + 'dvy.npz')['data'],
+                                        hx, hy, hz)
+            dvz = self.select_subdomain(np.load(base + 'dvz.npz')['data'],
+                                        hx, hy, hz)
+        else:
+            np.random.seed(11341351351)
+            _, dy1, dz1 = self.make_gradients(NX, NY, NZ, hx, hy, hz)
+            dx2, _, dz2 = self.make_gradients(NX, NY, NZ, hx, hy, hz)
+            dx3, dy3, _ = self.make_gradients(NX, NY, NZ, hx, hy, hz)
+
+            # Compute curl of the random field.
+            dvx = dy3 - dz2
+            dvy = dz1 - dx3
+            dvz = dx2 - dy1
+        return dvx, dvy, dvz
 
     def set_profile(self, sim, hx, hy, hz, NX, NY, NZ, pert=0.03):
         H = self.config.H
@@ -82,15 +105,7 @@ class ChannelSubdomain(Subdomain3D):
         u[y_plus < y0] = y_plus[y_plus < y0] * u_tau
         sim.vz[:] = u
 
-        np.random.seed(11341351351)
-        _, dy1, dz1 = self.make_gradients(NX, NY, NZ, hx, hy, hz, u)
-        dx2, _, dz2 = self.make_gradients(NX, NY, NZ, hx, hy, hz, u)
-        dx3, dy3, _ = self.make_gradients(NX, NY, NZ, hx, hy, hz, u)
-
-        # Compute curl of the random field.
-        dvx = dy3 - dz2
-        dvy = dz1 - dx3
-        dvz = dx2 - dy1
+        dvx, dvy, dvz = self.get_divfree_perturbation(NX, NY, NZ, hx, hy, hz)
 
         assert np.sum(np.isnan(dvx)) == 0
         assert np.sum(np.isnan(dvy)) == 0
@@ -100,9 +115,9 @@ class ChannelSubdomain(Subdomain3D):
 
         # Add random perturbation to the initial flow field. The numerical
         # factor determines the largest perturbation value.
-        sim.vx[:] += dvx / scale * pert
-        sim.vy[:] += dvy / scale * pert
-        sim.vz[:] += dvz / scale * pert  # streamwise
+        sim.vx[:] += dvx / scale * pert * u / self.u0
+        sim.vy[:] += dvy / scale * pert * u / self.u0
+        sim.vz[:] += dvz / scale * pert * u / self.u0 # streamwise
 
 
 class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
@@ -207,6 +222,9 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
         group.add_argument('--Re_tau', type=float, default=180.0, help='Re_tau')
         group.add_argument('--wall', choices=('hbb', 'bbl', 'tms'),
                            default='hbb', help='No-slip wall type.')
+        group.add_argument('--external_perturbation', type=str,
+                           default='', help='Use externally generated '
+                           'perturbation.')
 
     def __init__(self, config):
         super(ChannelSim, self).__init__(config)
