@@ -22,7 +22,6 @@ from sailfish.vis_mixin import Vis2DSliceMixIn
 import scipy.ndimage.filters
 
 class ChannelSubdomain(Subdomain3D):
-    wall_bc = NTFullBBWall
     u0 = 0.05
 
     @classmethod
@@ -108,6 +107,11 @@ class ChannelSubdomain(Subdomain3D):
 
 class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
     subdomain = ChannelSubdomain
+    _wall_map = {
+        'hbb': NTFullBBWall,
+        'bbl': NTHalfBBWall,
+        'tms': NTWallTMS
+    }
 
     @classmethod
     def update_defaults(cls, defaults):
@@ -136,7 +140,12 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
             })
 
     @classmethod
+    def wall_bc(cls, config):
+        return cls._wall_map[config.wall]
+
+    @classmethod
     def modify_config(cls, config):
+        cls.subdomain.wall_bc = cls.wall_bc(config)
         h = 2 if cls.subdomain.wall_bc.location == 0.5 else 0
 
         az = 6
@@ -177,6 +186,8 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
         ret.append('t_eddy = %d' % (config.H * 2.0 / cls.subdomain.u0))
         ret.append('t_flow = %d' % cls.t_flow(config))
         ret.append('t_char = %d' % cls.t_char(config))
+
+        ret.append('wall = %s' % cls.subdomain.wall_bc.__name__)
         return ret
 
     @classmethod
@@ -194,6 +205,8 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
     def add_options(cls, group, dim):
         group.add_argument('--H', type=int, default=40, help='channel half-height')
         group.add_argument('--Re_tau', type=float, default=180.0, help='Re_tau')
+        group.add_argument('--wall', choices=('hbb', 'bbl', 'tms'),
+                           default='hbb', help='No-slip wall type.')
 
     def __init__(self, config):
         super(ChannelSim, self).__init__(config)
