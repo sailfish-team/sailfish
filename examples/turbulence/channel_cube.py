@@ -170,6 +170,7 @@ class CubeChannelSim(ChannelSim):
 
     @classmethod
     def modify_config(cls, config):
+        cls.subdomain.wall_bc = cls.wall_bc(config)
         h = 2 if cls.subdomain.wall_bc.location == 0.5 else 0
 
         # 1/3 of the channel height
