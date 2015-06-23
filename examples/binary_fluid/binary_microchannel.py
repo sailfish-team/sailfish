@@ -72,12 +72,9 @@ class MicrochannelSim(LBBinaryFluidFreeEnergy, LBForcedSim):
         config.logger.info('Ca:{0:.2f}   Re:{1:.2f}  u_bubble:{2:.4e}  force:{3:.4e}'.format(
             config.Ca, Rey, u_bubble, force))
 
-        self.add_body_force((force, 0.0), grid=0, accel=False)
-
-        # Use the fluid velocity in the relaxation of the order parameter field,
-        # and the molecular velocity in the relaxation of the density field.
-        self.use_force_for_equilibrium(None, target_grid=0)
+        self.add_body_force((force, 0.0), grid=0)
         self.use_force_for_equilibrium(0, target_grid=1)
+
 
 if __name__ == '__main__':
     ctrl = LBSimulationController(MicrochannelSim, EqualSubdomainsGeometry2D)
