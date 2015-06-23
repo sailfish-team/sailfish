@@ -527,11 +527,11 @@ class SubdomainRunner(object):
 
         model = 'Relaxation model: {0}'.format(self.config.model)
         options = []
-        if self.config.regularized:
+        if hasattr(self.config, 'regularized') and self.config.regularized:
             options.append('regularized')
-        elif self.config.incompressible:
+        elif hasattr(self.config, 'regularized') and self.config.incompressible:
             options.append('incompressible')
-        elif self.config.minimize_roundoff:
+        elif hasattr(self.config, 'minimize_roundoff') and self.config.minimize_roundoff:
             options.append('round-off minimization')
         if options:
             model += ' ({0})'.format(', '.join(options))
