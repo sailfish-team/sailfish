@@ -11,6 +11,56 @@ from sailfish.sym import S, D3Q19
 from sailfish import util
 from sympy import sin, Piecewise
 
+from sailfish.stats import FlowStatsMixIn
+from sailfish.lb_base import ScalarField
+
+class StressMixIn(FlowStatsMixIn):
+    """Computes components of the stress tensor."""
+
+    @classmethod
+    def fields(cls):
+        return [ScalarField('stress_xx'), ScalarField('stress_xy'),
+                ScalarField('stress_xz'), ScalarField('stress_yy'),
+                ScalarField('stress_yz'), ScalarField('stress_zz')]
+
+    def before_main_loop(self, runner):
+        if self.config.node_addressing == 'indirect':
+            gpu_nodes = runner.gpu_indirect_address()
+            args = [gpu_nodes]
+        else:
+            args = []
+
+        gpu_map = runner.gpu_geo_map()
+        gpu_dist = runner.gpu_dist(0, 0)
+        gpu_stress_xx = runner.gpu_field(self.stress_xx)
+        gpu_stress_xy = runner.gpu_field(self.stress_xy)
+        gpu_stress_xz = runner.gpu_field(self.stress_xz)
+        gpu_stress_yy = runner.gpu_field(self.stress_yy)
+        gpu_stress_yz = runner.gpu_field(self.stress_yz)
+        gpu_stress_zz = runner.gpu_field(self.stress_zz)
+
+        args.extend(
+            [gpu_map, gpu_dist,
+             gpu_stress_xx, gpu_stress_xy,
+             gpu_stress_xz, gpu_stress_yy,
+             gpu_stress_yz, gpu_stress_zz])
+
+        self._stress_kernel = runner.get_kernel(
+            'ComputeStressTensor',
+            args, 'P' * len(args), needs_iteration=True)
+
+
+    def get_stress(self, runner):
+        runner.backend.run_kernel(self._stress_kernel, runner._kernel_grid_full)
+
+        runner.backend.from_buf(runner.gpu_field(self.stress_xx))
+        runner.backend.from_buf(runner.gpu_field(self.stress_xy))
+        runner.backend.from_buf(runner.gpu_field(self.stress_xz))
+        runner.backend.from_buf(runner.gpu_field(self.stress_yy))
+        runner.backend.from_buf(runner.gpu_field(self.stress_yz))
+        runner.backend.from_buf(runner.gpu_field(self.stress_zz))
+
+
 class InflowOutflowSubdomain(Subdomain3D):
     # Vector pointing in the direction of the flow (x+).
     _flow_orient = D3Q19.vec_to_dir([1, 0, 0])
