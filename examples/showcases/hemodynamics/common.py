@@ -3,13 +3,13 @@ import math
 import numpy as np
 import gzip
 
+from sailfish import converter
 from sailfish.node_type import NTRegularizedVelocity, DynamicValue, NTDoNothing, LinearlyInterpolatedTimeSeries, NTFullBBWall, NTRegularizedDensity, NTEquilibriumDensity, NTEquilibriumVelocity
 from sailfish.subdomain import Subdomain3D
 from sailfish.lb_single import LBFluidSim
 from sailfish.sym import S, D3Q19
 from sailfish import util
 from sympy import sin, Piecewise
-import converter
 
 class InflowOutflowSubdomain(Subdomain3D):
     # Vector pointing in the direction of the flow (x+).

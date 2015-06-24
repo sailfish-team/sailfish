@@ -1,7 +1,33 @@
+# coding=utf-8
+
+"""Converter between LB and physical coordinate systems."""
+
+__author__ = 'Michal Januszewski'
+__email__ = 'sailfish-cfd@googlegroups.com'
+__license__ = 'LGPL3'
+
 import math
 
+
 class CoordinateConverter(object):
-    """Converts between physical coordinates and LB coordinates."""
+    """Converts between physical coordinates and LB coordinates.
+
+    The physical <-> LB correspondece is established by a configuration
+    dictionary. The following keys are currently recognized:
+
+      axes: A permutation of the 'xyz' string. 'xyz' means that the
+        original axes are not shuffled. Note that the physical memory
+        layout of the LB simulation is the inverse of this layout.
+      bounding_box: Span of the simulation domain in physical space as:
+        [(x0, x1), (y0, y1), (z0, z1)].
+      size: Size of the LB simulation domain.
+      padding: Number of LB nodes that were added to the domain after
+        conversion from the physical space, as:
+        [fwd_x, back_x, fwd_y, back_y, fwd_z, back_z]
+      cuts: Number of LB ndoes that were removed from the domain after
+        conversion from the physical space, as:
+        [(fwd_x, back_x), (fwd_y, back_y), (fwd_z, back_z)]
+    """
 
     def __init__(self, config):
         """Initializes the converter.

@@ -1,19 +1,19 @@
 import unittest
-import converter
+from sailfish import converter
 import numpy as np
 
 config = {
-    'size': [10, 20, 30],
+    'size': [16, 25, 31],  # zyx
     'padding': [1, 0, 2, 3, 4, 2],
-    'bounding_box': [(-0.5, 0.5), (-0.3, 0.6), (1.2, 1.4)],
-    'axes': 'zxy',
+    'bounding_box': [(-0.5, 0.5), (-0.3, 0.6), (1.2, 1.4)],  # xyz
+    'axes': 'zyx',
 }
 
 class CoordinateConversionTest(unittest.TestCase):
     def test_from_lb(self):
         conv = converter.CoordinateConverter(config)
-        pos = [15, 5, 7]
-        exp = [0.0, 0.0, 1.29]
+        pos = [16, 9, 9]
+        exp = [0.0, 0.0, 1.3]
 
         # All coordinates should match within dx (1/size).
         self.assertTrue(np.all(np.abs(np.array(conv.from_lb(pos)) - np.array(exp)) <
@@ -21,8 +21,8 @@ class CoordinateConversionTest(unittest.TestCase):
 
     def test_to_lb(self):
         conv = converter.CoordinateConverter(config)
-        pos = [0.0, 0.0, 1.29]
-        exp = [15, 6, 7]
+        pos = [0.0, 0.0, 1.3]
+        exp = [15 + 1, 7 + 2, 5 + 4]
         self.assertEqual(exp, conv.to_lb(pos, round_=True))
 
     def test_ushape(self):
