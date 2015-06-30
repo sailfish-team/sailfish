@@ -8,6 +8,7 @@ import math
 import numpy as np
 import operator
 import os
+import re
 import ctypes
 from ctypes import Structure, c_uint16, c_int32, c_uint8, c_bool
 
@@ -177,6 +178,9 @@ def checkpoint_filename(base, digits, subdomain_id, it):
 
 def subdomain_checkpoint(base, subdomain_id):
     return '{0}.{1}.cpoint.npz'.format(base, subdomain_id)
+
+def iter_from_filename(fname):
+    return re.findall(r'([0-9]+)\.npz', fname)[0]
 
 class VTKOutput(LBOutput):
     """Saves simulation data in VTK files."""
