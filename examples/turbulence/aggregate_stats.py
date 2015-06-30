@@ -14,8 +14,12 @@ from collections import defaultdict
 import numpy as np
 import sys
 
+from sailfish import io
+
 data = {}
 weight_sum = 0.0
+
+sources = []
 
 for fname in sys.argv[2:]:
     fname, _, weight = fname.partition(',')
@@ -24,6 +28,8 @@ for fname in sys.argv[2:]:
     else:
         weight = 1.0
     a = np.load(fname)
+    sources.append(io.iter_from_filename(fname))
+
     print "\r", fname, np.max(a['uz_m1']),
     for field in a.files:
         if field in data:
@@ -35,4 +41,4 @@ for fname in sys.argv[2:]:
 for v in data.itervalues():
     v /= weight_sum
 
-np.savez(sys.argv[1], **data)
+np.savez(sys.argv[1], sources=sources, **data)
