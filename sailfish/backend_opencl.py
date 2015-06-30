@@ -4,18 +4,15 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+# Make sure the pyopencl module exists, but do not import it.
+import imp
+imp.find_module('pyopencl')
 import operator
 import os
-import pyopencl as cl
-import pyopencl.array as clarray
-import pyopencl.reduction as reduction
-import pyopencl.tools
 import numpy as np
 
 class OpenCLBackend(object):
     name ='opencl'
-    array = clarray
-    FatalError = pyopencl.RuntimeError
 
     @classmethod
     def add_options(cls, group):
@@ -30,6 +27,20 @@ class OpenCLBackend(object):
 
         :param gpu_id: number of the GPU to use
         """
+        # Late import of the pyopencl module and setup of related instance
+        # attributes. This is necesary because of
+        # http://lists.tiker.net/pipermail/pyopencl/2014-August/001798.html
+        import pyopencl as cl
+        import pyopencl.array as clarray
+        import pyopencl.reduction as reduction
+        import pyopencl.tools
+        globals()['cl'] = cl
+        globals()['clarray'] = clarray
+        globals()['reduction'] = reduction
+        globals()['pyopencl.tools'] = pyopencl.tools
+        self.array = clarray
+        self.FatalError = pyopencl.RuntimeError
+
         if options.opencl_interactive:
             self.ctx = cl.create_some_context(True)
         else:
