@@ -522,6 +522,9 @@ class SubdomainRunner(object):
                                 (total_field_bytes / 1024 / 1024))
 
     def _log_relaxation_model(self):
+        if not hasattr(self.config, 'model'):
+            return
+
         model = 'Relaxation model: {0}'.format(self.config.model)
         options = []
         if self.config.regularized:
