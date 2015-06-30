@@ -27,7 +27,7 @@ def _start_subdomain_runner(subdomain_spec, config, sim, num_subdomains,
     """
     :param num_subdomains: number of subdomains handled by this machine
     """
-    config.logger.debug('SubdomainRunner starting with PID {0}'.format(os.getpid()))
+    config.logger.info('SubdomainRunner starting with PID {0}'.format(os.getpid()))
     # Make sure each subdomain has its own temporary directory.  This is
     # particularly important with Numpy 1.3.0, where there is a race
     # condition when saving npz files.
