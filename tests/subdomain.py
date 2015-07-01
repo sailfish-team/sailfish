@@ -338,12 +338,12 @@ class TestLinkTagging3D(TestCase3D):
                      [1, 1, 1, 1, 1],
                      [1, 1, 1, 1, 1],
                      [1, 1, 1, 1, 1],
-                     [1, 1, 1, 1, 1]]], dtype=np.bool)
+                     [1, 1, 1, 1, 1]]], dtype=np.uint8)
                 wall_map = np.pad(wall_map, (1, 1), mode='constant',
-                                  constant_values=0)
-                self.set_node(wall_map, NTFullBBWall)
-                self.set_node(np.logical_not(wall_map) & (hz == 0),
-                            NTEquilibriumDensity(1.0))
+                                  constant_values=2)
+                self.set_node(wall_map == 1, NTFullBBWall)
+                self.set_node((wall_map == 0) & (hz == 0),
+                              NTEquilibriumDensity(1.0))
 
         sub = _LinkTaggingSubdomain3D((3, 8, 5), spec, D3Q19)
         sub.allocate()

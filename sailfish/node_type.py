@@ -55,6 +55,9 @@ class LBNodeType(object):
     #: domain.
     location = 0.0
 
+    #: If True, the node can be marked as unused. Only valid for wet nodes.
+    allow_unused = False
+
     def __init__(self, **params):
         if 'orientation' in params:
             self.orientation = params['orientation']
@@ -134,6 +137,7 @@ class NTHalfBBWall(LBNodeType):
     needs_orientation = True
     link_tags = True
     location = -0.5
+    allow_unused = True
 
 
 class NTFullBBWall(LBNodeType):
@@ -176,6 +180,7 @@ class NTWallTMS(LBNodeType):
     needs_orientation = True
     link_tags = True
     location = 0.5
+    allow_unused = True
 
     # This will cause the standard procedure to compute the instantaneous u and
     # rho as defined in the paper.
@@ -385,8 +390,9 @@ def __init_node_type_list():
 
     return dict([(node_type.id, node_type) for node_type in ret])
 
-def get_wet_node_type_ids():
-    return [id for id, nt in _NODE_TYPES.iteritems() if nt.wet_node]
+def get_wet_node_type_ids(allow_unused=None):
+    return [id for id, nt in _NODE_TYPES.iteritems() if nt.wet_node and
+            (allow_unused is None or nt.allow_unused == allow_unused)]
 
 def get_dry_node_type_ids():
     return [id for id, nt in _NODE_TYPES.iteritems() if not nt.wet_node]

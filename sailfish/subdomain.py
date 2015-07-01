@@ -461,15 +461,7 @@ class Subdomain(object):
         """
         self.config.logger.debug('... setting active node map from wall map')
         fluid_map = np.logical_not(wall_map)
-        # Build a convolution kernel to count active neighbor nodes.
-        if self.dim == 3:
-            neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
-            for x in self.grid.basis:
-                neighbors[x[0] + 1, x[1] + 1, x[2] + 1] = 1
-        else:
-            neighbors = np.zeros((3, 3), dtype=np.uint8)
-            for x in self.grid.basis:
-                neighbors[x[0] + 1, x[1] + 1] = 1
+        neighbor = self._lattice_kernel(zero=0)
 
         # Mark nodes connected to at least one active node as active.
         # We need these nodes for walls and ghost nodes.
@@ -809,7 +801,7 @@ class Subdomain(object):
         else:
             return fm == 0
 
-    def _fluid_map(self, wet=True, base=True):
+    def _fluid_map(self, wet=True, base=True, allow_unused=None):
         assert not self._type_map_encoded
 
         if base:
@@ -819,11 +811,41 @@ class Subdomain(object):
 
         if wet:
             uniq_types = set(np.unique(src))
-            wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
+            wet_types = list(set(nt.get_wet_node_type_ids(allow_unused=allow_unused)) & uniq_types)
             wet_types = self._type_map.dtype.type(wet_types)
             return util.in_anyd_fast(src, wet_types)
         else:
             return src == 0
+
+    def _lattice_kernel(self, zero=1):
+        raise NotImplementedError
+
+    def _postprocess_nodes(self):
+        fluid_map = self._fluid_map(wet=False, base=True).astype(np.uint8)
+        wet_map_for_unused = self._fluid_map(wet=True, allow_unused=True, base=True).astype(np.uint8)
+        wet_map = self._fluid_map(wet=True, base=True).astype(np.uint8)
+        neighbors = self._lattice_kernel()
+
+        # Any *wet* node not connected to at least one *fluid* node is marked unused.
+        # Note that dry nodes connecting to wet nodes need to be retained.
+        # For instance:
+        #  W W
+        #  W V
+        # where W is a HBB wall and V is a velocity BC.
+        where = (filters.convolve(fluid_map, neighbors, mode='constant', cval=1) == 0)
+        self._type_map_base[where & wet_map_for_unused.astype(np.bool)] = nt._NTUnused.id
+
+        # Any dry node, not connected to at least one wet node is marked unused.
+        # For instance, for HBB walls: .. W W W F -> .. U U W F.
+        where = (filters.convolve(wet_map, neighbors, mode='constant', cval=0) == 0)
+        self._type_map_base[where & np.logical_not(wet_map.astype(np.bool))] = nt._NTUnused.id
+
+        # If an unused node touches a wet node, mark it as propagation only.
+        # For instance, for HBB walls: .. U U W F -> .. U P W F.
+        used_map = (self._type_map_base != nt._NTUnused.id).astype(np.uint8)
+        where = (filters.convolve(used_map, neighbors, mode='constant', cval=0) > 0)
+        self._type_map_base[where & (self._type_map_base == nt._NTUnused.id)] = nt._NTPropagationOnly.id
+
 
 class Subdomain2D(Subdomain):
     dim = 2
@@ -883,33 +905,13 @@ class Subdomain2D(Subdomain):
         _set(self._type_map_base[es + self.spec.ny:, :], self.spec.Y_HIGH)
         _set(self._type_map_base[:, es + self.spec.nx:], self.spec.X_HIGH)
 
-    def _postprocess_nodes(self):
-        fluid_map = self._fluid_map(wet=False, base=False).astype(np.uint8)
-        wet_map = self._fluid_map(wet=True, base=False).astype(np.uint8)
+    def _lattice_kernel(self, zero=1):
         neighbors = np.zeros((3, 3), dtype=np.uint8)
-        neighbors[1,1] = 1
+        neighbors[1,1] = zero
         for ei in self.grid.basis:
             neighbors[1 + ei[1], 1 + ei[0]] = 1
+        return neighbors
 
-        # Any wet node not connected to at least one fluid node is marked unused.
-        # Note that dry nodes connecting to wet nodes need to be retained.
-        # For instance:
-        #  W W
-        #  W V
-        # where W is a HBB wall and V is a velocity BC.
-        where = (filters.convolve(fluid_map, neighbors, mode='constant', cval=1) == 0)
-        self._type_map[where & wet_map.astype(np.bool)] = nt._NTUnused.id
-
-        # Any dry node, not connected to at least one wet node is marked unused.
-        # For instance, for HBB walls: .. W W W F -> .. U U W F.
-        where = (filters.convolve(wet_map, neighbors, mode='constant', cval=0) == 0)
-        self._type_map[where & np.logical_not(wet_map)] = nt._NTUnused.id
-
-        # If an unused node touches a wet node, mark it as propagation only.
-        # For instance, for BBL walls: .. U U W F -> .. U P W F.
-        used_map = (self._type_map != nt._NTUnused.id).astype(np.uint8)
-        where = (filters.convolve(used_map, neighbors, mode='constant', cval=0) > 0)
-        self._type_map[where & (self._type_map == nt._NTUnused.id)] = nt._NTPropagationOnly.id
 
 class Subdomain3D(Subdomain):
     dim = 3
@@ -977,30 +979,9 @@ class Subdomain3D(Subdomain):
         _set(self._type_map_base[:, es + self.spec.ny:, :], self.spec.Y_HIGH)
         _set(self._type_map_base[:, :, es + self.spec.nx:], self.spec.X_HIGH)
 
-    def _postprocess_nodes(self):
-        fluid_map = self._fluid_map(wet=False, base=False).astype(np.uint8)
-        wet_map = self._fluid_map(wet=True, base=False).astype(np.uint8)
+    def _lattice_kernel(self, zero=1):
         neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
-        neighbors[1,1,1] = 1
+        neighbors[1,1,1] = zero
         for ei in self.grid.basis:
             neighbors[1 + ei[2], 1 + ei[1], 1 + ei[0]] = 1
-
-        # Any wet node not connected to at least one fluid node is marked unused.
-        # Note that dry nodes connecting to wet nodes need to be retained.
-        # For instance:
-        #  W W
-        #  W V
-        # where W is a HBB wall and V is a velocity BC.
-        where = (filters.convolve(fluid_map, neighbors, mode='constant', cval=1) == 0)
-        self._type_map[where & wet_map.astype(np.bool)] = nt._NTUnused.id
-
-        # Any dry node, not connected to at least one wet node is marked unused.
-        # For instance, for HBB walls: .. W W W F -> .. U U W F.
-        where = (filters.convolve(wet_map, neighbors, mode='constant', cval=0) == 0)
-        self._type_map[where & np.logical_not(wet_map.astype(np.bool))] = nt._NTUnused.id
-
-        # If an unused node touches a wet node, mark it as propagation only.
-        # For instance, for HBB walls: .. U U W F -> .. U P W F.
-        used_map = (self._type_map != nt._NTUnused.id).astype(np.uint8)
-        where = (filters.convolve(used_map, neighbors, mode='constant', cval=0) > 0)
-        self._type_map[where & (self._type_map == nt._NTUnused.id)] = nt._NTPropagationOnly.id
+        return neighbors
