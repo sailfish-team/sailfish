@@ -92,7 +92,8 @@ class CapillaryWaveSim(LBBinaryFluidShanChen):
             interface1 = m1 + scipy.optimize.brentq(lambda x: f(x) - phi_m, 0, phi.shape[0] - 1)
             interface2 = m1 + scipy.optimize.brentq(lambda x: f_rho(x) - rho_m, 0, phi.shape[0] - 1)
 
-            print interface1, interface2
+            self.config.logger.info('iface %e %e' % (interface1, interface2))
+
 
 if __name__ == '__main__':
     LBSimulationController(CapillaryWaveSim).run()
