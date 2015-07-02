@@ -463,6 +463,52 @@ class TestLinkTagging3D(TestCase3D):
                          enumerate(D3Q19.basis[1:]) if vec[1] <= 0))
         np.testing.assert_equal(hy_tags, sub._orientation[hy == ny - 1])
 
+    def test_duct(self):
+        self.sim.config.periodic_z = True
+        spec = SubdomainSpec3D((0, 0, 0), self.lattice_size, envelope_size=1,
+                               id_=0)
+        spec.enable_local_periodicity(2)
+        spec.runner = SubdomainRunner(self.sim, spec, output=None,
+                                      backend=self.backend, quit_event=None)
+        spec.runner._init_shape()
+
+        class _DuctSubdomain(Subdomain3D):
+            def boundary_conditions(self, hx, hy, hz):
+                self.set_node((hy == 0) | (hy == self.gy - 1) |
+                              (hx == 0) | (hx == self.gx - 1), NTHalfBBWall)
+
+        sub = _DuctSubdomain(list(reversed(self.lattice_size)), spec, D3Q19)
+        sub.allocate()
+        sub.reset()
+
+        nx, ny, nz = self.lattice_size
+        hx, hy, hz = sub._get_mgrid()
+
+        # Link tags should be the same in every Z-slice.
+        for z in range(nz):
+            np.testing.assert_equal(sub._orientation[hz == z],
+                                    sub._orientation[hz == 0])
+
+        def _get_tags(cond):
+            return reduce(operator.or_,
+                          ((1 << i) for i, vec in enumerate(D3Q19.basis[1:])
+                           if cond(vec)))
+
+        expected = np.zeros_like(sub._orientation[0, :, :])
+        # Edges.
+        expected[ 1:-1,  0] = _get_tags(lambda v: v[0] >= 0)
+        expected[ 1:-1, -1] = _get_tags(lambda v: v[0] <= 0)
+        expected[ 0,  1:-1] = _get_tags(lambda v: v[1] >= 0)
+        expected[-1,  1:-1] = _get_tags(lambda v: v[1] <= 0)
+
+        # Corners.
+        expected[ 0,  0] = _get_tags(lambda v: v[0] >= 0 and v[1] >= 0)
+        expected[ 0, -1] = _get_tags(lambda v: v[0] <= 0 and v[1] >= 0)
+        expected[-1,  0] = _get_tags(lambda v: v[0] >= 0 and v[1] <= 0)
+        expected[-1, -1] = _get_tags(lambda v: v[0] <= 0 and v[1] <= 0)
+
+        np.testing.assert_equal(expected, sub._orientation[0, :, :])
+
 
 if __name__ == '__main__':
     unittest.main()

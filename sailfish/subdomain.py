@@ -889,13 +889,14 @@ class Subdomain2D(Subdomain):
                 return slice(None), slc[0]
 
         def _set(x, face):
-            if unset_only:
+            # If the subdomain does not communicate with other subdomains, we
+            # are allowed to set ghost nodes on the whole face.
+            if unset_only and self.spec.has_face_conn(face):
                 # Nodes are fluid.
                 tg_map = (x == 0)
                 # Nodes do not communicate data to neighboring subdomains.
                 for cpair in self.spec._connections.get(face, []):
                     tg_map[_slice(cpair.src.src_slice, face)] = False
-
                 x[tg_map] = nt._NTGhost.id
             else:
                 x[:] = nt._NTGhost.id
@@ -961,7 +962,9 @@ class Subdomain3D(Subdomain):
                 return slice(None), slc[1], slc[0]
 
         def _set(x, face):
-            if unset_only:
+            # If the subdomain does not communicate with other subdomains, we
+            # are allowed to set ghost nodes on the whole face.
+            if unset_only and self.spec.has_face_conn(face):
                 # Nodes are fluid.
                 tg_map = (x == 0)
                 # Nodes do not communicate data to neighboring subdomains.
