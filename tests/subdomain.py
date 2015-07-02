@@ -12,30 +12,31 @@ from common import TestCase2D, TestCase3D
 # Basic node type setting.
 # ========================
 
-class SubdomainTest2D(Subdomain2D):
-    def boundary_conditions(self, hx, hy):
-        where = (hx == hy)
-        self.set_node(where, NTEquilibriumVelocity(
-            multifield((0.01 * (hx - self.gy / 2)**2, 0.0), where)))
-
-        where = ((hx == 5) & (hy == 7))
-        self.set_node(where, NTEquilibriumDensity(
-            DynamicValue(0.1 * S.gx)))
-
-        # Interpolated time series.
-        data = np.linspace(0, 50, 10)
-        where = ((hx == 5) & (hy == 8))
-        self.set_node(where, NTEquilibriumDensity(
-            DynamicValue(0.1 * S.gx * LinearlyInterpolatedTimeSeries(data, 40))))
-
-        # Same underlying data, but different time step.
-        where = ((hx == 5) & (hy == 9))
-        self.set_node(where, NTEquilibriumDensity(
-            DynamicValue(0.1 * S.gx * LinearlyInterpolatedTimeSeries(data, 30))))
-
-        self.set_node((hx > 10) & (hy < 5), NTFullBBWall)
-
 class TestNodeTypeSetting2D(TestCase2D):
+    class _SubdomainTest2D(Subdomain2D):
+        def boundary_conditions(self, hx, hy):
+            where = (hx == hy)
+            self.set_node(where, NTEquilibriumVelocity(
+                multifield((0.01 * (hx - self.gy / 2)**2, 0.0), where)))
+
+            where = ((hx == 5) & (hy == 7))
+            self.set_node(where, NTEquilibriumDensity(
+                DynamicValue(0.1 * S.gx)))
+
+            # Interpolated time series.
+            data = np.linspace(0, 50, 10)
+            where = ((hx == 5) & (hy == 8))
+            self.set_node(where, NTEquilibriumDensity(
+                DynamicValue(0.1 * S.gx * LinearlyInterpolatedTimeSeries(data, 40))))
+
+            # Same underlying data, but different time step.
+            where = ((hx == 5) & (hy == 9))
+            self.set_node(where, NTEquilibriumDensity(
+                DynamicValue(0.1 * S.gx * LinearlyInterpolatedTimeSeries(data, 30))))
+
+            self.set_node((hx > 10) & (hy < 5), NTFullBBWall)
+
+
     def test_array_setting(self):
         envelope = 1
         spec = SubdomainSpec2D((0, 0), self.lattice_size,
@@ -43,7 +44,7 @@ class TestNodeTypeSetting2D(TestCase2D):
         spec.runner = SubdomainRunner(self.sim, spec, output=None,
                                       backend=self.backend, quit_event=None)
         spec.runner._init_shape()
-        sub = SubdomainTest2D(list(reversed(self.lattice_size)), spec, D2Q9)
+        sub = self._SubdomainTest2D(list(reversed(self.lattice_size)), spec, D2Q9)
         sub.allocate()
         sub.reset(encode=False)
 
@@ -59,15 +60,48 @@ class TestNodeTypeSetting2D(TestCase2D):
         self.assertTrue(sub.config.time_dependence)
         self.assertTrue(sub.config.space_dependence)
 
-class SubdomainTest3D(Subdomain3D):
-    def boundary_conditions(self, hx, hy, hz):
-        where = np.logical_and((hx == hy), (hy == hz))
-        self.set_node(where, NTEquilibriumVelocity(
-            multifield((0.01 * (hy - self.gy / 2)**2,
-                        0.03 * (hz - self.gz / 2)**2, 0.0), where)))
-        self.set_node((hx > 10) & (hy < 5) & (hz < 7), NTFullBBWall)
+    def test_solid_interior_nodes(self):
+        """Verifies that interior solid nodes in a 2D cube are correctly
+        rewritten as unused/propagation only."""
+        spec = SubdomainSpec2D((0, 0), self.lattice_size, envelope_size=1, id_=0)
+        spec.runner = SubdomainRunner(self.sim, spec, output=None,
+                                      backend=self.backend, quit_event=None)
+        spec.runner._init_shape()
+
+        class _Subdomain2D(Subdomain2D):
+            def boundary_conditions(self, hx, hy):
+                box = (hx >= 5) & (hx <= 10) & (hy >= 5) & (hy <= 10)
+                self.set_node(box, NTHalfBBWall)
+
+        sub = _Subdomain2D(list(reversed(self.lattice_size)), spec, D2Q9)
+        sub.allocate()
+        sub.reset(encode=False)
+
+        # Outer layer is bounce-back nodes.
+        np.testing.assert_equal(sub._type_map[5:11, 5], NTHalfBBWall.id)
+        np.testing.assert_equal(sub._type_map[5:11, 10], NTHalfBBWall.id)
+        np.testing.assert_equal(sub._type_map[5, 5:11], NTHalfBBWall.id)
+        np.testing.assert_equal(sub._type_map[10, 5:11], NTHalfBBWall.id)
+
+        # Inner layer are propagation-only nodes.
+        np.testing.assert_equal(sub._type_map[6:10, 6], _NTPropagationOnly.id)
+        np.testing.assert_equal(sub._type_map[6:10, 9], _NTPropagationOnly.id)
+        np.testing.assert_equal(sub._type_map[6, 6:10], _NTPropagationOnly.id)
+        np.testing.assert_equal(sub._type_map[9, 6:10], _NTPropagationOnly.id)
+
+        # Core of unused nodes.
+        np.testing.assert_equal(sub._type_map[7:9, 7:9], _NTUnused.id)
+
 
 class TestNodeTypeSetting3D(TestCase3D):
+    class _SubdomainTest3D(Subdomain3D):
+        def boundary_conditions(self, hx, hy, hz):
+            where = np.logical_and((hx == hy), (hy == hz))
+            self.set_node(where, NTEquilibriumVelocity(
+                multifield((0.01 * (hy - self.gy / 2)**2,
+                            0.03 * (hz - self.gz / 2)**2, 0.0), where)))
+            self.set_node((hx > 10) & (hy < 5) & (hz < 7), NTFullBBWall)
+
     def test_array_setting(self):
         envelope = 1
         spec = SubdomainSpec3D((0, 0, 0), self.lattice_size,
@@ -75,7 +109,7 @@ class TestNodeTypeSetting3D(TestCase3D):
         spec.runner = SubdomainRunner(self.sim, spec, output=None,
                                       backend=self.backend, quit_event=None)
         spec.runner._init_shape()
-        sub = SubdomainTest3D(list(reversed(self.lattice_size)), spec, D3Q19)
+        sub = self._SubdomainTest3D(list(reversed(self.lattice_size)), spec, D3Q19)
         sub.allocate()
         sub.reset(encode=False)
 
@@ -91,22 +125,84 @@ class TestNodeTypeSetting3D(TestCase3D):
         np.testing.assert_equal(sub._type_map[1:5, 1:2, 13:-1], _NTUnused.id)
         np.testing.assert_equal(sub._type_map[5, 3, 12:-1], _NTPropagationOnly.id)
 
+    def test_boundary_nodes(self):
+        """Verifies that boundary (density) nodes do not get mistakenly
+        rewritten as unused/propagation-only."""
+        spec = SubdomainSpec3D((0, 0, 0), (5, 8, 3), envelope_size=1, id_=0)
+        spec.runner = SubdomainRunner(self.sim, spec, output=None,
+                                      backend=self.backend, quit_event=None)
+        spec.runner._init_shape()
+
+        class _Subdomain3D(Subdomain3D):
+            def boundary_conditions(self, hx, hy, hz):
+                wall_map = np.array([
+                    [[0, 0, 0, 0, 1],
+                     [0, 0, 0, 0, 1],
+                     [0, 0, 0, 1, 1],
+                     [0, 0, 0, 1, 1],  # There was a bug once that caused the
+                                       # middle node here to be marked
+                                       # PropagationOnly.
+                     [0, 0, 1, 1, 1],
+                     [0, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1]],
+                    [[0, 0, 0, 1, 1],
+                     [0, 0, 0, 1, 1],
+                     [0, 0, 1, 1, 1],
+                     [0, 1, 1, 1, 1],
+                     [0, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1]],
+                    [[0, 0, 1, 1, 1],
+                     [0, 1, 1, 1, 1],
+                     [0, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1]]], dtype=np.uint8)
+                wall_map = np.pad(wall_map, (1, 1), mode='constant',
+                                  constant_values=2)
+                self.set_node(wall_map == 1, NTFullBBWall)
+                self.set_node((wall_map == 0) & (hz == 0),
+                              NTEquilibriumDensity(1.0))
+
+        sub = _Subdomain3D((3, 8, 5), spec, D3Q19)
+        sub.allocate()
+        sub.reset(encode=False)
+
+        expected = np.array([
+             [ 3,  3,  3,  3,  5],
+             [ 3,  3,  3,  3,  5],
+             [ 3,  3,  3,  5,  5],
+             [ 3,  3,  3,  5, 19],
+             [ 3,  3,  5,  5, 19],
+             [ 3,  5,  5, 19, 19],
+             [ 5,  5, 19, 19, 20],
+             [19, 19, 19, 20, 20]])
+        expected[expected == 3] = NTEquilibriumDensity.id
+        expected[expected == 5] = NTFullBBWall.id
+        expected[expected == 19] = _NTPropagationOnly.id
+        expected[expected == 20] = _NTUnused.id
+        np.testing.assert_equal(expected, sub._type_map[0,:,:])
+
 
 # Orientation detection.
 # ======================
 
-class OrientationSubdomain2D(Subdomain2D):
-    def boundary_conditions(self, hx, hy):
-        self.set_node((hx == 0) | (hy == 0) | (hx == self.gx - 1) |
-                      (hy == self.gy - 1), NTEquilibriumDensity(1.0))
-
 class TestOrientationDetection2D(TestCase2D):
+    class _OrientationSubdomain2D(Subdomain2D):
+        def boundary_conditions(self, hx, hy):
+            self.set_node((hx == 0) | (hy == 0) | (hx == self.gx - 1) |
+                          (hy == self.gy - 1), NTEquilibriumDensity(1.0))
+
     def test_orientation(self):
         spec = SubdomainSpec2D((0, 0), self.lattice_size, envelope_size=1, id_=0)
         spec.runner = SubdomainRunner(self.sim, spec, output=None,
                                       backend=self.backend, quit_event=None)
         spec.runner._init_shape()
-        sub = OrientationSubdomain2D(list(reversed(self.lattice_size)), spec, D2Q9)
+        sub = self._OrientationSubdomain2D(list(reversed(self.lattice_size)), spec, D2Q9)
         sub.allocate()
         sub.reset()
 
@@ -132,17 +228,11 @@ class TestOrientationDetection2D(TestCase2D):
         np.testing.assert_equal(sub._orientation[ny - 1, nx - 1], 0)
 
 
-class OrientationSubdomain3D(Subdomain3D):
-    def boundary_conditions(self, hx, hy, hz):
-        self.set_node((hx == 0) | (hy == 0) | (hz == 0) | (hz == self.gz - 1) |
-                      (hx == self.gx - 1) | (hy == self.gy - 1),
-                      NTEquilibriumDensity(1.0))
-
-class ChannelSubdomain3D(Subdomain3D):
-    def boundary_conditions(self, hx, hy, hz):
-        self.set_node((hx == 0) | (hx == self.gx-1), NTHalfBBWall)
-
 class TestOrientationDetection3D(TestCase3D):
+    class _ChannelSubdomain3D(Subdomain3D):
+        def boundary_conditions(self, hx, hy, hz):
+            self.set_node((hx == 0) | (hx == self.gx-1), NTHalfBBWall)
+
     def test_orientation_channel_pbc(self):
         self.sim.config.periodic_z = True
         self.sim.config.periodic_y = True
@@ -152,7 +242,7 @@ class TestOrientationDetection3D(TestCase3D):
         spec.runner = SubdomainRunner(self.sim, spec, output=None,
                                       backend=self.backend, quit_event=None)
         spec.runner._init_shape()
-        sub = ChannelSubdomain3D(list(reversed(self.lattice_size)), spec, D3Q19)
+        sub = self._ChannelSubdomain3D(list(reversed(self.lattice_size)), spec, D3Q19)
         sub.allocate()
         sub.reset()
 
@@ -182,11 +272,11 @@ class TestOrientationDetection3D(TestCase3D):
                                        backend=self.backend, quit_event=None)
         spec1.runner._init_shape()
 
-        sub0 = ChannelSubdomain3D(list(reversed(self.lattice_size)), spec0, D3Q19)
+        sub0 = self._ChannelSubdomain3D(list(reversed(self.lattice_size)), spec0, D3Q19)
         sub0.allocate()
         sub0.reset()
 
-        sub1 = ChannelSubdomain3D(list(reversed(self.lattice_size)), spec1, D3Q19)
+        sub1 = self._ChannelSubdomain3D(list(reversed(self.lattice_size)), spec1, D3Q19)
         sub1.allocate()
         sub1.reset()
 
@@ -207,7 +297,14 @@ class TestOrientationDetection3D(TestCase3D):
         spec.runner = SubdomainRunner(self.sim, spec, output=None,
                                       backend=self.backend, quit_event=None)
         spec.runner._init_shape()
-        sub = OrientationSubdomain3D(list(reversed(self.lattice_size)), spec, D3Q19)
+
+        class _OrientationSubdomain3D(Subdomain3D):
+            def boundary_conditions(self, hx, hy, hz):
+                self.set_node((hx == 0) | (hy == 0) | (hz == 0) | (hz == self.gz - 1) |
+                              (hx == self.gx - 1) | (hy == self.gy - 1),
+                              NTEquilibriumDensity(1.0))
+
+        sub = _OrientationSubdomain3D(list(reversed(self.lattice_size)), spec, D3Q19)
         sub.allocate()
         sub.reset()
 
@@ -262,107 +359,10 @@ class TestOrientationDetection3D(TestCase3D):
 # Link tagging.
 # =============
 
-class TestLinkTaggingInterior2D(TestCase2D):
-    def setUp(self):
-        TestCase2D.setUp(self)
-        self.sim.config.use_link_tags = True
-
-    def testSolidInteriorNodes(self):
-        spec = SubdomainSpec2D((0, 0), self.lattice_size, envelope_size=1, id_=0)
-        spec.runner = SubdomainRunner(self.sim, spec, output=None,
-                                      backend=self.backend, quit_event=None)
-        spec.runner._init_shape()
-
-        class _LinkTaggingSubdomain2D(Subdomain2D):
-            def boundary_conditions(self, hx, hy):
-                box = (hx >= 5) & (hx <= 10) & (hy >= 5) & (hy <= 10)
-                self.set_node(box, NTHalfBBWall)
-
-        sub = _LinkTaggingSubdomain2D(list(reversed(self.lattice_size)), spec,
-                                      D2Q9)
-        sub.allocate()
-        sub.reset(encode=False)
-
-        # Outer layer is bounce-back nodes.
-        np.testing.assert_equal(sub._type_map[5:11, 5], NTHalfBBWall.id)
-        np.testing.assert_equal(sub._type_map[5:11, 10], NTHalfBBWall.id)
-        np.testing.assert_equal(sub._type_map[5, 5:11], NTHalfBBWall.id)
-        np.testing.assert_equal(sub._type_map[10, 5:11], NTHalfBBWall.id)
-
-        # Inner layer are propagation-only nodes.
-        np.testing.assert_equal(sub._type_map[6:10, 6], _NTPropagationOnly.id)
-        np.testing.assert_equal(sub._type_map[6:10, 9], _NTPropagationOnly.id)
-        np.testing.assert_equal(sub._type_map[6, 6:10], _NTPropagationOnly.id)
-        np.testing.assert_equal(sub._type_map[9, 6:10], _NTPropagationOnly.id)
-
-        # Core of unused nodes.
-        np.testing.assert_equal(sub._type_map[7:9, 7:9], _NTUnused.id)
-
-
 class TestLinkTagging3D(TestCase3D):
     def setUp(self):
         TestCase3D.setUp(self)
         self.sim.config.use_link_tags = True
-
-    def testBoundaryNodes(self):
-        spec = SubdomainSpec3D((0, 0, 0), (5, 8, 3), envelope_size=1, id_=0)
-        spec.runner = SubdomainRunner(self.sim, spec, output=None,
-                                      backend=self.backend, quit_event=None)
-        spec.runner._init_shape()
-
-        class _LinkTaggingSubdomain3D(Subdomain3D):
-            def boundary_conditions(self, hx, hy, hz):
-                wall_map = np.array([
-                    [[0, 0, 0, 0, 1],
-                     [0, 0, 0, 0, 1],
-                     [0, 0, 0, 1, 1],
-                     [0, 0, 0, 1, 1],  # There was a bug once that caused the
-                                       # middle node here to be marked
-                                       # PropagationOnly.
-                     [0, 0, 1, 1, 1],
-                     [0, 1, 1, 1, 1],
-                     [1, 1, 1, 1, 1],
-                     [1, 1, 1, 1, 1]],
-                    [[0, 0, 0, 1, 1],
-                     [0, 0, 0, 1, 1],
-                     [0, 0, 1, 1, 1],
-                     [0, 1, 1, 1, 1],
-                     [0, 1, 1, 1, 1],
-                     [1, 1, 1, 1, 1],
-                     [1, 1, 1, 1, 1],
-                     [1, 1, 1, 1, 1]],
-                    [[0, 0, 1, 1, 1],
-                     [0, 1, 1, 1, 1],
-                     [0, 1, 1, 1, 1],
-                     [1, 1, 1, 1, 1],
-                     [1, 1, 1, 1, 1],
-                     [1, 1, 1, 1, 1],
-                     [1, 1, 1, 1, 1],
-                     [1, 1, 1, 1, 1]]], dtype=np.uint8)
-                wall_map = np.pad(wall_map, (1, 1), mode='constant',
-                                  constant_values=2)
-                self.set_node(wall_map == 1, NTFullBBWall)
-                self.set_node((wall_map == 0) & (hz == 0),
-                              NTEquilibriumDensity(1.0))
-
-        sub = _LinkTaggingSubdomain3D((3, 8, 5), spec, D3Q19)
-        sub.allocate()
-        sub.reset(encode=False)
-
-        expected = np.array([
-             [ 3,  3,  3,  3,  5],
-             [ 3,  3,  3,  3,  5],
-             [ 3,  3,  3,  5,  5],
-             [ 3,  3,  3,  5, 19],
-             [ 3,  3,  5,  5, 19],
-             [ 3,  5,  5, 19, 19],
-             [ 5,  5, 19, 19, 20],
-             [19, 19, 19, 20, 20]])
-        expected[expected == 3] = NTEquilibriumDensity.id
-        expected[expected == 5] = NTFullBBWall.id
-        expected[expected == 19] = _NTPropagationOnly.id
-        expected[expected == 20] = _NTUnused.id
-        np.testing.assert_equal(expected, sub._type_map[0,:,:])
 
     def test_periodic_yz(self):
         self.sim.config.periodic_y = True
