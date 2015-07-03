@@ -15,14 +15,29 @@ fi
 logfile=$1
 deadline=$2
 
-if [[ "$(cat ${logfile} | grep 'SubdomainRunner starting with PID' | wc -l)" -lt 1 ]]; then
+getpids() {
+  pids=""
+  tac ${logfile} | grep 'starting with PID' | while read line ; do
+    [[ -n "$(echo ${line} | grep 'Machine master')" ]] && echo $pids && break
+    pids="${pids} $(echo ${line} | sed -e 's/.* PID \([0-9]\+\).*/\1/')"
+  done
+}
+
+pids=$(getpids)
+
+if [[ -z "$(echo ${pids} | tr -c -d 0-9)" ]]; then
   echo "No SubdomainRunner PIDs found."
   exit 1
 fi
 
+echo "SubdomainRunner PIDs found: ${pids}"
+sleep 10
+
 while true; do
-  if [[ $(qstat -f $PBS_JOBID | grep Walltime.Remaining | grep -o '[0-9]*') -lt $deadline ]]; then
-    cat ${logfile} | grep 'SubdomainRunner starting with PID ' | sed -e 's/.* PID \([0-9]\+\).*/\1/' | xargs kill -SIGHUP
+  remaining=$(qstat -f $PBS_JOBID | grep Walltime.Remaining | grep -o '[0-9]*')
+  echo "Remaining seconds: ${remaining}"
+  if [[ $remaining -lt $deadline ]]; then
+    kill -SIGHUP ${pids}
     exit 0
   fi
 
