@@ -64,6 +64,9 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
     #: between host syncs.
     stat_buf_size = 1024
 
+    #: List of iterations at which measurements were taken.
+    snapshot_iters = []
+
     def prepare_reynolds_stats(self, runner, moments=True,
                                correlations=True,
                                axis='x'):
@@ -191,6 +194,7 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
         """Collects Reynolds statistics."""
         # TODO(mjanusz): Run these kernels in a stream other than main.
         self.stat_cnt += 1
+        self.snapshot_iters.append(self.iteration)
 
         NX = self._reyn_points
         grid = [self.stat_cm_grid_size]
@@ -251,6 +255,10 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
 
             # Divide the stats by this value to get an average over all nodes.
             div = self._reyn_normalizer
+
+            iters = self.snapshot_iters
+            self.snapshot_iters = []
+
             return {
                 'ux_m1': self.stat_ux_m1 / div,
                 'ux_m2': self.stat_ux_m2 / div,
@@ -273,7 +281,8 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
                 'uy_uz': self.stat_uy_uz / div,
                 'ux_rho': self.stat_ux_rho / div,
                 'uy_rho': self.stat_uy_rho / div,
-                'uz_rho': self.stat_uz_rho / div}
+                'uz_rho': self.stat_uz_rho / div,
+                'iters': iters}
         else:
             # Update buffer offset.
             if self.cm_finalize:
