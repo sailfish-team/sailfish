@@ -31,34 +31,6 @@ ${kernel} void ComputeStressTensor(
   %endfor
 }
 
-${kernel} void ComputeStressTensor(
-  ${nodes_array_if_required()}
-  ${global_ptr} ${const_ptr} int *__restrict__ map,
-  ${global_ptr} float *dist,
-%for i in range(dim * (dim - 1)):
-  ${global_ptr} ${const_ptr} float *stress${i}
-%endfor
-) {
-  ${local_indices()}
-  ${indirect_index()}
-  ${load_node_type()}
-
-  Dist d0;
-  getDist(
-    ${nodes_array_arg_if_required()}
-    &d0, dist_in, gi
-    ${dense_gi_arg_if_required()}
-    ${iteration_number_arg_if_required()});
-
-  // Macroscopic quantities for the current cell
-  float rho, v[${dim}], stress[${dim * (dim - 1)}];
-  getMacro(&d0, ncode, type, orientation, &rho, v ${dynamic_val_call_args()});
-  compute_noneq_2nd_moment(&d0, rho, v, stress);
-  %for i in range(dim * (dim - 1)):
-    stress${i}[gi] = stress[${i}];
-  %endfor
-}
-
 %if dim == 3:
 ${kernel} void ComputeSquareVelocityAndVorticity(
   ${global_ptr} ${const_ptr} int *__restrict__ map,
