@@ -1422,7 +1422,7 @@ class SubdomainRunner(object):
         np.savez(fname, **data)
 
     def restore_checkpoint(self, fname):
-        self.config.logger.info('Restoring checkpoint')
+        self.config.logger.info('Restoring checkpoint from {0}'.format(fname))
 
         cpoint = np.load(fname)
         sim_state = pickle.loads(str(cpoint['state']))
@@ -1532,14 +1532,19 @@ class SubdomainRunner(object):
         self._log_relaxation_model()
         self._init_geometry()
 
+        restore_filename = None
+        if self.config.restore_from:
+            restore_filename = io.subdomain_checkpoint(
+                self.config.restore_from, self._spec.id)
+
         # Creates scalar fields on the host. They are used for gpu-host
         # communication and for specifing initial conditions.
         self._sim.init_fields(self)
         self._init_compute()
-        self.config.logger.debug("Initializing macroscopic fields.")
-        # No need to run the potentially costly initilization if we are
-        # restarting from a checkpoint.
-        if not self.config.restore_from:
+        if restore_filename is None:
+            self.config.logger.debug("Initializing macroscopic fields.")
+            # This has to take place before init_gpu_data, so that the initial
+            # values are automatically copied to the GPU buffer.
             self._subdomain.init_fields(self._sim)
         self._init_gpu_data()
         self._init_force_objects()
@@ -1552,23 +1557,25 @@ class SubdomainRunner(object):
             self._pbc_kernels = self._sim.get_pbc_kernels(self)
         self._aux_kernels = self._sim.get_aux_kernels(self)
 
-        self.config.logger.debug("Applying initial conditions.")
-        self._gpu_initial_conditions()
+        # No need to run the potentially costly initilization if we are
+        # restarting from a checkpoint.
+        if restore_filename is None:
+            self.config.logger.debug("Applying initial conditions.")
+            self._gpu_initial_conditions()
 
-        # Save initial state of the simulation.
-        if self.config.output and self.config.from_ == 0:
-            self.config.logger.debug("Saving initial state.")
-            self._output.save(self._sim.iteration)
+            # Run self-consistent (density) initialization if requested.
+            if self._initialization:
+                self.initialize()
+
+            # Save initial state of the simulation.
+            if self.config.output and self.config.from_ == 0:
+                self.config.logger.debug("Saving initial state.")
+                self._output.save(self._sim.iteration)
+        else:
+            self.restore_checkpoint(restore_filename)
 
         if not self.config.max_iters:
             self.config.logger.warning("Running infinite simulation.")
-
-        if self.config.restore_from:
-            self.restore_checkpoint(io.subdomain_checkpoint(
-                self.config.restore_from, self._spec.id))
-
-        if self._initialization:
-            self.initialize()
 
         self._sim.before_main_loop(self)
         # Allow mix-ins to have their own before_main_loop routines.
@@ -1581,7 +1588,6 @@ class SubdomainRunner(object):
 
         self.config.logger.info("Starting simulation.")
         self.main()
-
         self.config.logger.info(
             "Simulation completed after {0} iterations.".format(
                 self._sim.iteration))

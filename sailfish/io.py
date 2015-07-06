@@ -177,6 +177,14 @@ def checkpoint_filename(base, digits, subdomain_id, it):
     return ('{0}.{1:0' + str(digits) + 'd}.{2}.cpoint').format(base, it, subdomain_id)
 
 def subdomain_checkpoint(base, subdomain_id):
+    if base.endswith('.last'):
+        base = base[:-5]
+        files = glob.glob('{0}.*.{1}.cpoint.npz'.format(base, subdomain_id))
+        if not files:
+            return None
+        files.sort()
+        return files[0]
+
     return '{0}.{1}.cpoint.npz'.format(base, subdomain_id)
 
 def iter_from_filename(fname):
