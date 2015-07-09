@@ -250,10 +250,13 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
             self.need_fields_flag = True
         elif mod == 0:
             stats = self.collect_reynolds_stats(runner)
+
             if stats is not None:
-                np.savez('%s_reyn_stat_%s.%s' % (self.config.output, runner._spec.id,
-                                                 self.iteration),
-                         **stats)
+                output_path = os.path.join(self.config.output, 'reyn_stats')
+                if not os.path.exists(output_path):
+                    os.makedirs(output_path)
+                np.savez('%s/stats_%s.%s' % (output_path, runner._spec.id,
+                                             self.iteration), **stats)
 
 if __name__ == '__main__':
     ctrl = LBSimulationController(ChannelSim, EqualSubdomainsGeometry3D)
