@@ -44,6 +44,7 @@ Available measurements [DNS with IB, Yakhot, 2006]:
 """
 
 import math
+import os
 import numpy as np
 from sailfish.node_type import NTHalfBBWall, NTDoNothing, NTCopy, NTEquilibriumDensity, NTFullBBWall
 from sailfish.geo import LBGeometry3D
@@ -233,10 +234,12 @@ class CubeChannelSim(ChannelSim):
             for gpu_buf in self._gpu_stats:
                 runner.backend.from_buf(gpu_buf)
 
+            output_path = os.path.join(self.config.output, 'reyn_stats')
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
             # The order of the statistics collected here has to match the
             # definition in reynolds_statistics.mako.
-            np.savez('%s_reyn_stat_%s.%s' % (self.config.output, runner._spec.id,
-                                             self.iteration),
+            np.savez('%s/stats_%s.%s' % (output_path, runner._spec.id, self.iteration),
                      ux_m1=self._stats[0] / self.num_stats,
                      ux_m2=self._stats[1] / self.num_stats,
                      uy_m1=self._stats[2] / self.num_stats,
