@@ -1533,6 +1533,11 @@ class SubdomainRunner(object):
         # communication and for specifing initial conditions.
         self._sim.init_fields(self)
         self._init_compute()
+        if not self.config.restore_from:
+            self.config.logger.debug("Initializing macroscopic fields.")
+            # This has to take place before init_gpu_data, so that the initial
+            # values are automatically copied to the GPU buffer.
+            self._subdomain.init_fields(self._sim)
         self._init_gpu_data()
         self._init_force_objects()
         self.config.logger.debug("Initializing GPU kernels.")
@@ -1547,8 +1552,6 @@ class SubdomainRunner(object):
         # No need to run the potentially costly initilization if we are
         # restarting from a checkpoint.
         if not self.config.restore_from:
-            self.config.logger.debug("Initializing macroscopic fields.")
-            self._subdomain.init_fields(self._sim)
             self.config.logger.debug("Applying initial conditions.")
             self._gpu_initial_conditions()
 
