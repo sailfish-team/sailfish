@@ -32,7 +32,7 @@ class LBOutput(object):
         self._visualization_fields = {}
         self.basename = config.output
         self.subdomain_id = subdomain_id
-        self.num_subdomains = config.subdomains
+        self.num_subdomains = config.subdomains if hasattr(config, 'subdomains') else 1
 
     def register_field(self, field, name, visualization=False):
         if visualization:
@@ -200,7 +200,8 @@ def subdomain_glob(fname):
     return re.sub(r'[0-9]+(\.[0-9]+.{0})'.format(sfx), r'*\1', fname)
 
 def temp_filename(fname):
-    return '.tmp.' + fname
+    dirname, base = os.path.split(fname)
+    return os.path.join(dirname, '.tmp.' + base)
 
 class VTKOutput(LBOutput):
     """Saves simulation data in VTK files."""
@@ -256,13 +257,21 @@ class VTKOutput(LBOutput):
 
 
 def SaveWithRename(save, num_subdomains, fname, *args, **kwargs):
+    def _remove(path):
+        if os.path.exists(path):
+            os.remove(path)
+
     # Save to a temporary file first.
     tfname = temp_filename(fname)
+    _remove(fname)
+    _remove(tfname)
     save(tfname, *args, **kwargs)
 
-    # Wait for data from all subdomains to be ready.
-    pattern = subdomain_glob(tfname)
-    while len(glob.glob(pattern)) != num_subdomains:
+    # Wait for data from all subdomains to be ready. This assumes that the data is being
+    # saved to a shared filesystem.
+    pattern_tmp = subdomain_glob(tfname)
+    pattern_perm = subdomain_glob(fname)
+    while len(glob.glob(pattern_tmp)) + len(glob.glob(pattern_perm)) < num_subdomains:
         time.sleep(1)
 
     # Rename to final location.
@@ -281,14 +290,14 @@ class NPYOutput(LBOutput):
         else:
             self._do_save = np.savez
 
-    def _save(fname, *args, **kwargs):
-        args = [self._do_save, self.num_subdomains, fname] + args
-        t = threading.Thread(target=SaveWithRename, args=args, kwargs)
-        t.run()
+    def _save(self, fname, *args, **kwargs):
+        args = [self._do_save, self.num_subdomains, fname] + list(args)
+        t = threading.Thread(target=SaveWithRename, args=args, kwargs=kwargs)
+        t.start()
 
     def save(self, i):
         self.mask_nonfluid_nodes()
-        fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='')
+        fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='.npz')
         data = {}
         data.update(self._scalar_fields)
         data.update(self._vector_fields)
