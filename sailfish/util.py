@@ -5,6 +5,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 from collections import defaultdict, namedtuple
+import gzip
 import logging
 import random
 import socket
@@ -315,3 +316,9 @@ def lazy_property(f):
             setattr(self, attr_name, f(self))
         return getattr(self, attr_name)
     return _lazy_property
+
+def load_array(fname):
+    if fname.endswith('.gz'):
+        return np.load(gzip.GzipFile(fname))
+    else:
+        return np.load(fname)
