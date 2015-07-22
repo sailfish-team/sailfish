@@ -12,6 +12,7 @@ test: test_short test_med
 # Max 5 sec runtime.
 test_short:
 	$(PYTHON) tests/controller.py
+	$(PYTHON) tests/converter.py
 	$(PYTHON) tests/node_type.py
 	$(PYTHON) tests/sim.py
 	$(PYTHON) tests/subdomain.py
