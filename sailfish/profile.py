@@ -4,6 +4,8 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+from __future__ import division
+from builtins import object
 import time
 from sailfish import util
 
@@ -112,7 +114,7 @@ class TimeProfile(object):
         self.record_cpu_end(self.STEP)
 
         # Aggregate timings from GPU events.
-        for i, ev_start in self._events_start.iteritems():
+        for i, ev_start in self._events_start.items():
             duration = self._events_end[i].time_since(ev_start) / 1e3
             self._timings[i] += duration
             self._min_timings[i] = min(self._min_timings[i], duration)
