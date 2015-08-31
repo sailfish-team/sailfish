@@ -1,10 +1,10 @@
 """Code for profiling a simulation."""
+from __future__ import division
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
-from __future__ import division
 import time
 from sailfish import util
 
