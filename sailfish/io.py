@@ -13,8 +13,9 @@ import re
 import ctypes
 import threading
 import time
-from Queue import Queue
+from queue import Queue
 from ctypes import Structure, c_uint16, c_int32, c_uint8, c_bool
+from functools import reduce
 
 class VisConfig(Structure):
     MAX_NAME_SIZE = 64
@@ -46,9 +47,9 @@ class LBOutput(object):
 
     def mask_nonfluid_nodes(self):
         nonfluid = np.logical_not(self._fluid_map)
-        for f in self._scalar_fields.itervalues():
+        for f in self._scalar_fields.values():
             f[nonfluid] = np.nan
-        for fv in self._vector_fields.itervalues():
+        for fv in self._vector_fields.values():
             for f in fv:
                 f[nonfluid] = np.nan
 
@@ -71,9 +72,9 @@ class LBOutput(object):
     def verify(self):
         fm = self._fluid_map
         return (all((np.all(np.isfinite(f[fm])) for f in
-                    self._scalar_fields.itervalues()))
+                    self._scalar_fields.values()))
                 and all(np.all(np.isfinite(fc[fm])) for f in
-                    self._vector_fields.itervalues() for fc in f))
+                    self._vector_fields.values() for fc in f))
 
     def wait(self):
         pass
@@ -112,9 +113,9 @@ class VisualizationWrapper(LBOutput):
         self._output.save(i)
 
         if self._first_save:
-            self._scalar_names = self._output._scalar_fields.keys()
-            self._vis_names    = self._output._visualization_fields.keys()
-            self._vector_names = self._output._vector_fields.keys()
+            self._scalar_names = list(self._output._scalar_fields.keys())
+            self._vis_names    = list(self._output._visualization_fields.keys())
+            self._vector_names = list(self._output._vector_fields.keys())
             self._scalar_len = len(self._scalar_names)
             self._vis_len    = len(self._vis_names)
             self._vector_len = len(self._vector_names) * self._dim
@@ -224,7 +225,7 @@ class VTKOutput(LBOutput):
 
         first = True
         sample_field = None
-        for name, field in self._scalar_fields.iteritems():
+        for name, field in self._scalar_fields.items():
             if first:
                 idata.point_data.scalars = field.flatten()
                 idata.point_data.scalars.name = name
@@ -237,7 +238,7 @@ class VTKOutput(LBOutput):
         idata.update()
         dim = len(sample_field.shape)
 
-        for name, field in self._vector_fields.iteritems():
+        for name, field in self._vector_fields.items():
             if dim == 3:
                 tmp = idata.point_data.add_array(np.c_[field[0].flatten(),
                                                  field[1].flatten(), field[2].flatten()])
