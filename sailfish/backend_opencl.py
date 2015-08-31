@@ -1,4 +1,5 @@
 """Sailfish OpenCL backend."""
+from builtins import object
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
@@ -6,6 +7,7 @@ __license__ = 'LGPL3'
 
 # Make sure the pyopencl module exists, but do not import it.
 import imp
+from functools import reduce
 imp.find_module('pyopencl')
 import operator
 import os

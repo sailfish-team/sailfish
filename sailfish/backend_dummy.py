@@ -1,4 +1,5 @@
 """A dummy Sailfish backend.  Used for testing."""
+from builtins import object
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
