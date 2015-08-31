@@ -65,8 +65,8 @@ class KidaSim(LBFluidSim, KineticEnergyEnstrophyMixIn):
 
     @classmethod
     def modify_config(cls, config):
-        config.logger.info('Re = {0}'.format(config.lat_nx *
-                                             cls.subdomain.max_v / config.visc))
+        if not config.quiet:
+            print('Re = {0}'.format(config.lat_nx * cls.subdomain.max_v / config.visc))
 
     axis = 0
     axis_pos = 0
