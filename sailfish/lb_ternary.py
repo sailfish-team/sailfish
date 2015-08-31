@@ -330,4 +330,4 @@ class LBTernaryFluidShanChen(LBTernaryFluidBase, LBForcedSim):
         else:
             sim_pair = KernelPair(primary, primary)
 
-        return zip(macro_pair, sim_pair)
+        return list(zip(macro_pair, sim_pair))
