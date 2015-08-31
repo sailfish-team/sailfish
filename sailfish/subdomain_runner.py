@@ -1764,6 +1764,8 @@ class SubdomainRunner(object):
             self.config.logger.error("Requesting quit.")
             self._quit_event.set()
 
+        self._output.wait()
+
 
 class IBMSubdomainRunner(SubdomainRunner):
     """Subdomain runner for immersed boundary models."""

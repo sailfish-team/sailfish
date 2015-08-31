@@ -13,6 +13,7 @@ import re
 import ctypes
 import threading
 import time
+from Queue import Queue
 from ctypes import Structure, c_uint16, c_int32, c_uint8, c_bool
 
 class VisConfig(Structure):
@@ -73,6 +74,9 @@ class LBOutput(object):
                     self._scalar_fields.itervalues()))
                 and all(np.all(np.isfinite(fc[fm])) for f in
                     self._vector_fields.itervalues() for fc in f))
+
+    def wait(self):
+        pass
 
 
 class VisualizationWrapper(LBOutput):
@@ -148,7 +152,6 @@ class VisualizationWrapper(LBOutput):
 
             self._vis_buffer[0:self.nodes] = np.ravel(field)
             self._geo_buffer[0:self.nodes] = np.ravel(self.subdomain.runner.visualization_map())
-
 
 def filename_iter_digits(max_iters=0):
     """Returns the number of digits used to represent the iteration in the filename"""
@@ -280,6 +283,13 @@ def SaveWithRename(save, num_subdomains, fname, *args, **kwargs):
     os.rename(tfname, fname)
 
 
+def Saver(queue, do_save, num_subdomains):
+    while True:
+        args, kwargs = queue.get()
+        SaveWithRename(do_save, num_subdomains, *args, **kwargs)
+        queue.task_done()
+
+
 class NPYOutput(LBOutput):
     """Saves simulation data as np arrays."""
     format_name = 'npy'
@@ -291,11 +301,21 @@ class NPYOutput(LBOutput):
             self._do_save = np.savez_compressed
         else:
             self._do_save = np.savez
+        self._queue = None
 
     def _save(self, fname, *args, **kwargs):
-        args = [self._do_save, self.num_subdomains, fname] + list(args)
-        t = threading.Thread(target=SaveWithRename, args=args, kwargs=kwargs)
-        t.start()
+        # Lazy initialization of the saver thread. This is currentlly required
+        # since the LBOutput object can be instantiated outside of the runner
+        # process, to which the saver thread has to be assigned.
+        if self._queue is None:
+            self._queue = Queue()
+            self._thread = threading.Thread(target=Saver, args=(self._queue,
+                                                                self._do_save,
+                                                                self.num_subdomains))
+            self._thread.setDaemon(True)
+            self._thread.start()
+        args = [fname] + list(args)
+        self._queue.put((args, kwargs))
 
     def save(self, i):
         self.mask_nonfluid_nodes()
@@ -312,6 +332,10 @@ class NPYOutput(LBOutput):
     def dump_node_type(self, node_type_map):
         fname = node_type_filename(self.basename, self.subdomain_id)
         np.save(fname, node_type_map)
+
+    def wait(self):
+        self._queue.join()
+
 
 class MatlabOutput(LBOutput):
     """Saves simulation data as Matlab .mat files."""
