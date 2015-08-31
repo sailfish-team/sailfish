@@ -10,6 +10,12 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
+try:
+    import __builtin__
+    builtins = __builtin__
+except ImportError:
+    import builtins
+
 import copy
 import math
 import imp
@@ -769,14 +775,14 @@ class LBSimulationController(object):
 
         # No point in trying to process the command-line if running under
         # IPython.
-        if ignore_cmdline or hasattr(__builtin__, '__IPYTHON__'):
+        if ignore_cmdline or hasattr(builtins, '__IPYTHON__'):
             args = []
         else:
             args = sys.argv[1:]
 
         self.config = self._config_parser.parse(
             args, internal_defaults={'quiet': True} if hasattr(
-                __builtin__, '__IPYTHON__') else None)
+                builtins, '__IPYTHON__') else None)
 
         self._lb_class.modify_config(self.config)
         self.set_default_filenames()
