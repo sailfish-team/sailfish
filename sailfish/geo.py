@@ -1,4 +1,5 @@
 """Classes to specify global LB simulation geometry and its partitions."""
+from __future__ import division
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
@@ -82,13 +83,13 @@ class EqualSubdomainsGeometry2D(LBGeometry2D):
         s = self.config.subdomains
 
         if self.config.conn_axis == 'x':
-            sx = self.gx / s
+            sx = self.gx // s
             rx = self.gx % s
             return [SubdomainSpec2D((i * sx, 0),
                     (sx if i < s - 1 else rx + sx, self.gy))
                     for i in range(0, s)]
         else:
-            sy = self.gy / s
+            sy = self.gy // s
             ry = self.gy % s
 
             return [SubdomainSpec2D((0, i * sy),
@@ -113,20 +114,20 @@ class EqualSubdomainsGeometry3D(LBGeometry3D):
         s = self.config.subdomains
 
         if self.config.conn_axis == 'x':
-            sx = self.gx / s
+            sx = self.gx // s
             rx = self.gx % s
             return [SubdomainSpec3D((i * sx, 0, 0),
                     (sx if i < s - 1 else rx + sx, self.gy, self.gz))
                     for i in range(0, s)]
         elif self.config.conn_axis == 'y':
-            sy = self.gy / s
+            sy = self.gy // s
             ry = self.gy % s
 
             return [SubdomainSpec3D((0, i * sy, 0),
                     (self.gx, sy if i < s - 1 else ry + sy, self.gz))
                     for i in range(0, s)]
         else:
-            sz = self.gz / s
+            sz = self.gz // s
             rz = self.gz % s
 
             return [SubdomainSpec3D((0, 0, i * sz),
@@ -160,7 +161,7 @@ class WeightedSubdomainsGeometry3D(EqualSubdomainsGeometry3D):
 
         start = [0, 0, 0]
         size = [self.gx, self.gy, self.gz]
-        nodes_per_subdomain = profile[-1] / self.config.subdomains
+        nodes_per_subdomain = profile[-1] // self.config.subdomains
 
         ret = []
         for i, cum_nodes in enumerate(profile):
