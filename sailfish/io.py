@@ -13,7 +13,11 @@ import re
 import ctypes
 import threading
 import time
-from queue import Queue
+try:
+    from queue import Queue
+except ImportError:
+    from Queue import Queue
+
 from ctypes import Structure, c_uint16, c_int32, c_uint8, c_bool
 from functools import reduce
 
