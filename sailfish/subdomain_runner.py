@@ -460,7 +460,7 @@ class SubdomainRunner(object):
         else:
             self._boundary_blocks = (self._boundary_blocks, 1)
 
-        self._kernel_grid_bulk[0] /= bs
+        self._kernel_grid_bulk[0] //= bs
 
         # Special cases: boundary kernels can cover the whole domain or this is
         # the only block participating in the simulation.
