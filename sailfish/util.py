@@ -4,6 +4,7 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
+from __future__ import division
 from collections import defaultdict, namedtuple
 import gzip
 import logging
@@ -73,7 +74,7 @@ def _cluster_from_nodes_dict(nodes, iface):
         iface = None
 
     cluster = []
-    for node, gpus in sorted(nodes.iteritems()):
+    for node, gpus in sorted(nodes.items()):
         try:
             ipaddr = socket.gethostbyname(node)
         except socket.error:
@@ -131,12 +132,12 @@ def reverse_pairs(iterable, subitems=1):
     while it:
         x = []
         for i in range(0, subitems):
-            x.append(it.next())
+            x.append(next(it))
 
         try:
             y = []
             for i in range(0, subitems):
-                y.append(it.next())
+                y.append(next(it))
 
             for i in y:
                 yield i
@@ -287,7 +288,7 @@ def energy_spectrum(velocity, buckets=None, density=False):
     Vy /= scale
     Vz /= scale
 
-    kz, ky, kx = np.mgrid[-z/2:z/2, -y/2:y/2, -x/2:x/2]
+    kz, ky, kx = np.mgrid[-z//2:z//2, -y//2:y//2, -x//2:x//2]
     kz += 1
     ky += 1
     kx += 1
@@ -316,6 +317,7 @@ def lazy_property(f):
             setattr(self, attr_name, f(self))
         return getattr(self, attr_name)
     return _lazy_property
+
 
 def load_array(fname):
     if fname.endswith('.gz'):
