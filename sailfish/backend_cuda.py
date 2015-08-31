@@ -1,5 +1,4 @@
 """Sailfish CUDA backend."""
-from __future__ import print_function
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'

@@ -100,8 +100,8 @@ class GeoEncoderConst(GeoEncoder):
 
         # Refer to subdomain.Subdomain._verify_params for a list of allowed
         # ways of encoding nodes.
-        for node_key, node_type in param_dict.iteritems():
-            for param in node_type.params.itervalues():
+        for node_key, node_type in param_dict.items():
+            for param in node_type.params.values():
                 if util.is_number(param):
                     if param in seen_params:
                         idx = param_to_idx[param]
@@ -160,8 +160,8 @@ class GeoEncoderConst(GeoEncoder):
         # that of the boundary condition (vector vs scalar, etc).
         # Second pass: only process symbolic expressions here.
 
-        for node_key, node_type in param_dict.iteritems():
-            for param in node_type.params.itervalues():
+        for node_key, node_type in param_dict.items():
+            for param in node_type.params.values():
                 if isinstance(param, nt.DynamicValue):
                     if param in seen_params:
                         idx = param_to_idx[value]
@@ -201,7 +201,7 @@ class GeoEncoderConst(GeoEncoder):
             num_nodes = idx.shape[0]
             type_to_node_count[node_type.id] = num_nodes
 
-            for i in xrange(num_nodes):
+            for i in range(num_nodes):
                self._scratch_map[_selector(idx[i,:])] = i
 
             self._scratch_space_base[node_type.id] = self.scratch_space_size
@@ -211,7 +211,7 @@ class GeoEncoderConst(GeoEncoder):
             self.scratch_space_size += num_nodes * node_type.scratch_space_size(self.dim)
 
         if type_to_node_count:
-            self._bits_scratch = bit_len(max(type_to_node_count.itervalues()))
+            self._bits_scratch = bit_len(max(type_to_node_count.values()))
         else:
             self._bits_scratch = 0
 
@@ -244,11 +244,11 @@ class GeoEncoderConst(GeoEncoder):
         # Remap type IDs.
         max_type_code = max(self._type_id_remap.keys())
         self._type_choice_map = np.zeros(max_type_code + 1, dtype=np.uint32)
-        for orig_code, new_code in self._type_id_remap.iteritems():
+        for orig_code, new_code in self._type_id_remap.items():
             self._type_choice_map[orig_code] = new_code
 
         self.config.logger.debug('... type map is %s' % self._type_id_remap)
-        for k in self._type_id_remap.iterkeys():
+        for k in self._type_id_remap.keys():
             self.config.logger.debug('... ID %d: %s' % (k,
                                                         nt._NODE_TYPES[k].__name__))
 
