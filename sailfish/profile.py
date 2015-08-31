@@ -5,7 +5,6 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 from __future__ import division
-from builtins import object
 import time
 from sailfish import util
 

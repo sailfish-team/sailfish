@@ -1,5 +1,4 @@
 """Sailfish OpenCL backend."""
-from builtins import object
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
