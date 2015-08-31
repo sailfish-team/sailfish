@@ -1,4 +1,5 @@
 """Base Sailfish visualization classes."""
+import collections
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
@@ -38,7 +39,7 @@ class FluidVis(object):
         if type(field) is list or type(field) is tuple:
             self.vis_fields.append(Field(description, field, negative))
         else:
-            if callable(field):
+            if isinstance(field, collections.Callable):
                 self.vis_fields.append(Field(description, field, negative))
             else:
                 self.vis_fields.append(Field(description, lambda: field, negative))

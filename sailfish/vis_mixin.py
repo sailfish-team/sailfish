@@ -241,7 +241,7 @@ class Vis2DSliceMixIn(lb_base.LBMixIn):
                 return
 
             shape = self._buf_shapes[self._vis_config.axis]
-            grid = [(shape[0] + self.config.block_size - 1) /
+            grid = [(shape[0] + self.config.block_size - 1) //
                     self.config.block_size, shape[1]]
 
             # Run kernel to extract slice data.
