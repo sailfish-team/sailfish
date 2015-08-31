@@ -212,7 +212,7 @@ class LBMachineMaster(object):
             self.config.logger.warning('Requested visualization engine not '
                                        'available.')
             try:
-                vis_class = util.get_visualization_engines().next()
+                vis_class = next(util.get_visualization_engines())
             except StopIteration:
                 self.config.logger.warning(
                     'No visualization backends available. Falling back to '
@@ -337,7 +337,7 @@ class LBMachineMaster(object):
         ipc_files = self._init_connectors()
         output_initializer = self._init_visualization_and_io(self.sim)
         try:
-            backend_cls = util.get_backends(self.config.backends.split(',')).next()
+            backend_cls = next(util.get_backends(self.config.backends.split(',')))
         except StopIteration:
             self.config.logger.error('Failed to initialize compute backend.'
                     ' Make sure pycuda/pyopencl is installed.')

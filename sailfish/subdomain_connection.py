@@ -397,7 +397,7 @@ def _get_dst_partial_map(dists, grid, src_slice_global, b1, slice_axes,
     dst_partial_map = {}
     buf_min_loc = [span.start for span in src_slice_global]
 
-    for dist_idx, dist_map in dist_idx_to_dist_map.iteritems():
+    for dist_idx, dist_map in dist_idx_to_dist_map.items():
         partial_nodes = src_coords[np.logical_and(dist_map,
                                    np.logical_not(full_map))]
         if len(partial_nodes) > 0:
@@ -424,7 +424,7 @@ class LBConnection(object):
         :param grid: grid object defining the connectivity of the lattice
         """
         conn_axis = b1.face_to_axis(face)
-        slice_axes = range(0, b1.dim)
+        slice_axes = list(range(0, b1.dim))
         slice_axes.remove(conn_axis)
 
         src_slice, src_slice_global, src_macro_slice, dst_macro_slice = \
@@ -505,34 +505,32 @@ class LBConnection(object):
     @property
     def transfer_shape(self):
         """Logical shape of the transfer buffer."""
-        return [len(self.dists)] + map(lambda x: int(x.stop - x.start), reversed(self.src_slice))
+        return [len(self.dists)] + [int(x.stop - x.start) for x in reversed(self.src_slice)]
 
     @property
     def local_transfer_shape(self):
         """Logical shape of the transfer buffer for the fully local step in the AA access pattern."""
-        return [len(self.dists)] + map(lambda x: int(x.stop - x.start), reversed(self.src_macro_slice))
+        return [len(self.dists)] + [int(x.stop - x.start) for x in reversed(self.src_macro_slice)]
 
     @property
     def partial_nodes(self):
-        return sum([len(v) for v in self.dst_partial_map.itervalues()])
+        return sum([len(v) for v in self.dst_partial_map.values()])
 
     @property
     def full_shape(self):
         """Logical shape of the buffer for nodes with a full set of distributions."""
-        return [len(self.dists)] + map(lambda x: int(x.stop - x.start), reversed(self.dst_slice))
+        return [len(self.dists)] + [int(x.stop - x.start) for x in reversed(self.dst_slice)]
 
     @property
     def full_local_shape(self):
         """Logical shape of the buffer for nodes with a full set of distributions
         for the fully local step in the AA access pattern."""
-        return [len(self.dists)] + map(lambda x: int(x.stop - x.start),
-            reversed(self.dst_macro_slice))
+        return [len(self.dists)] + [int(x.stop - x.start) for x in reversed(self.dst_macro_slice)]
 
     @property
     def macro_transfer_shape(self):
         """Logical shape of the transfer buffer for a set of scalar macroscopic
         fields."""
-        return map(lambda x: int(x.stop - x.start),
-                reversed(self.src_macro_slice))
+        return [int(x.stop - x.start) for x in reversed(self.src_macro_slice)]
 
 

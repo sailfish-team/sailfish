@@ -1,4 +1,5 @@
 """Intra- and inter-subdomain geometry processing."""
+from __future__ import division
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
@@ -16,6 +17,7 @@ from sailfish import util
 from sailfish import sym
 import sailfish.node_type as nt
 from sailfish.subdomain_connection import LBConnection
+from functools import reduce
 
 ConnectionPair = namedtuple('ConnectionPair', 'src dst')
 
@@ -109,7 +111,7 @@ class SubdomainSpec(object):
     def update_context(self, ctx):
         ctx['dim'] = self.dim
         # The flux tensor is a symmetric matrix.
-        ctx['flux_components'] = self.dim * (self.dim + 1) / 2
+        ctx['flux_components'] = self.dim * (self.dim + 1) // 2
         ctx['envelope_size'] = self.envelope_size
         # TODO(michalj): Fix this.
         # This requires support for ghost nodes in the periodicity code
@@ -162,13 +164,13 @@ class SubdomainSpec(object):
         """Returns a list of pairs: (face, subdomain ID) representing connections
         to different subdomains."""
         ids = set([])
-        for face, v in self._connections.iteritems():
+        for face, v in self._connections.items():
             for pair in v:
                 ids.add((face, pair.dst.block_id))
         return list(ids)
 
     def has_face_conn(self, face):
-        return face in self._connections.keys()
+        return face in list(self._connections.keys())
 
     def set_actual_size(self, envelope_size):
         # TODO: It might be possible to optimize this a little by avoiding
@@ -215,7 +217,7 @@ class SubdomainSpec(object):
             self.Y_HIGH: self.Y_LOW,
             self.Z_HIGH: self.Z_LOW
         }
-        opp_map.update(dict((v, k) for k, v in opp_map.iteritems()))
+        opp_map.update(dict((v, k) for k, v in opp_map.items()))
         return opp_map[face]
 
     @classmethod
@@ -473,7 +475,7 @@ class Subdomain(object):
     @property
     def active_nodes(self):
         if self.active_node_mask is not None:
-            return long(np.sum(self.active_node_mask))
+            return int(np.sum(self.active_node_mask))
         else:
             return reduce(operator.mul, self.lat_shape)
 
@@ -487,7 +489,7 @@ class Subdomain(object):
     def _verify_params(self, where, node_type):
         """Verifies that the node parameters are set correctly."""
 
-        for name, param in node_type.params.iteritems():
+        for name, param in node_type.params.items():
             # Single number.
             if util.is_number(param):
                 continue
@@ -505,7 +507,7 @@ class Subdomain(object):
                         "in the 'where' array.  Use node_util.multifield() to "
                         "generate the array in an easy way.")
             elif isinstance(param, nt.DynamicValue):
-                if param.has_symbols(sym.S.time) or zip(param.get_timeseries()):
+                if param.has_symbols(sym.S.time) or list(zip(param.get_timeseries())):
                     self.config.time_dependence = True
                 if param.has_symbols(sym.S.gx, sym.S.gy, sym.S.gz):
                     self.config.space_dependence = True
@@ -529,7 +531,7 @@ class Subdomain(object):
 
         self._verify_params(where, node_type)
         self._type_map_base[where] = node_type.id
-        key = hash((node_type.id, frozenset(node_type.params.items())))
+        key = hash((node_type.id, frozenset(list(node_type.params.items()))))
         assert np.all(self._param_map_base[where] == 0),\
                 "Overriding previously set nodes is not allowed."
         self._param_map_base[where] = key
@@ -556,7 +558,7 @@ class Subdomain(object):
         if not self._type_map_encoded:
             raise ValueError('Simulation not started. Use set_node instead.')
 
-        key = hash((node_type.id, frozenset(node_type.params.items())))
+        key = hash((node_type.id, frozenset(list(node_type.params.items()))))
         if key not in self._params:
             if node_type.id == 0:
                 key = 0
