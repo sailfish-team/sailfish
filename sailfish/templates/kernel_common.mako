@@ -516,7 +516,7 @@
 #include <stdio.h>
 %endif
 
-%for name, val in constants.iteritems():
+%for name, val in constants.items():
   ${const_var} float ${name} = ${val}f;
 %endfor
 
