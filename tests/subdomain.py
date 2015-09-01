@@ -1,3 +1,4 @@
+from __future__ import division
 import numpy as np
 import operator
 import unittest
@@ -7,6 +8,7 @@ from sailfish.subdomain import Subdomain2D, Subdomain3D, SubdomainSpec2D, Subdom
 from sailfish.subdomain_runner import SubdomainRunner
 from sailfish.sym import D2Q9, D3Q19, S
 from common import TestCase2D, TestCase3D
+from functools import reduce
 
 
 # Basic node type setting.
@@ -48,7 +50,7 @@ class TestNodeTypeSetting2D(TestCase2D):
         sub.allocate()
         sub.reset(encode=False)
 
-        center = 64 / 2
+        center = 64 // 2
         for y in range(0, 64):
             np.testing.assert_array_almost_equal(
                     np.float64([0.01 * (y - center)**2, 0.0]),
@@ -98,8 +100,8 @@ class TestNodeTypeSetting3D(TestCase3D):
         def boundary_conditions(self, hx, hy, hz):
             where = np.logical_and((hx == hy), (hy == hz))
             self.set_node(where, NTEquilibriumVelocity(
-                multifield((0.01 * (hy - self.gy / 2)**2,
-                            0.03 * (hz - self.gz / 2)**2, 0.0), where)))
+                multifield((0.01 * (hy - self.gy // 2)**2,
+                            0.03 * (hz - self.gz // 2)**2, 0.0), where)))
             self.set_node((hx > 10) & (hy < 5) & (hz < 7), NTFullBBWall)
 
     def test_array_setting(self):
@@ -113,8 +115,8 @@ class TestNodeTypeSetting3D(TestCase3D):
         sub.allocate()
         sub.reset(encode=False)
 
-        center_y = 32 / 2
-        center_z = 16 / 2
+        center_y = 32 // 2
+        center_z = 16 // 2
         for y in range(0, 16):
             np.testing.assert_array_almost_equal(
                     np.float64([0.01 * (y - center_y)**2,

@@ -13,7 +13,7 @@ vi15 = lambda x, y, z: D3Q15.vec_idx([x, y, z])
 def _verify_partial_map(self, conn, expected_map):
     self.assertEqual(set(conn.dst_partial_map.keys()),
             set(expected_map.keys()))
-    for key, val in expected_map.iteritems():
+    for key, val in expected_map.items():
         self.assertEqual(
                 set([tuple(x) for x in val]),
                 set([tuple(x) for x in conn.dst_partial_map[key]]))
@@ -413,9 +413,9 @@ class TestBlock3D(unittest.TestCase):
 class TestBlock2D(unittest.TestCase):
 
     def _verify_partial_map(self, conn, expected_map):
-        self.assertEqual(conn.dst_partial_map.keys(),
-                expected_map.keys())
-        for key, val in expected_map.iteritems():
+        self.assertEqual(list(conn.dst_partial_map.keys()),
+                list(expected_map.keys()))
+        for key, val in expected_map.items():
             self.assertTrue(np.all(val == conn.dst_partial_map[key]))
 
     def _test_subdomain_conn(self, axis):
