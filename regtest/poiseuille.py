@@ -1,4 +1,5 @@
 #!/usr/bin/python -u
+from __future__ import print_function
 
 import os
 import shutil
@@ -43,7 +44,7 @@ def run_test_2d():
     profile_path = 'regtest/results/poiseuille'
 
     for i, visc in enumerate(xvec):
-        print '%f ' % visc,
+        print('%f ' % visc, end=' ')
 
         max_iters = int(100 / visc)
         base_path = os.path.join(tmpdir, 'visc{0}'.format(i))

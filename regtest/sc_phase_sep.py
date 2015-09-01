@@ -6,6 +6,7 @@ This test runs a phase separation simulation with multiple values of the
 Shan-Chen coupling constant and verifies that spontaneous spinodal
 decomposition takes place around G = 4.0.
 """
+from __future__ import print_function
 
 import argparse
 import os
@@ -41,7 +42,7 @@ def run_test(name, precision):
 
     max_iters = 50000
     for g in xvec:
-        print ' {0}'.format(g),
+        print(' {0}'.format(g), end=' ')
         defaults = {
                 'quiet': True,
                 'verbose': False,
@@ -66,9 +67,9 @@ def run_test(name, precision):
         minvec.append(np.min(rho))
         maxvec.append(np.max(rho))
         ordvec.append(order)
-        print >>f, g, minvec[-1], maxvec[-1], ordvec[-1]
+        print(g, minvec[-1], maxvec[-1], ordvec[-1], file=f)
 
-    print
+    print()
 
     f.close()
 
