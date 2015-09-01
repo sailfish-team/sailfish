@@ -5,6 +5,9 @@ import tempfile
 import numpy as np
 from sailfish import config, util
 
+random.seed(1234)
+PORT = random.randint(8000, 16000)
+
 class TestPbsUtils(unittest.TestCase):
     def test_gpufile_processing(self):
         fd, path = tempfile.mkstemp()
@@ -17,9 +20,9 @@ class TestPbsUtils(unittest.TestCase):
         cluster = util.gpufile_to_clusterspec(path)
         os.unlink(path)
         self.assertEqual(
-                [config.MachineSpec('socket=node1-gpu2.domain:15732',
+                [config.MachineSpec('socket=node1-gpu2.domain:%d' % PORT,
                                     'node1-gpu2.domain', [0, 2], None),
-                 config.MachineSpec('socket=node2-gpu4.domain:15732',
+                 config.MachineSpec('socket=node2-gpu4.domain:%d' % PORT,
                                     'node2-gpu4.domain', [0], None)],
                 cluster.nodes)
 
@@ -32,8 +35,8 @@ class TestLsfUtils(unittest.TestCase):
         random.seed(1234)
         cluster = util.lsf_vars_to_clusterspec(vars)
         self.assertEqual(
-            [config.MachineSpec('socket=hostA:15732', 'hostA', [0, 1], None),
-             config.MachineSpec('socket=hostB:15732', 'hostB', [0], None)],
+            [config.MachineSpec('socket=hostA:%d' % PORT, 'hostA', [0, 1], None),
+             config.MachineSpec('socket=hostB:%d' % PORT, 'hostB', [0], None)],
             cluster.nodes)
 
 class TestMiscUtils(unittest.TestCase):

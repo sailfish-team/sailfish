@@ -12,7 +12,11 @@ where:
 from __future__ import print_function
 import argparse
 import glob
-import pickle as pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
 import sys
 
 import numpy as np
@@ -34,7 +38,8 @@ def get_bounding_box(subdomains):
 
 def merge_subdomains(base, digits, it, save=True):
     fn_subdomains = io.subdomains_filename(base)
-    subdomains = pickle.load(open(fn_subdomains, 'r'))
+    with open(fn_subdomains, 'rb') as f:
+        subdomains = pickle.load(f)
     bb = get_bounding_box(subdomains)
 
     data = np.load(io.filename(base, digits, subdomains[0].id, it))

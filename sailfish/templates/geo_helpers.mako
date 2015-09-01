@@ -112,7 +112,7 @@ ${device_func} inline void loadNodeScratchSpace(unsigned int scratch_id,
 {
   switch (type) {
     %for nt_class in node_types:
-      %if nt_class.scratch_space > 0:
+      %if nt_class.scratch_space_size(dim) > 0:
         case ${type_id_remap[nt_class.id]}: {
           _loadNodeScratchSpace(scratch_id, ${nt_class.scratch_space_size(dim)},
                 g_buffer + ${scratch_space_base[nt_class.id]},
@@ -132,7 +132,7 @@ ${device_func} inline void storeNodeScratchSpace(unsigned int scratch_id,
 {
   switch (type) {
     %for nt_class in node_types:
-      %if nt_class.scratch_space > 0:
+      %if nt_class.scratch_space_size(dim) > 0:
         case ${type_id_remap[nt_class.id]}: {
           _storeNodeScratchSpace(scratch_id, ${nt_class.scratch_space_size(dim)},
                 buffer, g_buffer + ${scratch_space_base[nt_class.id]});

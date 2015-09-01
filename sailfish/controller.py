@@ -756,8 +756,8 @@ class LBSimulationController(object):
             dname = os.path.dirname(self.config.output)
             if dname and not os.path.exists(dname):
                 os.makedirs(dname)
-            pickle.dump(subdomains,
-                    open(io.subdomains_filename(self.config.output), 'w'))
+            with open(io.subdomains_filename(self.config.output), 'wb') as f:
+                pickle.dump(subdomains, f)
 
     def set_default_filenames(self):
         if not self.config.base_name:

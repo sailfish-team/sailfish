@@ -527,7 +527,7 @@ class LinearlyInterpolatedTimeSeries(Symbol):
         self._offset = None
 
     def __hash__(self):
-        return (hash(hashlib.sha1(str(self._step_size)).digest()) ^
+        return (hash(hashlib.sha1(str(self._step_size).encode('ascii')).digest()) ^
                 hash(hashlib.sha1(self._data).digest()))
 
     def __str__(self):
