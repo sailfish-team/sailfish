@@ -1,4 +1,5 @@
 #!/usr/bin/python
+from __future__ import division
 
 import os
 import shutil
@@ -91,9 +92,9 @@ class FESimulationTest(SeparationFESim):
 
 class Geometry4Blocks(LBGeometry2D):
     def subdomains(self, n=None):
-        y1 = self.gy / 2
+        y1 = self.gy // 2
         y2 = self.gy - y1
-        x1 = self.gx / 2
+        x1 = self.gx // 2
         x2 = self.gx - x1
 
         return [SubdomainSpec2D((0, 0), (x1, y1)),
@@ -103,7 +104,7 @@ class Geometry4Blocks(LBGeometry2D):
 
 class Geometry2BlocksHoriz(LBGeometry2D):
     def subdomains(self, n=None):
-        x1 = self.gx / 2
+        x1 = self.gx // 2
         x2 = self.gx - x1
 
         return [SubdomainSpec2D((0, 0), (x1, self.gy)),
@@ -112,7 +113,7 @@ class Geometry2BlocksHoriz(LBGeometry2D):
 
 class Geometry2BlocksVertical(LBGeometry2D):
     def subdomains(self, n=None):
-        y1 = self.gy / 2
+        y1 = self.gy // 2
         y2 = self.gy - y1
 
         return [SubdomainSpec2D((0, 0), (self.gx, y1)),
