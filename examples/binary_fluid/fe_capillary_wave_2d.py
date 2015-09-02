@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """Capillary wave.
 
 Two components are initially are separated by an interface perturbed with a
@@ -21,6 +20,7 @@ with:
 and \\lambda being the wavelength. The surface tension in the FE model
 is \sigma = \sqrt{8 \kappa A / 9}.
 """
+from __future__ import print_function
 
 import numpy as np
 
@@ -94,7 +94,7 @@ class CapillaryWaveSim(LBBinaryFluidFreeEnergy):
             x = np.linspace(0, phi.shape[0] - 1, phi.shape[0])
             f = scipy.interpolate.interp1d(x, phi)
             interface = m1 + scipy.optimize.brentq(f, 0, phi.shape[0] - 1)
-            print interface
+            print(interface)
 
         if self.iteration == 99999:
             np.savez('phi.npz', np.array(self.phi_log))

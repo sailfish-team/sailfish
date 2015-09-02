@@ -5,6 +5,8 @@ verify Laplace's law:
 
   \Delta p = \sigma / r
 """
+from __future__ import print_function
+
 import numpy as np
 
 from sailfish.geo import LBGeometry2D
@@ -68,7 +70,7 @@ class PoiseuilleSim(LBBinaryFluidShanChen):
             p1 = (phi1 + rho1) + G * phi1 * rho1
             p2 = (phi2 + rho2) + G * phi2 * rho2
 
-            print p1 - p2, p1, np.nansum(runner._sim.phi), np.nansum(runner._sim.rho)
+            print(p1 - p2, p1, np.nansum(runner._sim.phi), np.nansum(runner._sim.rho))
 
 if __name__ == '__main__':
     LBSimulationController(PoiseuilleSim).run()
