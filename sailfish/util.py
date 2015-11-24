@@ -205,26 +205,25 @@ def linpoints(i, min_=1., max_=.1, n=10):
 def setup_logger(config):
     logger = logging.getLogger('saifish')
     formatter = logging.Formatter("[%(relativeCreated)6d %(levelname)5s %(processName)s] %(message)s")
-    stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(formatter)
-    if config.verbose:
-        stream_handler.setLevel(logging.DEBUG)
-    elif config.quiet:
-        stream_handler.setLevel(logging.WARNING)
-    elif config.silent:
-        stream_handler.setLevel(logging.ERROR)
-    else:
-        stream_handler.setLevel(logging.INFO)
+ 
+    logger.setLevel(config.loglevel)
 
-    logger.addHandler(stream_handler)
+    if config.verbose:
+        logger.setLevel(logging.DEBUG)
+    elif config.quiet:
+        logger.setLevel(logging.WARNING)
+    elif config.silent:
+        logger.setLevel(logging.ERROR)
 
     if config.log:
         handler = logging.FileHandler(config.log)
         handler.setFormatter(formatter)
-        handler.setLevel(config.loglevel)
         logger.addHandler(handler)
+    else:
+        stream_handler = logging.StreamHandler()
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
 
-    logger.setLevel(logging.DEBUG)
     return logger
 
 
