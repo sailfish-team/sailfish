@@ -485,7 +485,7 @@ class Subdomain(object):
     @util.lazy_property
     def num_fluid_nodes(self):
         if self.active_node_mask is not None:
-            return active_nodes
+            return self.active_nodes
         else:
             return np.sum(self.fluid_map())
 
