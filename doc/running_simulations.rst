@@ -81,12 +81,11 @@ connected with running the simulation, and ``dim`` is the dimension of the simul
 domain. This method, like ``update_defaults``, is called before the class is
 instantiated. When the simulation is running, the command line arguments are
 parsed and their settings are stored in ``self.config`` (using the standard
-Python :py:mod:`argparse` module). In the first place, this method calls the same
-methods in superclasses. After that we can add our options::
+Python :py:mod:`argparse` module). When initializing a simulation, ``add_options`` 
+from all superclasses are called.  After that we can add our options::
 
     @classmethod
     def add_options(cls, group, dim):
-        LBFluidSim.add_options(group, dim)
         group.add_argument('--subdomains', type=int, default=1, help='number of subdomains to use')
 
 :class:`LDCBlock` describes the simulation geometry and inherits from
