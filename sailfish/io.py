@@ -204,7 +204,7 @@ class VTKOutput(LBOutput):
                 t = idata.point_data.add_array(field.flatten())
                 idata.point_data.get_array(t).name = name
 
-        idata.update()
+        # idata.update()
         dim = len(sample_field.shape)
 
         for name, field in self._vector_fields.iteritems():
@@ -223,8 +223,10 @@ class VTKOutput(LBOutput):
             idata.dimensions = list(reversed(sample_field.shape)) + [1]
 
         fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='.vti')
-        w = tvtk.XMLImageDataWriter(input=idata, file_name=fname)
-        w.write()
+        from tvtk.api import write_data
+        write_data(idata, fname)
+        #w = tvtk.XMLImageDataWriter(input=idata, file_name=fname)
+        #w.write()
 
     # TODO: Implement this function.
     def dump_dists(self, dists, i):
