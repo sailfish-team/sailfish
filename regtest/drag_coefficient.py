@@ -1,5 +1,7 @@
 #!/usr/bin/python -u
 
+from __future__ import division
+from __future__ import print_function
 raise NotImplementedError('This regression test has not been ported yet.')
 
 import os
@@ -48,7 +50,7 @@ def run_test(precision, model, grid, name):
 
     for re in [1, 10, 50, 100, 200, 300, 400]:
         defaults['re'] = re
-        print 'Testing for Re = %d' % re
+        print('Testing for Re = %d' % re)
 
         sim = LSphereSim(LBMGeoSphere, defaults)
         sim.run()
@@ -57,18 +59,18 @@ def run_test(precision, model, grid, name):
 
         with open(os.path.join(seriespath, '%s-re%s' % (bc, re)), 'w') as flog:
             for i, val in enumerate(sim.coeffs):
-                print >>flog, sim.dt * i, val
+                print(sim.dt * i, val, file=flog)
 
-        dc = math.fsum(coeffs)/len(coeffs)
+        dc = math.fsum(coeffs) / len(coeffs)
         dct = sim.drag_theo()
 
         xvec.append(re)
         yvec.append(dc)
         yvec2.append(dct)
 
-        print >>f, re, dc, dct
+        print(re, dc, dct, file=f)
 
-    print
+    print()
 
     f.close()
 
@@ -98,6 +100,6 @@ if options.grid:
 else:
     grid = 'D3Q13'
 
-print 'Running tests for %s' % (options.precision)
+print('Running tests for %s' % (options.precision))
 
 run_test(options.precision, options.model, grid, 'drag_coefficient')

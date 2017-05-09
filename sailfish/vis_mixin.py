@@ -241,7 +241,7 @@ class Vis2DSliceMixIn(lb_base.LBMixIn):
                 return
 
             shape = self._buf_shapes[self._vis_config.axis]
-            grid = [(shape[0] + self.config.block_size - 1) /
+            grid = [(shape[0] + self.config.block_size - 1) //
                     self.config.block_size, shape[1]]
 
             # Run kernel to extract slice data.
@@ -258,10 +258,12 @@ class Vis2DSliceMixIn(lb_base.LBMixIn):
             try:
                 data = sl.pair.host[selector]
                 # Bucketize the data to improve compression rates.
+                baseline = np.nanmin(data)
                 dv = ((np.nanmax(data) - np.nanmin(data)) /
                       self._vis_config.levels)
-                data = np.round(data / dv)
+                data = np.round((data - baseline) / dv)
                 data *= dv
+                data += baseline
                 self._sock.send(zlib.compress(data.astype(np.float16)), zmq.NOBLOCK)
             except zmq.ZMQError:
                 self.config.logger.error('Failed to send visualization data')

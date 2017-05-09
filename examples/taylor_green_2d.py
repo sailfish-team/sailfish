@@ -36,6 +36,7 @@ To verify that this is a solution of the incompressible Navier-Stokes equations:
 
 For the LB solution, we take p0 = 1.0 and use the P = rho/c_s^2 equation of
 state to get the form in solution()."""
+from __future__ import print_function
 
 import math
 import numpy as np
@@ -130,7 +131,7 @@ class TaylorGreenSim(LBFluidSim):
             err = (np.linalg.norm(np.dstack([dx, dy])) /
                    np.linalg.norm(np.dstack([ref_ux, ref_uy])))
             rho_err = np.linalg.norm(ref_rho - rho) / np.linalg.norm(ref_rho)
-            print self.iteration, err, top_v, top_ref_v, np.max(rho), np.max(ref_rho), rho_err
+            print(self.iteration, err, top_v, top_ref_v, np.max(rho), np.max(ref_rho), rho_err)
 
 
 if __name__ == '__main__':

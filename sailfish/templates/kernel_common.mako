@@ -171,10 +171,10 @@
     %if supports_shuffle and propagate_with_shuffle:
       // Shared variables for cross-warp propagation.
       %for i in sym.get_prop_dists(grid, 1):
-        ${shared_var} float prop_${grid.idx_name[i]}[${(block_size + warp_size - 1) / warp_size}];
+        ${shared_var} float prop_${grid.idx_name[i]}[${(block_size + warp_size - 1) // warp_size}];
       %endfor
       %for i in sym.get_prop_dists(grid, -1):
-        ${shared_var} float prop_${grid.idx_name[i]}[${(block_size + warp_size - 1) / warp_size}];
+        ${shared_var} float prop_${grid.idx_name[i]}[${(block_size + warp_size - 1) // warp_size}];
       %endfor
     %else:
       // Shared variables for in-block propagation
@@ -216,7 +216,13 @@
     ## Nodes using the Grad approximation use the velocity from the
     ## previous time step to compute the approximated distributions.
     ${'|| isNTGradFreeflow(type)' if nt.NTGradFreeflow in node_types else ''}) {
-    gg0m0[gi] = g0m0 ${' +1.0f' if config.minimize_roundoff else ''};
+
+    ## If minimize_roundoff is used, this just the density delta, not
+    ## actual density. We keep it this way to avoid precision loss in
+    ## saving output data, which could otherwise occur as we could
+    ## be adding values that are of the order of the machine epsilon
+    ## to 1.0f.
+    gg0m0[gi] = g0m0;
 
     %if not initialization and velocity:
       ovx[gi] = v[0];
@@ -305,7 +311,7 @@
   %>
   %if dim == 2:
     <%
-      xblocks = grid_nx / block_size
+      xblocks = grid_nx // block_size
       yblocks = arr_ny - y_conns * boundary_size
 
       bottom_idx = has_ylow * bns * xblocks
@@ -353,7 +359,7 @@
       has_zhigh = int(block.has_face_conn(block.Z_HIGH) or block.periodic_z)
       z_conns = has_zlow + has_zhigh
 
-      xblocks = grid_nx / block_size
+      xblocks = grid_nx // block_size
       yblocks = arr_ny - y_conns * boundary_size
       zblocks = arr_nz - z_conns * boundary_size
       yz_blocks = yblocks * zblocks
@@ -510,7 +516,7 @@
 #include <stdio.h>
 %endif
 
-%for name, val in constants.iteritems():
+%for name, val in constants.items():
   ${const_var} float ${name} = ${val}f;
 %endfor
 

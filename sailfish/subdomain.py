@@ -1,4 +1,5 @@
 """Intra- and inter-subdomain geometry processing."""
+from __future__ import division
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
@@ -16,6 +17,7 @@ from sailfish import util
 from sailfish import sym
 import sailfish.node_type as nt
 from sailfish.subdomain_connection import LBConnection
+from functools import reduce
 
 ConnectionPair = namedtuple('ConnectionPair', 'src dst')
 
@@ -44,8 +46,8 @@ class SubdomainSpec(object):
     Z_HIGH = 5
 
     def __init__(self, location, size, envelope_size=None, id_=None, *args, **kwargs):
-        self.location = location
-        self.size = size
+        self.location = tuple(location)
+        self.size = tuple(size)
 
         if envelope_size is not None:
             self.set_actual_size(envelope_size)
@@ -109,7 +111,7 @@ class SubdomainSpec(object):
     def update_context(self, ctx):
         ctx['dim'] = self.dim
         # The flux tensor is a symmetric matrix.
-        ctx['flux_components'] = self.dim * (self.dim + 1) / 2
+        ctx['flux_components'] = self.dim * (self.dim + 1) // 2
         ctx['envelope_size'] = self.envelope_size
         # TODO(michalj): Fix this.
         # This requires support for ghost nodes in the periodicity code
@@ -162,13 +164,13 @@ class SubdomainSpec(object):
         """Returns a list of pairs: (face, subdomain ID) representing connections
         to different subdomains."""
         ids = set([])
-        for face, v in self._connections.iteritems():
+        for face, v in self._connections.items():
             for pair in v:
                 ids.add((face, pair.dst.block_id))
         return list(ids)
 
     def has_face_conn(self, face):
-        return face in self._connections.keys()
+        return face in list(self._connections.keys())
 
     def set_actual_size(self, envelope_size):
         # TODO: It might be possible to optimize this a little by avoiding
@@ -215,7 +217,7 @@ class SubdomainSpec(object):
             self.Y_HIGH: self.Y_LOW,
             self.Z_HIGH: self.Z_LOW
         }
-        opp_map.update(dict((v, k) for k, v in opp_map.iteritems()))
+        opp_map.update(dict((v, k) for k, v in opp_map.items()))
         return opp_map[face]
 
     @classmethod
@@ -379,17 +381,19 @@ class Subdomain(object):
         self._seen_types = set([0])
         self._needs_orientation = False
 
-        # A dense boolean array indicaing which nodes are active in the
+        # A dense boolean array indicating which nodes are active in the
         # simulation (marked as True). This is only used in the indirect
         # addressing node. This array covers all nodes, including ghosts.
         self.active_node_mask = None
 
-    def allocate(self):
-        runner = self.spec.runner
         if self.spec.runner.config.node_addressing == 'indirect':
+            self.config.logger.debug('Loading active node map..')
             self.load_active_node_map(*self._get_mgrid_base(self.config))
             self.spec.runner.config.logger.info('Fill ratio is: %0.2f%%' %
                     (self.active_nodes / float(self.spec.num_actual_nodes) * 100))
+
+    def allocate(self):
+        runner = self.spec.runner
         self._type_map_ghost, self._sparse_type_map = runner.make_scalar_field(np.uint32, register=False, nonghost_view=False)
         self._type_map = self._type_map_ghost[self.spec._nonghost_slice]
         self._type_map_base = runner.field_base(self._type_map_ghost)
@@ -457,28 +461,21 @@ class Subdomain(object):
             True indicates a solid node not participating in the simulation.
             These nodes would typically be set to NTFullBBWall or similar.
         """
+        self.config.logger.debug('... setting active node map from wall map')
         fluid_map = np.logical_not(wall_map)
-        # Build a convolution kernel to count active neighbor nodes.
-        if self.dim == 3:
-            neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
-            for x in self.grid.basis:
-                neighbors[x[0] + 1, x[1] + 1, x[2] + 1] = 1
-        else:
-            neighbors = np.zeros((3, 3), dtype=np.uint8)
-            for x in self.grid.basis:
-                neighbors[x[0] + 1, x[1] + 1] = 1
+        neighbor = self._lattice_kernel(zero=0)
 
         # Mark nodes connected to at least one active node as active.
         # We need these nodes for walls and ghost nodes.
-        where = (filters.convolve(fluid_map.astype(np.uint8),
-                                  neighbors, mode='wrap') > 0)
+        where = (filters.convolve(fluid_map.astype(np.uint8), neighbors,
+                                  mode='wrap') > 0)
         fluid_map[where] = True
         self.active_node_mask = fluid_map
 
     @property
     def active_nodes(self):
         if self.active_node_mask is not None:
-            return long(np.sum(self.active_node_mask))
+            return int(np.sum(self.active_node_mask))
         else:
             return reduce(operator.mul, self.lat_shape)
 
@@ -492,7 +489,7 @@ class Subdomain(object):
     def _verify_params(self, where, node_type):
         """Verifies that the node parameters are set correctly."""
 
-        for name, param in node_type.params.iteritems():
+        for name, param in node_type.params.items():
             # Single number.
             if util.is_number(param):
                 continue
@@ -510,7 +507,7 @@ class Subdomain(object):
                         "in the 'where' array.  Use node_util.multifield() to "
                         "generate the array in an easy way.")
             elif isinstance(param, nt.DynamicValue):
-                if param.has_symbols(sym.S.time) or zip(param.get_timeseries()):
+                if param.has_symbols(sym.S.time) or list(zip(param.get_timeseries())):
                     self.config.time_dependence = True
                 if param.has_symbols(sym.S.gx, sym.S.gy, sym.S.gz):
                     self.config.space_dependence = True
@@ -518,6 +515,16 @@ class Subdomain(object):
             else:
                 raise ValueError("Unrecognized node param: {0} (type {1})".
                         format(name, type(param)))
+
+    @staticmethod
+    def _hashable_params(param_dict):
+        params = []
+        for k, v in param_dict.items():
+            if hasattr(v, 'tostring'):
+                params.append((k, v.tostring()))
+            else:
+                params.append((k, v))
+        return frozenset(params)
 
     def set_node(self, where, node_type):
         """Set a boundary condition at selected node(s).
@@ -535,7 +542,7 @@ class Subdomain(object):
 
         self._verify_params(where, node_type)
         self._type_map_base[where] = node_type.id
-        key = hash((node_type.id, frozenset(node_type.params.items())))
+        key = hash((node_type.id, self._hashable_params(node_type.params)))
         assert np.all(self._param_map_base[where] == 0),\
                 "Overriding previously set nodes is not allowed."
         self._param_map_base[where] = key
@@ -562,7 +569,7 @@ class Subdomain(object):
         if not self._type_map_encoded:
             raise ValueError('Simulation not started. Use set_node instead.')
 
-        key = hash((node_type.id, frozenset(node_type.params.items())))
+        key = hash((node_type.id, self._hashable_params(node_type.params)))
         if key not in self._params:
             if node_type.id == 0:
                 key = 0
@@ -716,6 +723,10 @@ class Subdomain(object):
             self.encoded_map()
         self.config.logger.debug('... encoder done.')
 
+        self.config.logger.info('Fluid node fraction: %.1f%%' %
+                                (self.num_fluid_nodes * 100.0 /
+                                 self.spec.num_nodes))
+
     def get_fo_distributions(self, fo):
         """Computes an array indicating which distributions correspond to
         momentum trasferred from the object to the fluid.
@@ -808,16 +819,51 @@ class Subdomain(object):
         else:
             return fm == 0
 
-    def _fluid_map_base(self, wet=True):
+    def _fluid_map(self, wet=True, base=True, allow_unused=None):
         assert not self._type_map_encoded
 
-        if wet:
-            uniq_types = set(np.unique(self._type_map_base))
-            wet_types = list(set(nt.get_wet_node_type_ids()) & uniq_types)
-            wet_types = self._type_map.dtype.type(wet_types)
-            return util.in_anyd_fast(self._type_map_base, wet_types)
+        if base:
+            src = self._type_map_base
         else:
-            return self._type_map_base == 0
+            src = self._type_map
+
+        if wet:
+            uniq_types = set(np.unique(src))
+            wet_types = list(set(nt.get_wet_node_type_ids(allow_unused=allow_unused)) & uniq_types)
+            wet_types = self._type_map.dtype.type(wet_types)
+            return util.in_anyd_fast(src, wet_types)
+        else:
+            return src == 0
+
+    def _lattice_kernel(self, zero=1):
+        raise NotImplementedError
+
+    def _postprocess_nodes(self):
+        fluid_map = self._fluid_map(wet=False, base=True).astype(np.uint8)
+        wet_map_for_unused = self._fluid_map(wet=True, allow_unused=True, base=True).astype(np.uint8)
+        wet_map = self._fluid_map(wet=True, base=True).astype(np.uint8)
+        neighbors = self._lattice_kernel()
+
+        # Any *wet* node not connected to at least one *fluid* node is marked unused.
+        # Note that dry nodes connecting to wet nodes need to be retained.
+        # For instance:
+        #  W W
+        #  W V
+        # where W is a HBB wall and V is a velocity BC.
+        where = (filters.convolve(fluid_map, neighbors, mode='constant', cval=1) == 0)
+        self._type_map_base[where & wet_map_for_unused.astype(np.bool)] = nt._NTUnused.id
+
+        # Any dry node, not connected to at least one wet node is marked unused.
+        # For instance, for HBB walls: .. W W W F -> .. U U W F.
+        where = (filters.convolve(wet_map, neighbors, mode='constant', cval=0) == 0)
+        self._type_map_base[where & np.logical_not(wet_map.astype(np.bool))] = nt._NTUnused.id
+
+        # If an unused node touches a wet node, mark it as propagation only.
+        # For instance, for HBB walls: .. U U W F -> .. U P W F.
+        used_map = (self._type_map_base != nt._NTUnused.id).astype(np.uint8)
+        where = (filters.convolve(used_map, neighbors, mode='constant', cval=0) > 0)
+        self._type_map_base[where & (self._type_map_base == nt._NTUnused.id)] = nt._NTPropagationOnly.id
+
 
 class Subdomain2D(Subdomain):
     dim = 2
@@ -861,13 +907,14 @@ class Subdomain2D(Subdomain):
                 return slice(None), slc[0]
 
         def _set(x, face):
-            if unset_only:
+            # If the subdomain does not communicate with other subdomains, we
+            # are allowed to set ghost nodes on the whole face.
+            if unset_only and self.spec.has_face_conn(face):
                 # Nodes are fluid.
                 tg_map = (x == 0)
                 # Nodes do not communicate data to neighboring subdomains.
                 for cpair in self.spec._connections.get(face, []):
                     tg_map[_slice(cpair.src.src_slice, face)] = False
-
                 x[tg_map] = nt._NTGhost.id
             else:
                 x[:] = nt._NTGhost.id
@@ -877,33 +924,13 @@ class Subdomain2D(Subdomain):
         _set(self._type_map_base[es + self.spec.ny:, :], self.spec.Y_HIGH)
         _set(self._type_map_base[:, es + self.spec.nx:], self.spec.X_HIGH)
 
-    def _postprocess_nodes(self):
-        fluid_map = self._fluid_map_base(wet=False).astype(np.uint8)
-        wet_map = self._fluid_map_base(wet=True).astype(np.uint8)
+    def _lattice_kernel(self, zero=1):
         neighbors = np.zeros((3, 3), dtype=np.uint8)
-        neighbors[1,1] = 1
+        neighbors[1,1] = zero
         for ei in self.grid.basis:
             neighbors[1 + ei[1], 1 + ei[0]] = 1
+        return neighbors
 
-        # Any wet node not connected to at least one fluid node is marked unused.
-        # Note that dry nodes connecting to wet nodes need to be retained.
-        # For instance:
-        #  W W
-        #  W V
-        # where W is a HBB wall and V is a velocity BC.
-        where = (filters.convolve(fluid_map, neighbors, mode='wrap') == 0)
-        self._type_map_base[where & wet_map.astype(np.bool)] = nt._NTUnused.id
-
-        # Any dry node, not connected to at least one wet node is marked unused.
-        # For instance, for HBB walls: .. W W W F -> .. U U W F.
-        where = (filters.convolve(wet_map, neighbors, mode='wrap') == 0)
-        self._type_map_base[where & np.logical_not(wet_map)] = nt._NTUnused.id
-
-        # If an unused node touches a wet node, mark it as propagation only.
-        # For instance, for HBB walls: .. U U W F -> .. U P W F.
-        used_map = (self._type_map_base != nt._NTUnused.id).astype(np.uint8)
-        where = (filters.convolve(used_map, neighbors, mode='wrap') > 0)
-        self._type_map_base[where & (self._type_map_base == nt._NTUnused.id)] = nt._NTPropagationOnly.id
 
 class Subdomain3D(Subdomain):
     dim = 3
@@ -953,7 +980,9 @@ class Subdomain3D(Subdomain):
                 return slice(None), slc[1], slc[0]
 
         def _set(x, face):
-            if unset_only:
+            # If the subdomain does not communicate with other subdomains, we
+            # are allowed to set ghost nodes on the whole face.
+            if unset_only and self.spec.has_face_conn(face):
                 # Nodes are fluid.
                 tg_map = (x == 0)
                 # Nodes do not communicate data to neighboring subdomains.
@@ -971,30 +1000,9 @@ class Subdomain3D(Subdomain):
         _set(self._type_map_base[:, es + self.spec.ny:, :], self.spec.Y_HIGH)
         _set(self._type_map_base[:, :, es + self.spec.nx:], self.spec.X_HIGH)
 
-    def _postprocess_nodes(self):
-        fluid_map = self._fluid_map_base(wet=False).astype(np.uint8)
-        wet_map = self._fluid_map_base(wet=True).astype(np.uint8)
+    def _lattice_kernel(self, zero=1):
         neighbors = np.zeros((3, 3, 3), dtype=np.uint8)
-        neighbors[1,1,1] = 1
+        neighbors[1,1,1] = zero
         for ei in self.grid.basis:
             neighbors[1 + ei[2], 1 + ei[1], 1 + ei[0]] = 1
-
-        # Any wet node not connected to at least one fluid node is marked unused.
-        # Note that dry nodes connecting to wet nodes need to be retained.
-        # For instance:
-        #  W W
-        #  W V
-        # where W is a HBB wall and V is a velocity BC.
-        where = (filters.convolve(fluid_map, neighbors, mode='wrap') == 0)
-        self._type_map_base[where & wet_map.astype(np.bool)] = nt._NTUnused.id
-
-        # Any dry node, not connected to at least one wet node is marked unused.
-        # For instance, for HBB walls: .. W W W F -> .. U U W F.
-        where = (filters.convolve(wet_map, neighbors, mode='wrap') == 0)
-        self._type_map_base[where & np.logical_not(wet_map)] = nt._NTUnused.id
-
-        # If an unused node touches a wet node, mark it as propagation only.
-        # For instance, for HBB walls: .. U U W F -> .. U P W F.
-        used_map = (self._type_map_base != nt._NTUnused.id).astype(np.uint8)
-        where = (filters.convolve(used_map, neighbors, mode='wrap') > 0)
-        self._type_map_base[where & (self._type_map_base == nt._NTUnused.id)] = nt._NTPropagationOnly.id
+        return neighbors

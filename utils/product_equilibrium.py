@@ -2,10 +2,11 @@
 
 Works for arbitrary lattices supporting an entropy function.
 """
-
+from __future__ import print_function
 from sailfish import sym
 from sympy import *
 import operator
+from functools import reduce
 
 g = sym.D3Q15
 As = []
@@ -82,18 +83,18 @@ for o in range(0, 9):
     my_ex = simplify(my_ex)
     mz_ex = simplify(mz_ex)
 
-    print 'Solving o = %d' % o
-    print ' *', rho_ex
-    print ' *', mx_ex
-    print ' *', my_ex
-    print ' *', mz_ex
-    print '.. for: ', args
+    print('Solving o = %d' % o)
+    print(' *', rho_ex)
+    print(' *', mx_ex)
+    print(' *', my_ex)
+    print(' *', mz_ex)
+    print('.. for: ', args)
 
     sol = solve((rho_ex, mx_ex, my_ex, mz_ex), *args)
     if sol:
-        for symbol, h in sol.iteritems():
+        for symbol, h in sol.items():
             res[symbol] = h.subs({k: 1})
-    print sol
-    print '---'
+    print(sol)
+    print('---')
 
-print res
+print(res)

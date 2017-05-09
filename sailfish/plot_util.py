@@ -32,7 +32,7 @@ def _plot_grid3d(ax, grid, bbox, planes):
     assert grid.dim == 3
     bb = 0
     for ei in grid.basis[1:]:
-        a = Arrow3D(*zip((0, 0, 0), [float(x) * 1.05 for x in ei]), color='k', arrowstyle='-|>',
+        a = Arrow3D(*list(zip((0, 0, 0), [float(x) * 1.05 for x in ei])), color='k', arrowstyle='-|>',
                     mutation_scale=10, lw=1)
         ax.add_artist(a)
         bb = max(bb, max([int(x) for x in ei]))
@@ -58,7 +58,7 @@ def _plot_grid3d(ax, grid, bbox, planes):
         r = [-bb, bb]
         for s, e in combinations(np.array(list(product(r, r, r))), 2):
             if np.sum(np.abs(s - e)) == r[1] - r[0]:
-                ax.plot3D(*zip(s, e), color='b', ls='--')
+                ax.plot3D(*list(zip(s, e)), color='b', ls='--')
 
 
 def _plot_grid2d(ax, grid):

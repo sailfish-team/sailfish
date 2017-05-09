@@ -9,6 +9,7 @@ direction so that copying data between subdomains is fast).
 import time
 import math
 import numpy as np
+import os
 
 from sailfish.geo import EqualSubdomainsGeometry3D
 from sailfish.subdomain import Subdomain3D
@@ -22,7 +23,6 @@ from sailfish.vis_mixin import Vis2DSliceMixIn
 import scipy.ndimage.filters
 
 class ChannelSubdomain(Subdomain3D):
-    wall_bc = NTHalfBBWall
     u0 = 0.05
 
     @classmethod
@@ -39,7 +39,7 @@ class ChannelSubdomain(Subdomain3D):
         wall_map = ((hx == 0) | (hx == self.gx - 1))
         self.set_node(wall_map, self.wall_bc)
 
-    def make_gradients(self, NX, NY, NZ, hx, hy, hz, u):
+    def make_gradients(self, NX, NY, NZ, hx, hy, hz):
         # Buffer size (used to make the random perturbation continuous
         # along the streamwise direction.
         B = 40
@@ -57,7 +57,7 @@ class ChannelSubdomain(Subdomain3D):
         # Remove the buffer layer. We also force the perturbations to be
         # smaller close to the wall. Select the right part of the random
         # field for this subdomain.
-        return [self.select_subdomain(x[hB:-hB,hB:-hB,:], hx, hy, hz) * u / self.u0 for x in np.gradient(nn1)]
+        return [self.select_subdomain(x[hB:-hB,hB:-hB,:], hx, hy, hz) for x in np.gradient(nn1)]
 
     def select_subdomain(self, field, hx, hy, hz):
         # Determine subdomain span.
@@ -66,8 +66,30 @@ class ChannelSubdomain(Subdomain3D):
         z0, z1 = np.min(hz), np.max(hz)
         return field[z0:z1+1, y0:y1+1, x0:x1+1]
 
+    def get_divfree_perturbation(self, NX, NY, NZ, hx, hy, hz):
+        if self.config.external_perturbation:
+            base = os.path.join(self.config.external_perturbation,
+                                'rng_%d_%d_%d_' % (NX, NY, NZ))
+            dvx = self.select_subdomain(np.load(base + 'dvx.npz')['data'],
+                                        hx, hy, hz)
+            dvy = self.select_subdomain(np.load(base + 'dvy.npz')['data'],
+                                        hx, hy, hz)
+            dvz = self.select_subdomain(np.load(base + 'dvz.npz')['data'],
+                                        hx, hy, hz)
+        else:
+            np.random.seed(11341351351)
+            _, dy1, dz1 = self.make_gradients(NX, NY, NZ, hx, hy, hz)
+            dx2, _, dz2 = self.make_gradients(NX, NY, NZ, hx, hy, hz)
+            dx3, dy3, _ = self.make_gradients(NX, NY, NZ, hx, hy, hz)
+
+            # Compute curl of the random field.
+            dvx = dy3 - dz2
+            dvy = dz1 - dx3
+            dvz = dx2 - dy1
+        return dvx, dvy, dvz
+
     def set_profile(self, sim, hx, hy, hz, NX, NY, NZ, pert=0.03):
-        H = NX / 2
+        H = self.config.H
 
         u_tau = self.u_tau(self.config.Re_tau)
         hhx = np.abs(hx - self.wall_bc.location - H)
@@ -83,15 +105,7 @@ class ChannelSubdomain(Subdomain3D):
         u[y_plus < y0] = y_plus[y_plus < y0] * u_tau
         sim.vz[:] = u
 
-        np.random.seed(11341351351)
-        _, dy1, dz1 = self.make_gradients(NX, NY, NZ, hx, hy, hz, u)
-        dx2, _, dz2 = self.make_gradients(NX, NY, NZ, hx, hy, hz, u)
-        dx3, dy3, _ = self.make_gradients(NX, NY, NZ, hx, hy, hz, u)
-
-        # Compute curl of the random field.
-        dvx = dy3 - dz2
-        dvy = dz1 - dx3
-        dvz = dx2 - dy1
+        dvx, dvy, dvz = self.get_divfree_perturbation(NX, NY, NZ, hx, hy, hz)
 
         assert np.sum(np.isnan(dvx)) == 0
         assert np.sum(np.isnan(dvy)) == 0
@@ -101,13 +115,18 @@ class ChannelSubdomain(Subdomain3D):
 
         # Add random perturbation to the initial flow field. The numerical
         # factor determines the largest perturbation value.
-        sim.vx[:] += dvx / scale * pert
-        sim.vy[:] += dvy / scale * pert
-        sim.vz[:] += dvz / scale * pert  # streamwise
+        sim.vx[:] += dvx / scale * pert * u / self.u0
+        sim.vy[:] += dvy / scale * pert * u / self.u0
+        sim.vz[:] += dvz / scale * pert * u / self.u0 # streamwise
 
 
 class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
     subdomain = ChannelSubdomain
+    _wall_map = {
+        'hbb': NTFullBBWall,
+        'bbl': NTHalfBBWall,
+        'tms': NTWallTMS
+    }
 
     @classmethod
     def update_defaults(cls, defaults):
@@ -136,7 +155,12 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
             })
 
     @classmethod
+    def wall_bc(cls, config):
+        return cls._wall_map[config.wall]
+
+    @classmethod
     def modify_config(cls, config):
+        cls.subdomain.wall_bc = cls.wall_bc(config)
         h = 2 if cls.subdomain.wall_bc.location == 0.5 else 0
 
         az = 6
@@ -148,39 +172,69 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
         config.lat_nz = config.H * az  # streamwise (PBC)
         config.visc = cls.subdomain.u_tau(config.Re_tau) * config.H / config.Re_tau
 
-        cls.show_info(config)
+        # Show data early. This is helpful for quick debugging.
+        if not config.quiet:
+            print '\n'.join(cls.get_info(config))
 
     @classmethod
-    def show_info(cls, config):
+    def get_info(cls, config):
         u_tau = cls.subdomain.u_tau(config.Re_tau)
-        Re = cls.subdomain.u0 * 2.0 * config.H / config.visc
-        print 'Delta_+ = %.2f' % (u_tau / config.visc)
-        print 'Re_tau = %.2f' % (config.Re_tau)
-        print 'Re = %.2f' % Re
-        print 'visc = %e' % config.visc
-        print 'u_tau = %e' % u_tau
-        print 'eta = %e' % (2.0 * config.H / Re**0.75)  # Kolmogorov scale
-        print 'force = %e' % (config.Re_tau**2 * config.visc**2 / config.H**3)
+        Re = cls.subdomain.u0 * config.H / config.visc
+
+        y_plus = (np.arange(config.H) + 0.5) * u_tau / config.visc
+        u = (1/0.41 * np.log(y_plus) + 5.5) * u_tau
+        u_bulk = np.sum(u) / config.H
+        Re_bulk = u_bulk * config.H / config.visc
+
+        ret = []
+        ret.append('Delta_+ = %.2f' % (u_tau / config.visc))
+        ret.append('Re_tau = %.2f' % (config.Re_tau))
+        ret.append('Re_H,max = %.2f' % Re)
+        ret.append('Re_H,bulk = %.2f' % Re_bulk)
+        ret.append('visc = %e' % config.visc)
+        ret.append('u_b = %e' % u_bulk)
+        ret.append('u_tau = %e' % u_tau)
+        ret.append('eta = %e' % (2.0 * config.H / Re**0.75))  # Kolmogorov scale
+        ret.append('force = %e' % (config.Re_tau**2 * config.visc**2 /
+                                   config.H**3))
 
         # Timescales: large eddies, flow-through time in the wall layer.
-        print 't_eddy = %d' % (config.H * 2.0 / cls.subdomain.u0)
-        print 't_flow = %d' % cls.t_flow(config)
+        ret.append('t_eddy = %d' % (config.H * 2.0 / cls.subdomain.u0))
+        ret.append('t_flow = %d' % cls.t_flow(config))
+        ret.append('t_char = %d' % cls.t_char(config))
+
+        ret.append('wall = %s' % cls.subdomain.wall_bc.__name__)
+        return ret
 
     @classmethod
     def t_flow(cls, config):
+        """Flow-through time."""
+        return cls.t_char(config) * (config.lat_nz / config.H)
+
+    @classmethod
+    def t_char(cls, config):
+        """Characteristic time."""
         u_tau = cls.subdomain.u_tau(config.Re_tau)
-        return config.H / u_tau * (config.lat_nz / config.H)
+        return config.H / u_tau
 
     @classmethod
     def add_options(cls, group, dim):
         group.add_argument('--H', type=int, default=40, help='channel half-height')
         group.add_argument('--Re_tau', type=float, default=180.0, help='Re_tau')
+        group.add_argument('--wall', choices=('hbb', 'bbl', 'tms'),
+                           default='hbb', help='No-slip wall type.')
+        group.add_argument('--external_perturbation', type=str,
+                           default='', help='Use externally generated '
+                           'perturbation.')
 
     def __init__(self, config):
         super(ChannelSim, self).__init__(config)
         # force = u_tau^2 / H
         self.add_body_force((0.0, 0.0, config.Re_tau**2 * config.visc**2 /
                              config.H**3))
+
+        for line in self.get_info(self.config):
+            self.config.logger.info(line)
 
     def before_main_loop(self, runner):
         self.prepare_reynolds_stats(runner, axis='x')
@@ -197,10 +251,13 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
             self.need_fields_flag = True
         elif mod == 0:
             stats = self.collect_reynolds_stats(runner)
+
             if stats is not None:
-                np.savez('%s_reyn_stat_%s.%s' % (self.config.output, runner._spec.id,
-                                                 self.iteration),
-                         **stats)
+                output_path = os.path.join(self.config.output, 'reyn_stats')
+                if not os.path.exists(output_path):
+                    os.makedirs(output_path)
+                np.savez('%s/stats_%s.%s' % (output_path, runner._spec.id,
+                                             self.iteration), **stats)
 
 if __name__ == '__main__':
     ctrl = LBSimulationController(ChannelSim, EqualSubdomainsGeometry3D)

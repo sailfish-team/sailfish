@@ -344,7 +344,7 @@ class LBSingleFluidShanChen(LBFluidSim, LBForcedSim):
         sim_kernels = super(LBSingleFluidShanChen, self).get_compute_kernels(
                 runner, full_output, bulk)
 
-        return zip(macro_kernels, sim_kernels)
+        return list(zip(macro_kernels, sim_kernels))
 
 
 class LBIBMFluidSim(LBFluidSim, LBForcedSim):

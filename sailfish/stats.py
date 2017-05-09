@@ -64,6 +64,9 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
     #: between host syncs.
     stat_buf_size = 1024
 
+    #: List of iterations at which measurements were taken.
+    snapshot_iters = []
+
     def prepare_reynolds_stats(self, runner, moments=True,
                                correlations=True,
                                axis='x'):
@@ -82,14 +85,17 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
         self._reyn_moments = moments
         self._reyn_corr = correlations
         self._reyn_normalizer = normalizer
+        self._reyn_bytes = 0
 
         def _alloc_stat_buf(name, helper_size, need_finalize):
             h = np.zeros([self.stat_buf_size, NX], dtype=np.float64)
+            self._reyn_bytes += h.nbytes
             setattr(self, 'stat_%s' % name, h)
             setattr(self, 'gpu_stat_%s' % name, runner.backend.alloc_buf(like=h))
 
             if need_finalize:
                 h = np.zeros([NX, helper_size], dtype=np.float64)
+                self._reyn_bytes += h.nbytes
                 setattr(self, 'stat_tmp_%s' % name, h)
                 setattr(self, 'gpu_stat_tmp_%s' % name, runner.backend.alloc_buf(like=h))
 
@@ -115,6 +121,8 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
         _alloc_stat_buf('ux_rho', self.stat_corr_grid_size, corr_finalize)
         _alloc_stat_buf('uy_rho', self.stat_corr_grid_size, corr_finalize)
         _alloc_stat_buf('uz_rho', self.stat_corr_grid_size, corr_finalize)
+
+        self.config.logger.info('Size of Reynolds stats buffer: %d' % self._reyn_bytes)
 
         gpu_rho = runner.gpu_field(self.rho)
         gpu_v = runner.gpu_field(self.v)
@@ -186,6 +194,7 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
         """Collects Reynolds statistics."""
         # TODO(mjanusz): Run these kernels in a stream other than main.
         self.stat_cnt += 1
+        self.snapshot_iters.append(self.iteration)
 
         NX = self._reyn_points
         grid = [self.stat_cm_grid_size]
@@ -246,6 +255,10 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
 
             # Divide the stats by this value to get an average over all nodes.
             div = self._reyn_normalizer
+
+            iters = self.snapshot_iters
+            self.snapshot_iters = []
+
             return {
                 'ux_m1': self.stat_ux_m1 / div,
                 'ux_m2': self.stat_ux_m2 / div,
@@ -268,7 +281,8 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
                 'uy_uz': self.stat_uy_uz / div,
                 'ux_rho': self.stat_ux_rho / div,
                 'uy_rho': self.stat_uy_rho / div,
-                'uz_rho': self.stat_uz_rho / div}
+                'uz_rho': self.stat_uz_rho / div,
+                'iters': iters}
         else:
             # Update buffer offset.
             if self.cm_finalize:

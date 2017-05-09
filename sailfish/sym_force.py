@@ -12,6 +12,7 @@ from sympy import Matrix, Symbol
 
 from sailfish.sym import S
 from sailfish.sym_codegen import poly_factorize
+from functools import reduce
 
 def needs_coupling_accel(i, force_couplings):
     """Returns True is a grid is coupled to any other grid.
@@ -22,7 +23,7 @@ def needs_coupling_accel(i, force_couplings):
     if type(force_couplings) is Undefined:
         return False
     return (i in
-        reduce(lambda x, y: operator.add(x, [y[0], y[1]]), force_couplings.keys(), []))
+        reduce(lambda x, y: operator.add(x, [y[0], y[1]]), list(force_couplings.keys()), []))
 
 def needs_accel(i, forces, force_couplings):
     """Returns True if there a force acting on a grid.

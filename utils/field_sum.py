@@ -2,7 +2,7 @@
 #
 # Prints the sum of all finite values of all fields on a given
 # slice. Arguments: axis, position
-
+from __future__ import print_function
 import sys
 import numpy as np
 
@@ -19,7 +19,7 @@ for i in range(0, 3):
         slc.append(slice(None))
 
 res = []
-for k, f in data.iteritems():
+for k, f in data.items():
     if len(f.shape) == 4:
         for i, ax in enumerate(('x', 'y', 'z')):
             slc2 = [i] + slc
@@ -28,4 +28,4 @@ for k, f in data.iteritems():
         res.append((k, np.nansum(f[slc])))
 
 
-print '  '.join(['%s: %.4f' % (x, y) for x, y in res])
+print('  '.join(['%s: %.4f' % (x, y) for x, y in res]))

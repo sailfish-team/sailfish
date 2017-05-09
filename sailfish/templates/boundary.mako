@@ -68,7 +68,7 @@ ${device_func} inline float get_time_from_iteration(unsigned int iteration) {
 %endif  ## time_dependence
 
 ## Renders functions to compute dynamic values.
-%for i, expressions in symbol_idx_map.iteritems():
+%for i, expressions in symbol_idx_map.items():
   ${device_func} inline void time_dep_param_${i}(float *out ${dynamic_val_args_decl()}) {
     %if time_dependence:
       float phys_time = get_time_from_iteration(iteration_number);
@@ -85,7 +85,7 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
   %if (time_dependence or space_dependence) and symbol_idx_map:
     if (idx >= ${non_symbolic_idxs}) {
       switch (idx) {
-        %for key, val in symbol_idx_map.iteritems():
+        %for key, val in symbol_idx_map.items():
           %if len(val) == dim:
             case ${key}:
               time_dep_param_${key}(out ${dynamic_val_args()});
@@ -112,7 +112,7 @@ ${device_func} inline float node_param_get_scalar(const int idx ${dynamic_val_ar
   %if (time_dependence or space_dependence) and symbol_idx_map:
     if (idx >= ${non_symbolic_idxs}) {
       switch (idx) {
-        %for key, val in symbol_idx_map.iteritems():
+        %for key, val in symbol_idx_map.items():
           %if len(val) == 1:
             case ${key}: {
               float out;
@@ -201,7 +201,7 @@ ${device_func} inline void bounce_back(Dist *fi)
 // Compute the 0th moment of the distributions, i.e. density.
 ${device_func} inline void compute_0th_moment(Dist *fi, float *out)
 {
-  *out = ${sym.ex_rho(grid, 'fi', incompressible)};
+  *out = ${sym.ex_rho(grid, 'fi', incompressible, minimize_roundoff=config.minimize_roundoff)};
 }
 
 // Compute the 1st moments of the distributions, i.e. momentum.
@@ -256,16 +256,7 @@ ${device_func} inline void compute_macro_quant(Dist *fi, float *rho, float *v)
 %if nt.NTZouHeVelocity in node_types or nt.NTZouHeDensity in node_types or nt.NTRegularizedVelocity in node_types:
 <%def name="do_noneq_bb(orientation)">
   case ${orientation}:
-    <%
-      import copy
-      tmp_config = copy.copy(config)
-
-      # When this function is called, rho is the node parameter, and therefore
-      # the full density, not the density delta. We turn off the round-off
-      # minimization locally so that the standard form of equilibrium is used.
-      tmp_config.minimize_roundoff = False
-    %>
-    %for arg, val in sym.noneq_bb(grid, orientation, equilibria[0](grid, tmp_config).expression):
+    %for arg, val in sym.noneq_bb(grid, orientation, equilibria[0](grid, config).expression):
       ${cex(arg, pointers=True)} = ${cex(val, pointers=True)};
     %endfor
     break;
@@ -369,7 +360,7 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 <%def name="_macro_density_bc_common()">
   int node_param_idx = decodeNodeParamIdx(ncode);
   ${_fill_missing_distributions_with_opposite()}
-  *rho = ${sym.ex_rho(grid, 'fi', incompressible)};
+  *rho = ${sym.ex_rho(grid, 'fi', incompressible, minimize_roundoff=config.minimize_roundoff)};
   float par_rho = node_param_get_scalar(node_param_idx ${dynamic_val_args()});
 
   switch (orientation) {
@@ -390,13 +381,13 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
   // might be meaningless.  Fill them with the values of the opposite
   // distributions.
   ${_fill_missing_distributions_with_opposite()}
-  *rho = ${sym.ex_rho(grid, 'fi', incompressible)};
+  *rho = ${sym.ex_rho(grid, 'fi', incompressible, minimize_roundoff=minimize_roundoff)};
   node_param_get_vector(node_param_idx, v0 ${dynamic_val_args()});
 
   switch (orientation) {
     %for i in range(1, grid.dim*2+1):
       case ${i}:
-        *rho = ${cex(sym.ex_rho(grid, 'fi', incompressible, missing_dir=i), pointers=True)};
+        *rho = ${cex(sym.ex_rho(grid, 'fi', incompressible, missing_dir=i, minimize_roundoff=config.minimize_roundoff), pointers=True)};
         break;
     %endfor
   }

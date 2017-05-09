@@ -6,6 +6,7 @@ __license__ = 'LGPL3'
 
 # Make sure the pyopencl module exists, but do not import it.
 import imp
+from functools import reduce
 imp.find_module('pyopencl')
 import operator
 import os

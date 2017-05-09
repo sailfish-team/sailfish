@@ -73,9 +73,10 @@ class PoiseuilleSubdomain(Subdomain2D):
     @classmethod
     def velocity_profile(cls, config, hi):
         width = cls.channel_width(config)
-        h = cls.wall_bc.location
-
-        return (4.0 * cls.max_v / width**2 * (hi + h) * (width - hi - h))
+        hx = hi - cls.wall_bc.location
+        a = width / 2.0
+        rx = np.abs(a - hx)
+        return 4.0 * cls.max_v / width**2 * (a**2 - rx**2)
 
     @classmethod
     def channel_width(cls, config):
@@ -102,9 +103,9 @@ class PoiseuilleSim(LBFluidSim, LBForcedSim):
 
     @classmethod
     def add_options(cls, group, dim):
-        group.add_argument('--horizontal', type=bool, default=False,
+        group.add_argument('--horizontal', action='store_true', default=False,
                 help='simulate a horizontal flow (along the X axis)')
-        group.add_argument('--stationary', type=bool, default=False,
+        group.add_argument('--stationary', action='store_true', default=False,
                 help='start with the correct velocity profile in the whole domain')
         group.add_argument('--drive', type=str, default='force',
                 choices=['force', 'pressure'])
@@ -127,6 +128,32 @@ class PoiseuilleSim(LBFluidSim, LBForcedSim):
             accel = self.subdomain.max_v * (8.0 * config.visc) / channel_width**2
             force_vec = (accel, 0.0) if config.horizontal else (0.0, accel)
             self.add_body_force(force_vec)
+
+    _ref = None
+    _prev_l2 = 0
+    def after_step(self, runner):
+        every = 1000
+        mod = self.iteration % every
+
+        if mod == every - 1:
+            self.need_sync_flag = True
+        elif mod == 0:
+            # Cache the reference solution.
+            if self._ref is None:
+                hx, hy = runner._subdomain._get_mgrid()
+                self._ref = runner._subdomain.velocity_profile(self.config, hx)
+
+            # Output data useful for monitoring the state of the simulation.
+            m = runner._output._fluid_map
+            l2 = (np.linalg.norm(self._ref[m] - runner._sim.vy[m]) /
+                  np.linalg.norm(self._ref[m]))
+
+            self.config.logger.info('%d %e %e' % (self.iteration, l2, np.nanmax(runner._sim.vy)))
+
+            if (np.abs(self._prev_l2 - l2) / l2 < 1e-6):
+                runner._quit_event.set()
+
+            self._prev_l2 = l2
 
 
 if __name__ == '__main__':

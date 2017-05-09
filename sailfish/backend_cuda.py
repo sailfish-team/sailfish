@@ -11,6 +11,7 @@ import pycuda.tools
 import pycuda.driver as cuda
 import pycuda.gpuarray as cudaarray
 import pycuda.reduction as reduction
+from functools import reduce
 
 
 def _expand_block(block):
@@ -254,8 +255,8 @@ class CUDABackend(object):
             ddata = pycuda.tools.DeviceData()
             occ = pycuda.tools.OccupancyRecord(ddata, reduce(operator.mul, block), kern.shared_size_bytes, kern.num_regs)
 
-            print '%s: l:%d  s:%d  r:%d  occ:(%f tb:%d w:%d l:%s)' % (name, kern.local_size_bytes, kern.shared_size_bytes,
-                    kern.num_regs, occ.occupancy, occ.tb_per_mp, occ.warps_per_mp, occ.limited_by)
+            print('%s: l:%d  s:%d  r:%d  occ:(%f tb:%d w:%d l:%s)' % (name, kern.local_size_bytes, kern.shared_size_bytes,
+                    kern.num_regs, occ.occupancy, occ.tb_per_mp, occ.warps_per_mp, occ.limited_by))
 
         return kern
 

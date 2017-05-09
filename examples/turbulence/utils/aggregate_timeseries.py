@@ -13,6 +13,7 @@
 
 from collections import defaultdict
 import numpy as np
+import glob
 import sys
 
 axis = int(sys.argv[1])
@@ -20,14 +21,15 @@ axis = int(sys.argv[1])
 data = {}
 cnt = 0
 
-for fname in sys.argv[3:]:
-    a = np.load(fname)
-    for field in a.files:
-        avg = np.average(a[field], axis=axis)
-        if field in data:
-            data[field] = np.vstack([data[field], avg])
-        else:
-            data[field] = avg
+for arg in sys.argv[3:]:
+    for fname in sorted(glob.glob(arg)):
+        a = np.load(fname)
+        for field in a.files:
+            avg = np.average(a[field], axis=axis)
+            if field in data:
+                data[field] = np.vstack([data[field], avg])
+            else:
+                data[field] = avg
 
 np.savez(sys.argv[2], **data)
 

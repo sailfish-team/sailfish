@@ -1,5 +1,35 @@
 <%namespace file="propagation.mako" import="rel_offset"/>
-<%namespace file="kernel_common.mako" import="kernel_args_1st_moment,local_indices,nodes_array_if_required,indirect_index" />
+<%namespace file="kernel_common.mako" import="*" />
+<%namespace file="mako_utils.mako" import="*" />
+
+${kernel} void ComputeStressTensor(
+  ${nodes_array_if_required()}
+  ${global_ptr} ${const_ptr} int *__restrict__ map,
+  ${global_ptr} ${const_ptr} float *dist
+%for i in range(dim * (dim - 1)):
+  , ${global_ptr} float *stress${i}
+%endfor
+  ${iteration_number_if_required()}
+) {
+  ${local_indices()}
+  ${indirect_index()}
+  ${load_node_type()}
+
+  Dist d0;
+  getDist(
+    ${nodes_array_arg_if_required()}
+    &d0, dist, gi
+    ${dense_gi_arg_if_required()}
+    ${iteration_number_arg_if_required()});
+
+  // Macroscopic quantities for the current cell
+  float rho, v[${dim}], stress[${dim * (dim - 1)}];
+  getMacro(&d0, ncode, type, orientation, &rho, v ${dynamic_val_call_args()});
+  compute_noneq_2nd_moment(&d0, rho, v, stress);
+  %for i in range(dim * (dim - 1)):
+    stress${i}[gi] = stress[${i}];
+  %endfor
+}
 
 %if dim == 3:
 ${kernel} void ComputeSquareVelocityAndVorticity(
@@ -429,8 +459,13 @@ ${kernel} void ExtractSliceUsq(int axis, int position,
   out[go] = sqrtf(vx * vx + vy * vy + vz * vz);
 }
 
-<%def name="stats_slice(name, axis, num_inputs=1, stats=[[(0,1)]], out_type='float')">
-${kernel} void ${name}(int position,
+## Computes statistics on a 2D slice.
+## No space averaging.
+<%def name="stats_slice(name, num_inputs=1, stats=[[(0,1)]], out_type='float')">
+// position: position along the axis
+${kernel} void ${name}(
+	int axis,
+	int position,
   %for i in range(num_inputs):
     ${global_ptr} float *f${i},
   %endfor
@@ -438,39 +473,19 @@ ${kernel} void ${name}(int position,
     ${global_ptr} ${out_type} *out${i} ${',' if i < len(stats) - 1 else ''}
   %endfor
 ){
-  const int c0 = get_global_id(0) + 1;
-  const int c1 = get_global_id(1) + 1;
-
-  %if axis == 0:
-    if (c0 >= ${lat_ny-1} || c1 >= ${lat_nz-1}) {
-      return;
-    }
-    const unsigned int gi = getGlobalIdx(1 + position, c0, c1);
-    const int stride = ${lat_ny - 2};
-  %elif axis == 1:
-    if (c0 >= ${lat_nx-1} || c1 >= ${lat_nz-1}) {
-      return;
-    }
-    const unsigned int gi = getGlobalIdx(c0, 1 + position, c1);
-    const int stride = ${lat_nx - 2};
-  %else:
-    if (c0 >= ${lat_nx-1} || c1 >= ${lat_ny-1}) {
-      return;
-    }
-    const unsigned int gi = getGlobalIdx(c0, c1, 1 + position);
-    const int stride = ${lat_nx - 2};
-  %endif
+	${_compute_gi_for_slice()}
   %for i in range(len(stats)):
     ${out_type} acc${i} = 0.0f;
   %endfor
   ${_compute_stats(num_inputs, stats, out_type)}
-  const unsigned int gi_dst = (c1 - 1) * stride + (c0 - 1);
   %for i in range(len(stats)):
-    out${i}[gi_dst] += acc${i};
+		out${i}[go] += acc${i};
   %endfor
 }
 </%def>
 
+## Computes statistics on all nodes in the domain.
+## No space averaging.
 <%def name="stats_global(name, num_inputs=1, stats=[], out_type='float')">
 ${kernel} void ${name}(
   %for i in range(num_inputs):

@@ -9,10 +9,14 @@ where:
     output series to be merged.  If --all is specified, all
     iterations are processed.
 """
-
+from __future__ import print_function
 import argparse
 import glob
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
 import sys
 
 import numpy as np
@@ -34,7 +38,8 @@ def get_bounding_box(subdomains):
 
 def merge_subdomains(base, digits, it, save=True):
     fn_subdomains = io.subdomains_filename(base)
-    subdomains = pickle.load(open(fn_subdomains, 'r'))
+    with open(fn_subdomains, 'rb') as f:
+        subdomains = pickle.load(f)
     bb = get_bounding_box(subdomains)
 
     data = np.load(io.filename(base, digits, subdomains[0].id, it))
@@ -58,7 +63,7 @@ def merge_subdomains(base, digits, it, save=True):
         data = np.load(fn)
         for field in data.files:
             selector = [slice(None)] * (len(data[field].shape) - dim)
-            selector.extend([slice(i0, i1) for i0, i1 in reversed(zip(s.location, s.end_location))])
+            selector.extend([slice(i0, i1) for i0, i1 in reversed(list(zip(s.location, s.end_location)))])
             out[field][selector] = data[field]
 
     if save:
@@ -81,7 +86,7 @@ if __name__ == '__main__':
     if args.all:
         for fn in glob.glob('.'.join([base, sub_id, ('[0-9]' * digits), 'npz'])):
             _, _, it, _ = fn.rsplit('.', 3)
-            print 'Processing {0}'.format(it)
+            print('Processing {0}'.format(it))
             merge_subdomains(base, digits, int(it))
     else:
         merge_subdomains(base, digits, int(it))

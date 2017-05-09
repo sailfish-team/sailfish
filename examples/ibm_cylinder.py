@@ -36,6 +36,7 @@ Re ranges for flow around a cylinder:
 Note that once turbulence starts, the 3D structure becomes important and the
 flow cannot be modeled with the current simulation.
 """
+from __future__ import print_function
 
 import math
 import numpy as np
@@ -105,7 +106,7 @@ class CylinderSimulation(LBIBMFluidSim):
         elif mod == 0:
             ly = self.config.lat_ny / 2
             lx = int(self.config.lat_nx * 0.75)
-            print self.iteration, self.vy[ly, lx], self.vx[ly, lx]
+            print(self.iteration, self.vy[ly, lx], self.vx[ly, lx])
 
 if __name__ == '__main__':
     ctrl = LBSimulationController(CylinderSimulation)

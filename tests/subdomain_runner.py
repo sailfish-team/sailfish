@@ -16,6 +16,7 @@ from sailfish.io import LBOutput
 from sailfish.sym import D2Q9
 
 from dummy import *
+from functools import reduce
 
 class BasicFunctionalityTest(unittest.TestCase):
     location = 0, 0
@@ -60,8 +61,6 @@ class BasicFunctionalityTest(unittest.TestCase):
         real_size = [3, 16]
         self.assertEqual(runner._physical_size, real_size)
 
-        strides = runner._get_strides(np.float32)
-        self.assertEqual(strides, [4 * 16, 4])
         nodes = runner.num_phys_nodes
         self.assertEqual(nodes, reduce(operator.mul, real_size))
 
@@ -74,8 +73,6 @@ class BasicFunctionalityTest(unittest.TestCase):
         # Last dimension is rounded up to a multiple of block_size
         real_size = [7, 5, 8]
         self.assertEqual(runner._physical_size, real_size)
-        strides = runner._get_strides(np.float64)
-        self.assertEqual(strides, [8*8*5, 8*8, 8])
         nodes = runner.num_phys_nodes
         self.assertEqual(nodes, reduce(operator.mul, real_size))
 

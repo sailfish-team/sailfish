@@ -19,3 +19,6 @@ voxelizer_octree: voxelizer_octree.cpp
 
 subdomain_test: subdomain_test.cpp
 	$(CXX) -std=c++11 $(CXXFLAGS) $(GTEST_INCLUDE) subdomain_test.cpp subdomain.cpp -I. -Icvmlcpp $(GTEST_LIBS) -o $@
+
+dump_normals: dump_normals.cpp
+	$(CXX) -O3 -DNDEBUG -std=c++11 $(CXXFLAGS) dump_normals.cpp -I. -Icvmlcpp -o $@

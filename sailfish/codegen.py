@@ -1,4 +1,5 @@
 """Run-time CUDA/OpenCL code generation."""
+from __future__ import print_function
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
@@ -135,7 +136,7 @@ class BlockCodeGenerator(object):
         try:
             src = code_tmpl.render(**ctx)
         except:
-            print mako.exceptions.text_error_template().render()
+            print(mako.exceptions.text_error_template().render())
             return ''
 
         aux_sources = list(self._sim.aux_code)
@@ -155,7 +156,7 @@ class BlockCodeGenerator(object):
             try:
                 src += '\n' + code_tmpl.render(**ctx)
             except:
-                print mako.exceptions.text_error_template().render()
+                print(mako.exceptions.text_error_template().render())
                 return ''
 
         if self.is_double_precision():
@@ -179,7 +180,7 @@ class BlockCodeGenerator(object):
 
     def save_code(self, code, dest_path, reformat=True):
         with open(dest_path, 'w') as fsrc:
-            print >>fsrc, code
+            print(code, file=fsrc)
 
         if reformat:
             os.system(self._format_cmd.format(
