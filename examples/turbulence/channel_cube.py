@@ -153,7 +153,7 @@ class CubeChannelSim(ChannelSim):
             'model': 'bgk',
             'minimize_roundoff': True,
             'precision': 'single',
-            'seed': 11341351351,
+            'seed': 1341351351,
             'periodic_y': True,
             'periodic_z': True,
 

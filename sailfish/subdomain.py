@@ -532,7 +532,8 @@ class Subdomain(object):
         :param where: index expression selecting nodes to set
         :param node_type: LBNodeType subclass or instance
         """
-        where = np.where(where)                                                                        
+        where_array = where
+        where = np.where(where)        
         assert not self._type_map_encoded
         if inspect.isclass(node_type):
             assert issubclass(node_type, nt.LBNodeType)
@@ -540,7 +541,7 @@ class Subdomain(object):
         else:
             assert isinstance(node_type, nt.LBNodeType)
 
-        self._verify_params(where, node_type)
+        self._verify_params(where_array, node_type)
         self._type_map_base[where] = node_type.id
         key = hash((node_type.id, self._hashable_params(node_type.params)))
         assert np.all(self._param_map_base[where] == 0),\

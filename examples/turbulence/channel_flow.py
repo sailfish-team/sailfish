@@ -77,7 +77,7 @@ class ChannelSubdomain(Subdomain3D):
             dvz = self.select_subdomain(np.load(base + 'dvz.npz')['data'],
                                         hx, hy, hz)
         else:
-            np.random.seed(11341351351)
+            np.random.seed(1341351351)
             _, dy1, dz1 = self.make_gradients(NX, NY, NZ, hx, hy, hz)
             dx2, _, dz2 = self.make_gradients(NX, NY, NZ, hx, hy, hz)
             dx3, dy3, _ = self.make_gradients(NX, NY, NZ, hx, hy, hz)
@@ -137,7 +137,7 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
             'model': 'bgk',
             'minimize_roundoff': True,
             'precision': 'single',
-            'seed': 11341351351,
+            'seed': 1341351351,
             'periodic_y': True,
             'periodic_z': True,
 

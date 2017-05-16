@@ -35,7 +35,7 @@ NZ = int(sys.argv[3])
 H = int(sys.argv[4])
 
 tg = sys.argv[5]
-np.random.seed(11341351351)
+np.random.seed(1341351351)
 
 _, dy1, dz1 = [
         x[hB:-hB,hB:-hB,:] for x in np.gradient(make_rand(NX, NY, NZ, H))]
