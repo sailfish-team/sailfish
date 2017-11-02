@@ -173,12 +173,8 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
         config.visc = cls.subdomain.u_tau(config.Re_tau) * config.H / config.Re_tau
 
         # Show data early. This is helpful for quick debugging.
-<<<<<<< HEAD
-        print '\n'.join(cls.get_info(config))
-=======
         if not config.quiet:
             print '\n'.join(cls.get_info(config))
->>>>>>> sailfish-team
 
     @classmethod
     def get_info(cls, config):
