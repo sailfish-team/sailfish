@@ -1,5 +1,6 @@
 #!/usr/bin/python
-
+from __future__ import division
+from __future__ import print_function
 import os
 import shutil
 import tempfile
@@ -28,16 +29,16 @@ class LDCGeometry(LBGeometry3D):
         bps = int(blocks**(1.0/3))
 
         if bps**3 != blocks:
-            print ('Only configurations with '
+            print('Only configurations with '
                     'a third power of an integer number of subdomains are '
                     'supported.  Falling back to {0} x {0} subdomains.'.
                     format(bps))
 
-        xq = self.gx / bps
+        xq = self.gx // bps
         xd = self.gx % bps
-        yq = self.gy / bps
+        yq = self.gy // bps
         yd = self.gy % bps
-        zq = self.gz / bps
+        zq = self.gz // bps
         zd = self.gz % bps
 
         for i in range(0, bps):

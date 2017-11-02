@@ -466,21 +466,21 @@ ${kernel} void ExtractSliceUsq(int axis, int position,
 ${kernel} void ${name}(
 	int axis,
 	int position,
-	%for i in range(num_inputs):
-		${global_ptr} float *f${i},
-	%endfor
-	%for i in range(len(stats)):
-		${global_ptr} ${out_type} *out${i} ${',' if i < len(stats) - 1 else ''}
-	%endfor
+  %for i in range(num_inputs):
+    ${global_ptr} float *f${i},
+  %endfor
+  %for i in range(len(stats)):
+    ${global_ptr} ${out_type} *out${i} ${',' if i < len(stats) - 1 else ''}
+  %endfor
 ){
 	${_compute_gi_for_slice()}
-	%for i in range(len(stats)):
-		${out_type} acc${i} = 0.0f;
-	%endfor
-	${_compute_stats(num_inputs, stats, out_type)}
-	%for i in range(len(stats)):
+  %for i in range(len(stats)):
+    ${out_type} acc${i} = 0.0f;
+  %endfor
+  ${_compute_stats(num_inputs, stats, out_type)}
+  %for i in range(len(stats)):
 		out${i}[go] += acc${i};
-	%endfor
+  %endfor
 }
 </%def>
 

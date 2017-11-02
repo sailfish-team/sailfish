@@ -14,7 +14,7 @@ tmpdir=$(mktemp -d)
 # PrepareMacroFields step.
 common="--cuda-nvcc-opts=-fmad=false --every=50 --seed=1234 --quiet --max_iters=50"
 
-find examples -perm +0111 -name '*.py' | while read filename ; do
+find examples -perm -0111 -name '*.py' | while read filename ; do
 	if [[ ${blacklist/${filename}/} == ${blacklist} ]]; then
 		echo -n "Testing ${filename}..."
 		python $filename --access_pattern=AB ${common} --output=${tmpdir}/result_ab

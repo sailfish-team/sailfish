@@ -9,7 +9,7 @@ tmpdir=$(mktemp -d -t sailfish_addr.XXXXXXXX)
 # Examples to run can be specified in a list on the command line as well.
 targets="$*"
 if [ -z "$targets" ]; then
-	targets=$(find examples -perm +0111 -name '*.py')
+	targets=$(find examples -perm -0111 -name '*.py')
 fi
 
 echo ${targets} | tr ' ' '\n' | while read filename ; do

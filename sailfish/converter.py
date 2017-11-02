@@ -1,6 +1,7 @@
 # coding=utf-8
-
 """Converter between LB and physical coordinate systems."""
+from __future__ import division
+
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'

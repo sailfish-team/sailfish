@@ -5,6 +5,7 @@ numerical results from the literature. Numerical solutions of 2-D steady
 incompressible driven cavity flow at high Reynolds numbers E. Erturk; T. C. Corke
 and C. Gokcol with numerical calculation of Navier-Stokes equations;
 grid size: 601x601."""
+from __future__ import print_function
 
 import numpy as np
 import matplotlib
@@ -74,7 +75,7 @@ def save_output(basepath, max_iters):
 
 
 def run_test(name, re, max_iters, i):
-    print 'Testing Re = %s' % re
+    print('Testing Re = %s' % re)
 
     basepath = os.path.join('results', name, 're%s' % re)
     if not os.path.exists(basepath):
@@ -96,7 +97,7 @@ def run_test(name, re, max_iters, i):
     plt.gca().yaxis.grid(True, which='minor')
 
     plt.title('2D Lid Driven Cavity, Re = %s' % re)
-    print os.path.join(basepath, 'results.pdf')
+    print(os.path.join(basepath, 'results.pdf'))
     plt.savefig(os.path.join(basepath, 'results.pdf'), format='pdf')
 
     plt.clf()

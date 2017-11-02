@@ -45,7 +45,7 @@ class TestSubdomainRunner2D(SubdomainRunner):
                             'PP', block_size=1024)
         self.backend.run_kernel(k, [1, NY])
 
-        h = (NX + 2 + 31) / 32
+        h = (NX + 2 + 31) // 32
         self.ret_y2 = np.zeros(NY, dtype=np.float32)
         gpu_ret_y2 = self.backend.alloc_buf(like=self.ret_y2)
         temp_y2 = np.zeros((NY, h), dtype=np.float32)

@@ -1,5 +1,6 @@
 #!/usr/bin/python
-
+from __future__ import division
+from __future__ import print_function
 import math
 import os
 import shutil
@@ -30,9 +31,9 @@ class LDCGeometry(LBGeometry2D):
 
         # Special case.
         if blocks == 3:
-            w1 = self.gx / 2
+            w1 = self.gx // 2
             w2 = self.gx - w1
-            h1 = self.gy / 2
+            h1 = self.gy // 2
             h2 = self.gy - h1
 
             subdomains.append(SubdomainSpec2D((0, 0), (w1, h1)))
@@ -41,13 +42,13 @@ class LDCGeometry(LBGeometry2D):
             return subdomains
 
         if bps**2 != blocks:
-            print ('Only configurations with '
+            print('Only configurations with '
                     'square-of-interger numbers of subdomains are supported. '
                     'Falling back to {0} x {0} subdomains.'.format(bps))
 
-        yq = self.gy / bps
+        yq = self.gy // bps
         ydiff = self.gy % bps
-        xq = self.gx / bps
+        xq = self.gx // bps
         xdiff = self.gx % bps
 
         for i in range(0, bps):

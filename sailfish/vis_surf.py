@@ -91,8 +91,8 @@ class FluidSurfaceVis(vis.FluidVis):
         self.sim = sim
 
         m = min(lat_nx, lat_ny)
-        mx = lat_nx / m
-        my = lat_ny / m
+        mx = lat_nx // m
+        my = lat_ny // m
 
         self.mesh_x, self.mesh_y = numpy.mgrid[
                 -my:my:complex(0, lat_ny),
@@ -112,7 +112,7 @@ class FluidSurfaceVis(vis.FluidVis):
         self._paused = False
         self._reset()
 
-        self._colormap = _colormaps.keys()[0]
+        self._colormap = list(_colormaps.keys())[0]
         self._minh = -0.1
         self._maxh = 0.1
 
@@ -233,7 +233,7 @@ class FluidSurfaceVis(vis.FluidVis):
                 elif event.key == pygame.K_p:
                     self._paused = not self._paused
                     if self._paused:
-                        print 'Simulation paused @ iter = %d.' % self.sim.iter_
+                        print('Simulation paused @ iter = %d.' % self.sim.iter_)
                 elif event.key == pygame.K_q:
                     sys.exit()
                 elif event.key == pygame.K_r:
@@ -248,10 +248,10 @@ class FluidSurfaceVis(vis.FluidVis):
 
                     fname = '%s_%05d.png' % (self.sim.filename, i)
                     if os.path.exists(fname):
-                        print 'Could not create screenshot.'
+                        print('Could not create screenshot.')
 
                     pygame.image.save(self._screen, fname)
-                    print 'Saved %s.' % fname
+                    print('Saved %s.' % fname)
                 elif event.key == pygame.K_i:
                     self._show_info = not self._show_info
                 elif event.key == pygame.K_COMMA:
@@ -284,9 +284,9 @@ class FluidSurfaceVis(vis.FluidVis):
                     else:
                         self._angle_z += 1.0
                 elif event.key == pygame.K_c:
-                    idx = _colormaps.keys().index(self._colormap) + 1
-                    idx %= len(_colormaps.keys())
-                    self._colormap = _colormaps.keys()[idx]
+                    idx = list(_colormaps.keys()).index(self._colormap) + 1
+                    idx %= len(list(_colormaps.keys()))
+                    self._colormap = list(_colormaps.keys())[idx]
 
     def main(self):
         t_prev = time.time()

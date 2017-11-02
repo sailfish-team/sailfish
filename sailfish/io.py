@@ -13,7 +13,14 @@ import re
 import ctypes
 import threading
 import time
+
+try:
+    from queue import Queue
+except ImportError:
+    from Queue import Queue
+
 from ctypes import Structure, c_uint16, c_int32, c_uint8, c_bool
+from functools import reduce
 
 class VisConfig(Structure):
     MAX_NAME_SIZE = 64
@@ -45,9 +52,9 @@ class LBOutput(object):
 
     def mask_nonfluid_nodes(self):
         nonfluid = np.logical_not(self._fluid_map)
-        for f in self._scalar_fields.itervalues():
+        for f in self._scalar_fields.values():
             f[nonfluid] = np.nan
-        for fv in self._vector_fields.itervalues():
+        for fv in self._vector_fields.values():
             for f in fv:
                 f[nonfluid] = np.nan
 
@@ -70,9 +77,12 @@ class LBOutput(object):
     def verify(self):
         fm = self._fluid_map
         return (all((np.all(np.isfinite(f[fm])) for f in
-                    self._scalar_fields.itervalues()))
+                    self._scalar_fields.values()))
                 and all(np.all(np.isfinite(fc[fm])) for f in
-                    self._vector_fields.itervalues() for fc in f))
+                    self._vector_fields.values() for fc in f))
+
+    def wait(self):
+        pass
 
 
 class VisualizationWrapper(LBOutput):
@@ -108,9 +118,9 @@ class VisualizationWrapper(LBOutput):
         self._output.save(i)
 
         if self._first_save:
-            self._scalar_names = self._output._scalar_fields.keys()
-            self._vis_names    = self._output._visualization_fields.keys()
-            self._vector_names = self._output._vector_fields.keys()
+            self._scalar_names = list(self._output._scalar_fields.keys())
+            self._vis_names    = list(self._output._visualization_fields.keys())
+            self._vector_names = list(self._output._vector_fields.keys())
             self._scalar_len = len(self._scalar_names)
             self._vis_len    = len(self._vis_names)
             self._vector_len = len(self._vector_names) * self._dim
@@ -149,7 +159,6 @@ class VisualizationWrapper(LBOutput):
             self._vis_buffer[0:self.nodes] = np.ravel(field)
             self._geo_buffer[0:self.nodes] = np.ravel(self.subdomain.runner.visualization_map())
 
-
 def filename_iter_digits(max_iters=0):
     """Returns the number of digits used to represent the iteration in the filename"""
     if max_iters:
@@ -184,6 +193,8 @@ def subdomain_checkpoint(base, subdomain_id):
     if base.endswith('.last'):
         base = base[:-5]
         files = glob.glob('{0}.*.{1}.cpoint.npz'.format(base, subdomain_id))
+        if not files:
+            return None
         files.sort()
         return files[0]
 
@@ -219,7 +230,7 @@ class VTKOutput(LBOutput):
 
         first = True
         sample_field = None
-        for name, field in self._scalar_fields.iteritems():
+        for name, field in self._scalar_fields.items():
             if first:
                 idata.point_data.scalars = field.flatten()
                 idata.point_data.scalars.name = name
@@ -229,9 +240,10 @@ class VTKOutput(LBOutput):
                 t = idata.point_data.add_array(field.flatten())
                 idata.point_data.get_array(t).name = name
 
+        # idata.update()
         dim = len(sample_field.shape)
 
-        for name, field in self._vector_fields.iteritems():
+        for name, field in self._vector_fields.items():
             if dim == 3:
                 tmp = idata.point_data.add_array(np.c_[field[0].flatten(),
                                                  field[1].flatten(), field[2].flatten()])
@@ -249,7 +261,6 @@ class VTKOutput(LBOutput):
         fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='.vti')
         from tvtk.api import write_data
         write_data(idata, fname)
-
 
     # TODO: Implement this function.
     def dump_dists(self, dists, i):
@@ -274,10 +285,16 @@ def SaveWithRename(save, num_subdomains, fname, *args, **kwargs):
 
     while len(glob.glob(pattern_tmp)) + len(glob.glob(pattern_perm)) < num_subdomains:
         time.sleep(1)
-        
 
     # Rename to final location.
     os.rename(tfname, fname)
+
+
+def Saver(queue, do_save, num_subdomains):
+    while True:
+        args, kwargs = queue.get()
+        SaveWithRename(do_save, num_subdomains, *args, **kwargs)
+        queue.task_done()
 
 
 class NPYOutput(LBOutput):
@@ -291,13 +308,23 @@ class NPYOutput(LBOutput):
             self._do_save = np.savez_compressed
         else:
             self._do_save = np.savez
-        self.thread_list = []
+
+        self._queue = None
 
     def _save(self, fname, *args, **kwargs):
-        args = [self._do_save, self.num_subdomains, fname] + list(args)
-        t = threading.Thread(target=SaveWithRename, args=args, kwargs=kwargs)
-        t.start()
-        self.thread_list.append(t)
+        # Lazy initialization of the saver thread. This is currentlly required
+        # since the LBOutput object can be instantiated outside of the runner
+        # process, to which the saver thread has to be assigned.
+        if self._queue is None:
+            self._queue = Queue()
+            self._thread = threading.Thread(target=Saver, args=(self._queue,
+                                                                self._do_save,
+                                                                self.num_subdomains))
+            self._thread.setDaemon(True)
+            self._thread.start()
+        args = [fname] + list(args)
+        self._queue.put((args, kwargs))
+
 
     def save(self, i):
         self.mask_nonfluid_nodes()
@@ -314,6 +341,10 @@ class NPYOutput(LBOutput):
     def dump_node_type(self, node_type_map):
         fname = node_type_filename(self.basename, self.subdomain_id)
         np.save(fname, node_type_map)
+
+    def wait(self):
+        self._queue.join()
+
 
 class MatlabOutput(LBOutput):
     """Saves simulation data as Matlab .mat files."""

@@ -192,7 +192,7 @@ class LBSim(object):
 
     def verify_fields(self):
         """Verifies that fields have not accidentally been overridden."""
-        for name, field_pair in self._fields.iteritems():
+        for name, field_pair in self._fields.items():
             assert getattr(self, name) is field_pair.buffer,\
                     'Field {0} redefined (probably in initial_conditions())'.format(
                             name)

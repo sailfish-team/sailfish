@@ -10,6 +10,9 @@ except ImportError:
     pass
 import os
 import tempfile
+import sys
+if sys.version_info > (3,):
+    buffer = memoryview
 
 import numpy as np
 from multiprocessing import Array, Event

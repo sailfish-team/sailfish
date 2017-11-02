@@ -1,11 +1,15 @@
 """Code for controlling a single subdomain of a LB simulation."""
+from __future__ import division
 
 __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 from collections import defaultdict, namedtuple
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import math
 import operator
 import os
@@ -19,6 +23,7 @@ from sailfish.lb_base import LBMixIn, LBSim
 from sailfish.profile import profile, TimeProfile
 from sailfish.subdomain_connection import ConnectionBuffer, MacroConnectionBuffer
 import sailfish.node_type as nt
+from functools import reduce
 
 # Used to hold a reference to a CUDA kernel and a grid on which it is
 # to be executed.
@@ -147,7 +152,7 @@ class SubdomainRunner(object):
         # communicated to the master.
         unready = []
         ports = {}
-        for b_id, connector in self._spec._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.items():
             if connector.is_ready():
                 connector.init_runner(self._ctx)
                 if connector.port is not None:
@@ -435,19 +440,19 @@ class SubdomainRunner(object):
         # (i.e. bs > bns).
         if spec.dim == 2:
             self._boundary_blocks = (
-                    (bns * grid_nx / bs) * y_conns +      # top & bottom
+                    (bns * grid_nx // bs) * y_conns +      # top & bottom
                     (arr_ny - y_conns * bns) * x_conns)  # left & right (w/o top & bottom rows)
             self._kernel_grid_bulk = [grid_nx - x_conns * bs, arr_ny - y_conns * bns]
-            self._kernel_grid_full = [grid_nx / bs, arr_ny]
+            self._kernel_grid_full = [grid_nx // bs, arr_ny]
         else:
             self._boundary_blocks = (
-                    grid_nx * arr_ny * bns / bs * z_conns +                    # T/B faces
-                    grid_nx * (arr_nz - z_conns * bns) / bs * bns * y_conns +  # N/S faces
+                    grid_nx * arr_ny * bns // bs * z_conns +                    # T/B faces
+                    grid_nx * (arr_nz - z_conns * bns) // bs * bns * y_conns +  # N/S faces
                     (arr_ny - y_conns * bns) * (arr_nz - z_conns * bns) * x_conns)
             self._kernel_grid_bulk = [
                     (grid_nx - x_conns * bs) * (arr_ny - y_conns * bns),
                     arr_nz - z_conns * bns]
-            self._kernel_grid_full = [grid_nx * arr_ny / bs, arr_nz]
+            self._kernel_grid_full = [grid_nx * arr_ny // bs, arr_nz]
 
         if self._boundary_blocks >= 65536:
             # Use an artificial 2D grid to work around device limits.
@@ -455,7 +460,7 @@ class SubdomainRunner(object):
         else:
             self._boundary_blocks = (self._boundary_blocks, 1)
 
-        self._kernel_grid_bulk[0] /= bs
+        self._kernel_grid_bulk[0] //= bs
 
         # Special cases: boundary kernels can cover the whole domain or this is
         # the only block participating in the simulation.
@@ -513,15 +518,18 @@ class SubdomainRunner(object):
 
         self.config.logger.info('Required memory: ')
         self.config.logger.info('. distributions: %d MiB' %
-                                (total_dist_bytes / 1024 / 1024))
+                                (total_dist_bytes // 1024 // 1024))
 
         scalar, vector = self._sim.count_fields(self)
         total_field_bytes = (self.num_active_nodes *
                              (scalar + self.dim * vector) * self.float().nbytes)
         self.config.logger.info('. fields: %d MiB' %
-                                (total_field_bytes / 1024 / 1024))
+                                (total_field_bytes // 1024 // 1024))
 
     def _log_relaxation_model(self):
+        if not hasattr(self.config, 'model'):
+            return
+
         model = 'Relaxation model: {0}'.format(self.config.model)
         options = []
         if hasattr(self.config, 'regularized') and self.config.regularized:
@@ -795,7 +803,7 @@ class SubdomainRunner(object):
         # separate dictionary where the order of the connection buffers
         # corresponds to that used by the _other_ subdomain.
         self._recv_block_to_connbuf = defaultdict(list)
-        for subdomain_id, cbufs in self._block_to_connbuf.iteritems():
+        for subdomain_id, cbufs in self._block_to_connbuf.items():
             cbufs.sort(key=lambda x: (x.face, x.grid_id))
             recv_bufs = list(cbufs)
             recv_bufs.sort(key=lambda x: (self._spec.opposite_face(x.face),
@@ -1063,14 +1071,14 @@ class SubdomainRunner(object):
         else:
             buf = 'coll_buf'
 
-        for b_id, connector in self._spec._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.items():
             conn_bufs = self._block_to_connbuf[b_id]
             for x in conn_bufs:
                 self.backend.from_buf_async(getattr(x, buf).gpu, self._data_stream)
 
         self.backend.sync_stream(self._data_stream)
 
-        for b_id, connector in self._spec._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.items():
             conn_bufs = self._block_to_connbuf[b_id]
 
             if len(conn_bufs) > 1:
@@ -1094,7 +1102,7 @@ class SubdomainRunner(object):
         else:
             get_buf = operator.attrgetter('recv_buf')
 
-        for b_id, connector in self._spec._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.items():
             conn_bufs = self._recv_block_to_connbuf[b_id]
             if len(conn_bufs) > 1:
                 dest = np.hstack([np.ravel(get_buf(x)) for x in conn_bufs])
@@ -1337,7 +1345,7 @@ class SubdomainRunner(object):
         def _grid_dim1(x):
             return int(math.ceil(x / float(collect_block)))
 
-        for b_id, conn_bufs in self._block_to_connbuf.iteritems():
+        for b_id, conn_bufs in self._block_to_connbuf.items():
             for cbuf in conn_bufs:
                 primary, secondary = self._init_collect_kernels(cbuf, _grid_dim1,
                                                                 collect_block)
@@ -1363,7 +1371,7 @@ class SubdomainRunner(object):
 
         self.config.logger.debug('getting dist for grid {0} iter={1} ({2})'.format(
             grid_num, iter_idx, self.gpu_dist(grid_num, iter_idx)))
-        dbuf = np.zeros(self._get_dist_bytes(self._sim.grid) / self.float().nbytes,
+        dbuf = np.zeros(self._get_dist_bytes(self._sim.grid) // self.float().nbytes,
             dtype=self.float)
         self.backend.from_buf(self.gpu_dist(grid_num, iter_idx), dbuf)
         if self.config.node_addressing == 'indirect':
@@ -1380,11 +1388,11 @@ class SubdomainRunner(object):
         self.backend.to_buf(self.gpu_dist(grid_num, iter_idx), dbuf)
 
     def _debug_global_idx_to_tuple(self, gi):
-        dist_num = gi / self.num_phys_nodes
+        dist_num = gi // self.num_phys_nodes
         rest = gi % self.num_phys_nodes
         arr_nx = self._physical_size[-1]
         gx = rest % arr_nx
-        gy = rest / arr_nx
+        gy = rest // arr_nx
         return dist_num, gy, gx
 
     def send_summary_info(self, timing_info, min_timings, max_timings):
@@ -1427,7 +1435,7 @@ class SubdomainRunner(object):
         if not self.config.restore_time:
             self._sim.iteration = 0
 
-        for k, v in cpoint.iteritems():
+        for k, v in cpoint.items():
             if not k.startswith('dist'):
                 continue
 
@@ -1460,7 +1468,7 @@ class SubdomainRunner(object):
 
             idxs = np.array([], dtype=np.int32)
             idxs_opp = np.array([], dtype=np.int32)
-            for dist_num, locs in sorted(dists.iteritems()):
+            for dist_num, locs in sorted(dists.items()):
                 opp_idx = self._subdomain.grid.idx_opposite[dist_num]
 
                 # XXX: fix this for indirect
@@ -1480,7 +1488,7 @@ class SubdomainRunner(object):
 
             components = np.zeros((self.dim, idxs.size), dtype=np.int32)
             h = 0
-            for dist_num, locs in sorted(dists.iteritems()):
+            for dist_num, locs in sorted(dists.items()):
                 opp_idx = self._subdomain.grid.idx_opposite[dist_num]
                 ei = self._subdomain.grid.basis[opp_idx]
                 for i, ei_comp in enumerate(ei):
@@ -1511,7 +1519,7 @@ class SubdomainRunner(object):
                               fo.gpu_force_buf, fo.force_buf.size],
                              'PPPPi',
                              block_size=128,
-                             grid=[(fo.force_buf.size + 127) / 128])
+                             grid=[(fo.force_buf.size + 127) // 128])
 
     def sighup_handler(self, signum, frame):
         self.config.logger.info('Received HUP signal, will save checkpoint (it=%d).' % self._sim.iteration)
@@ -1529,11 +1537,16 @@ class SubdomainRunner(object):
         self._log_relaxation_model()
         self._init_geometry()
 
+        restore_filename = None
+        if self.config.restore_from:
+            restore_filename = io.subdomain_checkpoint(
+                self.config.restore_from, self._spec.id)
+
         # Creates scalar fields on the host. They are used for gpu-host
         # communication and for specifing initial conditions.
         self._sim.init_fields(self)
         self._init_compute()
-        if not self.config.restore_from:
+        if restore_filename is None:
             self.config.logger.debug("Initializing macroscopic fields.")
             # This has to take place before init_gpu_data, so that the initial
             # values are automatically copied to the GPU buffer.
@@ -1551,7 +1564,7 @@ class SubdomainRunner(object):
 
         # No need to run the potentially costly initilization if we are
         # restarting from a checkpoint.
-        if not self.config.restore_from:
+        if restore_filename is None:
             self.config.logger.debug("Applying initial conditions.")
             self._gpu_initial_conditions()
 
@@ -1564,8 +1577,7 @@ class SubdomainRunner(object):
                 self.config.logger.debug("Saving initial state.")
                 self._output.save(self._sim.iteration)
         else:
-            self.restore_checkpoint(io.subdomain_checkpoint(
-                self.config.restore_from, self._spec.id))
+            self.restore_checkpoint(restore_filename)
 
         if not self.config.max_iters:
             self.config.logger.warning("Running infinite simulation.")
@@ -1611,7 +1623,7 @@ class SubdomainRunner(object):
         visc = self.config.visc
         self.config.visc = 1.0/6.0
         try:
-            for init_it in xrange(0, self.config.init_iters):
+            for init_it in range(0, self.config.init_iters):
                 self.step(False)
                 self._data_stream.synchronize()
                 self._calc_stream.synchronize()
@@ -1748,12 +1760,6 @@ class SubdomainRunner(object):
 
             self._sim.after_main_loop(self)
 
-            if hasattr(self._output,'thread_list'):
-                while any([t.isAlive() for t in self._output.thread_list]):
-                    self.config.logger.info('Waiting until all io threads finish, active threads: '+str(len(self._output.thread_list)))
-                    time.sleep(1)      
-
-
         except self.backend.FatalError:
             is_quit = True
             self.config.logger.exception("Fatal on-device error at iteration "
@@ -1762,6 +1768,8 @@ class SubdomainRunner(object):
         if is_quit:
             self.config.logger.error("Requesting quit.")
             self._quit_event.set()
+
+        self._output.wait()
 
 
 class IBMSubdomainRunner(SubdomainRunner):
@@ -1795,7 +1803,7 @@ class IBMSubdomainRunner(SubdomainRunner):
 
         self._part_stiffness = self.float([p.stiffness for p in particles])
         self._gpu_part_stiffness = alloc(like=self._part_stiffness)
-        self._part_grid = [(self._sim.num_particles + 127) / 128, 1]
+        self._part_grid = [(self._sim.num_particles + 127) // 128, 1]
 
     @property
     def gpu_particle_position(self):
@@ -1864,7 +1872,7 @@ class NNSubdomainRunner(SubdomainRunner):
 
     @profile(TimeProfile.RECV_MACRO)
     def _recv_macro(self):
-        for b_id, connector in self._spec._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.items():
             conn_bufs = self._recv_block_to_macrobuf[b_id]
             if len(conn_bufs) > 1:
                 dest = np.hstack([np.ravel(x.recv_buf.host) for x in conn_bufs])
@@ -1889,14 +1897,14 @@ class NNSubdomainRunner(SubdomainRunner):
 
     @profile(TimeProfile.SEND_MACRO)
     def _send_macro(self):
-        for b_id, connector in self._spec._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.items():
             conn_bufs = self._block_to_macrobuf[b_id]
             for x in conn_bufs:
                 self.backend.from_buf_async(x.coll_buf.gpu, self._data_stream)
 
         self.backend.sync_stream(self._data_stream)
 
-        for b_id, connector in self._spec._connectors.iteritems():
+        for b_id, connector in self._spec._connectors.items():
             conn_bufs = self._block_to_macrobuf[b_id]
             if len(conn_bufs) > 1:
                 connector.send(np.hstack(
@@ -1958,7 +1966,7 @@ class NNSubdomainRunner(SubdomainRunner):
         # separate dictionary where the order of the connection buffers
         # corresponds to that used by the _other_ subdomain.
         self._recv_block_to_macrobuf = defaultdict(list)
-        for subdomain_id, cbufs in self._block_to_macrobuf.iteritems():
+        for subdomain_id, cbufs in self._block_to_macrobuf.items():
             cbufs.sort(key=lambda x:(x.face))
             recv_bufs = list(cbufs)
             recv_bufs.sort(key=lambda x: self._spec.opposite_face(x.face))
@@ -2055,7 +2063,7 @@ class NNSubdomainRunner(SubdomainRunner):
         self._macro_collect_kernels = []
         self._macro_distrib_kernels = []
 
-        for b_id, conn_bufs in self._block_to_macrobuf.iteritems():
+        for b_id, conn_bufs in self._block_to_macrobuf.items():
             for cbuf in conn_bufs:
                 self._macro_collect_kernels.append(
                         self._init_macro_collect_kernels(cbuf, _grid_dim1,

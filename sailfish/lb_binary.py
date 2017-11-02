@@ -369,7 +369,7 @@ class LBBinaryFluidFreeEnergy(LBBinaryFluidBase):
         else:
             sim_pair = KernelPair(primary, primary)
 
-        return zip(macro_pair, sim_pair)
+        return list(zip(macro_pair, sim_pair))
 
 
 class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
@@ -514,4 +514,4 @@ class LBBinaryFluidShanChen(LBBinaryFluidBase, LBForcedSim):
         else:
             sim_pair = KernelPair(primary, primary)
 
-        return zip(macro_pair, sim_pair)
+        return list(zip(macro_pair, sim_pair))

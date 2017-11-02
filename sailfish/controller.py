@@ -6,8 +6,16 @@ __author__ = 'Michal Januszewski'
 __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
-import __builtin__
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+try:
+    import __builtin__
+    builtins = __builtin__
+except ImportError:
+    import builtins
+
 import copy
 import math
 import imp
@@ -42,7 +50,10 @@ def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
 
     This function is executed by the execnet module.  In order for it to work,
     it cannot depend on any global symbols."""
-    import cPickle as pickle
+    try:
+        import cPickle as pickle
+    except ImportError:
+        import pickle
     import os
     import platform
     import sys
@@ -185,7 +196,7 @@ class LBGeometryProcessor(object):
                     continue
                 b = subdomain
                 locs = set(_pbc_helper(list(b.location), b,
-                                       range(axis, self.dim)))
+                                       list(range(axis, self.dim))))
                 locs.remove(b.location)
 
                 for loc in locs:
@@ -298,7 +309,7 @@ class LBSimulationController(object):
             type=str, default='')
         group.add_argument('--output_format',
             help='output format', type=str,
-            choices=io.format_name_to_cls.keys(), default='npy')
+            choices=list(io.format_name_to_cls.keys()), default='npy')
         group.add_argument('--nooutput_compress', dest='output_compress',
                            action='store_false', default=True,
                            help='stores the output in compressed files'
@@ -511,7 +522,7 @@ class LBSimulationController(object):
             # config file.
             node_config = copy.copy(self.config)
             node_config.gpus = cluster.nodes[i].gpus
-            for k, v in node.settings.iteritems():
+            for k, v in node.settings.items():
                 setattr(node_config, k, v)
 
             self._cluster_channels.append(
@@ -527,7 +538,7 @@ class LBSimulationController(object):
             data = channel.receive()
             # If a string is received, print it to help with debugging.
             if type(data) is str:
-                print data
+                print(data)
             else:
                 ports.update(data)
 
@@ -549,7 +560,7 @@ class LBSimulationController(object):
         def _try_next_port(i, node, still_starting):
             port = node.get_port() + 1
             node.set_port(port)
-            print 'retrying node %s:%s...' % (node.host, node.addr)
+            print('retrying node %s:%s...' % (node.host, node.addr))
             self._node_handlers[i] = start_socketserver(node.addr, port)
             still_starting.append((i, node))
 
@@ -729,13 +740,13 @@ class LBSimulationController(object):
                 high = nodes / high * 1e-6 - total
 
                 if not self.config.quiet:
-                    print ('Subdomain {0}: MLUPS eff:{1:.2f} +{2:.2f} -{3:.2f}  '
+                    print(('Subdomain {0}: MLUPS eff:{1:.2f} +{2:.2f} -{3:.2f}  '
                            'comp:{4:.2f}'.format(ti.subdomain_id, total,
-                                                 abs(high), abs(low), comp))
+                                                 abs(high), abs(low), comp)))
 
             if not self.config.quiet:
-                print ('Total MLUPS: eff:{0:.2f}  comp:{1:.2f}'.format(
-                        mlups_total,  mlups_comp))
+                print(('Total MLUPS: eff:{0:.2f}  comp:{1:.2f}'.format(
+                        mlups_total,  mlups_comp)))
             return timing_infos, min_timings, max_timings, subdomains
 
         return None, None
@@ -745,8 +756,8 @@ class LBSimulationController(object):
             dname = os.path.dirname(self.config.output)
             if dname and not os.path.exists(dname):
                 os.makedirs(dname)
-            pickle.dump(subdomains,
-                    open(io.subdomains_filename(self.config.output), 'w'))
+            with open(io.subdomains_filename(self.config.output), 'wb') as f:
+                pickle.dump(subdomains, f)
 
     def set_default_filenames(self):
         if not self.config.base_name:
@@ -764,14 +775,14 @@ class LBSimulationController(object):
 
         # No point in trying to process the command-line if running under
         # IPython.
-        if ignore_cmdline or hasattr(__builtin__, '__IPYTHON__'):
+        if ignore_cmdline or hasattr(builtins, '__IPYTHON__'):
             args = []
         else:
             args = sys.argv[1:]
 
         self.config = self._config_parser.parse(
             args, internal_defaults={'quiet': True} if hasattr(
-                __builtin__, '__IPYTHON__') else None)
+                builtins, '__IPYTHON__') else None)
 
         self._lb_class.modify_config(self.config)
         self.set_default_filenames()

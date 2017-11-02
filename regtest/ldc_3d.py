@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 
 import numpy as np
 import matplotlib
@@ -89,7 +90,7 @@ def run_test(name):
     plt.gca().yaxis.grid(True, which='minor')
 
     plt.title('Lid Driven Cavity, Re = 400')
-    print os.path.join(basepath, 're400.pdf' )
+    print(os.path.join(basepath, 're400.pdf' ))
     plt.savefig(os.path.join(basepath, 're400.pdf' ), format='pdf')
 
     plt.clf()

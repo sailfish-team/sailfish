@@ -171,10 +171,10 @@
     %if supports_shuffle and propagate_with_shuffle:
       // Shared variables for cross-warp propagation.
       %for i in sym.get_prop_dists(grid, 1):
-        ${shared_var} float prop_${grid.idx_name[i]}[${(block_size + warp_size - 1) / warp_size}];
+        ${shared_var} float prop_${grid.idx_name[i]}[${(block_size + warp_size - 1) // warp_size}];
       %endfor
       %for i in sym.get_prop_dists(grid, -1):
-        ${shared_var} float prop_${grid.idx_name[i]}[${(block_size + warp_size - 1) / warp_size}];
+        ${shared_var} float prop_${grid.idx_name[i]}[${(block_size + warp_size - 1) // warp_size}];
       %endfor
     %else:
       // Shared variables for in-block propagation
@@ -311,7 +311,7 @@
   %>
   %if dim == 2:
     <%
-      xblocks = grid_nx / block_size
+      xblocks = grid_nx // block_size
       yblocks = arr_ny - y_conns * boundary_size
 
       bottom_idx = has_ylow * bns * xblocks
@@ -359,7 +359,7 @@
       has_zhigh = int(block.has_face_conn(block.Z_HIGH) or block.periodic_z)
       z_conns = has_zlow + has_zhigh
 
-      xblocks = grid_nx / block_size
+      xblocks = grid_nx // block_size
       yblocks = arr_ny - y_conns * boundary_size
       zblocks = arr_nz - z_conns * boundary_size
       yz_blocks = yblocks * zblocks
@@ -516,7 +516,7 @@
 #include <stdio.h>
 %endif
 
-%for name, val in constants.iteritems():
+%for name, val in constants.items():
   ${const_var} float ${name} = ${val}f;
 %endfor
 

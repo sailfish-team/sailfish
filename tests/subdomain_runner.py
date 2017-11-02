@@ -16,6 +16,7 @@ from sailfish.io import LBOutput
 from sailfish.sym import D2Q9
 
 from dummy import *
+from functools import reduce
 
 class BasicFunctionalityTest(unittest.TestCase):
     location = 0, 0

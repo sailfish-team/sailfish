@@ -6,7 +6,7 @@ Computes effective simulation performance based on creation time of output files
 Usage:
       ./compute_performance.py <sample_output_file>
 """
-
+from __future__ import print_function
 
 import sys
 import os.path
@@ -54,9 +54,9 @@ def eff(start, stop, times):
     aver = sum(effi)/len(effi)
     index = 'files: ' + str(times[start][1]) + ' - ' + str(times[stop][1])
     nn = ' (' + str(n) + ')'
-    print index
-    print '{0:<20} min: {1:.2f} / max: {2:.2f} / avg: {3:.2f} MLUPS'.format('one subdomain', mini, maxi, aver)
-    print '{0:<15}{1:<5} min: {2:.2f} / max: {3:.2f} / avg: {4:.2f} MLUPS'.format('all subdomains', nn, mini * n_subd_all / n_subd, maxi * n_subd_all / n_subd, aver * n_subd_all / n_subd)
+    print(index)
+    print('{0:<20} min: {1:.2f} / max: {2:.2f} / avg: {3:.2f} MLUPS'.format('one subdomain', mini, maxi, aver))
+    print('{0:<15}{1:<5} min: {2:.2f} / max: {3:.2f} / avg: {4:.2f} MLUPS'.format('all subdomains', nn, mini * n_subd_all / n_subd, maxi * n_subd_all / n_subd, aver * n_subd_all / n_subd))
 
 
 start = 0

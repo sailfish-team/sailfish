@@ -805,7 +805,7 @@ def relaxation_time(viscosity):
     return (6.0 * viscosity + 1.0) / 2.0
 
 def _pressure_tensor(grid):
-    press = [Symbol('flux[%d]' % i) for i in range(grid.dim * (grid.dim + 1) / 2)]
+    press = [Symbol('flux[%d]' % i) for i in range(grid.dim * (grid.dim + 1) // 2)]
     P = sympy.ones(grid.dim)  # P_ab - rho cs^2 \delta_ab
     k = 0
     for i in range(grid.dim):

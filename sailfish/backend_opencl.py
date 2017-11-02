@@ -6,6 +6,7 @@ __license__ = 'LGPL3'
 
 # Make sure the pyopencl module exists, but do not import it.
 import imp
+from functools import reduce
 imp.find_module('pyopencl')
 import operator
 import os
@@ -58,6 +59,7 @@ class OpenCLBackend(object):
         self.buffers = {}
         self.arrays = {}
         self._iteration_kernels = []
+        self.config = options
 
     @property
     def info(self):
@@ -152,7 +154,9 @@ class OpenCLBackend(object):
                 is_blocking=False)
 
     def build(self, source):
-        preamble = '#pragma OPENCL EXTENSION cl_khr_fp64: enable\n'
+        preamble = ''
+        if self.config.precision == 'double':
+            preamble += '#pragma OPENCL EXTENSION cl_khr_fp64: enable\n'
         return cl.Program(self.ctx, preamble + source).build() #'-cl-single-precision-constant -cl-fast-relaxed-math')
 
     def get_kernel(self, prog, name, block, args, args_format, shared=0,

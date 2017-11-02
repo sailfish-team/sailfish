@@ -7,7 +7,7 @@ WX-based visualizer for data generated from the VisMixIn class. Run with:
 where remote_addr is the host, port and authentication token printed by the
 simulation.
 """
-
+from __future__ import print_function
 
 import json
 import re
@@ -377,7 +377,7 @@ class App(wx.App):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print 'Usage: visualizer.py <address>'
+        print('Usage: visualizer.py <address>')
         sys.exit(0)
 
     app = App(0)

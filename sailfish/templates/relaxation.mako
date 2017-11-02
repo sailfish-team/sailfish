@@ -113,6 +113,13 @@ ${device_func} inline void BGK_relaxate${grid_idx}(${bgk_args_decl(grid_idx)},
   ## previous call to body_force().
   ${body_force(grid_idx, vector_decl=(force_for_eq.get(grid_idx, -1) is None))}
 
+  ## Only update the acceleration vector if the force for equilibrium and is different
+  ## than the one for relaxation.
+  %if force_for_eq.get(grid_idx, grid_idx) != grid_idx:
+    ## The acceleration vector needs to declared if no force was used for relaxation.
+    ${body_force(grid_idx, vector_decl=(force_for_eq.get(grid_idx, grid_idx) is None))}
+  %endif
+
   %if grid_idx == 1:
     float omega = ${cex(1.0 / tau_phi)};
   %elif grid_idx == 2:
