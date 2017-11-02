@@ -153,11 +153,7 @@ class CubeChannelSim(ChannelSim):
             'model': 'bgk',
             'minimize_roundoff': True,
             'precision': 'single',
-<<<<<<< HEAD
-            'seed': 11341351351,
-=======
             'seed': 1341351351,
->>>>>>> sailfish-team
             'periodic_y': True,
             'periodic_z': True,
 
@@ -188,12 +184,10 @@ class CubeChannelSim(ChannelSim):
         config.visc = cls.subdomain.u_tau(config.Re_tau) * config.H / config.Re_tau
 
         # Show data early. This is helpful for quick debugging.
-<<<<<<< HEAD
-        print '\n'.join(cls.get_info(config))
-=======
+
         if not config.quiet:
             print '\n'.join(cls.get_info(config))
->>>>>>> sailfish-team
+
 
     @classmethod
     def get_info(cls, config):

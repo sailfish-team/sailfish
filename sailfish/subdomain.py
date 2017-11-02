@@ -515,16 +515,7 @@ class Subdomain(object):
             else:
                 raise ValueError("Unrecognized node param: {0} (type {1})".
                         format(name, type(param)))
-    @staticmethod
-    def _hashable_params(param_dict):
-        params = []
-        for k, v in param_dict.items():
-            if hasattr(v, 'tostring'):
-                params.append((k, v.tostring()))
-            else:
-                params.append((k, v))
-        return frozenset(params)
-
+ 
     @staticmethod
     def _hashable_params(param_dict):
         params = []

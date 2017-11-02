@@ -77,11 +77,7 @@ class ChannelSubdomain(Subdomain3D):
             dvz = self.select_subdomain(np.load(base + 'dvz.npz')['data'],
                                         hx, hy, hz)
         else:
-<<<<<<< HEAD
-            np.random.seed(11341351351)
-=======
             np.random.seed(1341351351)
->>>>>>> sailfish-team
             _, dy1, dz1 = self.make_gradients(NX, NY, NZ, hx, hy, hz)
             dx2, _, dz2 = self.make_gradients(NX, NY, NZ, hx, hy, hz)
             dx3, dy3, _ = self.make_gradients(NX, NY, NZ, hx, hy, hz)
