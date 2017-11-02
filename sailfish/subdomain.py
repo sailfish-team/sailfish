@@ -511,7 +511,7 @@ class Subdomain(object):
                 assert param.size == np.sum(where), ("Your array needs to "
                         "have exactly as many nodes as there are True values "
                         "in the 'where' array.  Use node_util.multifield() to "
-                        "generate the array in an easy way.")
+                                                     "generate the array in an easy way.")
             elif isinstance(param, nt.DynamicValue):
                 if param.has_symbols(sym.S.time) or zip(param.get_timeseries()):
                     self.config.time_dependence = True
@@ -521,6 +521,15 @@ class Subdomain(object):
             else:
                 raise ValueError("Unrecognized node param: {0} (type {1})".
                         format(name, type(param)))
+    @staticmethod
+    def _hashable_params(param_dict):
+        params = []
+        for k, v in param_dict.items():
+            if hasattr(v, 'tostring'):
+                params.append((k, v.tostring()))
+            else:
+                params.append((k, v))
+        return frozenset(params)
 
     def set_node(self, where, node_type):
         """Set a boundary condition at selected node(s).
@@ -528,6 +537,8 @@ class Subdomain(object):
         :param where: index expression selecting nodes to set
         :param node_type: LBNodeType subclass or instance
         """
+        where_mask = where
+        where = np.where(where)                                                                        
         assert not self._type_map_encoded
         if inspect.isclass(node_type):
             assert issubclass(node_type, nt.LBNodeType)
@@ -535,9 +546,9 @@ class Subdomain(object):
         else:
             assert isinstance(node_type, nt.LBNodeType)
 
-        self._verify_params(where, node_type)
+        self._verify_params(where_mask, node_type)
         self._type_map_base[where] = node_type.id
-        key = hash((node_type.id, frozenset(node_type.params.items())))
+        key = hash((node_type.id, self._hashable_params(node_type.params))) 
         assert np.all(self._param_map_base[where] == 0),\
                 "Overriding previously set nodes is not allowed."
         self._param_map_base[where] = key

@@ -229,7 +229,6 @@ class VTKOutput(LBOutput):
                 t = idata.point_data.add_array(field.flatten())
                 idata.point_data.get_array(t).name = name
 
-        idata.update()
         dim = len(sample_field.shape)
 
         for name, field in self._vector_fields.iteritems():
@@ -248,8 +247,9 @@ class VTKOutput(LBOutput):
             idata.dimensions = list(reversed(sample_field.shape)) + [1]
 
         fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='.vti')
-        w = tvtk.XMLImageDataWriter(input=idata, file_name=fname)
-        w.write()
+        from tvtk.api import write_data
+        write_data(idata, fname)
+
 
     # TODO: Implement this function.
     def dump_dists(self, dists, i):
@@ -271,8 +271,10 @@ def SaveWithRename(save, num_subdomains, fname, *args, **kwargs):
     # saved to a shared filesystem.
     pattern_tmp = subdomain_glob(tfname)
     pattern_perm = subdomain_glob(fname)
+
     while len(glob.glob(pattern_tmp)) + len(glob.glob(pattern_perm)) < num_subdomains:
         time.sleep(1)
+        
 
     # Rename to final location.
     os.rename(tfname, fname)
@@ -289,11 +291,13 @@ class NPYOutput(LBOutput):
             self._do_save = np.savez_compressed
         else:
             self._do_save = np.savez
+        self.thread_list = []
 
     def _save(self, fname, *args, **kwargs):
         args = [self._do_save, self.num_subdomains, fname] + list(args)
         t = threading.Thread(target=SaveWithRename, args=args, kwargs=kwargs)
         t.start()
+        self.thread_list.append(t)
 
     def save(self, i):
         self.mask_nonfluid_nodes()

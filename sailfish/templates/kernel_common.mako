@@ -522,7 +522,7 @@
 
 %if node_params:
   // Additional geometry parameters (velocities, pressures, etc)
-  ${const_var} float node_params[${len(node_params)}] = {
+  ${device_func} float node_params[${len(node_params)}] = {
   %for param in node_params:
     ${cex(param)},
   %endfor

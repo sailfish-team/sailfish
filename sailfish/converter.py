@@ -121,7 +121,11 @@ class UnitConverter(object):
         self._lb_len = None
         self._lb_vel = None
 
-    def set_lb(self, visc=None, length=None, velocity=None):
+    def set_lb(self, visc=None, length=None, velocity=None):     
+        self._lb_visc = None
+        self._lb_len = None
+        self._lb_vel = None
+        
         if visc is not None:
             self._lb_visc = visc
         if length is not None:
@@ -196,7 +200,7 @@ class UnitConverter(object):
 
     @property
     def info_lb(self):
-        return ('Re:%.2f  Wo:%.2f  visc:%.3e  vel:%.3e  len:%.3e  T:%d  '
-                'dx:%.4e  dt:%.4e' % (
+        return ('Re=%.2f  Wo=%.2f  visc=%.3e  vel=%.3e  len=%.3e  T=%d  '
+                'dx=%.4e  dt=%.4e phys_len=%.4e phys_visc=%.4e phys_vel=%.4e' % (
                     self.Re_lb, self.Womersley_lb, self.visc_lb, self.velocity_lb,
-                    self.len_lb, int(1.0 / self.freq_lb), self.dx, self.dt))
+                    self.len_lb, int(1.0 / self.freq_lb), self.dx, self.dt,self._phys_len,self._phys_visc,self._phys_vel))

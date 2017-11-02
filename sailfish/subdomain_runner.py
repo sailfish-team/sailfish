@@ -1748,6 +1748,12 @@ class SubdomainRunner(object):
 
             self._sim.after_main_loop(self)
 
+            if hasattr(self._output,'thread_list'):
+                while any([t.isAlive() for t in self._output.thread_list]):
+                    self.config.logger.info('Waiting until all io threads finish, active threads: '+str(len(self._output.thread_list)))
+                    time.sleep(1)      
+
+
         except self.backend.FatalError:
             is_quit = True
             self.config.logger.exception("Fatal on-device error at iteration "
