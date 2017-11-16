@@ -68,8 +68,15 @@ ${device_func} inline float get_time_from_iteration(unsigned int iteration) {
 %endif  ## time_dependence
 
 ## Renders functions to compute dynamic values.
-%for i, expressions in symbol_idx_map.items():
-  ${device_func} inline void time_dep_param_${i}(float *out ${dynamic_val_args_decl()}) {
+%for i, expressions in symbol_idx_map.iteritems():
+  ${device_func} inline void time_dep_param_${i}(float *out
+    %if symbol_to_geo_map:                                             
+      , float spatial_array_x, float spatial_array_y  
+      %if dim==3:
+        ,float  spatial_array_z
+      %endif
+    %endif
+    ${dynamic_val_args_decl()}) {
     %if time_dependence:
       float phys_time = get_time_from_iteration(iteration_number);
     %endif
@@ -84,8 +91,25 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
     ${dynamic_val_args_decl()}) {
   %if (time_dependence or space_dependence) and symbol_idx_map:
     if (idx >= ${non_symbolic_idxs}) {
+        ##if both spatial array and sympy expression:
+        %if  symbol_to_geo_map: 
+          %for key, val in symbol_to_geo_map.iteritems():
+            if (idx >= ${min(val)} &&  idx<=${max(val)}){
+               float spatial_array_x = node_params[idx];
+               float spatial_array_y = node_params[idx + 1];
+              %if dim == 3:
+                float spatial_array_z = node_params[idx + 2];  
+                time_dep_param_${key}(out,spatial_array_x,spatial_array_y, spatial_array_z ${dynamic_val_args()});
+                return;
+              %else:
+                time_dep_param_${key}(out,spatial_array_x,spatial_array_y ${dynamic_val_args()});
+                return;
+              %endif  
+            }
+          %endfor
+        %else:
       switch (idx) {
-        %for key, val in symbol_idx_map.items():
+        %for key, val in symbol_idx_map.iteritems():
           %if len(val) == dim:
             case ${key}:
               time_dep_param_${key}(out ${dynamic_val_args()});
@@ -96,11 +120,10 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
           %if gpu_check_invalid_values:
             printf("Invalid vector value (idx=%d)\n", idx);
           %endif
-          die();
-      }
-    }
-  %endif
-  out[0] = node_params[idx];
+          die();}
+   %endif 
+   }
+  %endif out[0] = node_params[idx];
   out[1] = node_params[idx + 1];
   %if dim == 3:
     out[2] = node_params[idx + 2];
@@ -112,7 +135,7 @@ ${device_func} inline float node_param_get_scalar(const int idx ${dynamic_val_ar
   %if (time_dependence or space_dependence) and symbol_idx_map:
     if (idx >= ${non_symbolic_idxs}) {
       switch (idx) {
-        %for key, val in symbol_idx_map.items():
+        %for key, val in symbol_idx_map.iteritems():
           %if len(val) == 1:
             case ${key}: {
               float out;

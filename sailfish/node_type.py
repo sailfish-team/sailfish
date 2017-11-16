@@ -11,6 +11,8 @@ import numpy as np
 from sympy import Symbol
 from sympy.core import expr
 
+from sailfish.util import is_number
+
 ScratchSize = namedtuple('ScratchSize', ('dim2', 'dim3'))
 
 
@@ -445,6 +447,11 @@ class DynamicValue(object):
 
     def __init__(self, *params):
         """:param params: sympy expressions"""
+        self.need_mf=self.need_structured_array(params)
+        self.data=None
+        if self.need_mf:
+            self.data=self._get_structured_array(params)
+       
         self.params = params
 
     def __hash__(self):
@@ -491,6 +498,46 @@ class DynamicValue(object):
             for arg in param.args:
                 if isinstance(arg, LinearlyInterpolatedTimeSeries):
                     yield arg
+                    
+    def need_structured_array(self, params):
+        for param in params:
+            if isinstance(param, SpatialArray):
+                return True
+            elif not isinstance(param, expr.Expr):
+                continue
+            for arg in param.args:
+                if isinstance(arg, SpatialArray):
+                    return True
+        return False 
+    
+    def _get_structured_array(self, params):
+        """Returns a structured numpy array with spatial data"""
+        data=()
+        where=[]
+        for param in params:
+            if isinstance(param, SpatialArray): 
+                data+=(param._data,)
+                if where!=[] and where is not None:
+                    assert where==param._where
+                else:
+                    where=param._where.copy()
+                continue
+            elif is_number(param):
+                data+=(param,)
+                continue
+            elif not isinstance(param, expr.Expr):
+                continue
+            for arg in param.args:
+                if isinstance(arg, SpatialArray):
+                    data+=(arg._data,)
+                    if where!=[] and where is not None:
+                        assert where==arg._where
+                    else:
+                        where=arg._where.copy()
+                    break
+            else:
+                data+=(1.0,)         
+        return multifield(data, where)
 
 
 class LinearlyInterpolatedTimeSeries(Symbol):
@@ -548,5 +595,57 @@ class LinearlyInterpolatedTimeSeries(Symbol):
         """Returns a hash of the underying data series."""
         return hashlib.sha1(self._data).digest()
 
+    
+class SpatialArray(Symbol):
+    """A spatial-dependent scalar data source."""
+
+    def __new__(cls, data,index='x', where=None):
+        return Symbol.__new__(cls, 'spatarr%s_%s' % (hashlib.sha1(np.array(data)).hexdigest(),
+                                                  index)) 
+
+    def __init__(self, data, index='x', where=None):
+        """A continuous scalar data source from a discrete time series.
+
+        :param data: iterable of scalar values
+        :param index: index of velocity coordinate given by data.
+        """
+
+        Symbol.__init__('unused')
+       
+
+       
+        if type(data) is list or type(data) is tuple:
+            data = np.float64(data)
+
+        # Copy here is necessary so that the caller doesn't accidentally change
+        # the underlying array later. Also, we need the array to be C-contiguous
+        # (for __hash__ below), which might not be the case if it's a view.
+        self._data = data.copy()
+        self._index = index
+        self._where = where.copy()
+        # To be set later by the geometry encoder class. This is necessary due
+        # to how the printing system in Sympy works (see _ccode below).
+        #self._offset = None
+
+    def __hash__(self):
+        return (hash(hashlib.sha1(self._index).digest()) ^
+                hash(hashlib.sha1(self._data).digest()))
+
+
+    def __str__(self):
+        return 'SpatialArray([%d items], %s)' % (
+            self._data.size, self._index)
+                
+    def __eq__(self, other):
+        if not isinstance(other, SpatialArray):
+            return False
+        return np.all(other._data == self._data) and self._index == other._index
+
+    def _ccode(self, printer):
+        return 'spatial_array_%s' % (self._index)
+
+    def data_hash(self):
+        """Returns a hash of the underying data series."""
+        return hashlib.sha1(self._data).digest()
 # Maps node type IDs to their classes.
 _NODE_TYPES = __init_node_type_list()
