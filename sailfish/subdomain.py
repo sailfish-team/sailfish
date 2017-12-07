@@ -463,7 +463,7 @@ class Subdomain(object):
         """
         self.config.logger.debug('... setting active node map from wall map')
         fluid_map = np.logical_not(wall_map)
-        neighbor = self._lattice_kernel(zero=0)
+        neighbors = self._lattice_kernel(zero=0)
 
         # Mark nodes connected to at least one active node as active.
         # We need these nodes for walls and ghost nodes.
