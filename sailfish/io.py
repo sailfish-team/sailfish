@@ -101,7 +101,8 @@ class VisualizationWrapper(LBOutput):
         self.subdomain = subdomain
         self.nodes = reduce(operator.mul, subdomain.size)
         self._dim = len(self.subdomain.size)
-
+        self._fluid_map = self._output._fluid_map
+        
     def register_field(self, field, name, visualization=False):
         self._output.register_field(field, name, visualization)
 
@@ -110,7 +111,7 @@ class VisualizationWrapper(LBOutput):
 
     def set_fluid_map(self, fluid_map):
         self._output.set_fluid_map(fluid_map)
-
+    
     def verify(self):
         return self._output.verify()
 
