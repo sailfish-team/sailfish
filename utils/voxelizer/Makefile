@@ -1,6 +1,7 @@
 all: voxelizer voxelizer_octree
 
-CXX=clang++
+CXX=clang++-3.8
+# CXX=clang++
 CXXFLAGS=-stdlib=libstdc++ -I/opt/local/include
 
 GTEST_INCLUDE=-Igtest/include
