@@ -41,7 +41,7 @@ ${device_func} inline float interpolate_linear(const float d0, const float d1, c
 // Arguments are:
 //  offset - offset in the global timeseries array (bc_timeseries)
 //  size - size of the current timeseries
-//  step - number LB iterations corresponding to two neighboring data points
+//  step - number LB iations corresponding to two neighboring data points
 //  iteration - current LB iteration number
 ${device_func} inline float timeseries_interpolate(
     const unsigned int offset,
@@ -69,7 +69,14 @@ ${device_func} inline float get_time_from_iteration(unsigned int iteration) {
 
 ## Renders functions to compute dynamic values.
 %for i, expressions in symbol_idx_map.items():
-  ${device_func} inline void time_dep_param_${i}(float *out ${dynamic_val_args_decl()}) {
+  ${device_func} inline void time_dep_param_${i}(float *out
+      %if symbol_to_geo_map:                                             
+        , float spatial_array_x, float spatial_array_y  
+        %if dim==3:
+          ,float  spatial_array_z
+        %endif
+    %endif
+    ${dynamic_val_args_decl()}) {
     %if time_dependence:
       float phys_time = get_time_from_iteration(iteration_number);
     %endif
@@ -84,6 +91,23 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
     ${dynamic_val_args_decl()}) {
   %if (time_dependence or space_dependence) and symbol_idx_map:
     if (idx >= ${non_symbolic_idxs}) {
+        ##if both spatial array and sympy expression:
+        %if  symbol_to_geo_map: 
+          %for key, val in symbol_to_geo_map.items():
+            if (idx >= ${min(val)} &&  idx<=${max(val)}){
+               float spatial_array_x = node_params[idx];
+               float spatial_array_y = node_params[idx + 1];
+              %if dim == 3:
+                float spatial_array_z = node_params[idx + 2];  
+                time_dep_param_${key}(out,spatial_array_x,spatial_array_y, spatial_array_z ${dynamic_val_args()});
+                return;
+              %else:
+                time_dep_param_${key}(out,spatial_array_x,spatial_array_y ${dynamic_val_args()});
+                return;
+              %endif  
+            }
+          %endfor
+        %else:
       switch (idx) {
         %for key, val in symbol_idx_map.items():
           %if len(val) == dim:
@@ -98,6 +122,7 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
           %endif
           die();
       }
+       %endif     
     }
   %endif
   out[0] = node_params[idx];
