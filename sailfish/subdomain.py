@@ -397,7 +397,7 @@ class Subdomain(object):
         self._type_map_ghost, self._sparse_type_map = runner.make_scalar_field(np.uint32, register=False, nonghost_view=False)
         self._type_map = self._type_map_ghost[self.spec._nonghost_slice]
         self._type_map_base = runner.field_base(self._type_map_ghost)
-        self._param_map, self._sparse_param_map = runner.make_scalar_field(dtype=np.int_, register=False)
+        self._param_map, self._sparse_param_map = runner.make_scalar_field(dtype=np.intp, register=False)
         self._param_map_base = runner.field_base(self._param_map)
         self._orientation, self._sparse_orientation_map = runner.make_scalar_field(np.uint32, register=False)
         self._orientation_base = runner.field_base(self._orientation)
