@@ -524,7 +524,11 @@
   // Additional geometry parameters (velocities, pressures, etc)
   ${device_func} float node_params[${len(node_params)}] = {
   %for param in node_params:
-    ${cex(param)},
+    %if isinstance(param, tuple):
+      ${cex(param[0])},
+    %else:
+      ${cex(param)},
+    %endif
   %endfor
   };
 %else:
