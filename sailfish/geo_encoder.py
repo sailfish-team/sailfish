@@ -148,44 +148,15 @@ class GeoEncoderConst(GeoEncoder):
                         else:
                             assert False, 'Unsupported dimension: {0}'.format(
                                     idxs.shape[1])
-
-        self._non_symbolic_idxs = param_items
+                            
+        self._non_symbolic_idxs = param_items        
         self._symbol_map = {}  # Maps param indices to sympy expressions.
         self._symbol_to_geo_map = {}    #Maps array indices 
                                         #to one sympy expression
-
-        # Maps timeseries data ID to offset in self._timeseries_data.
-        timeseries_offset_map = {}
-        timeseries_offset = 0
-
-        # TODO(michalj): Verify that the type of the symbolic expression matches
-        # that of the boundary condition (vector vs scalar, etc).
-        # Second pass: only process symbolic expressions here.
-
+                
         for node_key, node_type in param_dict.items():
-            for param in node_type.params.values():
-                if isinstance(param, nt.DynamicValue) and not param.need_mf:
-                    if param in seen_params:
-                        idx = param_to_idx[value]
-                    else:
-                        seen_params.add(param)
-                        idx = param_items
-                        self._symbol_map[idx] = param
-                        param_to_idx[param] = idx
-                        param_items += 1
-
-                        for ts in param.get_timeseries():
-                            dh = ts.data_hash()
-                            if dh in timeseries_offset_map:
-                                ts._offset = timeseries_offset_map[dh]
-                            else:
-                                ts._offset = timeseries_offset
-                                timeseries_offset_map[dh] = ts._offset
-                                timeseries_offset += ts._data.size
-                                self._timeseries_data.extend(ts._data)
-
-                    self._encoded_param_map[param_map == node_key] = idx
-                elif isinstance(param, nt.DynamicValue) and param.need_mf:
+            for param in node_type.params.values():                
+                if isinstance(param, nt.DynamicValue) and param.need_mf:
                     param_data = param.data
                     nodes_idx = np.argwhere(param_map == node_key)
                     symbol_idx = param_items
@@ -217,7 +188,41 @@ class GeoEncoderConst(GeoEncoder):
                         else:
                             assert False, 'Unsupported dimension: {0}'.format(
                                     idxs.shape[1])
-                    self._symbol_to_geo_map[symbol_idx]=sym_indexes    
+                    self._symbol_to_geo_map[symbol_idx]=sym_indexes 
+                
+
+        # Maps timeseries data ID to offset in self._timeseries_data.
+        timeseries_offset_map = {}
+        timeseries_offset = 0
+
+        # TODO(michalj): Verify that the type of the symbolic expression matches
+        # that of the boundary condition (vector vs scalar, etc).
+        # Second pass: only process symbolic expressions here.
+
+        for node_key, node_type in param_dict.items():                    
+            for param in node_type.params.values():
+                if isinstance(param, nt.DynamicValue) and not param.need_mf:
+                    if param in seen_params:
+                        idx = param_to_idx[value]
+                    else:
+                        seen_params.add(param)
+                        idx = param_items
+                        self._symbol_map[idx] = param
+                        param_to_idx[param] = idx
+                        param_items += 1
+
+                        for ts in param.get_timeseries():
+                            dh = ts.data_hash()
+                            if dh in timeseries_offset_map:
+                                ts._offset = timeseries_offset_map[dh]
+                            else:
+                                ts._offset = timeseries_offset
+                                timeseries_offset_map[dh] = ts._offset
+                                timeseries_offset += ts._data.size
+                                self._timeseries_data.extend(ts._data)
+
+                    self._encoded_param_map[param_map == node_key] = idx
+               
 
         self._bits_param = bit_len(param_items)
 
