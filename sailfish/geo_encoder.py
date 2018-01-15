@@ -153,6 +153,7 @@ class GeoEncoderConst(GeoEncoder):
         self._symbol_map = {}  # Maps param indices to sympy expressions.
         self._symbol_to_geo_map = {}    #Maps array indices 
                                         #to one sympy expression
+        self._non_sa_symbolic_map = {}
                 
         for node_key, node_type in param_dict.items():
             for param in node_type.params.values():                
@@ -208,6 +209,7 @@ class GeoEncoderConst(GeoEncoder):
                         seen_params.add(param)
                         idx = param_items
                         self._symbol_map[idx] = param
+                        self._non_sa_symbolic_map[idx] = param
                         param_to_idx[param] = idx
                         param_items += 1
 
@@ -242,7 +244,7 @@ class GeoEncoderConst(GeoEncoder):
             type_to_node_count[node_type.id] = num_nodes
 
             for i in range(num_nodes):
-               self._scratch_map[_selector(idx[i,:])] = i
+                self._scratch_map[_selector(idx[i,:])] = i
 
             self._scratch_space_base[node_type.id] = self.scratch_space_size
 
@@ -328,6 +330,7 @@ class GeoEncoderConst(GeoEncoder):
             'node_params': self._geo_params,
             'symbol_idx_map': self._symbol_map,
             'symbol_to_geo_map': self._symbol_to_geo_map,
+            'non_sa_symbolic_map':self._non_sa_symbolic_map,
             'timeseries_data': self._timeseries_data,
             'non_symbolic_idxs': self._non_symbolic_idxs,
             'scratch_space': self.scratch_space_size > 0,

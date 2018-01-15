@@ -90,39 +90,62 @@ ${device_func} inline float get_time_from_iteration(unsigned int iteration) {
 ${device_func} inline void node_param_get_vector(const int idx, float *out
     ${dynamic_val_args_decl()}) {
   %if (time_dependence or space_dependence) and symbol_idx_map:
+      
     if (idx >= ${non_symbolic_idxs}) {
-        ##if both spatial array and sympy expression:
-        %if  symbol_to_geo_map: 
+        ## if both spatial array and sympy expression:
+      %if  symbol_to_geo_map: 
+        if (0) {}
           %for key, val in symbol_to_geo_map.items():
-            if (idx >= ${min(val)} &&  idx<=${max(val)}){
-               float spatial_array_x = node_params[idx];
-               float spatial_array_y = node_params[idx + 1];
-              %if dim == 3:
-                float spatial_array_z = node_params[idx + 2];  
-                time_dep_param_${key}(out,spatial_array_x,spatial_array_y, spatial_array_z ${dynamic_val_args()});
-                return;
-              %else:
-                time_dep_param_${key}(out,spatial_array_x,spatial_array_y ${dynamic_val_args()});
-                return;
-              %endif  
-            }
-          %endfor
-        %else:
-      switch (idx) {
-        %for key, val in symbol_idx_map.items():
-          %if len(val) == dim:
-            case ${key}:
-              time_dep_param_${key}(out ${dynamic_val_args()});
+             
+        else if (idx >= ${min(val)} &&  idx<=${max(val)}){
+          float spatial_array_x = node_params[idx];
+          float spatial_array_y = node_params[idx + 1];
+            %if dim == 3:
+              float spatial_array_z = node_params[idx + 2];  
+              time_dep_param_${key}(out,spatial_array_x,spatial_array_y, spatial_array_z ${dynamic_val_args()});
               return;
-          %endif
-        %endfor
-        default:
+            %else:
+              time_dep_param_${key}(out,spatial_array_x,spatial_array_y ${dynamic_val_args()});
+              return;
+            %endif  
+        }  
+          %endfor
+          %if non_sa_symbolic:
+        else {
+          switch (idx) {
+            %for key, val in non_sa_symbolic.items():
+              %if len(val) == dim:
+                case ${key}:{
+                  time_dep_param_${key}(out ${dynamic_val_args()});
+                  return;
+                  }
+              %endif
+            %endfor
+          default:
           %if gpu_check_invalid_values:
             printf("Invalid vector value (idx=%d)\n", idx);
           %endif
           die();
-      }
-       %endif     
+          }
+            
+        }
+        %endif
+      %else:
+        switch (idx) {
+          %for key, val in symbol_idx_map.items():
+            %if len(val) == dim:
+              case ${key}:
+                time_dep_param_${key}(out ${dynamic_val_args()});
+                return;
+            %endif
+          %endfor
+          default:
+          %if gpu_check_invalid_values:
+            printf("Invalid vector value (idx=%d)\n", idx);
+          %endif
+          die();
+          }
+      %endif     
     }
   %endif
   out[0] = node_params[idx];
