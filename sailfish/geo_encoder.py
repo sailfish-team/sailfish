@@ -154,6 +154,11 @@ class GeoEncoderConst(GeoEncoder):
         self._symbol_to_geo_map = {}    #Maps array indices 
                                         #to one sympy expression
         self._non_sa_symbolic_map = {}
+        
+        # Maps timeseries data ID to offset in self._timeseries_data.
+        timeseries_offset_map = {}
+        timeseries_offset = 0
+
                 
         for node_key, node_type in param_dict.items():
             for param in node_type.params.values():                
@@ -179,6 +184,16 @@ class GeoEncoderConst(GeoEncoder):
                             sym_indexes+=(idx,)
                             param_to_idx[(value, param)] = idx
                             param_items += len(value)
+                            
+                            for ts in param.get_timeseries():
+                                dh = ts.data_hash()
+                                if dh in timeseries_offset_map:
+                                    ts._offset = timeseries_offset_map[dh]
+                                else:
+                                    ts._offset = timeseries_offset
+                                    timeseries_offset_map[dh] = ts._offset
+                                    timeseries_offset += ts._data.size
+                                    self._timeseries_data.extend(ts._data)
 
                         idxs = nodes_idx[param_data == value]
                         if idxs.shape[1] == 3:
@@ -192,9 +207,6 @@ class GeoEncoderConst(GeoEncoder):
                     self._symbol_to_geo_map[symbol_idx]=sym_indexes 
                 
 
-        # Maps timeseries data ID to offset in self._timeseries_data.
-        timeseries_offset_map = {}
-        timeseries_offset = 0
 
         # TODO(michalj): Verify that the type of the symbolic expression matches
         # that of the boundary condition (vector vs scalar, etc).
