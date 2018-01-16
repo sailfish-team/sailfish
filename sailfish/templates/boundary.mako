@@ -89,14 +89,12 @@ ${device_func} inline float get_time_from_iteration(unsigned int iteration) {
 // Returns a node parameter which is a vector (in 'out').
 ${device_func} inline void node_param_get_vector(const int idx, float *out
     ${dynamic_val_args_decl()}) {
-  %if (time_dependence or space_dependence) and symbol_idx_map:
-      
+  %if (time_dependence or space_dependence) and symbol_idx_map:     
     if (idx >= ${non_symbolic_idxs}) {
-        ## if both spatial array and sympy expression:
+      ## if both spatial array and sympy expression:
       %if  symbol_to_geo_map: 
         if (0) {}
-          %for key, val in symbol_to_geo_map.items():
-             
+          %for key, val in symbol_to_geo_map.items():            
         else if (idx >= ${min(val)} &&  idx<=${max(val)}){
           float spatial_array_x = node_params[idx];
           float spatial_array_y = node_params[idx + 1];
@@ -110,13 +108,17 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
             %endif  
         }  
           %endfor
-          %if non_sa_symbolic:
+          %if non_sa_symbolic_map:
         else {
           switch (idx) {
-            %for key, val in non_sa_symbolic.items():
+            %for key, val in non_sa_symbolic_map.items():
               %if len(val) == dim:
                 case ${key}:{
-                  time_dep_param_${key}(out ${dynamic_val_args()});
+                  %if dim == 3:
+                    time_dep_param_${key}(out,0,0,0 ${dynamic_val_args()});
+                  %else:
+                    time_dep_param_${key}(out,0,0 ${dynamic_val_args()});
+                  %endif
                   return;
                   }
               %endif
@@ -127,7 +129,6 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
           %endif
           die();
           }
-            
         }
         %endif
       %else:
