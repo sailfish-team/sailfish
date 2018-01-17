@@ -55,7 +55,7 @@ class TestMiscUtils(unittest.TestCase):
         self.assertEqual(l5, [1, 2])
 
     def test_inanyd_fast(self):
-        a = np.random.random_integers(0, 20, (128, 128))
+        a = np.random.randint(0, 20+1, (128, 128))
         b = np.uint32([1, 4, 6, 10, 19])
 
         np.testing.assert_array_equal(
