@@ -611,20 +611,13 @@ class SpatialArray(Symbol):
 
         Symbol.__init__('unused')
        
-
-       
         if type(data) is list or type(data) is tuple:
             data = np.float64(data)
 
-        # Copy here is necessary so that the caller doesn't accidentally change
-        # the underlying array later. Also, we need the array to be C-contiguous
-        # (for __hash__ below), which might not be the case if it's a view.
         self._data = data.copy()
         self._index = index
         self._where = where.copy()
-        # To be set later by the geometry encoder class. This is necessary due
-        # to how the printing system in Sympy works (see _ccode below).
-        #self._offset = None
+        
 
     def __hash__(self):
         return (hash(hashlib.sha1(str(self._index).encode('ascii')).digest()) ^
