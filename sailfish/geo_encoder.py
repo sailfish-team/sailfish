@@ -204,7 +204,7 @@ class GeoEncoderConst(GeoEncoder):
             for param in node_type.params.values():
                 if isinstance(param, nt.DynamicValue) and not param.need_mf:
                     if param in seen_params:
-                        idx = param_to_idx[value]
+                        idx = param_to_idx[param]
                     else:
                         seen_params.add(param)
                         idx = param_items
