@@ -617,11 +617,12 @@ class SpatialArray(Symbol):
         self._data = data.copy()
         self._index = index
         self._where = where.copy()
+        self._hash = hash(hashlib.sha1(str(self._index).encode('ascii')).digest()) ^ \
+                hash(hashlib.sha1(self._data).digest())
         
 
     def __hash__(self):
-        return (hash(hashlib.sha1(str(self._index).encode('ascii')).digest()) ^
-                hash(hashlib.sha1(self._data).digest()))
+        return self._hash
 
 
     def __str__(self):
