@@ -40,19 +40,6 @@ class TestLsfUtils(unittest.TestCase):
             cluster.nodes)
 
 class TestMiscUtils(unittest.TestCase):
-    def test_reverse_pairs(self):
-        l1 = [1, 2, 3, 4]
-        l2 = list(util.reverse_pairs(l1))
-        self.assertEqual(l2, [2, 1, 4, 3])
-
-        l3 = list(util.reverse_pairs(l1, 2))
-        self.assertEqual(l3, [3, 4, 1, 2])
-
-        ls = [1, 2]
-        l4 = list(util.reverse_pairs(ls))
-        self.assertEqual(l4, [2, 1])
-        l5 = list(util.reverse_pairs(ls, 2))
-        self.assertEqual(l5, [1, 2])
 
     def test_inanyd_fast(self):
         a = np.random.randint(0, 20+1, (128, 128))

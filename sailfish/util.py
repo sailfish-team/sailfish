@@ -127,26 +127,6 @@ def gpufile_to_clusterspec(gpufile, iface=''):
     return _cluster_from_nodes_dict(nodes, iface)
 
 
-def reverse_pairs(iterable, subitems=1):
-    it = iter(iterable)
-    while it:
-        x = []
-        for i in range(0, subitems):
-            x.append(next(it))
-
-        try:
-            y = []
-            for i in range(0, subitems):
-                y.append(next(it))
-
-            for i in y:
-                yield i
-        except StopIteration:
-            pass
-
-        for i in x:
-            yield i
-
 def in_anyd(arr1, arr2):
     """Wrapper around np.in1d which returns an array with the same shape as arr1"""
     return np.in1d(arr1, arr2).reshape(arr1.shape)
