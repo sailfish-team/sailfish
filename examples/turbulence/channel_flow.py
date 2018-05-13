@@ -43,7 +43,7 @@ class ChannelSubdomain(Subdomain3D):
         # Buffer size (used to make the random perturbation continuous
         # along the streamwise direction.
         B = 40
-        hB = B / 2
+        hB = B // 2
 
         n1 = np.random.random((NZ + B, NY + B, NX)).astype(np.float32) * 2.0 - 1.0
         # Make the field continous along the streamwise and spanwise direction.
@@ -53,7 +53,7 @@ class ChannelSubdomain(Subdomain3D):
         n1[:,-hB:,:] = n1[:,hB:B,:]
         n1[:,:hB,:] = n1[:,-B:-hB,:]
 
-        nn1 = scipy.ndimage.filters.gaussian_filter(n1, 5 * self.config.H / 40)
+        nn1 = scipy.ndimage.filters.gaussian_filter(n1, 5 * self.config.H // 40)
         # Remove the buffer layer. We also force the perturbations to be
         # smaller close to the wall. Select the right part of the random
         # field for this subdomain.
@@ -96,7 +96,7 @@ class ChannelSubdomain(Subdomain3D):
         # Sanity checks.
         assert np.all((H - hhx)[hx == 0] == -self.wall_bc.location)
 
-        y_plus = (H - hhx) * u_tau / self.config.visc
+        y_plus = (H - hhx + 1) * u_tau / self.config.visc
         # Log-law.
         u = (1/0.41 * np.log(y_plus) + 5.5) * u_tau
         # Linear scaling close to the wall. y0 is chosen to make
@@ -174,7 +174,7 @@ class ChannelSim(LBFluidSim, LBForcedSim, ReynoldsStatsMixIn, Vis2DSliceMixIn):
 
         # Show data early. This is helpful for quick debugging.
         if not config.quiet:
-            print '\n'.join(cls.get_info(config))
+            print('\n'.join(cls.get_info(config)))
 
     @classmethod
     def get_info(cls, config):

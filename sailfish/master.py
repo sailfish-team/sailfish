@@ -198,7 +198,7 @@ class LBMachineMaster(object):
         vis_lock = mp.Lock()
         vis_config = Value(io.VisConfig, lock=vis_lock)
         vis_config.iteration = -1
-        vis_config.field_name = ''
+        vis_config.field_name = b''
         vis_config.all_subdomains = False
 
         # Start the visualizatione engine.

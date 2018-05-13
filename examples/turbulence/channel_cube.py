@@ -91,7 +91,7 @@ class CubeChannelGeometry(LBGeometry3D):
         # Actual simulation domain.
         n = self.config.subdomains
         z = self.buf_nz(c)
-        dz = self.main_nz(c) / n
+        dz = self.main_nz(c) // n
         rz = self.main_nz(c) % n
         for i in range(0, n):
             ret.append(SubdomainSpec3D((0, 0, z),
@@ -186,7 +186,7 @@ class CubeChannelSim(ChannelSim):
         # Show data early. This is helpful for quick debugging.
 
         if not config.quiet:
-            print '\n'.join(cls.get_info(config))
+            print('\n'.join(cls.get_info(config)))
 
 
     @classmethod

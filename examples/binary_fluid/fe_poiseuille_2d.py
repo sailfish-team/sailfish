@@ -21,7 +21,7 @@ visc1 = visc2 / 5.0
 
 class PoiseuilleDomain(Subdomain2D):
     def initial_conditions(self, sim, hx, hy):
-        core = (hx > H / 4) & (hx <= 3 * H / 4)
+        core = (hx > H // 4) & (hx <= 3 * H / 4)
         boundary = np.logical_not(core)
 
         sim.rho[:] = 1.0
@@ -41,7 +41,7 @@ class PoiseuilleSim(LBBinaryFluidFreeEnergy, LBForcedSim):
     def update_defaults(cls, defaults):
         defaults.update({
             'lat_nx': H + 2,
-            'lat_ny': H / 4,
+            'lat_ny': H // 4,
             'grid': 'D2Q9',
             'tau_a': relaxation_time(visc1),
             'tau_b': relaxation_time(visc2),
