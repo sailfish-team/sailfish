@@ -91,7 +91,7 @@ class KidaSim(LBFluidSim, KineticEnergyEnstrophyMixIn):
             self.stats.append((self.iteration, ke, ens))
 
             runner.backend.run_kernel(self.extract_k, ((self.config.lat_nx + 127)
-                                                        / 128, self.config.lat_ny))
+                                                        // 128, self.config.lat_ny))
 
 
         if self.iteration == self.config.max_iters - 1:

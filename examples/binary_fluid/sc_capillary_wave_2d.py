@@ -71,9 +71,9 @@ class CapillaryWaveSim(LBBinaryFluidShanChen):
             self.need_sync_flag = True
 
         if self.iteration % every == 0:
-            x = W / n_waves / 4
-            m1 = H / 2 - 2 * A
-            m2 = H / 2 + 2 * A
+            x = W // n_waves // 4
+            m1 = H // 2 - 2 * A
+            m2 = H // 2 + 2 * A
             phi = runner._sim.phi[m1:m2, x]
             rho = runner._sim.rho[m1:m2, x]
 
