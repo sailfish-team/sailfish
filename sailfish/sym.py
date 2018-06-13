@@ -526,6 +526,33 @@ def get_missing_dists(grid, orientation):
     _, unknown = _get_known_dists(grid, normal)
     return unknown
 
+def rotate_dist(grid, idx, transformation_matrix):
+    """Returns an index of rotated distribution
+    
+    :param grid: grid object
+    :param idx: index of rotating distribution
+    :param rotation_matrix: sympy matrix of rotation
+    """
+    rotation_matrix = Matrix(transformation_matrix[:-1, :-1])
+    if grid.dim == 2:
+        b = grid.basis[idx].col_insert(grid.basis[idx].shape[1],Matrix([0]))
+        t = tuple(int(i) for i in rotation_matrix.dot(b)[:-1])
+        return grid.basis.index(Matrix((t,)))
+    else:    
+        b  = grid.basis[idx]
+        t = tuple(int(i) for i in rotation_matrix.dot(b))
+        return grid.basis.index(Matrix((t,)))
+
+def rotate_pos(grid,  TM):
+    """Returns offset
+    
+    :param grid: grid object
+    :param TM: sympy transformation matrix
+    """
+    position = Matrix((S.gx,S.gy,S.gz,1))
+    rotated_pos =TM.dot(position)[:grid.dim]
+    offset = Matrix([rotated_pos[i] - position[i] for i in  range(grid.dim)])
+    return offset
 
 def ex_rho(grid, distp, incompressible, missing_dir=None,
            minimize_roundoff=False):

@@ -5,6 +5,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 import numpy as np
+from sympy import ImmutableDenseMatrix
 
 from sailfish import util
 import sailfish.node_type as nt
@@ -154,11 +155,11 @@ class GeoEncoderConst(GeoEncoder):
         self._symbol_to_geo_map = {}    #Maps array indices 
                                         #to one sympy expression
         self._non_sa_symbolic_map = {}
+        self._extended_copy_map = {}
         
         # Maps timeseries data ID to offset in self._timeseries_data.
         timeseries_offset_map = {}
         timeseries_offset = 0
-
                 
         for node_key, node_type in param_dict.items():
             for param in node_type.params.values():                
@@ -236,7 +237,17 @@ class GeoEncoderConst(GeoEncoder):
                                 self._timeseries_data.extend(ts._data)
 
                     self._encoded_param_map[param_map == node_key] = idx
-               
+                elif isinstance(param, ImmutableDenseMatrix):
+                    if param in seen_params:
+                        idx = param_to_idx[param]
+                    else:
+                        seen_params.add(param)
+                        idx = param_items
+                        self._extended_copy_map[idx] = param
+                        param_to_idx[param] = idx
+                        param_items += 1
+                    
+                    self._encoded_param_map[param_map == node_key] = idx   
 
         self._bits_param = bit_len(param_items)
 
@@ -342,7 +353,8 @@ class GeoEncoderConst(GeoEncoder):
             'node_params': self._geo_params,
             'symbol_idx_map': self._symbol_map,
             'symbol_to_geo_map': self._symbol_to_geo_map,
-            'non_sa_symbolic_map':self._non_sa_symbolic_map,
+            'non_sa_symbolic_map':self._non_sa_symbolic_map,           
+            'extended_copy_map': self._extended_copy_map,
             'timeseries_data': self._timeseries_data,
             'non_symbolic_idxs': self._non_symbolic_idxs,
             'scratch_space': self.scratch_space_size > 0,
