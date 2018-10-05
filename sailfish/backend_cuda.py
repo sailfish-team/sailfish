@@ -11,6 +11,7 @@ import pycuda.tools
 import pycuda.driver as cuda
 import pycuda.gpuarray as cudaarray
 import pycuda.reduction as reduction
+from subprocess import run, PIPE
 from functools import reduce
 
 
@@ -56,6 +57,9 @@ class CUDABackend(object):
         group.add_argument('--cuda-keep-temp', dest='cuda_keep_temp',
                 help='keep intermediate CUDA files', action='store_true',
                 default=False)
+        group.add_argument('--cuda-clang-format', dest='cuda_clang_format',
+                           help='run clang-format on CUDA files', action='store_true',
+                           default=False)
         group.add_argument('--cuda-fermi-highprec', dest='cuda_fermi_highprec',
                 help='use high precision division and sqrt on Compute Capability 2.0+ '
                      ' devices', action='store_true', default=False)
@@ -212,6 +216,20 @@ class CUDABackend(object):
             cache = None
         else:
             cache = False
+
+        if self.options.cuda_clang_format:
+            options.append('-lineinfo')
+            result = run(
+                [
+                    'clang-format',
+                    '-style={ MaxEmptyLinesToKeep: 0 }',
+                    '-assume-filename=dummy.cpp'
+                ],
+                stdout=PIPE,
+                input=source,
+                encoding='ascii'
+            )
+            source = result.stdout
 
         return pycuda.compiler.SourceModule(source, options=options,
                 nvcc=self.options.cuda_nvcc, keep=self.options.cuda_keep_temp,
