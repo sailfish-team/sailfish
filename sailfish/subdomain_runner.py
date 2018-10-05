@@ -957,6 +957,12 @@ class SubdomainRunner(object):
         self.backend.run_kernel(kernel, self._kernel_grid_full if grid is None
                                 else grid)
 
+    def get_surface(self, name):
+        return self.backend.get_surface(self.module, name)
+
+    def get_texture(self, name):
+        return self.backend.get_texture(self.module, name)
+
     def step(self, sync_req):
         self._step_boundary(sync_req)
         self._step_bulk(sync_req)
