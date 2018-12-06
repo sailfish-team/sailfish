@@ -188,10 +188,12 @@ ${kernel} void CollideAndPropagate(
       ${dense_gi_arg_if_required()}
       ${iteration_number_arg_if_required()});
     fixMissingDistributions(
+
         ${nodes_array_arg_if_required()}
         &d0, dist_in
         ${dense_gi_arg_if_required()},
         ncode, type, orientation, gi,
+
                 ovx, ovy ${', ovz' if dim == 3 else ''}, gg0m0
                 ${misc_bc_args()}
                 ${scratch_space_arg_if_required()});
