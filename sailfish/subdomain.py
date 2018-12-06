@@ -12,6 +12,7 @@ import operator
 import multiprocessing as mp
 import numpy as np
 from scipy.ndimage import filters
+from sympy import ImmutableDenseMatrix
 
 from sailfish import util
 from sailfish import sym
@@ -511,6 +512,8 @@ class Subdomain(object):
                     self.config.time_dependence = True
                 if param.has_symbols(sym.S.gx, sym.S.gy, sym.S.gz):
                     self.config.space_dependence = True
+                continue
+            elif isinstance(param, ImmutableDenseMatrix):
                 continue
             else:
                 raise ValueError("Unrecognized node param: {0} (type {1})".

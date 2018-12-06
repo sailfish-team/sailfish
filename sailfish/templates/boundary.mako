@@ -23,6 +23,22 @@
   %endif
 </%def>
 
+<%def name="extended_rel_offset(x, y, z)" filter="trim">
+  %if grid.dim == 2:
+    ${x}+offset[0]+(${y}+offset[1])*${arr_nx}
+  %else:
+    ${x}+offset[0]+ ${arr_nx}*(${y}+offset[1]+${arr_ny}*(${z}+offset[2]))
+  %endif
+</%def>
+
+<%def name="extended_get_odist(dist_out, idir=0, xoff=0, yoff=0, zoff=0, offset=0)" filter="trim">
+  %if node_addressing == 'indirect' :
+    ${dist_out}[nodes[dense_gi + (unsigned int)(${offset} + ${extended_rel_offset(xoff, yoff, zoff)})] + ${dist_size * idir}u]
+  %else:
+    ${dist_out}[gi + (${dist_size * idir}u + (unsigned int)(${offset} + ${extended_rel_offset(xoff, yoff, zoff)}))]
+ %endif
+</%def>
+
 #############################################################################
 ## Code rendering.
 #############################################################################
@@ -506,6 +522,55 @@ ${device_func} inline void fixMissingDistributions(
   ## this way only with the AB access pattern. In the AA access pattern,
   ## their implementation requires a separate kernel call.
   %if access_pattern == 'AB':
+    %if nt.NTExtendedCopy in node_types:
+      else if (isNTExtendedCopy(node_type)) {
+        int node_param_idx = decodeNodeParamIdx(ncode);
+        %if dim == 2:
+          int gx = get_global_id(0);
+          int gy = get_global_id(1);
+        %else:
+          // This is a workaround for the limitations of current CUDA devices.
+          // We would like the grid to be 3 dimensional, but only 2 dimensions
+          // are supported.  We thus encode the first two dimensions (x, y) of
+          // the simulation grid into the x dimension of the CUDA/OpenCL grid
+          // as:
+          //   x_dev = y * num_blocks + x.
+          //
+          // This works fine, as x is relatively small, since:
+          //   x = x_sim / block_size.
+          int gx = get_global_id(0) % ${grid_nx};
+          int gy = get_global_id(0) / ${grid_nx};
+          int gz = get_global_id(1);
+        %endif
+        
+        
+        switch (node_param_idx){
+          %for i, transformation_data in extended_copy_map.items():
+            case ${i}:{  
+              int offset[${grid.dim}];
+              %for k in range(grid.dim):
+                offset[${k}] = (int)(${sym.rotate_pos(grid, transformation_data)[k]});
+              %endfor
+          //    printf("invalid node index detected in sparse coll %d  %d %d (%d, %d, %d) orient %d \n", offset[0], offset[1], offset[2], gx, gy, gz, orientation); 
+              switch (orientation) {
+                %for o in range(1, grid.dim*2+1):
+                  case ${o}: {
+                      %for dist_idx in sym.get_missing_dists(grid, o):
+                     
+                        fi->${grid.idx_name[dist_idx]} = ${extended_get_odist('dist_in', sym.rotate_dist(grid,dist_idx, transformation_data))};
+                      %endfor
+                      break;
+                      }
+              %endfor
+              
+            }
+            break;
+                      }
+          %endfor
+        }
+      }
+      
+    %endif
     %if nt.NTCopy in node_types:
       else if (isNTCopy(node_type)) {
         switch (orientation) {

@@ -8,7 +8,7 @@ __license__ = 'LGPL3'
 import hashlib
 from collections import namedtuple
 import numpy as np
-from sympy import Symbol
+from sympy import Symbol, ImmutableDenseMatrix
 from sympy.core import expr
 from sailfish.util import is_number
 
@@ -316,7 +316,23 @@ class NTCopy(LBNodeType):
     standard_macro = True
     needs_orientation = True
 
+    
+class NTExtendedCopy(LBNodeType):
+    """Copies distributions from another node.
 
+    This can be used to implement extended periodic 
+    boundary condition."""
+    wet_node = True
+    standard_macro = True
+    needs_orientation = True
+    
+    def __init__(self, transformation=None, orientation=None):
+        assert transformation.shape == (4,4), "Invalid shape of transformation array"
+        self.trans_sympy = ImmutableDenseMatrix(transformation)
+        self.params = {'transformation': self.trans_sympy}
+        self.orientation = orientation
+        
+        
 class NTYuOutflow(LBNodeType):
     """Implements the open boundary condition described in:
 
@@ -620,10 +636,8 @@ class SpatialArray(Symbol):
         self._hash = hash(hashlib.sha1(str(self._index).encode('ascii')).digest()) ^ \
                 hash(hashlib.sha1(self._data).digest())
         
-
     def __hash__(self):
         return self._hash
-
 
     def __str__(self):
         return 'SpatialArray([%d items], %s)' % (
