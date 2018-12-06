@@ -534,7 +534,7 @@ class SubdomainRunner(object):
         options = []
         if hasattr(self.config, 'regularized') and self.config.regularized:
             options.append('regularized')
-        elif hasattr(self.config, 'regularized') and self.config.incompressible:
+        elif hasattr(self.config, 'incompressible') and self.config.incompressible:
             options.append('incompressible')
         elif hasattr(self.config, 'minimize_roundoff') and self.config.minimize_roundoff:
             options.append('round-off minimization')

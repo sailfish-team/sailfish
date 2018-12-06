@@ -63,7 +63,16 @@ def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
     try:
         sys.path.append(os.path.dirname(main_script))
         import imp
-        main = imp.load_source('main', main_script)
+
+        try:
+            main = imp.load_source('main', main_script)
+        except:
+            main = None
+            with open('log%s.txt'%ids,'w') as fp: 
+                fp.write('failed imp\n')
+                fp.write(str(sys.path)+'\n')
+            
+
         for name in dir(main):
             globals()[name] = getattr(main, name)
 

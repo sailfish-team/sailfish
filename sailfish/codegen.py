@@ -175,6 +175,7 @@ class BlockCodeGenerator(object):
                     sailfish.io.source_filename(self.config.save_src,
                         subdomain_runner._spec.id),
                     self.config.format_src)
+            self.config.code_context = ctx
 
         return src
 
