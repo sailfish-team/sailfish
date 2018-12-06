@@ -509,7 +509,10 @@ ${device_func} inline void getMacro(
 // Uses extrapolation/other schemes to compute missing distributions for some implementations
 // of boundary condtitions.
 ${device_func} inline void fixMissingDistributions(
-    Dist *fi, ${global_ptr} float *dist_in, int ncode, int node_type, int orientation, unsigned int gi,
+    ${nodes_array_if_required()}
+    Dist *fi, ${global_ptr} float *dist_in
+    ${dense_gi_if_required()},
+    int ncode, int node_type, int orientation, unsigned int gi,
     ${kernel_args_1st_moment('iv')}
     ${global_ptr} float *gg0m0
     ${misc_bc_args_decl()}
