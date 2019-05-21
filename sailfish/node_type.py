@@ -382,6 +382,19 @@ class NTNeumann(LBNodeType):
     needs_orientation = True
 
 
+class NTLaminarize(LBNodeType):
+    """Average  distributions perpendicular to a given direction."""
+    needs_orientation = True
+    wet_node = True
+    standard_macro = True
+
+    def __init__(self, alpha, orientation=None):
+        self.params = {'alpha': alpha}
+        self.orientation = orientation
+
+
+    
+
 ############################################################################
 # Other nodes.
 ############################################################################

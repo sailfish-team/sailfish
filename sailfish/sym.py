@@ -496,6 +496,22 @@ def slip_bb_swap_pairs(grid, normal_dir):
                     break
     return ret
 
+def get_sym_groups(grid,n):
+
+#    print("get_sym_groups:: ",grid,n)
+    n = grid.basis[n]
+    groups = set([n.dot(ei)/ei.dot(ei) for i,ei in enumerate(grid.basis) if ei!=grid.basis[0]])
+    groups.remove(1)
+    groups.remove(-1)
+    
+    idx = [ 
+         [i for i,ei in enumerate(grid.basis) if n.dot(ei)/ei.dot(ei)==g] 
+                  for g in groups]
+#    print("get_sym_groups:: ",idx,n)
+    return idx
+
+
+
 def missing_dirs_from_tag(grid, tag_code):
     """Generates a list of missing mass fractions given an orientation tag code.
 
