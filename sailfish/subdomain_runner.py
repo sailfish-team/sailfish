@@ -22,6 +22,7 @@ from sailfish import codegen, io
 from sailfish.lb_base import LBMixIn, LBSim
 from sailfish.profile import profile, TimeProfile
 from sailfish.subdomain_connection import ConnectionBuffer, MacroConnectionBuffer
+from sailfish.util import deprecated_async
 import sailfish.node_type as nt
 from functools import reduce
 
@@ -250,8 +251,9 @@ class SubdomainRunner(object):
     def add_visualization_field(self, field_cb, name):
         self._output.register_field(field_cb, name, visualization=True)
 
+    @deprecated_async
     def make_scalar_field(self, dtype=None, name=None, register=True,
-                          async=False, gpu_array=False, need_indirect=True,
+                          asynchronous=False, gpu_array=False, need_indirect=True,
                           nonghost_view=True):
         """Allocates a scalar NumPy array.
 
@@ -270,7 +272,7 @@ class SubdomainRunner(object):
         if dtype is None:
             dtype = self.float
 
-        if async:
+        if asynchronous:
             field = self.backend.alloc_async_host_buf(self._physical_size, dtype=dtype)
         else:
             field = np.zeros(self._physical_size, dtype=dtype)
@@ -309,7 +311,7 @@ class SubdomainRunner(object):
         # initialization code.
         sparse_field = None
         if self.config.node_addressing == 'indirect' and need_indirect:
-            if async:
+            if asynchronous:
                 sparse_field = self.backend.alloc_async_host_buf(
                     self._subdomain.active_nodes, dtype=dtype)
             else:
@@ -322,7 +324,8 @@ class SubdomainRunner(object):
     def field_base(self, field):
         return self._field_base[id(field.base)]
 
-    def make_vector_field(self, name=None, output=False, async=False,
+    @deprecated_async
+    def make_vector_field(self, name=None, output=False, asynchronous=False,
                           gpu_array=False):
         """Allocates several scalar arrays representing a vector field."""
         components = []
@@ -330,7 +333,7 @@ class SubdomainRunner(object):
 
         for x in range(0, self._spec.dim):
             field, sparse_field = self.make_scalar_field(
-                self.float, register=False, async=async, gpu_array=gpu_array)
+                self.float, register=False, asynchronous=asynchronous, gpu_array=gpu_array)
             components.append(field)
             sparse_components.append(sparse_field)
 

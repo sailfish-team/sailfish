@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 
 from sailfish import lb_base
+from sailfish.util import deprecated_async
 
 class SimTest(lb_base.LBSim):
     @classmethod
@@ -9,8 +10,9 @@ class SimTest(lb_base.LBSim):
         return [lb_base.ScalarField('a'), lb_base.ScalarField('b')]
 
 class DummyRunner(object):
+    @deprecated_async
     def make_scalar_field(self, dtype=None, name=None, register=True,
-            async=False, gpu_array=False):
+            asynchronous=False, gpu_array=False):
         if dtype is None:
             dtype = np.float
         buf = np.zeros([64, 64], dtype=dtype)

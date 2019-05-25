@@ -11,6 +11,7 @@ import logging
 import random
 import socket
 import sys
+from functools import wraps
 
 import numpy as np
 from math import exp, log, ceil
@@ -324,3 +325,18 @@ def load_array(fname):
         return np.load(gzip.GzipFile(fname))
     else:
         return np.load(fname)
+
+
+def deprecated_async(func):
+    """A decorator allows use 'async' function parameter name, but deprecate it"""
+    @wraps(func)
+    def inner(*args, **kwargs):
+        if 'async' in kwargs:
+            if 'asynchronous' in kwargs:
+                raise ValueError('cannot use both async and asynchronous '
+                                 'keyword arguments! the latter obsoletes the first.')
+            warnings.warn('async keyword argumnt is deprecated, '
+                          'use asynchronous instead', DeprecationWarning)
+            kwargs['asynchronous'] = kwargs.pop('async')
+        return func(*args, **kwargs)
+    return inner
