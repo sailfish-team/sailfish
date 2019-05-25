@@ -152,12 +152,12 @@ class LBSim(object):
         for src in sources:
             for field in src.fields():
                 if type(field) is ScalarField:
-                    f, _ = runner.make_scalar_field(name=field.name, async=True,
+                    f, _ = runner.make_scalar_field(name=field.name, asynchronous=True,
                                                     gpu_array=field.gpu_array)
                     f[:] = field.init
                     self._scalar_fields.append(FieldPair(field, f))
                 elif type(field) is VectorField:
-                    f = runner.make_vector_field(name=field.name, async=True,
+                    f = runner.make_vector_field(name=field.name, asynchronous=True,
                                                  gpu_array=field.gpu_array)
                     self._vector_fields.append(FieldPair(field, f))
                     for i in range(0, self.grid.dim):
