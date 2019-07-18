@@ -722,6 +722,54 @@ ${device_func} inline void postcollisionBoundaryConditions(
       ${_global_mem_fill_missing_dists_with_opposites()}
     }
   %endif
+
+
+%if nt.NTLaminarize in node_types:
+    %if grid.dim == 3 and grid.Q == 13:
+      #error Laminarize  condition unsupported in D3Q13.
+    %endif
+     else if (isNTLaminarize(node_type) ) {
+      float f;
+
+      int node_param_idx = decodeNodeParamIdx(ncode);
+
+
+      float alpha = node_param_get_scalar(node_param_idx ${dynamic_val_args()});
+
+
+
+      switch (orientation-(orientation+1)%2) {      
+      %for o in [1,3,5]:
+        case ${o}: {
+
+
+      %for group in sym.get_sym_groups(grid, o):
+       f = 0.0f;   
+       %for i in group:
+           f += ${float(grid.weights[i]/sum(grid.weights[s_] for s_ in group))} * fi->${grid.idx_name[i]};
+       %endfor
+
+      %for j in group:
+            fi->${grid.idx_name[j]} *= (1.0f - alpha);
+            fi->${grid.idx_name[j]} += alpha*f;
+       %endfor
+     %endfor  
+
+
+          
+          break;
+        }
+      %endfor
+      }
+
+
+
+
+     
+    }
+  %endif
+
+
 }
 
 <%def name="precollision_arguments()" filter="trim">
@@ -806,6 +854,10 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode,
       }
     }
   %endif
+
+
+
+  
 
   %if access_pattern == 'AA' and nt.NTDoNothing in node_types:
     // Only need to do special processing for the propagate in-place step.
