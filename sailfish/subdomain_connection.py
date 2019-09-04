@@ -213,13 +213,13 @@ class ConnectionBuffer(object):
     def distribute(self, backend, stream):
         # Serialize partial distributions into a contiguous buffer.
         if self.dist_partial_sel is not None:
-            self.dist_partial_buf.host[:] = self.recv_buf[self.dist_partial_sel]
+            self.dist_partial_buf.host[:] = self.recv_buf[tuple(self.dist_partial_sel)]
             backend.to_buf_async(self.dist_partial_buf.gpu, stream)
 
         if self.cpair.dst.dst_slice:
             slc = [slice(0, self.recv_buf.shape[0])] + list(
                     reversed(self.cpair.dst.dst_full_buf_slice))
-            self.dist_full_buf.host[:] = self.recv_buf[slc]
+            self.dist_full_buf.host[:] = self.recv_buf[tuple(slc)]
             backend.to_buf_async(self.dist_full_buf.gpu, stream)
 
     def distribute_unpropagated(self, backend, stream):
