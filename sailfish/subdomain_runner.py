@@ -251,7 +251,7 @@ class SubdomainRunner(object):
         self._output.register_field(field_cb, name, visualization=True)
 
     def make_scalar_field(self, dtype=None, name=None, register=True,
-                          async=False, gpu_array=False, need_indirect=True,
+                          async_=False, gpu_array=False, need_indirect=True,
                           nonghost_view=True):
         """Allocates a scalar NumPy array.
 
@@ -270,7 +270,7 @@ class SubdomainRunner(object):
         if dtype is None:
             dtype = self.float
 
-        if async:
+        if async_:
             field = self.backend.alloc_async_host_buf(self._physical_size, dtype=dtype)
         else:
             field = np.zeros(self._physical_size, dtype=dtype)
@@ -309,7 +309,7 @@ class SubdomainRunner(object):
         # initialization code.
         sparse_field = None
         if self.config.node_addressing == 'indirect' and need_indirect:
-            if async:
+            if async_:
                 sparse_field = self.backend.alloc_async_host_buf(
                     self._subdomain.active_nodes, dtype=dtype)
             else:
@@ -322,7 +322,7 @@ class SubdomainRunner(object):
     def field_base(self, field):
         return self._field_base[id(field.base)]
 
-    def make_vector_field(self, name=None, output=False, async=False,
+    def make_vector_field(self, name=None, output=False, async_=False,
                           gpu_array=False):
         """Allocates several scalar arrays representing a vector field."""
         components = []
@@ -330,7 +330,7 @@ class SubdomainRunner(object):
 
         for x in range(0, self._spec.dim):
             field, sparse_field = self.make_scalar_field(
-                self.float, register=False, async=async, gpu_array=gpu_array)
+                self.float, register=False, async_=async_, gpu_array=gpu_array)
             components.append(field)
             sparse_components.append(sparse_field)
 
