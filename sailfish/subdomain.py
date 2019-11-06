@@ -604,7 +604,7 @@ class Subdomain(object):
         for i, periodic in enumerate(reversed(self.spec._periodicity)):
             if not periodic:
                 ngs[i] = slice(None)
-
+        ngs = tuple(ngs) 
         # Limit dry and wet types to these that are actually used in the simulation.
         uniq_types = set(np.unique(self._type_map.base))
         dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)

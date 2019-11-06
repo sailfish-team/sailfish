@@ -260,7 +260,7 @@ class GeoEncoderConst(GeoEncoder):
                 continue
 
             def _selector(idx_list):
-                return [slice(i, i+1) for i in idx_list]
+                return tuple([slice(i, i+1) for i in idx_list])
 
             idx = np.argwhere(self._type_map == node_type.id)
             num_nodes = idx.shape[0]
