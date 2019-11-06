@@ -136,6 +136,9 @@ class ZMQRemoteSubdomainConnector(ZMQSubdomainConnector):
     def init_runner(self, ctx):
         import zmq
         self.socket = ctx.socket(zmq.PAIR)
+        with open('log.txt','w') as fp: 
+            fp.write('CONNECTOR:'+ str(self._receiver)+" "+self._addr+'\n')
+
         if self._receiver:
             self.socket.connect("{0}:{1}".format(self._addr, self.port))
         else:

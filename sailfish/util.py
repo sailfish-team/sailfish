@@ -127,26 +127,6 @@ def gpufile_to_clusterspec(gpufile, iface=''):
     return _cluster_from_nodes_dict(nodes, iface)
 
 
-def reverse_pairs(iterable, subitems=1):
-    it = iter(iterable)
-    while it:
-        x = []
-        for i in range(0, subitems):
-            x.append(next(it))
-
-        try:
-            y = []
-            for i in range(0, subitems):
-                y.append(next(it))
-
-            for i in y:
-                yield i
-        except StopIteration:
-            pass
-
-        for i in x:
-            yield i
-
 def in_anyd(arr1, arr2):
     """Wrapper around np.in1d which returns an array with the same shape as arr1"""
     return np.in1d(arr1, arr2).reshape(arr1.shape)
@@ -206,6 +186,8 @@ def linpoints(i, min_=1., max_=.1, n=10):
 
 def setup_logger(config):
     logger = logging.getLogger('saifish')
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
     formatter = logging.Formatter("[%(relativeCreated)6d %(levelname)5s %(processName)s] %(message)s")
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
@@ -318,9 +300,52 @@ def lazy_property(f):
         return getattr(self, attr_name)
     return _lazy_property
 
-
 def load_array(fname):
     if fname.endswith('.gz'):
         return np.load(gzip.GzipFile(fname))
     else:
         return np.load(fname)
+
+import scipy as sp
+import scipy.sparse
+import scipy.sparse.linalg
+import skimage.morphology
+import numpy as np
+
+def make_L(nx,ny,dx=1,dy=1):
+
+    dx2,dy2 = dx**2,dy**2
+    N = nx*ny
+    diag_rows = np.array([np.ones(nx),-2.0*np.ones(nx),np.ones(nx)])
+    positions = [-1, 0, 1]
+    
+    Ax = sp.sparse.spdiags(diag_rows, positions, nx, nx)
+    diag_rows = np.array([np.ones(ny),-2.0*np.ones(ny),np.ones(ny)])
+    Ay = sp.sparse.spdiags(diag_rows, positions, ny, ny)
+
+    Ix = sp.sparse.eye(nx,nx,format='dia')
+    Iy = sp.sparse.eye(ny,ny,format='dia')
+    
+    Lh = sp.sparse.kron(Iy,(1.0/dx2)*Ax)+sp.sparse.kron((1.0/dy2)*Ay,Ix)
+    return Lh
+
+def ij2k(i,j,nx):
+    return int(nx*i+j)
+
+def get_normalized_Poisseulle_inflow(m):
+    gy,gx = m.shape
+    Lh = make_L(gx,gy)
+    N = gx*gy
+    Lcsr = Lh.tocsr()
+    b = -np.ones(N)
+    m_skinny = np.bitwise_xor(skimage.morphology.binary_dilation(~m),~m)
+    for i0,j0 in zip(*np.where(m_skinny)):
+        row = ij2k(i0,j0,gx)
+        Lcsr.data[Lcsr.indptr[row]:Lcsr.indptr[row+1]] = 0.0
+        Lcsr[row,row] = 1
+        b[row] = 0
+    phi = sp.sparse.linalg.spsolve(Lcsr,b)
+    u = phi.reshape(gy,gx)
+    u = u/np.max(u[~m])
+    u[m] = 0.0
+    return u

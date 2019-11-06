@@ -18,7 +18,7 @@ class CapillaryDomain(Subdomain2D):
     def boundary_conditions(self, hx, hy):
         chan_diam = 32 * self.gy / 200.0
         chan_len = 200 * self.gy / 200.0
-        rem_y = (self.gy - chan_diam) / 2
+        rem_y = (self.gy - chan_diam) // 2
 
         geometry = np.zeros(hx.shape, dtype=np.bool)
         geometry[hy == 0] = True

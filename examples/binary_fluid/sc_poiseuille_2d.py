@@ -38,7 +38,7 @@ class PoiseuilleSim(LBBinaryFluidShanChen):
     def update_defaults(cls, defaults):
         defaults.update({
             'lat_nx': H + 2,
-            'lat_ny': H / 4,
+            'lat_ny': H // 4,
             'grid': 'D2Q9',
             'visc': visc1,
             'tau_phi': relaxation_time(visc2),

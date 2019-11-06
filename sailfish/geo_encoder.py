@@ -5,6 +5,7 @@ __email__ = 'sailfish-cfd@googlegroups.com'
 __license__ = 'LGPL3'
 
 import numpy as np
+from sympy import ImmutableDenseMatrix
 
 from sailfish import util
 import sailfish.node_type as nt
@@ -148,27 +149,80 @@ class GeoEncoderConst(GeoEncoder):
                         else:
                             assert False, 'Unsupported dimension: {0}'.format(
                                     idxs.shape[1])
-
-        self._non_symbolic_idxs = param_items
+                            
+        self._non_symbolic_idxs = param_items        
         self._symbol_map = {}  # Maps param indices to sympy expressions.
-
+        self._symbol_to_geo_map = {}    #Maps array indices 
+                                        #to one sympy expression
+        self._non_sa_symbolic_map = {}
+        self._extended_copy_map = {}
+        
         # Maps timeseries data ID to offset in self._timeseries_data.
         timeseries_offset_map = {}
         timeseries_offset = 0
+                
+        for node_key, node_type in param_dict.items():
+            for param in node_type.params.values():                
+                if isinstance(param, nt.DynamicValue) and param.need_mf:
+                    param_data = param.data
+                    nodes_idx = np.argwhere(param_map == node_key)
+                    symbol_idx = param_items
+                    self._symbol_map[symbol_idx] = param
+                    
+                    uniques = np.unique(param_data)
+                    uniques.flags.writeable = False
+
+                    sym_indexes=()
+                    for value in uniques:
+                        if (value, param) in seen_params:
+                            idx = param_to_idx[(value, param)]
+                        else:
+                            seen_params.add((value, param))
+                            for v in value:
+                                self._geo_params.append((v, param))
+                            idx = param_items
+                            
+                            sym_indexes+=(idx,)
+                            param_to_idx[(value, param)] = idx
+                            param_items += len(value)
+                            
+                            for ts in param.get_timeseries():
+                                dh = ts.data_hash()
+                                if dh in timeseries_offset_map:
+                                    ts._offset = timeseries_offset_map[dh]
+                                else:
+                                    ts._offset = timeseries_offset
+                                    timeseries_offset_map[dh] = ts._offset
+                                    timeseries_offset += ts._data.size
+                                    self._timeseries_data.extend(ts._data)
+
+                        idxs = nodes_idx[param_data == value]
+                        if idxs.shape[1] == 3:
+                            self._encoded_param_map[idxs[:,0], idxs[:,1],
+                                                    idxs[:,2]] = idx
+                        elif idxs.shape[1] == 2:
+                            self._encoded_param_map[idxs[:,0], idxs[:,1]] = idx
+                        else:
+                            assert False, 'Unsupported dimension: {0}'.format(
+                                    idxs.shape[1])
+                    self._symbol_to_geo_map[symbol_idx]=sym_indexes 
+                
+
 
         # TODO(michalj): Verify that the type of the symbolic expression matches
         # that of the boundary condition (vector vs scalar, etc).
         # Second pass: only process symbolic expressions here.
 
-        for node_key, node_type in param_dict.items():
+        for node_key, node_type in param_dict.items():                    
             for param in node_type.params.values():
-                if isinstance(param, nt.DynamicValue):
+                if isinstance(param, nt.DynamicValue) and not param.need_mf:
                     if param in seen_params:
-                        idx = param_to_idx[value]
+                        idx = param_to_idx[param]
                     else:
                         seen_params.add(param)
                         idx = param_items
                         self._symbol_map[idx] = param
+                        self._non_sa_symbolic_map[idx] = param
                         param_to_idx[param] = idx
                         param_items += 1
 
@@ -183,6 +237,17 @@ class GeoEncoderConst(GeoEncoder):
                                 self._timeseries_data.extend(ts._data)
 
                     self._encoded_param_map[param_map == node_key] = idx
+                elif isinstance(param, ImmutableDenseMatrix):
+                    if param in seen_params:
+                        idx = param_to_idx[param]
+                    else:
+                        seen_params.add(param)
+                        idx = param_items
+                        self._extended_copy_map[idx] = param
+                        param_to_idx[param] = idx
+                        param_items += 1
+                    
+                    self._encoded_param_map[param_map == node_key] = idx   
 
         self._bits_param = bit_len(param_items)
 
@@ -195,14 +260,14 @@ class GeoEncoderConst(GeoEncoder):
                 continue
 
             def _selector(idx_list):
-                return [slice(i, i+1) for i in idx_list]
+                return tuple([slice(i, i+1) for i in idx_list])
 
             idx = np.argwhere(self._type_map == node_type.id)
             num_nodes = idx.shape[0]
             type_to_node_count[node_type.id] = num_nodes
 
             for i in range(num_nodes):
-               self._scratch_map[_selector(idx[i,:])] = i
+                self._scratch_map[_selector(idx[i,:])] = i
 
             self._scratch_space_base[node_type.id] = self.scratch_space_size
 
@@ -287,6 +352,9 @@ class GeoEncoderConst(GeoEncoder):
                                 # in orientation processing code
             'node_params': self._geo_params,
             'symbol_idx_map': self._symbol_map,
+            'symbol_to_geo_map': self._symbol_to_geo_map,
+            'non_sa_symbolic_map':self._non_sa_symbolic_map,           
+            'extended_copy_map': self._extended_copy_map,
             'timeseries_data': self._timeseries_data,
             'non_symbolic_idxs': self._non_symbolic_idxs,
             'scratch_space': self.scratch_space_size > 0,

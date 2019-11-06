@@ -10,7 +10,7 @@ class SimTest(lb_base.LBSim):
 
 class DummyRunner(object):
     def make_scalar_field(self, dtype=None, name=None, register=True,
-            async=False, gpu_array=False):
+            async_=False, gpu_array=False):
         if dtype is None:
             dtype = np.float
         buf = np.zeros([64, 64], dtype=dtype)

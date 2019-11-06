@@ -63,7 +63,16 @@ def _start_cluster_machine_master(channel, args, main_script, lb_class_name,
     try:
         sys.path.append(os.path.dirname(main_script))
         import imp
-        main = imp.load_source('main', main_script)
+
+        try:
+            main = imp.load_source('main', main_script)
+        except:
+            main = None
+            with open('log%s.txt'%ids,'w') as fp: 
+                fp.write('failed imp\n')
+                fp.write(str(sys.path)+'\n')
+            
+
         for name in dir(main):
             globals()[name] = getattr(main, name)
 
@@ -709,15 +718,21 @@ class LBSimulationController(object):
                 for handler in self._node_handlers:
                     handler.terminate()
         else:
-            if self.config.mode == 'benchmark':
+            if self.config.mode == 'benchmark' and not self.config.debug_single_process:
                 # Collect timing information from all subdomains.
                 for i in range(len(subdomains)):
                     ti, min_ti, max_ti, nodes = summary_receiver.recv_pyobj()
-                    summary_receiver.send('ack')
+                    summary_receiver.send_string('ack')
                     timing_infos.append(ti)
                     min_timings.append(min_ti)
                     max_timings.append(max_ti)
                     num_nodes.append(nodes)
+            if self.config.mode == 'benchmark' and self.config.debug_single_process:
+                ti, min_ti,max_ti,nodes = self.master.runner.summary
+                timing_infos.append(ti)
+                min_timings.append(min_ti)
+                max_timings.append(max_ti)
+                num_nodes.append(nodes)
 
             if not self.config.debug_single_process:
                 self._simulation_process.join()
@@ -789,11 +804,15 @@ class LBSimulationController(object):
 
         self.geo = self._lb_geo(self.config)
 
-        ctx = zmq.Context()
-        summary_receiver = ctx.socket(zmq.REP)
-        port = summary_receiver.bind_to_random_port('tcp://127.0.0.1')
-        self.config._zmq_port = port
-
+        if not self.config.debug_single_process:
+            ctx = zmq.Context()
+            summary_receiver = ctx.socket(zmq.REP)
+            port = summary_receiver.bind_to_random_port('tcp://127.0.0.1')
+            self.config._zmq_port = port
+        else:
+            summary_receiver = None
+            self.config._zmq_port = None
+            
         subdomain_specs = self.geo.subdomains()
         assert subdomain_specs is not None, \
                 "Make sure the subdomain list is returned in geo_class.subdomains()"

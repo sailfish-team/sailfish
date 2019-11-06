@@ -251,7 +251,7 @@ class SubdomainRunner(object):
         self._output.register_field(field_cb, name, visualization=True)
 
     def make_scalar_field(self, dtype=None, name=None, register=True,
-                          async=False, gpu_array=False, need_indirect=True,
+                          async_=False, gpu_array=False, need_indirect=True,
                           nonghost_view=True):
         """Allocates a scalar NumPy array.
 
@@ -270,7 +270,7 @@ class SubdomainRunner(object):
         if dtype is None:
             dtype = self.float
 
-        if async:
+        if async_:
             field = self.backend.alloc_async_host_buf(self._physical_size, dtype=dtype)
         else:
             field = np.zeros(self._physical_size, dtype=dtype)
@@ -309,7 +309,7 @@ class SubdomainRunner(object):
         # initialization code.
         sparse_field = None
         if self.config.node_addressing == 'indirect' and need_indirect:
-            if async:
+            if async_:
                 sparse_field = self.backend.alloc_async_host_buf(
                     self._subdomain.active_nodes, dtype=dtype)
             else:
@@ -322,7 +322,7 @@ class SubdomainRunner(object):
     def field_base(self, field):
         return self._field_base[id(field.base)]
 
-    def make_vector_field(self, name=None, output=False, async=False,
+    def make_vector_field(self, name=None, output=False, async_=False,
                           gpu_array=False):
         """Allocates several scalar arrays representing a vector field."""
         components = []
@@ -330,7 +330,7 @@ class SubdomainRunner(object):
 
         for x in range(0, self._spec.dim):
             field, sparse_field = self.make_scalar_field(
-                self.float, register=False, async=async, gpu_array=gpu_array)
+                self.float, register=False, async_=async_, gpu_array=gpu_array)
             components.append(field)
             sparse_components.append(sparse_field)
 
@@ -534,7 +534,7 @@ class SubdomainRunner(object):
         options = []
         if hasattr(self.config, 'regularized') and self.config.regularized:
             options.append('regularized')
-        elif hasattr(self.config, 'regularized') and self.config.incompressible:
+        elif hasattr(self.config, 'incompressible') and self.config.incompressible:
             options.append('incompressible')
         elif hasattr(self.config, 'minimize_roundoff') and self.config.minimize_roundoff:
             options.append('round-off minimization')
@@ -1400,8 +1400,12 @@ class SubdomainRunner(object):
             self._summary_sender.send_pyobj((timing_info, min_timings,
                     max_timings, self._subdomain.active_nodes))
             self.config.logger.debug('Sending timing information to controller.')
-            assert self._summary_sender.recv() == 'ack'
-
+            assert self._summary_sender.recv() == b'ack'
+        else:
+            assert self.config.debug_single_process == True
+            self.summary  =  (timing_info, min_timings,
+                    max_timings, self._subdomain.active_nodes)
+            
     def _gpu_initial_conditions(self):
         self._sim.verify_fields()
         # Applies initial conditions on the GPU.

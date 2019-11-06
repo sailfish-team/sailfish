@@ -8,7 +8,7 @@ try:
 except ImportError:
     from sympy.core import basic
     NegativeOne = basic.S.NegativeOne
-from sympy.printing.ccode import CCodePrinter
+from sympy.printing.ccode import C99CodePrinter
 from sympy.printing.precedence import precedence
 from sympy import Symbol, Poly
 
@@ -168,7 +168,7 @@ def _int2float(t):
     return re.sub(r'([^eE]|^)([\(\+\-\*/ ]|^)([0-9]+)([\+\-\*/\) ]|$)',
                   r'\1\2\3.0\4', str(t))
 
-class KernelCodePrinter(CCodePrinter):
+class KernelCodePrinter(C99CodePrinter):
 
     def _print_Pow(self, expr):
         PREC = precedence(expr)

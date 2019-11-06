@@ -496,6 +496,22 @@ def slip_bb_swap_pairs(grid, normal_dir):
                     break
     return ret
 
+def get_sym_groups(grid,n):
+
+#    print("get_sym_groups:: ",grid,n)
+    n = grid.basis[n]
+    groups = set([n.dot(ei)/ei.dot(ei) for i,ei in enumerate(grid.basis) if ei!=grid.basis[0]])
+    groups.remove(1)
+    groups.remove(-1)
+    
+    idx = [ 
+         [i for i,ei in enumerate(grid.basis) if n.dot(ei)/ei.dot(ei)==g] 
+                  for g in groups]
+#    print("get_sym_groups:: ",idx,n)
+    return idx
+
+
+
 def missing_dirs_from_tag(grid, tag_code):
     """Generates a list of missing mass fractions given an orientation tag code.
 
@@ -526,6 +542,33 @@ def get_missing_dists(grid, orientation):
     _, unknown = _get_known_dists(grid, normal)
     return unknown
 
+def rotate_dist(grid, idx, transformation_matrix):
+    """Returns an index of rotated distribution
+    
+    :param grid: grid object
+    :param idx: index of rotating distribution
+    :param rotation_matrix: sympy matrix of rotation
+    """
+    rotation_matrix = Matrix(transformation_matrix[:-1, :-1])
+    if grid.dim == 2:
+        b = grid.basis[idx].col_insert(grid.basis[idx].shape[1],Matrix([0]))
+        t = tuple(int(i) for i in rotation_matrix.dot(b)[:-1])
+        return grid.basis.index(Matrix((t,)))
+    else:    
+        b  = grid.basis[idx]
+        t = tuple(int(i) for i in rotation_matrix.dot(b))
+        return grid.basis.index(Matrix((t,)))
+
+def rotate_pos(grid,  TM):
+    """Returns offset
+    
+    :param grid: grid object
+    :param TM: sympy transformation matrix
+    """
+    position = Matrix((S.gx,S.gy,S.gz,1))
+    rotated_pos =TM.dot(position)[:grid.dim]
+    offset = Matrix([rotated_pos[i] - position[i] for i in  range(grid.dim)])
+    return offset
 
 def ex_rho(grid, distp, incompressible, missing_dir=None,
            minimize_roundoff=False):

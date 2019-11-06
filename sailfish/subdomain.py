@@ -12,6 +12,7 @@ import operator
 import multiprocessing as mp
 import numpy as np
 from scipy.ndimage import filters
+from sympy import ImmutableDenseMatrix
 
 from sailfish import util
 from sailfish import sym
@@ -397,7 +398,7 @@ class Subdomain(object):
         self._type_map_ghost, self._sparse_type_map = runner.make_scalar_field(np.uint32, register=False, nonghost_view=False)
         self._type_map = self._type_map_ghost[self.spec._nonghost_slice]
         self._type_map_base = runner.field_base(self._type_map_ghost)
-        self._param_map, self._sparse_param_map = runner.make_scalar_field(dtype=np.int_, register=False)
+        self._param_map, self._sparse_param_map = runner.make_scalar_field(dtype=np.intp, register=False)
         self._param_map_base = runner.field_base(self._param_map)
         self._orientation, self._sparse_orientation_map = runner.make_scalar_field(np.uint32, register=False)
         self._orientation_base = runner.field_base(self._orientation)
@@ -463,7 +464,7 @@ class Subdomain(object):
         """
         self.config.logger.debug('... setting active node map from wall map')
         fluid_map = np.logical_not(wall_map)
-        neighbor = self._lattice_kernel(zero=0)
+        neighbors = self._lattice_kernel(zero=0)
 
         # Mark nodes connected to at least one active node as active.
         # We need these nodes for walls and ghost nodes.
@@ -505,17 +506,19 @@ class Subdomain(object):
                 assert param.size == np.sum(where), ("Your array needs to "
                         "have exactly as many nodes as there are True values "
                         "in the 'where' array.  Use node_util.multifield() to "
-                        "generate the array in an easy way.")
+                                                     "generate the array in an easy way.")
             elif isinstance(param, nt.DynamicValue):
                 if param.has_symbols(sym.S.time) or list(zip(param.get_timeseries())):
                     self.config.time_dependence = True
                 if param.has_symbols(sym.S.gx, sym.S.gy, sym.S.gz):
                     self.config.space_dependence = True
                 continue
+            elif isinstance(param, ImmutableDenseMatrix):
+                continue
             else:
                 raise ValueError("Unrecognized node param: {0} (type {1})".
                         format(name, type(param)))
-
+ 
     @staticmethod
     def _hashable_params(param_dict):
         params = []
@@ -601,7 +604,7 @@ class Subdomain(object):
         for i, periodic in enumerate(reversed(self.spec._periodicity)):
             if not periodic:
                 ngs[i] = slice(None)
-
+        ngs = tuple(ngs) 
         # Limit dry and wet types to these that are actually used in the simulation.
         uniq_types = set(np.unique(self._type_map.base))
         dry_types = list(set(nt.get_dry_node_type_ids()) & uniq_types)
@@ -924,6 +927,7 @@ class Subdomain2D(Subdomain):
         _set(self._type_map_base[:, 0:es], self.spec.X_LOW)
         _set(self._type_map_base[es + self.spec.ny:, :], self.spec.Y_HIGH)
         _set(self._type_map_base[:, es + self.spec.nx:], self.spec.X_HIGH)
+
 
     def _lattice_kernel(self, zero=1):
         neighbors = np.zeros((3, 3), dtype=np.uint8)

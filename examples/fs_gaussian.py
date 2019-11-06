@@ -25,6 +25,8 @@ class FSSim(LBFreeSurface):
     @classmethod
     def update_defaults(cls, defaults):
         defaults.update({
+            'lat_nx':62,
+            'lat_ny':62,
             'every': 10,
             'visc': 0.005})
 

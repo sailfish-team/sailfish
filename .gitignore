@@ -1,3 +1,8 @@
 *.pyc
 *.*~
 *~
+examples/showcases/hemodynamics/*
+*/*/#*#
+*/#*#
+#*#
+utils/voxelizer/voxelizer*
