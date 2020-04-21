@@ -103,7 +103,7 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
 
         # Buffers for moments of the hydrodynamic variables.
         cm_bs = 128   # block_size, keep in sync with template
-        self.stat_cm_grid_size = (NX + 2 + cm_bs - 1) / cm_bs
+        self.stat_cm_grid_size = (NX + 2 + cm_bs - 1) // cm_bs
         cm_finalize = lat_nx >= cm_bs and axis != 'x'
         self.cm_finalize = cm_finalize
         for m in range(1, 5):
@@ -112,7 +112,7 @@ class ReynoldsStatsMixIn(FlowStatsMixIn):
 
         # Buffer for correlations of hydrodynamic variables.
         corr_bs = 128    # block_size, keep in sync with template
-        self.stat_corr_grid_size = (NX + 2 + corr_bs - 1) / corr_bs
+        self.stat_corr_grid_size = (NX + 2 + corr_bs - 1) // corr_bs
         corr_finalize = lat_nx >= corr_bs and axis != 'x'
         self.corr_finalize = corr_finalize
         _alloc_stat_buf('ux_uy', self.stat_corr_grid_size, corr_finalize)

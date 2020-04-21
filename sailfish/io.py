@@ -13,6 +13,7 @@ import re
 import ctypes
 import threading
 import time
+
 try:
     from queue import Queue
 except ImportError:
@@ -100,7 +101,8 @@ class VisualizationWrapper(LBOutput):
         self.subdomain = subdomain
         self.nodes = reduce(operator.mul, subdomain.size)
         self._dim = len(self.subdomain.size)
-
+        self._fluid_map = self._output._fluid_map
+        
     def register_field(self, field, name, visualization=False):
         self._output.register_field(field, name, visualization)
 
@@ -109,7 +111,7 @@ class VisualizationWrapper(LBOutput):
 
     def set_fluid_map(self, fluid_map):
         self._output.set_fluid_map(fluid_map)
-
+    
     def verify(self):
         return self._output.verify()
 
@@ -260,8 +262,6 @@ class VTKOutput(LBOutput):
         fname = filename(self.basename, self.digits, self.subdomain_id, i, suffix='.vti')
         from tvtk.api import write_data
         write_data(idata, fname)
-        #w = tvtk.XMLImageDataWriter(input=idata, file_name=fname)
-        #w.write()
 
     # TODO: Implement this function.
     def dump_dists(self, dists, i):
@@ -283,6 +283,7 @@ def SaveWithRename(save, num_subdomains, fname, *args, **kwargs):
     # saved to a shared filesystem.
     pattern_tmp = subdomain_glob(tfname)
     pattern_perm = subdomain_glob(fname)
+
     while len(glob.glob(pattern_tmp)) + len(glob.glob(pattern_perm)) < num_subdomains:
         time.sleep(1)
 
@@ -308,6 +309,7 @@ class NPYOutput(LBOutput):
             self._do_save = np.savez_compressed
         else:
             self._do_save = np.savez
+
         self._queue = None
 
     def _save(self, fname, *args, **kwargs):
@@ -323,6 +325,7 @@ class NPYOutput(LBOutput):
             self._thread.start()
         args = [fname] + list(args)
         self._queue.put((args, kwargs))
+
 
     def save(self, i):
         self.mask_nonfluid_nodes()

@@ -1,7 +1,8 @@
 all: voxelizer voxelizer_octree
 
-CXX=clang++
-CXXFLAGS=-stdlib=libc++ -I/opt/local/include
+CXX=clang++-3.8
+# CXX=clang++
+CXXFLAGS=-stdlib=libstdc++ -I/opt/local/include
 
 GTEST_INCLUDE=-Igtest/include
 GTEST_LIBS=gtest/lib/.libs/libgtest.a gtest/lib/.libs/libgtest_main.a
@@ -16,6 +17,9 @@ voxelizer: voxelizer.cpp
 
 voxelizer_octree: voxelizer_octree.cpp
 	$(CXX) -O3 -DNDEBUG -std=c++11 $(CXXFLAGS) voxelizer_octree.cpp subdomain.cpp -I. -Icvmlcpp -o $@
+
+voxelizer_octree2: voxelizer_octree2.cpp
+	$(CXX) -O3 -DNDEBUG -std=c++11 $(CXXFLAGS) voxelizer_octree2.cpp subdomain.cpp -I. -Icvmlcpp -o $@
 
 subdomain_test: subdomain_test.cpp
 	$(CXX) -std=c++11 $(CXXFLAGS) $(GTEST_INCLUDE) subdomain_test.cpp subdomain.cpp -I. -Icvmlcpp $(GTEST_LIBS) -o $@

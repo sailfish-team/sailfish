@@ -23,6 +23,22 @@
   %endif
 </%def>
 
+<%def name="extended_rel_offset(x, y, z)" filter="trim">
+  %if grid.dim == 2:
+    ${x}+offset[0]+(${y}+offset[1])*${arr_nx}
+  %else:
+    ${x}+offset[0]+ ${arr_nx}*(${y}+offset[1]+${arr_ny}*(${z}+offset[2]))
+  %endif
+</%def>
+
+<%def name="extended_get_odist(dist_out, idir=0, xoff=0, yoff=0, zoff=0, offset=0)" filter="trim">
+  %if node_addressing == 'indirect' :
+    ${dist_out}[nodes[dense_gi + (unsigned int)(${offset} + ${extended_rel_offset(xoff, yoff, zoff)})] + ${dist_size * idir}u]
+  %else:
+    ${dist_out}[gi + (${dist_size * idir}u + (unsigned int)(${offset} + ${extended_rel_offset(xoff, yoff, zoff)}))]
+ %endif
+</%def>
+
 #############################################################################
 ## Code rendering.
 #############################################################################
@@ -41,7 +57,7 @@ ${device_func} inline float interpolate_linear(const float d0, const float d1, c
 // Arguments are:
 //  offset - offset in the global timeseries array (bc_timeseries)
 //  size - size of the current timeseries
-//  step - number LB iterations corresponding to two neighboring data points
+//  step - number LB iations corresponding to two neighboring data points
 //  iteration - current LB iteration number
 ${device_func} inline float timeseries_interpolate(
     const unsigned int offset,
@@ -68,13 +84,14 @@ ${device_func} inline float get_time_from_iteration(unsigned int iteration) {
 %endif  ## time_dependence
 
 ## Renders functions to compute dynamic values.
-%for i, expressions in symbol_idx_map.iteritems():
+%for i, expressions in symbol_idx_map.items():
   ${device_func} inline void time_dep_param_${i}(float *out
-    %if symbol_to_geo_map:                                             
-      , float spatial_array_x, float spatial_array_y  
-      %if dim==3:
-        ,float  spatial_array_z
-      %endif
+      %if symbol_to_geo_map:                                             
+        , float spatial_array_x, float spatial_array_y  
+        %if dim==3:
+          ,float  spatial_array_z
+        %endif
+
     %endif
     ${dynamic_val_args_decl()}) {
     %if time_dependence:
@@ -89,41 +106,69 @@ ${device_func} inline float get_time_from_iteration(unsigned int iteration) {
 // Returns a node parameter which is a vector (in 'out').
 ${device_func} inline void node_param_get_vector(const int idx, float *out
     ${dynamic_val_args_decl()}) {
-  %if (time_dependence or space_dependence) and symbol_idx_map:
+  %if (time_dependence or space_dependence) and symbol_idx_map:     
     if (idx >= ${non_symbolic_idxs}) {
-        ##if both spatial array and sympy expression:
-        %if  symbol_to_geo_map: 
-          %for key, val in symbol_to_geo_map.iteritems():
-            if (idx >= ${min(val)} &&  idx<=${max(val)}){
-               float spatial_array_x = node_params[idx];
-               float spatial_array_y = node_params[idx + 1];
-              %if dim == 3:
-                float spatial_array_z = node_params[idx + 2];  
-                time_dep_param_${key}(out,spatial_array_x,spatial_array_y, spatial_array_z ${dynamic_val_args()});
-                return;
-              %else:
-                time_dep_param_${key}(out,spatial_array_x,spatial_array_y ${dynamic_val_args()});
-                return;
-              %endif  
-            }
-          %endfor
-        %else:
-      switch (idx) {
-        %for key, val in symbol_idx_map.iteritems():
-          %if len(val) == dim:
-            case ${key}:
-              time_dep_param_${key}(out ${dynamic_val_args()});
+
+      ## if both spatial array and sympy expression:
+      %if  symbol_to_geo_map: 
+        if (0) {}
+          %for key, val in symbol_to_geo_map.items():            
+        else if (idx >= ${min(val)} &&  idx<=${max(val)}){
+          float spatial_array_x = node_params[idx];
+          float spatial_array_y = node_params[idx + 1];
+            %if dim == 3:
+              float spatial_array_z = node_params[idx + 2];  
+              time_dep_param_${key}(out,spatial_array_x,spatial_array_y, spatial_array_z ${dynamic_val_args()});
               return;
-          %endif
-        %endfor
-        default:
+            %else:
+              time_dep_param_${key}(out,spatial_array_x,spatial_array_y ${dynamic_val_args()});
+              return;
+            %endif  
+        }  
+          %endfor
+          %if non_sa_symbolic_map:
+        else {
+          switch (idx) {
+            %for key, val in non_sa_symbolic_map.items():
+              %if len(val) == dim:
+                case ${key}:{
+                  %if dim == 3:
+                    time_dep_param_${key}(out,0,0,0 ${dynamic_val_args()});
+                  %else:
+                    time_dep_param_${key}(out,0,0 ${dynamic_val_args()});
+                  %endif
+                  return;
+                  }
+              %endif
+            %endfor
+          default:
           %if gpu_check_invalid_values:
             printf("Invalid vector value (idx=%d)\n", idx);
           %endif
-          die();}
-   %endif 
-   }
-  %endif out[0] = node_params[idx];
+          die();
+          }
+        }
+        %endif
+      %else:
+        switch (idx) {
+          %for key, val in symbol_idx_map.items():
+            %if len(val) == dim:
+              case ${key}:
+                time_dep_param_${key}(out ${dynamic_val_args()});
+                return;
+            %endif
+          %endfor
+          default:
+          %if gpu_check_invalid_values:
+            printf("Invalid vector value (idx=%d)\n", idx);
+          %endif
+
+          die();
+          }
+      %endif     
+    }
+  %endif
+  out[0] = node_params[idx];
   out[1] = node_params[idx + 1];
   %if dim == 3:
     out[2] = node_params[idx + 2];
@@ -467,7 +512,10 @@ ${device_func} inline void getMacro(
 // Uses extrapolation/other schemes to compute missing distributions for some implementations
 // of boundary condtitions.
 ${device_func} inline void fixMissingDistributions(
-    Dist *fi, ${global_ptr} float *dist_in, int ncode, int node_type, int orientation, unsigned int gi,
+    ${nodes_array_if_required()}
+    Dist *fi, ${global_ptr} float *dist_in
+    ${dense_gi_if_required()},
+    int ncode, int node_type, int orientation, unsigned int gi,
     ${kernel_args_1st_moment('iv')}
     ${global_ptr} float *gg0m0
     ${misc_bc_args_decl()}
@@ -477,6 +525,55 @@ ${device_func} inline void fixMissingDistributions(
   ## this way only with the AB access pattern. In the AA access pattern,
   ## their implementation requires a separate kernel call.
   %if access_pattern == 'AB':
+    %if nt.NTExtendedCopy in node_types:
+      else if (isNTExtendedCopy(node_type)) {
+        int node_param_idx = decodeNodeParamIdx(ncode);
+        %if dim == 2:
+          int gx = get_global_id(0);
+          int gy = get_global_id(1);
+        %else:
+          // This is a workaround for the limitations of current CUDA devices.
+          // We would like the grid to be 3 dimensional, but only 2 dimensions
+          // are supported.  We thus encode the first two dimensions (x, y) of
+          // the simulation grid into the x dimension of the CUDA/OpenCL grid
+          // as:
+          //   x_dev = y * num_blocks + x.
+          //
+          // This works fine, as x is relatively small, since:
+          //   x = x_sim / block_size.
+          int gx = get_global_id(0) % ${grid_nx};
+          int gy = get_global_id(0) / ${grid_nx};
+          int gz = get_global_id(1);
+        %endif
+        
+        
+        switch (node_param_idx){
+          %for i, transformation_data in extended_copy_map.items():
+            case ${i}:{  
+              int offset[${grid.dim}];
+              %for k in range(grid.dim):
+                offset[${k}] = (int)(${sym.rotate_pos(grid, transformation_data)[k]});
+              %endfor
+          //    printf("invalid node index detected in sparse coll %d  %d %d (%d, %d, %d) orient %d \n", offset[0], offset[1], offset[2], gx, gy, gz, orientation); 
+              switch (orientation) {
+                %for o in range(1, grid.dim*2+1):
+                  case ${o}: {
+                      %for dist_idx in sym.get_missing_dists(grid, o):
+                     
+                        fi->${grid.idx_name[dist_idx]} = ${extended_get_odist('dist_in', sym.rotate_dist(grid,dist_idx, transformation_data))};
+                      %endfor
+                      break;
+                      }
+              %endfor
+              
+            }
+            break;
+                      }
+          %endfor
+        }
+      }
+      
+    %endif
     %if nt.NTCopy in node_types:
       else if (isNTCopy(node_type)) {
         switch (orientation) {
@@ -628,6 +725,54 @@ ${device_func} inline void postcollisionBoundaryConditions(
       ${_global_mem_fill_missing_dists_with_opposites()}
     }
   %endif
+
+
+%if nt.NTLaminarize in node_types:
+    %if grid.dim == 3 and grid.Q == 13:
+      #error Laminarize  condition unsupported in D3Q13.
+    %endif
+     else if (isNTLaminarize(node_type) ) {
+      float f;
+
+      int node_param_idx = decodeNodeParamIdx(ncode);
+
+
+      float alpha = node_param_get_scalar(node_param_idx ${dynamic_val_args()});
+
+
+
+      switch (orientation-(orientation+1)%2) {      
+      %for o in [1,3,5]:
+        case ${o}: {
+
+
+      %for group in sym.get_sym_groups(grid, o):
+       f = 0.0f;   
+       %for i in group:
+           f += ${float(grid.weights[i]/sum(grid.weights[s_] for s_ in group))} * fi->${grid.idx_name[i]};
+       %endfor
+
+      %for j in group:
+            fi->${grid.idx_name[j]} *= (1.0f - alpha);
+            fi->${grid.idx_name[j]} += alpha*f;
+       %endfor
+     %endfor  
+
+
+          
+          break;
+        }
+      %endfor
+      }
+
+
+
+
+     
+    }
+  %endif
+
+
 }
 
 <%def name="precollision_arguments()" filter="trim">
@@ -712,6 +857,10 @@ ${device_func} inline void precollisionBoundaryConditions(Dist *fi, int ncode,
       }
     }
   %endif
+
+
+
+  
 
   %if access_pattern == 'AA' and nt.NTDoNothing in node_types:
     // Only need to do special processing for the propagate in-place step.

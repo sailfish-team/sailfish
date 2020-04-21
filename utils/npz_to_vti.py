@@ -28,11 +28,17 @@ src_data = np.load(filename)
 
 dt = 1.0 if args.dt == 0.0 else args.dt
 
-max_len = 0
-for field in src_data.files:
-    max_len = max(len(src_data[field].shape), max_len)
+if type(src_data)==np.ndarray:
+    field = src_data
+    max_len = len(src_data.shape)
+    single_field = True
+else:
+    max_len = 0
+    for field in src_data.files:
+        max_len = max(len(src_data[field].shape), max_len)
 
-field = src_data[src_data.files[0]]
+    field = src_data[src_data.files[0]]
+    single_field = False
 shape = None
 origin = [0.0, 0.0, 0.0]
 spacing = [1.0, 1.0, 1.0]
@@ -92,41 +98,56 @@ else:
 
 first = True
 idata = tvtk.ImageData(spacing=spacing, origin=origin)
-# Only process scalar fields.
-for field in src_data.files:
-    if len(src_data[field].shape) == max_len:
-        continue
 
-    if first:
-        idata.point_data.scalars = reorder(src_data[field]).flatten()
-        idata.point_data.scalars.name = field
-        first = False
-    else:
-        t = idata.point_data.add_array(reorder(src_data[field]).flatten())
-        idata.point_data.get_array(t).name = field
+if single_field:
+    #idata.point_data.scalars = reorder(field).flatten()
+    #idata.point_data.scalars.name = "scalar"
+    xxx = reorder(field).flatten()
+    print type(xxx)
+    tmp = idata.point_data.add_array(reorder(field).flatten())
+    idata.point_data.get_array(tmp).name = "scalar"
 
-# Only process vector fields.
-for field in src_data.files:
-    if len(src_data[field].shape) != max_len:
-        continue
 
-    f = src_data[field]
+else:
+    # Only process scalar fields.
+    for field in src_data.files:
+        if len(src_data[field].shape) == max_len:
+            continue
 
-    if dim == 3:
-        tmp = idata.point_data.add_array(np.c_[reorder(f[0]).flatten() * spacing[0]/dt,
-                                               reorder(f[1]).flatten() * spacing[1]/dt,
-                                               reorder(f[2]).flatten() * spacing[2]/dt])
-    else:
-        tmp = idata.point_data.add_array(np.c_[reorder(f[0]).flatten() * spacing[0]/dt,
-                                               reorder(f[1]).flatten() * spacing[1]/dt,
-                                               np.zeros_like(f[0].flatten())])
-    idata.point_data.get_array(tmp).name = field
+        if first:
+            idata.point_data.scalars = reorder(src_data[field]).flatten()
+            idata.point_data.scalars.name = field
+            first = False
+        else:
+            t = idata.point_data.add_array(reorder(src_data[field]).flatten())
+            idata.point_data.get_array(t).name = field
+
+    # Only process vector fields.
+    for field in src_data.files:
+        if len(src_data[field].shape) != max_len:
+            continue
+
+        f = src_data[field]
+
+        if dim == 3:
+            tmp = idata.point_data.add_array(np.c_[reorder(f[0]).flatten() * spacing[0]/dt,
+                                                   reorder(f[1]).flatten() * spacing[1]/dt,
+                                                   reorder(f[2]).flatten() * spacing[2]/dt])
+        else:
+            tmp = idata.point_data.add_array(np.c_[reorder(f[0]).flatten() * spacing[0]/dt,
+                                                   reorder(f[1]).flatten() * spacing[1]/dt,
+                                                   np.zeros_like(f[0].flatten())])
+        idata.point_data.get_array(tmp).name = field
 
 if dim == 3:
     idata.dimensions = list(reversed(shape))
 else:
     idata.dimensions = list(reversed(shape)) + [1]
 
-out_filename = filename.replace('.npz', '.vti')
-w = tvtk.XMLImageDataWriter(input=idata, file_name=out_filename)
-w.write()
+if single_field:
+    out_filename = filename.replace('.npy', '.vti')
+else:
+    out_filename = filename.replace('.npz', '.vti')
+
+from tvtk.api import write_data
+write_data(idata, out_filename)

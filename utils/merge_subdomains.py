@@ -64,6 +64,7 @@ def merge_subdomains(base, digits, it, save=True):
         for field in data.files:
             selector = [slice(None)] * (len(data[field].shape) - dim)
             selector.extend([slice(i0, i1) for i0, i1 in reversed(list(zip(s.location, s.end_location)))])
+            selector = tuple(selector)
             out[field][selector] = data[field]
 
     if save:

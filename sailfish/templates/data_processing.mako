@@ -344,7 +344,7 @@ ${kernel} void Reduce${name}(
 // has to be called to compute the final value.
 <%
   import math
-  real_block_size = (lat_nx + block_size - 1) / block_size
+  real_block_size = (lat_nx + block_size - 1) // block_size
   # Round to the next nearest power of two.
   phys_block_size = int(pow(2, math.ceil(math.log(real_block_size, 2))))
 %>

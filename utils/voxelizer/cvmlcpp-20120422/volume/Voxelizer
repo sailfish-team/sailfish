@@ -1050,7 +1050,7 @@ bool distances(const Geometry<Tg> &geometry,
 		 std::vector<std::pair<int, Td> > > & distances,
 	const voxel_type inside = 1)
 {
-	if (!voxelSize > 0)
+	if (!(voxelSize > 0))
 		return false;
 	distances.clear();
 	
@@ -1220,7 +1220,7 @@ bool distances(const Geometry<Tg>  &geometry,
 	std::map<iPoint3D, std::vector<std::pair<int, Td> > > & distances,
 	const std::size_t pad = 0u, const voxel_type inside = 1)
 {
-	if (!voxelSize > 0)
+	if (!(voxelSize > 0))
 		return false;
 
 	distances.clear();

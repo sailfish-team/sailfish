@@ -6,7 +6,7 @@
 # sc_ and fe_ examples: temporarily blacklisted until a bug in the HalfBB
 #						condition is fixed
 
-blacklist="examples/ldc_2d_unorm.py examples/duct_flow.py examples/ldc_2d_entropic.py examples/binary_fluid/fe_poiseuille_2d.py examples/binary_fluid/fe_capillary_wave_2d.py examples/binary_fluid/sc_poiseuille_2d.py examples/binary_fluid/sc_capillary_wave_2d.py"
+blacklist="examples/ldc_2d_unorm.py examples/duct_flow.py examples/ldc_2d_entropic.py examples/binary_fluid/fe_poiseuille_2d.py examples/binary_fluid/fe_capillary_wave_2d.py examples/binary_fluid/sc_poiseuille_2d.py examples/binary_fluid/sc_capillary_wave_2d.py examples/fs_gaussian.py"
 tmpdir=$(mktemp -d)
 
 # Disable FMAD as it generates spurious differences for Shan-Chen models. This is casued

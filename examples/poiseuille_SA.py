@@ -19,6 +19,9 @@ class PoiseuilleSubdomain(Subdomain2D):
     wall_bc = NTFullBBWall
     velocity_bc = NTEquilibriumVelocity
 
+    pressure_bc = NTEquilibriumDensity
+
+
 
     def boundary_conditions(self, hx, hy):
         land=np.logical_and
@@ -35,6 +38,11 @@ class PoiseuilleSubdomain(Subdomain2D):
         # Add 0.5 to the grid symbols to indicate that the node is located in the
         # middle of the grid cell.
         # The velocity vector direction matches the flow orientation vector.
+
+        where = (hx==self.gx-1) & not_wall
+        self.set_node(where, self.pressure_bc(1.0)) 
+        
+
         if self.config.velocity =="equation":
             vv =  self.max_v * (1.0 -  (S.gy + 0.5 - radius)**2 / radius_sq)* \
                         Piecewise((S.time / 5000, S.time < 5000),(1.0, True))
