@@ -200,8 +200,34 @@ ${kernel} void CollideAndPropagate(
 
     // Macroscopic quantities for the current cell
     float g0m0, v[${dim}];
-    getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
-
+    %if nt.NTChunksVelocityCopy in node_types or nt.NTChunksDensityCopy in node_types:
+    if (false
+        %if nt.NTChunksVelocityCopy in node_types:        
+           || isNTChunksVelocityCopy(type)
+        %endif
+        %if nt.NTChunksDensityCopy in node_types:
+            ||isNTChunksDensityCopy(type)
+        %endif
+         ){
+            int node_param_idx = decodeNodeParamIdx(ncode);
+            int offset[3];
+            extended_node_param_get_vector(node_param_idx, offset);
+            int gx_source = gx + offset[0];
+            int gy_source = gy + offset[1];
+            int gz_source = gz + offset[2];
+            unsigned int gi_source = getGlobalIdx(gx_source, gy_source, gz_source);
+            int ncode_source = map[gi_source];
+            getMacro(&d0, ncode, type, orientation, &g0m0, v, iteration_number, ncode_source);
+        }
+        else{
+        
+            getMacro(&d0, ncode, type, orientation, &g0m0, v, iteration_number,0);
+        }    
+         
+    %else:
+        getMacro(&d0, ncode, type, orientation, &g0m0, v ${dynamic_val_call_args()});
+    %endif
+    
     %if simtype == 'shan-chen':
       ${sc_calculate_force()}
     %endif

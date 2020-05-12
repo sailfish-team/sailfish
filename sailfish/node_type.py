@@ -280,6 +280,8 @@ class NTRegularizedVelocity(LBNodeType):
     def __init__(self, velocity, orientation=None):
         self.params = {'velocity': velocity}
         self.orientation = orientation
+        
+        
 
 ############################################################################
 # Outflow (zero-gradient) nodes.
@@ -335,6 +337,64 @@ class NTExtendedCopy(LBNodeType):
         self.orientation = orientation
         
         
+class NTExtendedCopy(LBNodeType):
+    """Copies distributions from another node.
+
+    This can be used to implement extended periodic 
+    boundary condition."""
+    wet_node = True
+    standard_macro = True
+    needs_orientation = True
+    
+    def __init__(self, transformation=None, orientation=None):
+        assert transformation.shape == (4,4), "Invalid shape of transformation array"
+        self.trans_sympy = ImmutableDenseMatrix(transformation)
+        self.params = {'transformation': self.trans_sympy}
+        self.orientation = orientation
+      
+    
+class NTChunksCopy(LBNodeType):
+    """Copies all distributions from another node.
+
+    This can be used to implement extended periodic 
+    boundary condition."""
+    wet_node = True
+    standard_macro = True
+    needs_orientation = False
+    
+    
+    def __init__(self, offset):
+        self.params = {'offset': offset[::-1]}
+       
+    
+class NTChunksVelocityCopy(LBNodeType):
+    """Copies all distributions from another node.
+
+    This can be used to implement extended periodic 
+    boundary condition."""
+    wet_node = True
+#     standard_macro = True
+    needs_orientation = True
+    
+    
+    def __init__(self, offset, orientation=None):
+        self.params = {'offset': offset[::-1]}    
+        self.orientation = orientation
+    
+class NTChunksDensityCopy(LBNodeType):
+    """Copies all distributions from another node.
+
+    This can be used to implement extended periodic 
+    boundary condition."""
+    wet_node = True
+#     standard_macro = True
+    needs_orientation = True
+    
+    
+    def __init__(self, offset, orientation=None):
+        self.params = {'offset': offset[::-1]}     
+        self.orientation = orientation
+    
 class NTYuOutflow(LBNodeType):
     """Implements the open boundary condition described in:
 

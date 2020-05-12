@@ -239,6 +239,8 @@ class GeoEncoderConst(GeoEncoder):
 
                     self._encoded_param_map[param_map == node_key] = idx
 
+                    
+                    
                 elif isinstance(param, ImmutableDenseMatrix):
                     if param in seen_params:
                         idx = param_to_idx[param]
@@ -251,18 +253,8 @@ class GeoEncoderConst(GeoEncoder):
                     
                     self._encoded_param_map[param_map == node_key] = idx   
 
-                        idxs = nodes_idx[param_data == value]
-                        if idxs.shape[1] == 3:
-                            self._encoded_param_map[idxs[:,0], idxs[:,1],
-                                                    idxs[:,2]] = idx
-                        elif idxs.shape[1] == 2:
-                            self._encoded_param_map[idxs[:,0], idxs[:,1]] = idx
-                        else:
-                            assert False, 'Unsupported dimension: {0}'.format(
-                                    idxs.shape[1])
-                    self._symbol_to_geo_map[symbol_idx]=sym_indexes
-                    
         self._bits_param = bit_len(param_items)
+                
 
         # Maps node type ID to base offset within the scratch space array.
         self._scratch_space_base = {}

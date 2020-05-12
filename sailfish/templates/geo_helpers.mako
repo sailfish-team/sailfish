@@ -26,7 +26,7 @@ typedef struct DistM {
   }
 %endfor
 
-%if (nt.NTEquilibriumVelocity in node_types) or (nt.NTEquilibriumDensity in node_types):
+%if (nt.NTEquilibriumVelocity in node_types) or (nt.NTEquilibriumDensity in node_types) or (nt.NTChunksDensityCopy in node_types) or (nt.NTChunksVelocityCopy in node_types):
 ${device_func} inline bool is_NTEquilibriumNode(unsigned int type) {
   return (false
   %if nt.NTEquilibriumVelocity in node_types:
@@ -34,6 +34,12 @@ ${device_func} inline bool is_NTEquilibriumNode(unsigned int type) {
   %endif
   %if nt.NTEquilibriumDensity in node_types:
     || isNTEquilibriumDensity(type)
+  %endif
+  %if nt.NTChunksDensityCopy in node_types:
+    || isNTChunksDensityCopy(type)
+  %endif
+  %if nt.NTChunksVelocityCopy in node_types:
+    || isNTChunksVelocityCopy(type)
   %endif
   );
 }
