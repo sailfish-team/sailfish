@@ -216,6 +216,9 @@ ${kernel} void CollideAndPropagate(
             int gy_source = gy + offset[1];
             int gz_source = gz + offset[2];
             unsigned int gi_source = getGlobalIdx(gx_source, gy_source, gz_source);
+            %if node_addressing == 'indirect':
+                gi_source = nodes[gi_source];
+            %endif
             int ncode_source = map[gi_source];
             getMacro(&d0, ncode, type, orientation, &g0m0, v, iteration_number, ncode_source);
         }
