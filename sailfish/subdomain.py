@@ -546,7 +546,25 @@ class Subdomain(object):
 
         self._verify_params(where_array, node_type)
         self._type_map_base[where] = node_type.id
-        key = hash((node_type.id, self._hashable_params(node_type.params)))
+    
+        import pickle
+        import hashlib
+        def hash_for_tuple(data):
+            bytez = pickle.dumps(data)
+            hashed = hashlib.md5(bytez)
+            return int(hashed.hexdigest(), 16)//1e20
+        
+       
+        for n_param in node_type.params.values():
+            if type(n_param) is tuple:
+                key = hash_for_tuple((node_type.id, self._hashable_params(node_type.params))) 
+
+                assert key not in self._params.keys() or n_param  in list(node_type.params.values()),\
+                "Hashing error."
+                break   
+        else:
+            key = hash((node_type.id, self._hashable_params(node_type.params)))
+        
         assert np.all(self._param_map_base[where] == 0),\
                 "Overriding previously set nodes is not allowed."
         self._param_map_base[where] = key

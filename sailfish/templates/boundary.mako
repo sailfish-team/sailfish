@@ -91,6 +91,7 @@ ${device_func} inline float get_time_from_iteration(unsigned int iteration) {
         %if dim==3:
           ,float  spatial_array_z
         %endif
+
     %endif
     ${dynamic_val_args_decl()}) {
     %if time_dependence:
@@ -107,6 +108,7 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
     ${dynamic_val_args_decl()}) {
   %if (time_dependence or space_dependence) and symbol_idx_map:     
     if (idx >= ${non_symbolic_idxs}) {
+
       ## if both spatial array and sympy expression:
       %if  symbol_to_geo_map: 
         if (0) {}
@@ -160,6 +162,7 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
           %if gpu_check_invalid_values:
             printf("Invalid vector value (idx=%d)\n", idx);
           %endif
+
           die();
           }
       %endif     
@@ -171,6 +174,18 @@ ${device_func} inline void node_param_get_vector(const int idx, float *out
     out[2] = node_params[idx + 2];
   %endif
 }
+
+%if nt.NTChunksCopy in node_types:
+${device_func} inline void extended_node_param_get_vector(const int idx, int *out) {
+  out[0] = (int)(node_params[idx]);
+  out[1] = (int)(node_params[idx + 1]);
+  %if dim == 3:
+    out[2] = (int)(node_params[idx + 2]);
+  %endif
+}
+%endif
+
+
 
 // Returns a node parameter which is a scalar.
 ${device_func} inline float node_param_get_scalar(const int idx ${dynamic_val_args_decl()}) {
@@ -426,7 +441,22 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
   int node_param_idx = decodeNodeParamIdx(ncode);
   ${_fill_missing_distributions_with_opposite()}
   *rho = ${sym.ex_rho(grid, 'fi', incompressible, minimize_roundoff=config.minimize_roundoff)};
-  float par_rho = node_param_get_scalar(node_param_idx ${dynamic_val_args()});
+  %if nt.NTChunksDensityCopy in node_types: 
+      float par_rho;
+      if (isNTChunksDensityCopy(node_type)){
+            int node_param_idx_source = decodeNodeParamIdx(ncode_source);
+            par_rho = node_param_get_scalar(node_param_idx_source, iteration_number);
+        }
+        else{
+            par_rho = node_param_get_scalar(node_param_idx ${dynamic_val_args()});
+		}
+  %else:
+      float par_rho = node_param_get_scalar(node_param_idx ${dynamic_val_args()});
+  %endif
+  
+  
+  
+  
 
   switch (orientation) {
     %for i in range(1, grid.dim*2+1):
@@ -447,8 +477,18 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
   // distributions.
   ${_fill_missing_distributions_with_opposite()}
   *rho = ${sym.ex_rho(grid, 'fi', incompressible, minimize_roundoff=minimize_roundoff)};
-  node_param_get_vector(node_param_idx, v0 ${dynamic_val_args()});
-
+  
+  %if nt.NTChunksVelocityCopy in node_types: 
+      if (isNTChunksVelocityCopy(node_type)){
+            int node_param_idx_source = decodeNodeParamIdx(ncode_source);
+            node_param_get_vector(node_param_idx_source, v0, iteration_number);
+        }
+        else{
+            node_param_get_vector(node_param_idx, v0, iteration_number);
+		}
+  %else:
+      node_param_get_vector(node_param_idx, v0 ${dynamic_val_args()});
+  %endif
   switch (orientation) {
     %for i in range(1, grid.dim*2+1):
       case ${i}:
@@ -464,13 +504,21 @@ ${device_func} inline void get0thMoment(Dist *fi, int node_type, int orientation
 //
 ${device_func} inline void getMacro(
     Dist *fi, int ncode, int node_type, int orientation, float *rho,
-    float *v0 ${dynamic_val_args_decl()})
+    float *v0 ${dynamic_val_args_decl()}
+    %if nt.NTChunksVelocityCopy in node_types or nt.NTChunksDensityCopy in node_types:
+        , int ncode_source
+    %endif
+    )
 {
   if (NTUsesStandardMacro(node_type) || orientation == ${nt_dir_other}) {
     compute_macro_quant(fi, rho, v0);
   }
   %if nt.NTEquilibriumVelocity in node_types:
-    else if (isNTEquilibriumVelocity(node_type)) {
+    else if (isNTEquilibriumVelocity(node_type)
+    %if nt.NTChunksVelocityCopy in node_types:
+        ||isNTChunksVelocityCopy(node_type)
+    %endif
+    ) {
       ${_macro_velocity_bc_common()}
     }
   %endif
@@ -493,7 +541,12 @@ ${device_func} inline void getMacro(
     }
   %endif
   %if nt.NTEquilibriumDensity in node_types:
-    else if (isNTEquilibriumDensity(node_type)) {
+    else if (isNTEquilibriumDensity(node_type)
+    %if nt.NTChunksDensityCopy in node_types:
+        ||isNTChunksDensityCopy(node_type)
+    %endif
+    
+    ) {
       ${_macro_density_bc_common()}
       *rho = par_rho ${'-1.0f' if config.minimize_roundoff else ''};
     }
@@ -523,7 +576,7 @@ ${device_func} inline void fixMissingDistributions(
   ## their implementation requires a separate kernel call.
   %if access_pattern == 'AB':
     %if nt.NTExtendedCopy in node_types:
-      else if (isNTExtendedCopy(node_type)) {
+       else if (isNTExtendedCopy(node_type)) {
         int node_param_idx = decodeNodeParamIdx(ncode);
         %if dim == 2:
           int gx = get_global_id(0);
@@ -551,7 +604,7 @@ ${device_func} inline void fixMissingDistributions(
               %for k in range(grid.dim):
                 offset[${k}] = (int)(${sym.rotate_pos(grid, transformation_data)[k]});
               %endfor
-          //    printf("invalid node index detected in sparse coll %d  %d %d (%d, %d, %d) orient %d \n", offset[0], offset[1], offset[2], gx, gy, gz, orientation); 
+              
               switch (orientation) {
                 %for o in range(1, grid.dim*2+1):
                   case ${o}: {
@@ -571,6 +624,28 @@ ${device_func} inline void fixMissingDistributions(
       }
       
     %endif
+    
+    %if nt.NTChunksCopy in node_types or nt.NTChunksVelocityCopy in node_types or nt.NTChunksDensityCopy in node_types:
+      else if (false 
+      %if nt.NTChunksVelocityCopy in node_types:
+          || isNTChunksVelocityCopy (node_type)
+      %endif
+      %if nt.NTChunksDensityCopy in node_types:
+          || isNTChunksDensityCopy (node_type)
+      %endif
+      %if nt.NTChunksCopy in node_types:
+         || isNTChunksCopy(node_type)
+      %endif    
+         ) {
+          int node_param_idx = decodeNodeParamIdx(ncode);
+	       int offset[${grid.dim}];
+           extended_node_param_get_vector(node_param_idx, offset);
+           %for dist_idx, vec in enumerate(grid.basis):
+               fi->${grid.idx_name[dist_idx]} = ${extended_get_odist('dist_in', dist_idx)};
+           %endfor
+      }
+    %endif
+    
     %if nt.NTCopy in node_types:
       else if (isNTCopy(node_type)) {
         switch (orientation) {
@@ -623,7 +698,7 @@ ${device_func} inline void fixMissingDistributions(
     %endif
   ## access_pattern == AA
   %else:
-    %if nt.NTYuOutflow in node_types or nt.NTGradFreeflow in node_types or nt.NTCopy in node_types:
+    %if nt.NTYuOutflow in node_types or nt.NTGradFreeflow in node_types or nt.NTCopy in node_types or nt.NTExtendedCopy in node_types or nt.NTChunksCopy in node_types:
       #error NTYuOutflow, NTGradFreeflow and NTCopy are not supported with the AA access_pattern.
     %endif
   %endif

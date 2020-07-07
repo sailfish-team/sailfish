@@ -12,6 +12,8 @@ from sympy import Symbol, ImmutableDenseMatrix
 from sympy.core import expr
 from sailfish.util import is_number
 
+from sailfish.util import is_number
+
 ScratchSize = namedtuple('ScratchSize', ('dim2', 'dim3'))
 
 
@@ -278,6 +280,8 @@ class NTRegularizedVelocity(LBNodeType):
     def __init__(self, velocity, orientation=None):
         self.params = {'velocity': velocity}
         self.orientation = orientation
+        
+        
 
 ############################################################################
 # Outflow (zero-gradient) nodes.
@@ -333,6 +337,64 @@ class NTExtendedCopy(LBNodeType):
         self.orientation = orientation
         
         
+class NTExtendedCopy(LBNodeType):
+    """Copies distributions from another node.
+
+    This can be used to implement extended periodic 
+    boundary condition."""
+    wet_node = True
+    standard_macro = True
+    needs_orientation = True
+    
+    def __init__(self, transformation=None, orientation=None):
+        assert transformation.shape == (4,4), "Invalid shape of transformation array"
+        self.trans_sympy = ImmutableDenseMatrix(transformation)
+        self.params = {'transformation': self.trans_sympy}
+        self.orientation = orientation
+      
+    
+class NTChunksCopy(LBNodeType):
+    """Copies all distributions from another node.
+
+    This can be used to implement extended periodic 
+    boundary condition."""
+    wet_node = True
+    standard_macro = True
+    needs_orientation = False
+    
+    
+    def __init__(self, offset):
+        self.params = {'offset': offset[::-1]}
+       
+    
+class NTChunksVelocityCopy(LBNodeType):
+    """Copies all distributions from another node.
+
+    This can be used to implement extended periodic 
+    boundary condition."""
+    wet_node = True
+#     standard_macro = True
+    needs_orientation = True
+    
+    
+    def __init__(self, offset, orientation=None):
+        self.params = {'offset': offset[::-1]}    
+        self.orientation = orientation
+    
+class NTChunksDensityCopy(LBNodeType):
+    """Copies all distributions from another node.
+
+    This can be used to implement extended periodic 
+    boundary condition."""
+    wet_node = True
+#     standard_macro = True
+    needs_orientation = True
+    
+    
+    def __init__(self, offset, orientation=None):
+        self.params = {'offset': offset[::-1]}     
+        self.orientation = orientation
+    
 class NTYuOutflow(LBNodeType):
     """Implements the open boundary condition described in:
 
@@ -479,7 +541,6 @@ class DynamicValue(object):
         self.data=None
         if self.need_mf:
             self.data=self._get_structured_array(params)
-            
         self.params = params
 
     def __hash__(self):
@@ -536,7 +597,9 @@ class DynamicValue(object):
             for arg in param.args:
                 if isinstance(arg, SpatialArray):
                     return True
-        return False
+
+        return False 
+
     
     def _get_structured_array(self, params):
         """Returns a structured numpy array with spatial data"""
@@ -566,7 +629,6 @@ class DynamicValue(object):
             else:
                 data+=(1.0,)         
         return multifield(data, where)
-                    
 
 
 class LinearlyInterpolatedTimeSeries(Symbol):
@@ -624,6 +686,7 @@ class LinearlyInterpolatedTimeSeries(Symbol):
         """Returns a hash of the underying data series."""
         return hashlib.sha1(self._data).digest()
 
+
 class SpatialArray(Symbol):
     """A spatial-dependent scalar data source."""
 
@@ -667,6 +730,6 @@ class SpatialArray(Symbol):
     def data_hash(self):
         """Returns a hash of the underying data series."""
         return hashlib.sha1(self._data).digest()
-    
+
 # Maps node type IDs to their classes.
 _NODE_TYPES = __init_node_type_list()

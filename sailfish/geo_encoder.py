@@ -154,6 +154,7 @@ class GeoEncoderConst(GeoEncoder):
         self._symbol_map = {}  # Maps param indices to sympy expressions.
         self._symbol_to_geo_map = {}    #Maps array indices 
                                         #to one sympy expression
+
         self._non_sa_symbolic_map = {}
         self._extended_copy_map = {}
         
@@ -237,6 +238,9 @@ class GeoEncoderConst(GeoEncoder):
                                 self._timeseries_data.extend(ts._data)
 
                     self._encoded_param_map[param_map == node_key] = idx
+
+                    
+                    
                 elif isinstance(param, ImmutableDenseMatrix):
                     if param in seen_params:
                         idx = param_to_idx[param]
@@ -250,6 +254,7 @@ class GeoEncoderConst(GeoEncoder):
                     self._encoded_param_map[param_map == node_key] = idx   
 
         self._bits_param = bit_len(param_items)
+                
 
         # Maps node type ID to base offset within the scratch space array.
         self._scratch_space_base = {}
@@ -353,8 +358,10 @@ class GeoEncoderConst(GeoEncoder):
             'node_params': self._geo_params,
             'symbol_idx_map': self._symbol_map,
             'symbol_to_geo_map': self._symbol_to_geo_map,
+
             'non_sa_symbolic_map':self._non_sa_symbolic_map,           
             'extended_copy_map': self._extended_copy_map,
+
             'timeseries_data': self._timeseries_data,
             'non_symbolic_idxs': self._non_symbolic_idxs,
             'scratch_space': self.scratch_space_size > 0,
