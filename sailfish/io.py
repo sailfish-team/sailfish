@@ -344,7 +344,8 @@ class NPYOutput(LBOutput):
         np.save(fname, node_type_map)
 
     def wait(self):
-        self._queue.join()
+        if self._queue is not None:
+            self._queue.join()
 
 
 class MatlabOutput(LBOutput):
