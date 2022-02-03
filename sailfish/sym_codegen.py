@@ -8,7 +8,7 @@ try:
 except ImportError:
     from sympy.core import basic
     NegativeOne = basic.S.NegativeOne
-from sympy.printing.ccode import C99CodePrinter
+from sympy.printing.c import C99CodePrinter
 from sympy.printing.precedence import precedence
 from sympy import Symbol, Poly
 
