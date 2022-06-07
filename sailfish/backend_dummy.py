@@ -49,6 +49,12 @@ class DummyBackend(object):
     def from_buf_async(self, *args):
         pass
 
+    def get_texture(self, prog, texture_name):
+        pass
+
+    def get_surface(self, prog, surface_name):
+        pass
+
     def get_defines(self):
         return {
             'warp_size': 32,

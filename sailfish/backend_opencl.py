@@ -207,6 +207,12 @@ class OpenCLBackend(object):
                 arguments=', '.join(arguments))
         return lambda : kernel(*arrays).get()
 
+    def get_surface(self, name):
+        raise NotImplementedError()
+
+    def get_texture(self, name):
+        raise NotImplementedError()
+
     def sync(self):
         self.default_queue.finish()
 

@@ -190,6 +190,12 @@ class CUDABackend(object):
     def from_buf_async(self, cl_buf, stream=None):
         cuda.memcpy_dtoh_async(self.buffers[cl_buf], cl_buf, stream)
 
+    def get_texture(self, prog, texture_name):
+        return prog.get_texref(texture_name)
+
+    def get_surface(self, prog, surface_name):
+        return prog.get_surfref(surface_name)
+
     def build(self, source):
         if self.options.cuda_nvcc_opts:
             import shlex
